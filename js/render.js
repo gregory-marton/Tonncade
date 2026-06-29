@@ -87,6 +87,12 @@ const Render = {
                 if (options.isPuzzle && !Board.isInBounds(p, q)) {
                     opacity = 0.2;
                 }
+                if (options.isGravity) {
+                    const col = p + Math.floor(q / 2);
+                    if (q < 0 || q >= 15 || col < -5 || col > 4) {
+                        continue;
+                    }
+                }
 
                 const hex = this.createHex(p, q, {
                     fill: fill,

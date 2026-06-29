@@ -14,8 +14,12 @@ const Board = {
     radius: 5,
     cells: new Map(), // Key: "p,q", Value: { type, color }
     
-    // Check if a cell is within the radius 5 hexagon
+    // Check if a cell is within the active game bounds
     isInBounds: function(p, q) {
+        if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
+            const col = p + Math.floor(q / 2);
+            return q >= 0 && q <= 20 && col >= -5 && col <= 4;
+        }
         return Math.abs(p) <= this.radius && 
                Math.abs(q) <= this.radius && 
                Math.abs(p + q) <= this.radius;
@@ -43,6 +47,27 @@ const Board = {
      */
     findFullLines: function() {
         const fullLines = [];
+
+        if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
+            // Find completed horizontal rows in the cup (q: 0 to 14)
+            for (let q = 0; q < 15; q++) {
+                const line = [];
+                let complete = true;
+                for (let col = -5; col <= 4; col++) {
+                    const p = col - Math.floor(q / 2);
+                    if (this.cells.has(`${p},${q}`)) {
+                        line.push({ p, q });
+                    } else {
+                        complete = false;
+                        break;
+                    }
+                }
+                if (complete) {
+                    fullLines.push(line);
+                }
+            }
+            return fullLines;
+        }
 
         // 1. f-axis (Fifths): Horizontal (fixed q, p varies)
         for (let q = -this.radius; q <= this.radius; q++) {

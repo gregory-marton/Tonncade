@@ -44,12 +44,11 @@ const Synth = {
         osc.stop(startTime + dur + 0.05);
     },
 
-    playChord: function(midis, rolled = true) {
+    playChord: function(midis, rolled = true, peak = 0.16, dur = 1.2) {
         this.init();
-        const t = 0;
         midis.forEach((m, i) => {
             const delay = rolled ? i * 0.06 : 0;
-            this.playNote(m, delay, 1.2);
+            this.playNote(m, delay, dur, peak);
         });
     }
 };

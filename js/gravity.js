@@ -1,0 +1,400 @@
+/**
+ * gravity.js - Controller for Gravity Mode (falling Tetris with slide physics).
+ */
+
+const GravityMode = {
+    state: {
+        nextQueue: [],
+        linesCleared: 0,
+        isGameOver: false,
+        activePiece: null, // Piece type key ('I', 'O', etc.)
+        p: 0,
+        q: 20,
+        rotation: 0,
+        dropInterval: 1000, // ms
+        timer: null
+    },
+
+    init: function() {
+        this.reset();
+        this.setupEvents();
+    },
+
+    reset: function() {
+        Board.cells.clear();
+        this.state.linesCleared = 0;
+        this.state.isGameOver = false;
+        this.state.dropInterval = 1000;
+        this.state.nextQueue = [this.randomPiece(), this.randomPiece(), this.randomPiece()];
+        
+        if (this.state.timer) {
+            clearInterval(this.state.timer);
+        }
+        
+        this.spawnPiece();
+        this.startTimer();
+        this.refreshUI();
+    },
+
+    randomPiece: function() {
+        const keys = Object.keys(Pieces.TYPES);
+        return keys[Math.floor(Math.random() * keys.length)];
+    },
+
+    spawnPiece: function() {
+        this.state.activePiece = this.state.nextQueue.shift();
+        this.state.nextQueue.push(this.randomPiece());
+        
+        // Spawn at height 20 (q = 20), centered column index (col = 0)
+        // Since col = p + floor(q/2) => 0 = p + 10 => p = -10
+        this.state.p = -10;
+        this.state.q = 20;
+        this.state.rotation = 0;
+
+        // Check if spawn position is blocked
+        if (!Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, this.state.rotation)) {
+            this.state.isGameOver = true;
+            if (this.state.timer) clearInterval(this.state.timer);
+            setTimeout(() => alert("Game Over! Lines cleared: " + this.state.linesCleared), 100);
+        } else {
+            this.playActivePieceSound(0.08, 0.4); // soft sound on spawn
+        }
+    },
+
+    startTimer: function() {
+        if (this.state.timer) clearInterval(this.state.timer);
+        this.state.timer = setInterval(() => this.tick(), this.state.dropInterval);
+    },
+
+    updateSpeed: function() {
+        // Decrease drop interval by 50ms per cleared line, min 100ms
+        this.state.dropInterval = Math.max(100, 1000 - this.state.linesCleared * 50);
+        this.startTimer();
+    },
+
+    tick: function() {
+        if (this.state.isGameOver) return;
+
+        const down = this.getDown(this.state.p, this.state.q);
+        if (Board.checkPlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+            this.state.p = down.p;
+            this.state.q = down.q;
+            this.playActivePieceSound(0.06, 0.3); // very soft/short tick sound
+            this.refreshUI();
+        } else {
+            this.lockActivePiece();
+        }
+    },
+
+    lockActivePiece: function() {
+        const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
+        Board.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
+
+        // Solid placement chord
+        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+        Synth.playChord(midis, true, 0.16, 1.2);
+
+        // 1. Settle blocks (slide cascade)
+        this.settleBlocks();
+
+        // 2. Clear lines and settle again if cleared
+        this.processClears();
+
+        if (!this.state.isGameOver) {
+            this.spawnPiece();
+            this.refreshUI();
+        }
+    },
+
+    processClears: function() {
+        let lines = Board.findFullLines();
+        let clearedCount = 0;
+        
+        while (lines.length > 0) {
+            const allNotes = [];
+            lines.forEach(line => {
+                line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
+                Board.clearCells(line);
+                this.state.linesCleared++;
+                clearedCount++;
+            });
+
+            // Flourish sound
+            Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5);
+
+            // Settle falling blocks into gaps
+            this.settleBlocks();
+
+            // Check if settling completed new lines
+            lines = Board.findFullLines();
+        }
+
+        if (clearedCount > 0) {
+            this.updateSpeed();
+        }
+    },
+
+    getDown: function(p, q) {
+        if (q % 2 !== 0) {
+            return { p: p, q: q - 1 };
+        } else {
+            return { p: p + 1, q: q - 1 };
+        }
+    },
+
+    settleBlocks: function() {
+        let moved = true;
+        let limit = 100;
+        while (moved && limit > 0) {
+            moved = false;
+            limit--;
+            // Check bottom-up
+            for (let q = 1; q <= 20; q++) {
+                for (let col = -5; col <= 4; col++) {
+                    const p = col - Math.floor(q / 2);
+                    const key = `${p},${q}`;
+                    if (Board.cells.has(key)) {
+                        const cellVal = Board.cells.get(key);
+
+                        const dl = { p: p, q: q - 1 };
+                        const dr = { p: p + 1, q: q - 1 };
+
+                        const dlEmpty = Board.isCellEmpty(dl.p, dl.q);
+                        const drEmpty = Board.isCellEmpty(dr.p, dr.q);
+
+                        if (dlEmpty && drEmpty) {
+                            const down = this.getDown(p, q);
+                            if (Board.isCellEmpty(down.p, down.q)) {
+                                Board.cells.delete(key);
+                                Board.cells.set(`${down.p},${down.q}`, cellVal);
+                                moved = true;
+                            }
+                        } else if (dlEmpty && !drEmpty) {
+                            // Slide down-left
+                            Board.cells.delete(key);
+                            Board.cells.set(`${dl.p},${dl.q}`, cellVal);
+                            moved = true;
+                        } else if (!dlEmpty && drEmpty) {
+                            // Slide down-right
+                            Board.cells.delete(key);
+                            Board.cells.set(`${dr.p},${dr.q}`, cellVal);
+                            moved = true;
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    hardDrop: function() {
+        let current = { p: this.state.p, q: this.state.q };
+        let next = this.getDown(current.p, current.q);
+        
+        while (Board.checkPlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
+            current = next;
+            next = this.getDown(current.p, current.q);
+        }
+        
+        this.state.p = current.p;
+        this.state.q = current.q;
+        this.lockActivePiece();
+    },
+
+    playActivePieceSound: function(peak = 0.1, dur = 0.8) {
+        if (!this.state.activePiece) return;
+        const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
+        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+        Synth.playChord(midis, true, peak, dur);
+    },
+
+    refreshUI: function() {
+        this.renderNextQueue();
+        this.refreshBoard();
+
+        const linesEl = document.getElementById('lines-count');
+        if (linesEl) linesEl.textContent = this.state.linesCleared;
+    },
+
+    renderNextQueue: function() {
+        const list = document.getElementById('piece-list');
+        if (!list) return;
+
+        list.innerHTML = '<h3>Next Pieces</h3>';
+        this.state.nextQueue.forEach((key) => {
+            const piece = Pieces.TYPES[key];
+            const div = document.createElement('div');
+            div.className = 'piece-item next-item';
+            div.innerHTML = `
+                <svg class="piece-preview"></svg>
+                <div class="piece-name">${piece.name}</div>
+            `;
+            list.appendChild(div);
+
+            const svg = div.querySelector('.piece-preview');
+            const positions = piece.cells.map(c => Render.getScreenPos(c.p, c.q));
+            const minX = Math.min(...positions.map(pos => pos.x));
+            const maxX = Math.max(...positions.map(pos => pos.x));
+            const minY = Math.min(...positions.map(pos => pos.y));
+            const maxY = Math.max(...positions.map(pos => pos.y));
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const padding = 40;
+            const size = Math.max(maxX - minX, maxY - minY) + padding * 2;
+            svg.setAttribute('viewBox', `${centerX - size/2} ${centerY - size/2} ${size} ${size}`);
+
+            piece.cells.forEach(c => {
+                const hex = Render.createHex(c.p, c.q, {
+                    fill: piece.color,
+                    stroke: 'white',
+                    strokeWidth: 2
+                });
+                svg.appendChild(hex);
+            });
+        });
+    },
+
+    refreshBoard: function() {
+        // Draw 10-wide, 15-high cup background
+        const viewport = { minP: -15, maxP: 15, minQ: -2, maxQ: 21 };
+        Render.drawLattice(viewport, { isGravity: true });
+
+        // Render settled cells from Board
+        Board.cells.forEach((val, key) => {
+            const [p, q] = key.split(',').map(Number);
+            // Only draw if within bounds (don't draw top hidden cells if they somehow stuck)
+            if (q < 15) {
+                const hex = Render.createHex(p, q, {
+                    fill: val.color,
+                    stroke: 'white',
+                    strokeWidth: 2,
+                    className: 'placed-piece',
+                    data: { p, q }
+                });
+                Render.svg.appendChild(hex);
+            }
+        });
+
+        // Render active falling piece
+        if (this.state.activePiece && !this.state.isGameOver) {
+            const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
+            const color = Pieces.TYPES[this.state.activePiece].color;
+            cells.forEach(c => {
+                if (c.q < 15) { // crop drawing to cup height
+                    const hex = Render.createHex(c.p, c.q, {
+                        fill: color,
+                        stroke: 'white',
+                        strokeWidth: 2,
+                        className: 'active-piece'
+                    });
+                    Render.svg.appendChild(hex);
+                }
+            });
+
+            // Draw active piece labels
+            cells.forEach(c => {
+                if (c.q < 15) {
+                    const midi = Tonnetz.getMidi(c.p, c.q);
+                    if (midi >= 0 && midi <= 127) {
+                        const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
+                        Render.svg.appendChild(label);
+                    }
+                }
+            });
+
+            // Render ghost projection
+            this.updateGhost();
+        }
+
+        // Center viewBox on the cup and spawn area
+        Render.updateView(-330, -960, 1.2);
+    },
+
+    updateGhost: function() {
+        if (!this.state.activePiece || this.state.isGameOver) return;
+        
+        let ghostQ = this.state.q;
+        let ghostP = this.state.p;
+        let next = this.getDown(ghostP, ghostQ);
+        
+        while (Board.checkPlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
+            ghostP = next.p;
+            ghostQ = next.q;
+            next = this.getDown(ghostP, ghostQ);
+        }
+
+        const cells = Pieces.getAbsoluteCells(this.state.activePiece, ghostP, ghostQ, this.state.rotation);
+        const color = Pieces.TYPES[this.state.activePiece].color;
+        
+        cells.forEach(c => {
+            if (c.q < 15) {
+                const hex = Render.createHex(c.p, c.q, {
+                    fill: color,
+                    className: 'ghost'
+                });
+                hex.style.pointerEvents = 'none';
+                Render.svg.appendChild(hex);
+            }
+        });
+    },
+
+    setupEvents: function() {
+        window.onkeydown = (e) => {
+            if (this.state.isGameOver) return;
+
+            const key = e.key.toLowerCase();
+            
+            // 1. Move Left/Right/Soft-drop
+            if (key === 'f' || e.key === 'ArrowLeft') {
+                if (Board.checkPlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
+                    this.state.p -= 1;
+                    this.playActivePieceSound(0.06, 0.3);
+                    this.refreshUI();
+                }
+            } else if (key === 'h' || e.key === 'ArrowRight') {
+                if (Board.checkPlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
+                    this.state.p += 1;
+                    this.playActivePieceSound(0.06, 0.3);
+                    this.refreshUI();
+                }
+            } else if (key === 'v' || key === 's' || e.key === 'ArrowDown') {
+                const down = this.getDown(this.state.p, this.state.q);
+                if (Board.checkPlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+                    this.state.p = down.p;
+                    this.state.q = down.q;
+                    this.playActivePieceSound(0.06, 0.3);
+                    this.refreshUI();
+                }
+            }
+            
+            // 2. Rotate (Space, ArrowUp, or g)
+            if (e.code === 'Space') {
+                e.preventDefault();
+                let nextRot = e.shiftKey ? (this.state.rotation + 5) % 6 : (this.state.rotation + 1) % 6;
+                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                    this.state.rotation = nextRot;
+                    this.playActivePieceSound(0.08, 0.4);
+                    this.refreshUI();
+                }
+            } else if (key === 'g' && !e.shiftKey || e.key === 'ArrowUp') {
+                let nextRot = (this.state.rotation + 1) % 6;
+                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                    this.state.rotation = nextRot;
+                    this.playActivePieceSound(0.08, 0.4);
+                    this.refreshUI();
+                }
+            } else if (e.key === 'ArrowLeft' && e.shiftKey) { // fallback
+                let nextRot = (this.state.rotation + 5) % 6;
+                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                    this.state.rotation = nextRot;
+                    this.playActivePieceSound(0.08, 0.4);
+                    this.refreshUI();
+                }
+            }
+
+            // 3. Action (Shift-G to place / hard drop)
+            if (key === 'g' && e.shiftKey) {
+                this.hardDrop();
+            }
+        };
+    }
+};

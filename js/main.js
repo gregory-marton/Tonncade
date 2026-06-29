@@ -25,14 +25,26 @@ const App = {
         window.onmousemove = null;
         Render.svg.onmousedown = null;
 
+        if (typeof GravityMode !== 'undefined' && GravityMode.state.timer) {
+            clearInterval(GravityMode.state.timer);
+        }
+
         if (this.currentMode === 'chop') {
             this.currentMode = 'puzzle';
             badge.textContent = 'PUZZLE MODE';
-            toggleBtn.textContent = 'Switch to Chop Mode';
+            toggleBtn.textContent = 'Switch to Gravity Mode';
             stats.style.display = 'block';
             chopCtrls.style.display = 'none';
             clickAction.textContent = 'Place Piece';
             PuzzleMode.init();
+        } else if (this.currentMode === 'puzzle') {
+            this.currentMode = 'gravity';
+            badge.textContent = 'GRAVITY MODE';
+            toggleBtn.textContent = 'Switch to Chop Mode';
+            stats.style.display = 'block';
+            chopCtrls.style.display = 'none';
+            clickAction.textContent = 'Drop Piece';
+            GravityMode.init();
         } else {
             this.currentMode = 'chop';
             badge.textContent = 'CHOP MODE';
