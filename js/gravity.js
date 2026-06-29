@@ -77,8 +77,8 @@ const GravityMode = {
         this.state.q = 20;
         this.state.rotation = 0;
 
-        // Check if spawn position is blocked
-        if (!Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, this.state.rotation)) {
+        // Check if spawn position is blocked (using active placement with wider bounds)
+        if (!Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, this.state.rotation)) {
             this.state.isGameOver = true;
             if (this.state.timer) clearInterval(this.state.timer);
             setTimeout(() => alert("Game Over! Lines cleared: " + this.state.linesCleared), 100);
@@ -102,7 +102,7 @@ const GravityMode = {
         if (this.state.isGameOver || this.state.isPaused) return;
 
         const down = this.getDown(this.state.p, this.state.q);
-        if (Board.checkPlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+        if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
             this.state.p = down.p;
             this.state.q = down.q;
             this.playActivePieceSound(0.06, 0.3); // very soft/short tick sound
@@ -216,7 +216,7 @@ const GravityMode = {
         let current = { p: this.state.p, q: this.state.q };
         let next = this.getDown(current.p, current.q);
         
-        while (Board.checkPlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
+        while (Board.checkActivePlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
             current = next;
             next = this.getDown(current.p, current.q);
         }
@@ -339,7 +339,7 @@ const GravityMode = {
         let ghostP = this.state.p;
         let next = this.getDown(ghostP, ghostQ);
         
-        while (Board.checkPlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
+        while (Board.checkActivePlacement(this.state.activePiece, next.p, next.q, this.state.rotation)) {
             ghostP = next.p;
             ghostQ = next.q;
             next = this.getDown(ghostP, ghostQ);
@@ -370,55 +370,61 @@ const GravityMode = {
 
             if (this.state.isPaused || this.state.isGameOver) return;
             
-            // 1. Move Left/Right/Soft-drop
+            // Prevent default browser scrolling actions on game controls
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key) || e.code === 'Space') {
+                e.preventDefault();
+            }
+
+            // 1. Move Left/Right (allows half-step columns [-6, 5])
             if (key === 'f' || e.key === 'ArrowLeft') {
-                if (Board.checkPlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
+                if (Board.checkActivePlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
                     this.state.p -= 1;
                     this.playActivePieceSound(0.06, 0.3);
                     this.refreshUI();
                 }
             } else if (key === 'h' || e.key === 'ArrowRight') {
-                if (Board.checkPlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
+                if (Board.checkActivePlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
                     this.state.p += 1;
                     this.playActivePieceSound(0.06, 0.3);
                     this.refreshUI();
                 }
-            } else if (key === 'v' || key === 's' || e.key === 'ArrowDown') {
+            } else if (key === 'v' || key === 's') { // Soft drop key option
                 const down = this.getDown(this.state.p, this.state.q);
-                if (Board.checkPlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+                if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
                     this.state.p = down.p;
                     this.state.q = down.q;
                     this.playActivePieceSound(0.06, 0.3);
                     this.refreshUI();
                 }
+            } else if (e.key === 'ArrowDown') { // Down arrow hard drops
+                this.hardDrop();
             }
             
             // 2. Rotate (Space, ArrowUp, or g)
             if (e.code === 'Space') {
-                e.preventDefault();
                 let nextRot = e.shiftKey ? (this.state.rotation + 5) % 6 : (this.state.rotation + 1) % 6;
-                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
                     this.state.rotation = nextRot;
                     this.playActivePieceSound(0.08, 0.4);
                     this.refreshUI();
                 }
             } else if (key === 'g' && !e.shiftKey || e.key === 'ArrowUp') {
                 let nextRot = (this.state.rotation + 1) % 6;
-                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
                     this.state.rotation = nextRot;
                     this.playActivePieceSound(0.08, 0.4);
                     this.refreshUI();
                 }
             } else if (e.key === 'ArrowLeft' && e.shiftKey) { // CCW fallback
                 let nextRot = (this.state.rotation + 5) % 6;
-                if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
                     this.state.rotation = nextRot;
                     this.playActivePieceSound(0.08, 0.4);
                     this.refreshUI();
                 }
             }
 
-            // 3. Action (Shift-G to place / hard drop)
+            // 3. Action (Shift-G also hard drops)
             if (key === 'g' && e.shiftKey) {
                 this.hardDrop();
             }

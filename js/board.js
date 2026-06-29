@@ -126,9 +126,23 @@ const Board = {
     },
 
     checkGameOver: function(nextPieceType) {
-        // Brute force check every cell and rotation
         const rotations = [0, 1, 2, 3, 4, 5];
         
+        if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
+            for (let q = 0; q <= 20; q++) {
+                for (let col = -6; col <= 5; col++) {
+                    const p = col - Math.floor(q / 2);
+                    for (const rot of rotations) {
+                        if (this.checkActivePlacement(nextPieceType, p, q, rot)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Puzzle Mode default check
         for (let p = -this.radius; p <= this.radius; p++) {
             for (let q = -this.radius; q <= this.radius; q++) {
                 if (!this.isInBounds(p, q)) continue;
@@ -147,6 +161,15 @@ const Board = {
     checkPlacement: function(type, p, q, rotation) {
         const cells = Pieces.getAbsoluteCells(type, p, q, rotation);
         return cells.every(c => this.isCellEmpty(c.p, c.q));
+    },
+
+    checkActivePlacement: function(type, p, q, rotation) {
+        const cells = Pieces.getAbsoluteCells(type, p, q, rotation);
+        return cells.every(c => {
+            const col = c.p + Math.floor(c.q / 2);
+            const inBounds = c.q >= 0 && col >= -6 && col <= 5;
+            return inBounds && !this.cells.has(`${c.p},${c.q}`);
+        });
     }
 };
 

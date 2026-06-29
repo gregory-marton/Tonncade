@@ -111,6 +111,10 @@ const PuzzleMode = {
         window.onkeydown = (e) => {
             if (this.state.isGameOver) return;
             
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key) || e.code === 'Space') {
+                e.preventDefault();
+            }
+
             const key = e.key.toLowerCase();
 
             // 1. Navigation (ftyhbv cluster)
