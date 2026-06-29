@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tonnetz Tetris — what is a "cell"?</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 28px 24px 60px;
+    background: #14161c; color: #e7e9ee;
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #9aa0ad; margin: 0 0 24px; max-width: 820px; }
+  .panel {
+    background: #1c1f28; border: 1px solid #2a2e3a; border-radius: 14px;
+    padding: 18px 20px 22px; margin: 0 0 22px; max-width: 860px;
+  }
+  .panel h2 { font-size: 17px; margin: 0 0 2px; }
+  .panel .tag { display:inline-block; font-size:12px; font-weight:600; letter-spacing:.04em;
+    text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px; }
+  .tag.note { background:#1f3a3a; color:#7fe0d0; }
+  .tag.triad { background:#3a2a1f; color:#f0b97f; }
+  .desc { color:#9aa0ad; margin:0 0 14px; }
+  svg { display:block; width:100%; height:auto; touch-action: manipulation; }
+  .controls { margin-top:12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  button {
+    font: inherit; font-weight:600; color:#14161c; background:#7fe0d0;
+    border:0; border-radius:9px; padding:9px 16px; cursor:pointer;
+  }
+  button.warm { background:#f0b97f; }
+  button:active { transform: translateY(1px); }
+  .readout { color:#c7ccd6; font-variant-numeric: tabular-nums; }
+  circle.node { cursor:pointer; }
+  polygon.tri { cursor:pointer; }
+  .hint { color:#6c7280; font-size:13px; margin-top:8px; }
+  .footer { color:#9aa0ad; max-width:860px; }
+  code { background:#262a35; padding:2px 6px; border-radius:5px; }
+</style>
+</head>
+<body>
+  <h1>Tonnetz Tetris — the one decision to make first</h1>
+  <p class="sub">Same Tonnetz lattice in both panels. The question is just: <b>what does one Tetris cell represent?</b>
+     Click around to hear it, then hit “Play the sample piece.” Sound starts on your first click (browser rule).</p>
+
+  <div class="panel">
+    <span class="tag note">Option A</span>
+    <h2>A cell is a <b>note</b> (a node)</h2>
+    <p class="desc">Closest to traditional Tetris: one block = one note. A 4-cell piece sounds 4 notes together —
+       a tetrachord / cluster. The highlighted piece is a “T”: three fifths in a row plus a third.</p>
+    <svg id="svgA"></svg>
+    <div class="controls">
+      <button id="playA">▶ Play the sample piece</button>
+      <span class="readout" id="readA">click a note…</span>
+    </div>
+    <p class="hint">Tip: notes rise in pitch as you move up/right — this is the real “Harmonic Table” layout.</p>
+  </div>
+
+  <div class="panel">
+    <span class="tag triad">Option B</span>
+    <h2>A cell is a <b>chord</b> (a triangle)</h2>
+    <p class="desc">Most uniquely Tonnetz: every little triangle is a major or minor triad, and neighbors share notes.
+       A 4-cell piece is 4 chords that flow into each other — a tiny progression. The highlighted piece is a
+       4-triangle strip; you’ll hear it strummed chord-by-chord.</p>
+    <svg id="svgB"></svg>
+    <div class="controls">
+      <button id="playB" class="warm">▶ Play the sample piece</button>
+      <span class="readout" id="readB">click a triangle…</span>
+    </div>
+    <p class="hint">Up-triangles are major, down-triangles are minor. Three triangles meeting at a node = the three triads containing that note.</p>
+  </div>
+
+  <p class="footer">Once you’ve heard both: which feels like the Tetris <i>you</i> want to play —
+     placing <b>notes</b> (A) or placing <b>chords</b> (B)? Tell me in the terminal. (We can also mix later;
+     this is just about the core grid.)</p>
+
+<script>
+// ---------- music / audio ----------
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+let ctx, master;
+function audio() {
+  if (ctx) return;
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = 0.9;
+  const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600;
+  master.connect(lp); lp.connect(ctx.destination);
+}
+function playMidi(midi, t0, dur, peak=0.16) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'triangle';
+  o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(peak, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0006, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function midiName(m){ return NOTE_NAMES[((m%12)+12)%12]; }
+
+// ---------- lattice ----------
+// node (p,q): pitch = 60 + 7*(p-2) + 4*(q-1).  +7 = perfect fifth (→ right), +4 = major third (→ up-right)
+const COLS = 6, ROWS = 4;            // p:0..5, q:0..3
+const W = 92, H = 80, R = 17, M = 34;
+function midiAt(p,q){ return 60 + 7*(p-2) + 4*(q-1); }
+function pos(p,q){
+  return { x: M + p*W + q*(W/2), y: M + (ROWS-1 - q)*H };
+}
+const SVG_W = M*2 + (COLS-1)*W + (ROWS-1)*(W/2);
+const SVG_H = M*2 + (ROWS-1)*H;
+
+const NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs){ const e=document.createElementNS(NS,name);
+  for(const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+
+// highlighted sample pieces
+const notePiece = new Set(['2,1','3,1','4,1','3,2']);          // a "T" of nodes
+const triadPiece = new Set(['U,2,1','D,2,1','U,3,1','D,3,1']); // a 4-triangle strip
+
+function triVerts(type,p,q){
+  return type==='U'
+    ? [[p,q],[p+1,q],[p,q+1]]
+    : [[p+1,q],[p,q+1],[p+1,q+1]];
+}
+function inRange(p,q){ return p>=0 && p<COLS && q>=0 && q<ROWS; }
+
+function flash(node){
+  node.setAttribute('data-flash','1');
+  const orig = node.getAttribute('data-fill');
+  node.setAttribute('fill', node.getAttribute('data-flashfill'));
+  setTimeout(()=>{ node.setAttribute('fill', orig); }, 260);
+}
+
+function draw(svgId, mode, readout){
+  const svg = document.getElementById(svgId);
+  svg.setAttribute('viewBox', `0 0 ${SVG_W} ${SVG_H}`);
+  svg.innerHTML = '';
+
+  // triangles
+  for(let p=0;p<COLS;p++) for(let q=0;q<ROWS;q++) for(const type of ['U','D']){
+    const vs = triVerts(type,p,q);
+    if(!vs.every(([a,b])=>inRange(a,b))) continue;
+    const pts = vs.map(([a,b])=>{const o=pos(a,b);return `${o.x},${o.y}`;}).join(' ');
+    const major = (type==='U');
+    const hot = triadPiece.has(`${type},${p},${q}`);
+    let fill, flashfill;
+    if(mode==='triad'){
+      fill = hot ? (major?'#5a3a1f':'#4a2f22') : (major?'#23252f':'#1d1f28');
+      flashfill = major? '#f0b97f' : '#e6a070';
+    } else { // note mode: faint context
+      fill = major?'#1b1d25':'#181a21'; flashfill = fill;
+    }
+    const tri = el('polygon', { points: pts, fill, stroke:'#2c3140', 'stroke-width':1.2,
+      'data-fill':fill, 'data-flashfill':flashfill });
+    if(mode==='triad'){
+      tri.setAttribute('class','tri');
+      if(hot){ tri.setAttribute('stroke','#f0b97f'); tri.setAttribute('stroke-width',2.4); }
+      const midis = vs.map(([a,b])=>midiAt(a,b));
+      tri.addEventListener('click', ()=>{
+        audio(); const t=ctx.currentTime;
+        midis.forEach(m=>playMidi(m,t,0.7));
+        flash(tri);
+        readout.textContent = (major?'Major: ':'Minor: ') + midis.map(midiName).join(' – ');
+      });
+    }
+    svg.appendChild(tri);
+  }
+
+  // nodes
+  for(let p=0;p<COLS;p++) for(let q=0;q<ROWS;q++){
+    const o = pos(p,q), m = midiAt(p,q);
+    const hot = notePiece.has(`${p},${q}`);
+    let r, fill, flashfill;
+    if(mode==='note'){
+      r = R; fill = hot ? '#1f5a50' : '#2b3140'; flashfill = '#7fe0d0';
+    } else { // triad mode: small reference dots
+      r = 7; fill = '#3a4150'; flashfill = '#3a4150';
+    }
+    const c = el('circle', { cx:o.x, cy:o.y, r, fill, stroke:'#0e1014', 'stroke-width':1.5,
+      'data-fill':fill, 'data-flashfill':flashfill });
+    if(mode==='note'){
+      c.setAttribute('class','node');
+      if(hot){ c.setAttribute('stroke','#7fe0d0'); c.setAttribute('stroke-width',2.6); }
+      c.addEventListener('click', ()=>{
+        audio(); playMidi(m, ctx.currentTime, 0.8); flash(c);
+        readout.textContent = `${midiName(m)}  (note)`;
+      });
+    }
+    svg.appendChild(c);
+    if(mode==='note'){
+      const t = el('text', { x:o.x, y:o.y+4, 'text-anchor':'middle',
+        'font-size':13, 'font-weight':700, fill:'#e7e9ee', 'pointer-events':'none' });
+      t.textContent = midiName(m); svg.appendChild(t);
+    }
+  }
+}
+
+const readA = document.getElementById('readA');
+const readB = document.getElementById('readB');
+draw('svgA','note', readA);
+draw('svgB','triad', readB);
+
+// play sample pieces
+document.getElementById('playA').addEventListener('click', ()=>{
+  audio(); const t = ctx.currentTime;
+  const midis = [...notePiece].map(s=>{const[p,q]=s.split(',').map(Number);return midiAt(p,q);});
+  // quick roll, then let them ring together
+  midis.forEach((m,i)=>playMidi(m, t + i*0.06, 1.1));
+  readA.textContent = 'Piece: ' + midis.map(midiName).join(' + ');
+});
+document.getElementById('playB').addEventListener('click', ()=>{
+  audio(); const t = ctx.currentTime;
+  const order = ['U,2,1','D,2,1','U,3,1','D,3,1'];
+  order.forEach((key,i)=>{
+    const [type,p,q] = [key.split(',')[0], +key.split(',')[1], +key.split(',')[2]];
+    const midis = triVerts(type,p,q).map(([a,b])=>midiAt(a,b));
+    const tt = t + i*0.32;
+    midis.forEach(m=>playMidi(m, tt, 0.6));
+  });
+  readB.textContent = 'Piece: 4 chords strummed in sequence';
+});
+</script>
+</body>
+</html>

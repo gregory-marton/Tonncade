@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tonnetz Tetris</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="sidebar">
+            <h1 id="game-title">Tonnetz Tetris</h1>
+            <div id="mode-badge" class="mode-tag">CHOP MODE</div>
+            
+            <div id="puzzle-stats" style="display: none;">
+                <p>Lines: <span id="lines-count">0</span></p>
+            </div>
+
+            <div id="palette">
+                <div id="piece-list"></div>
+            </div>
+
+            <div id="controls">
+                <div id="mode-controls">
+                    <button id="toggle-mode">Switch to Puzzle Mode</button>
+                </div>
+                <p><strong>F T Y H B V</strong>: Move</p>
+                <p><strong>Space / G / Arrows</strong>: Rotate (Shift-Space: CCW)</p>
+                <p><strong>Shift-G / Click</strong>: <span id="click-action">Place/Pick up</span></p>
+                <p id="chop-controls"><strong>Letters</strong>: Select Piece</p>
+            </div>
+        </div>
+        <div id="game-container">
+            <svg id="tonnetz-svg"></svg>
+        </div>
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="js/tonnetz.js"></script>
+    <script src="js/synth.js"></script>
+    <script src="js/pieces.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/chop.js"></script>
+    <script src="js/puzzle.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

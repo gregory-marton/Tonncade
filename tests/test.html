@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tonnetz Tetris - Unit Tests</title>
+    <style>
+        body { font-family: monospace; background: #14161c; color: #e7e9ee; padding: 20px; }
+        .pass { color: #7fe0d0; }
+        .fail { color: #f0b97f; font-weight: bold; }
+        .group { margin-bottom: 20px; border-left: 2px solid #2a2e3a; padding-left: 15px; }
+    </style>
+</head>
+<body>
+    <h1>Lattice Math Tests</h1>
+    <div id="results"></div>
+
+    <script src="../js/tonnetz.js"></script>
+    <script src="../js/pieces.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        function log(msg, type = '') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = msg;
+            results.appendChild(div);
+        }
+
+        function assert(condition, message) {
+            if (condition) {
+                log('✓ ' + message, 'pass');
+                return true;
+            } else {
+                log('✗ ' + message, 'fail');
+                return false;
+            }
+        }
+
+        // Test Tonnetz Math
+        log('Testing Tonnetz.js...', 'group');
+        
+        // C4 at (0,0)
+        assert(Tonnetz.getMidi(0, 0) === 60, "Origin (0,0) should be MIDI 60 (C4)");
+        assert(Tonnetz.getNoteName(60) === 'C', "MIDI 60 should be 'C'");
+        
+        // Fifths axis
+        assert(Tonnetz.getMidi(1, 0) === 67, "(1,0) should be G4 (+7)");
+        assert(Tonnetz.getNoteName(67) === 'G', "MIDI 67 should be 'G'");
+        
+        // Major Thirds axis
+        assert(Tonnetz.getMidi(0, 1) === 64, "(0,1) should be E4 (+4)");
+        assert(Tonnetz.getNoteName(64) === 'E', "MIDI 64 should be 'E'");
+        
+        // Minor Thirds axis (resultant)
+        const min3 = Tonnetz.getMidi(-1, 1);
+        assert(min3 === 63, "(-1,1) should be Eb4 (+3)");
+        assert(Tonnetz.getNoteName(63) === 'D#', "MIDI 63 should be 'D#' (Eb)");
+
+        // Octaves
+        assert(Tonnetz.getOctave(60) === 4, "MIDI 60 is Octave 4");
+        assert(Tonnetz.getOctave(24) === 1, "MIDI 24 is Octave 1");
+
+        // Bounds
+        assert(Tonnetz.isValid(0, 0) === true, "(0,0) is valid");
+        assert(Tonnetz.isValid(100, 100) === false, "(100,100) is out of MIDI range");
+
+        // Test Pieces
+        log('Testing Pieces.js...', 'group');
+        
+        const bar = Pieces.TYPES['I'].cells;
+        assert(bar.length === 4, "Bar piece should have 4 cells");
+        
+        // Rotate Bar
+        const barRotated = Pieces.rotate(bar);
+        assert(barRotated[1].p === 0 && barRotated[1].q === 1, "Rotation: (1,0) should become (0,1)");
+        
+        const midisOrig = bar.map(c => Tonnetz.getMidi(c.p, c.q));
+        const midisRot = barRotated.map(c => Tonnetz.getMidi(c.p, c.q));
+        
+        assert(midisOrig[1] - midisOrig[0] === 7, "Original Bar is fifths (+7)");
+        assert(midisRot[1] - midisRot[0] === 4, "Rotated Bar is major thirds (+4)");
+        
+        const barRotated2 = Pieces.rotate(barRotated);
+        const midisRot2 = barRotated2.map(c => Tonnetz.getMidi(c.p, c.q));
+        assert(midisRot2[1] - midisRot2[0] === 3, "Double Rotated Bar is minor thirds (+3)");
+
+        log('Lattice math and piece tests complete.');
+    </script>
+</body>
+</html>

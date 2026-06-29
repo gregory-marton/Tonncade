@@ -1,0 +1,174 @@
+:root {
+    --bg: #14161c;
+    --panel: #1c1f28;
+    --border: #2a2e3a;
+    --text: #e7e9ee;
+    --dim: #9aa0ad;
+    --accent: #7fe0d0;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+#app {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#sidebar {
+    width: 300px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+h1 { font-size: 20px; margin: 0 0 4px; }
+.mode-tag {
+    font-size: 11px;
+    font-weight: bold;
+    color: var(--accent);
+    background: #1f3a3a;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 20px;
+}
+
+#palette {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+#piece-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.piece-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.piece-item:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.piece-item.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(127, 224, 208, 0.3);
+    background: #232731;
+}
+
+.piece-preview {
+    width: 100%;
+    height: 60px;
+    margin-bottom: 4px;
+}
+
+.piece-name {
+    font-size: 12px;
+    color: var(--dim);
+}
+
+#controls {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--dim);
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+
+#game-container {
+    flex-grow: 1;
+    position: relative;
+    cursor: crosshair;
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+.cell {
+    transition: fill 0.1s;
+}
+
+.cell:hover {
+    fill: #2a2e3a;
+}
+
+.note-label {
+    fill: var(--text);
+    font-size: 11px;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
+}
+
+.ghost {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.placed-piece {
+    stroke-width: 2px;
+}
+
+#mode-controls {
+    margin-bottom: 15px;
+}
+
+button {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+#puzzle-stats {
+    background: var(--panel);
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+#puzzle-stats p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.next-item {
+    border-color: var(--border);
+    cursor: default;
+}
+
+.next-item:hover {
+    transform: none;
+}

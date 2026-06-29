@@ -1,0 +1,130 @@
+/**
+ * board.js - State management for the bounded Puzzle board.
+ * 
+ * Radius 5 Hexagon (11 cells across at widest point).
+ * Coordinates are axial (p, q).
+ * 
+ * Axes (user defined):
+ * - f (Fifths): Horizontal (p increases, q constant)
+ * - m (Minor Thirds): SW to NE (p constant, q increases)
+ * - t (Major Thirds): NW to SE (p increases, q decreases)
+ */
+
+const Board = {
+    radius: 5,
+    cells: new Map(), // Key: "p,q", Value: { type, color }
+    
+    // Check if a cell is within the radius 5 hexagon
+    isInBounds: function(p, q) {
+        return Math.abs(p) <= this.radius && 
+               Math.abs(q) <= this.radius && 
+               Math.abs(p + q) <= this.radius;
+    },
+
+    isCellEmpty: function(p, q) {
+        return this.isInBounds(p, q) && !this.cells.has(`${p},${q}`);
+    },
+
+    fillCells: function(pieceCells, type, color) {
+        pieceCells.forEach(c => {
+            this.cells.set(`${c.p},${c.q}`, { type, color });
+        });
+    },
+
+    clearCells: function(pieceCells) {
+        pieceCells.forEach(c => {
+            this.cells.delete(`${c.p},${c.q}`);
+        });
+    },
+
+    /**
+     * Detection logic for the three axes (f, m, t).
+     * A line is a straight sequence from one boundary to the other.
+     */
+    findFullLines: function() {
+        const fullLines = [];
+
+        // 1. f-axis (Fifths): Horizontal (fixed q, p varies)
+        for (let q = -this.radius; q <= this.radius; q++) {
+            const line = [];
+            // Calculate valid p range for this q in the hexagon
+            const minP = Math.max(-this.radius, -this.radius - q);
+            const maxP = Math.min(this.radius, this.radius - q);
+            
+            for (let p = minP; p <= maxP; p++) {
+                if (this.cells.has(`${p},${q}`)) {
+                    line.push({p, q});
+                } else {
+                    line.length = 0; // Break if gap
+                    break;
+                }
+            }
+            if (line.length > 0) fullLines.push(line);
+        }
+
+        // 2. m-axis (Minor Thirds): SW to NE (fixed p, q varies)
+        for (let p = -this.radius; p <= this.radius; p++) {
+            const line = [];
+            const minQ = Math.max(-this.radius, -this.radius - p);
+            const maxQ = Math.min(this.radius, this.radius - p);
+            
+            for (let q = minQ; q <= maxQ; q++) {
+                if (this.cells.has(`${p},${q}`)) {
+                    line.push({p, q});
+                } else {
+                    line.length = 0;
+                    break;
+                }
+            }
+            if (line.length > 0) fullLines.push(line);
+        }
+
+        // 3. t-axis (Major Thirds): NW to SE (p + q = constant)
+        for (let s = -this.radius; s <= this.radius; s++) {
+            const line = [];
+            // For a constant s = p + q
+            for (let p = -this.radius; p <= this.radius; p++) {
+                const q = s - p;
+                if (this.isInBounds(p, q)) {
+                    if (this.cells.has(`${p},${q}`)) {
+                        line.push({p, q});
+                    } else {
+                        line.length = 0;
+                        break;
+                    }
+                }
+            }
+            if (line.length > 0) fullLines.push(line);
+        }
+
+        return fullLines;
+    },
+
+    checkGameOver: function(nextPieceType) {
+        // Brute force check every cell and rotation
+        const rotations = [0, 1, 2, 3, 4, 5];
+        
+        for (let p = -this.radius; p <= this.radius; p++) {
+            for (let q = -this.radius; q <= this.radius; q++) {
+                if (!this.isInBounds(p, q)) continue;
+                
+                for (const rot of rotations) {
+                    const cells = Pieces.getAbsoluteCells(nextPieceType, p, q, rot);
+                    if (cells.every(c => this.isCellEmpty(c.p, c.q))) {
+                        return false; // Still a valid move
+                    }
+                }
+            }
+        }
+        return true; // No moves left
+    },
+
+    checkPlacement: function(type, p, q, rotation) {
+        const cells = Pieces.getAbsoluteCells(type, p, q, rotation);
+        return cells.every(c => this.isCellEmpty(c.p, c.q));
+    }
+};
+
+if (typeof module !== 'undefined') {
+    module.exports = Board;
+}
