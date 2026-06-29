@@ -18,7 +18,7 @@ const Board = {
     isInBounds: function(p, q) {
         if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
             const col = p + Math.floor(q / 2);
-            return q >= 0 && q <= 20 && col >= -5 && col <= 4;
+            return q >= 0 && col >= -5 && col <= 4;
         }
         return Math.abs(p) <= this.radius && 
                Math.abs(q) <= this.radius && 
