@@ -46,18 +46,21 @@ const App = {
         if (mode === 'chop') {
             badge.textContent = 'CHOP MODE';
             stats.style.display = 'none';
+            document.getElementById('gravity-controls').style.display = 'none';
             chopCtrls.style.display = 'block';
             clickAction.textContent = 'Place/Pick up';
             ChopMode.init();
         } else if (mode === 'puzzle') {
             badge.textContent = 'PUZZLE MODE';
             stats.style.display = 'block';
+            document.getElementById('gravity-controls').style.display = 'none';
             chopCtrls.style.display = 'none';
             clickAction.textContent = 'Place Piece';
             PuzzleMode.init();
         } else if (mode === 'gravity') {
             badge.textContent = 'GRAVITY MODE';
-            stats.style.display = 'block';
+            stats.style.display = 'none';
+            document.getElementById('gravity-controls').style.display = 'block';
             chopCtrls.style.display = 'none';
             clickAction.textContent = 'Drop Piece';
             GravityMode.init();

@@ -7,6 +7,7 @@ const GravityMode = {
         nextQueue: [],
         linesCleared: 0,
         isGameOver: false,
+        isPaused: false,
         activePiece: null, // Piece type key ('I', 'O', etc.)
         p: 0,
         q: 20,
@@ -16,6 +17,12 @@ const GravityMode = {
     },
 
     init: function() {
+        const pauseBtn = document.getElementById('gravity-start-pause');
+        const resetBtn = document.getElementById('gravity-reset');
+        
+        if (pauseBtn) pauseBtn.onclick = () => this.togglePause();
+        if (resetBtn) resetBtn.onclick = () => this.reset();
+
         this.reset();
         this.setupEvents();
     },
@@ -24,9 +31,13 @@ const GravityMode = {
         Board.cells.clear();
         this.state.linesCleared = 0;
         this.state.isGameOver = false;
+        this.state.isPaused = false;
         this.state.dropInterval = 1000;
         this.state.nextQueue = [this.randomPiece(), this.randomPiece(), this.randomPiece()];
         
+        const pauseBtn = document.getElementById('gravity-start-pause');
+        if (pauseBtn) pauseBtn.textContent = 'Pause';
+
         if (this.state.timer) {
             clearInterval(this.state.timer);
         }
@@ -34,6 +45,21 @@ const GravityMode = {
         this.spawnPiece();
         this.startTimer();
         this.refreshUI();
+    },
+
+    togglePause: function() {
+        if (this.state.isGameOver) return;
+        
+        const pauseBtn = document.getElementById('gravity-start-pause');
+        if (this.state.isPaused) {
+            this.state.isPaused = false;
+            if (pauseBtn) pauseBtn.textContent = 'Pause';
+            this.startTimer();
+        } else {
+            this.state.isPaused = true;
+            if (pauseBtn) pauseBtn.textContent = 'Resume';
+            if (this.state.timer) clearInterval(this.state.timer);
+        }
     },
 
     randomPiece: function() {
@@ -73,7 +99,7 @@ const GravityMode = {
     },
 
     tick: function() {
-        if (this.state.isGameOver) return;
+        if (this.state.isGameOver || this.state.isPaused) return;
 
         const down = this.getDown(this.state.p, this.state.q);
         if (Board.checkPlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
@@ -211,8 +237,10 @@ const GravityMode = {
         this.renderNextQueue();
         this.refreshBoard();
 
-        const linesEl = document.getElementById('lines-count');
+        const linesEl = document.getElementById('gravity-lines-count');
         if (linesEl) linesEl.textContent = this.state.linesCleared;
+        const speedEl = document.getElementById('gravity-speed-level');
+        if (speedEl) speedEl.textContent = (1000 / this.state.dropInterval).toFixed(1) + 'x';
     },
 
     renderNextQueue: function() {
@@ -261,7 +289,6 @@ const GravityMode = {
         // Render settled cells from Board
         Board.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
-            // Only draw if within bounds (don't draw top hidden cells if they somehow stuck)
             if (q < 15) {
                 const hex = Render.createHex(p, q, {
                     fill: val.color,
@@ -274,30 +301,26 @@ const GravityMode = {
             }
         });
 
-        // Render active falling piece
+        // Render active falling piece (above-cup cells visible)
         if (this.state.activePiece && !this.state.isGameOver) {
             const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
             const color = Pieces.TYPES[this.state.activePiece].color;
             cells.forEach(c => {
-                if (c.q < 15) { // crop drawing to cup height
-                    const hex = Render.createHex(c.p, c.q, {
-                        fill: color,
-                        stroke: 'white',
-                        strokeWidth: 2,
-                        className: 'active-piece'
-                    });
-                    Render.svg.appendChild(hex);
-                }
+                const hex = Render.createHex(c.p, c.q, {
+                    fill: color,
+                    stroke: 'white',
+                    strokeWidth: 2,
+                    className: 'active-piece'
+                });
+                Render.svg.appendChild(hex);
             });
 
             // Draw active piece labels
             cells.forEach(c => {
-                if (c.q < 15) {
-                    const midi = Tonnetz.getMidi(c.p, c.q);
-                    if (midi >= 0 && midi <= 127) {
-                        const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
-                        Render.svg.appendChild(label);
-                    }
+                const midi = Tonnetz.getMidi(c.p, c.q);
+                if (midi >= 0 && midi <= 127) {
+                    const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
+                    Render.svg.appendChild(label);
                 }
             });
 
@@ -306,7 +329,7 @@ const GravityMode = {
         }
 
         // Center viewBox on the cup and spawn area
-        Render.updateView(-330, -960, 1.2);
+        Render.updateView(-720, -980, 1.8);
     },
 
     updateGhost: function() {
@@ -326,22 +349,26 @@ const GravityMode = {
         const color = Pieces.TYPES[this.state.activePiece].color;
         
         cells.forEach(c => {
-            if (c.q < 15) {
-                const hex = Render.createHex(c.p, c.q, {
-                    fill: color,
-                    className: 'ghost'
-                });
-                hex.style.pointerEvents = 'none';
-                Render.svg.appendChild(hex);
-            }
+            const hex = Render.createHex(c.p, c.q, {
+                fill: color,
+                className: 'ghost'
+            });
+            hex.style.pointerEvents = 'none';
+            Render.svg.appendChild(hex);
         });
     },
 
     setupEvents: function() {
         window.onkeydown = (e) => {
-            if (this.state.isGameOver) return;
-
             const key = e.key.toLowerCase();
+            
+            // Allow toggling pause with 'p' key
+            if (key === 'p') {
+                this.togglePause();
+                return;
+            }
+
+            if (this.state.isPaused || this.state.isGameOver) return;
             
             // 1. Move Left/Right/Soft-drop
             if (key === 'f' || e.key === 'ArrowLeft') {
@@ -382,7 +409,7 @@ const GravityMode = {
                     this.playActivePieceSound(0.08, 0.4);
                     this.refreshUI();
                 }
-            } else if (e.key === 'ArrowLeft' && e.shiftKey) { // fallback
+            } else if (e.key === 'ArrowLeft' && e.shiftKey) { // CCW fallback
                 let nextRot = (this.state.rotation + 5) % 6;
                 if (Board.checkPlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
                     this.state.rotation = nextRot;

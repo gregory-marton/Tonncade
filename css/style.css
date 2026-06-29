@@ -215,3 +215,35 @@ button:hover {
 .next-item:hover {
     transform: none;
 }
+
+#gravity-controls {
+    margin-bottom: 20px;
+}
+
+.control-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.control-buttons button {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.stats-panel {
+    background: var(--panel);
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.stats-panel p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.stats-panel p:not(:last-child) {
+    margin-bottom: 8px;
+}
