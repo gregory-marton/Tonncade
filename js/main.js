@@ -306,7 +306,7 @@ const App = {
 
             const cachedSha = sessionStorage.getItem('tonntris_commit_sha');
             const cachedParentSha = sessionStorage.getItem('tonntris_parent_sha') || '';
-            if (cachedSha) {
+            if (cachedSha && cachedParentSha) {
                 const currentSha = localVer.replace('git-', '');
                 if (currentSha !== cachedSha && currentSha !== cachedParentSha) {
                     el.textContent = `${localVer} (update available: git-${cachedSha})`;
