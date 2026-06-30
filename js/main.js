@@ -148,6 +148,8 @@ const App = {
         let startAngle = 0;
         let lastAngle = 0;
         let isGesture = false;
+        let lastTapCell = null;
+        let lastTouchCell = null;
 
         const getAngle = (t1, t2) => {
             return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
@@ -170,9 +172,55 @@ const App = {
                 isGesture = false;
                 const cell = getCellFromTouch(e.touches[0]);
                 if (cell) {
+                    lastTouchCell = cell;
                     const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
-                    modeObj.state.hoverCell = cell;
-                    modeObj.updateGhost();
+                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
+
+                    // If a piece is active, prevent default simulated mouse events to block unwanted panning
+                    if (pieceType) {
+                        e.preventDefault();
+                    }
+
+                    // Check for instant pick up in Chop Mode
+                    let isPickup = false;
+                    if (this.currentMode === 'chop') {
+                        isPickup = ChopMode.state.placedPieces.some(piece => {
+                            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+                            return cells.some(c => c.p === cell.p && c.q === cell.q);
+                        });
+                    }
+
+                    if (isPickup || !pieceType) {
+                        // Instant action for notes and picking up pieces
+                        modeObj.state.hoverCell = cell;
+                        if (this.currentMode === 'chop') {
+                            ChopMode.handleAction(cell.p, cell.q);
+                        } else {
+                            const midi = Tonnetz.getMidi(cell.p, cell.q);
+                            Synth.playNote(midi);
+                        }
+                        lastTapCell = null;
+                    } else {
+                        // Regular placement flow (preview on first tap, place on second)
+                        const isSameCell = lastTapCell && lastTapCell.p === cell.p && lastTapCell.q === cell.q;
+                        modeObj.state.hoverCell = cell;
+                        modeObj.updateGhost();
+
+                        if (isSameCell) {
+                            if (this.currentMode === 'chop') {
+                                if (ChopMode.canPlace(ChopMode.state.selectedPiece, cell.p, cell.q, ChopMode.state.rotation)) {
+                                    ChopMode.placePiece(cell.p, cell.q);
+                                }
+                            } else {
+                                if (Board.checkPlacement(PuzzleMode.state.activePiece, cell.p, cell.q, PuzzleMode.state.rotation)) {
+                                    PuzzleMode.placePiece(cell.p, cell.q);
+                                }
+                            }
+                            lastTapCell = null; // Clear tap
+                        } else {
+                            lastTapCell = cell;
+                        }
+                    }
                 }
             } else if (e.touches.length === 2) {
                 isGesture = true;
@@ -188,13 +236,16 @@ const App = {
             if (e.touches.length === 1 && !isGesture) {
                 const cell = getCellFromTouch(e.touches[0]);
                 if (cell) {
+                    lastTouchCell = cell;
                     const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
+                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
 
                     // Disable standard page panning/scrolling while dragging an active piece
                     if (this.currentMode === 'puzzle' || (this.currentMode === 'chop' && ChopMode.state.selectedPiece)) {
                         e.preventDefault();
                         modeObj.state.hoverCell = cell;
                         modeObj.updateGhost();
+                        lastTapCell = cell; // Align double-tap coordinates to latest dragged cell
                     }
                 }
             } else if (e.touches.length === 2) {
