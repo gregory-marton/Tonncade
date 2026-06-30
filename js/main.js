@@ -291,7 +291,20 @@ window.onload = () => {
     // Register Service Worker for PWA compatibility
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker registered:', reg.scope))
+            .then(reg => {
+                console.log('Service Worker registered:', reg.scope);
+                // Force-check for updates on server to bypass cache
+                reg.update().catch(err => console.warn('Service worker update check failed:', err));
+            })
             .catch(err => console.error('Service Worker registration failed:', err));
+
+        // Auto-reload the app immediately when a new service worker finishes activation
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
+        });
     }
 };
