@@ -17,12 +17,34 @@ body {
 
 #app {
     display: flex;
+    flex-direction: column;
     width: 100vw;
     height: 100vh;
 }
 
+#top-header {
+    height: 60px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    box-sizing: border-box;
+    z-index: 15;
+}
+
+#main-content {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    height: calc(100vh - 60px);
+    width: 100%;
+}
+
 #sidebar {
     width: 300px;
+    height: 100%;
     background: var(--panel);
     border-right: 1px solid var(--border);
     display: flex;
@@ -32,7 +54,7 @@ body {
     z-index: 10;
 }
 
-h1 { font-size: 20px; margin: 0 0 4px; }
+h1 { font-size: 20px; margin: 0; }
 .mode-tag {
     font-size: 11px;
     font-weight: bold;
@@ -133,7 +155,7 @@ svg {
 }
 
 #mode-controls {
-    margin-bottom: 20px;
+    margin-bottom: 0;
 }
 
 /* Mode Slider Segmented Control */
@@ -146,6 +168,7 @@ svg {
     padding: 2px;
     cursor: pointer;
     user-select: none;
+    width: 240px;
 }
 
 .mode-option {
@@ -246,4 +269,108 @@ button:hover {
 
 .stats-panel p:not(:last-child) {
     margin-bottom: 8px;
+}
+
+/* Mobile virtual controller buttons styling */
+#mobile-controls {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.mobile-control-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.m-btn {
+    flex: 1;
+    height: 44px;
+    background: #2a2e3a;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.m-btn:active {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+.m-btn.long {
+    background: var(--accent);
+    color: var(--bg);
+}
+
+/* Responsive UI: Stacks side-by-side components on mobile portrait */
+@media (orientation: portrait) {
+    #main-content {
+        flex-direction: column;
+    }
+
+    #sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 12px 15px;
+    }
+
+    #game-container {
+        height: 0;
+        flex-grow: 1;
+    }
+
+    #top-header {
+        padding: 0 15px;
+        height: 50px;
+    }
+
+    #main-content {
+        height: calc(100vh - 50px);
+    }
+
+    h1 {
+        font-size: 18px;
+    }
+
+    /* Horizontal scroll palette to save vertical space on portrait layout */
+    #piece-list {
+        display: flex;
+        overflow-x: auto;
+        gap: 10px;
+        padding-bottom: 5px;
+    }
+
+    .piece-item {
+        flex: 0 0 75px;
+        padding: 6px;
+    }
+
+    .piece-preview {
+        height: 40px;
+        margin-bottom: 2px;
+    }
+
+    .piece-name {
+        font-size: 10px;
+    }
+
+    #controls {
+        display: none; /* Hide keyboard shortcut text on mobile portrait */
+    }
 }

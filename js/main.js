@@ -11,6 +11,8 @@ const App = {
             opt.onclick = () => this.setMode(opt.getAttribute('data-mode'), idx);
         });
         
+        this.setupMobileControls();
+
         // Start in Chop Mode
         ChopMode.init();
     },
@@ -18,7 +20,6 @@ const App = {
     setMode: function(mode, idx) {
         if (this.currentMode === mode) return;
 
-        const badge = document.getElementById('mode-badge');
         const stats = document.getElementById('puzzle-stats');
         const chopCtrls = document.getElementById('chop-controls');
         const clickAction = document.getElementById('click-action');
@@ -30,7 +31,9 @@ const App = {
         options[idx].classList.add('active');
 
         // Slide the active background indicator
-        activePill.style.transform = `translateX(${idx * 100}%)`;
+        if (activePill) {
+            activePill.style.transform = `translateX(${idx * 100}%)`;
+        }
 
         // Clean up global listeners
         window.onkeydown = null;
@@ -43,29 +46,74 @@ const App = {
 
         this.currentMode = mode;
 
+        // Configure mobile action button text based on active mode
+        const actionBtn = document.getElementById('m-btn-action');
+        if (actionBtn) {
+            if (mode === 'gravity') {
+                actionBtn.style.display = 'none'; // The down arrow is sufficient for Gravity
+            } else {
+                actionBtn.style.display = 'block';
+                actionBtn.textContent = mode === 'chop' ? 'Place / Pick up' : 'Place Piece';
+            }
+        }
+
         if (mode === 'chop') {
-            badge.textContent = 'CHOP MODE';
             stats.style.display = 'none';
             document.getElementById('gravity-controls').style.display = 'none';
             document.getElementById('placement-controls').style.display = 'block';
             chopCtrls.style.display = 'block';
-            clickAction.textContent = 'Place/Pick up';
+            if (clickAction) clickAction.textContent = 'Place/Pick up';
             ChopMode.init();
         } else if (mode === 'puzzle') {
-            badge.textContent = 'PUZZLE MODE';
             stats.style.display = 'block';
             document.getElementById('gravity-controls').style.display = 'none';
             document.getElementById('placement-controls').style.display = 'block';
             chopCtrls.style.display = 'none';
-            clickAction.textContent = 'Place Piece';
+            if (clickAction) clickAction.textContent = 'Place Piece';
             PuzzleMode.init();
         } else if (mode === 'gravity') {
-            badge.textContent = 'GRAVITY MODE';
             stats.style.display = 'none';
             document.getElementById('gravity-controls').style.display = 'block';
             document.getElementById('placement-controls').style.display = 'none';
             chopCtrls.style.display = 'none';
             GravityMode.init();
+        }
+    },
+
+    setupMobileControls: function() {
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const mobileContainer = document.getElementById('mobile-controls');
+        
+        if (isTouch && mobileContainer) {
+            mobileContainer.style.display = 'flex';
+            
+            const bindBtn = (id, key, code = '', shiftKey = false) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                
+                // Use touchstart for instantaneous mobile response, fallback to click
+                const trigger = (e) => {
+                    e.preventDefault();
+                    const event = new KeyboardEvent('keydown', {
+                        key: key,
+                        code: code,
+                        shiftKey: shiftKey,
+                        bubbles: true
+                    });
+                    window.dispatchEvent(event);
+                };
+                
+                btn.ontouchstart = trigger;
+                btn.onclick = trigger;
+            };
+
+            bindBtn('m-btn-ccw', 'ArrowLeft', 'ArrowLeft', true); // CCW Rotate
+            bindBtn('m-btn-cw', 'ArrowUp', 'ArrowUp', false);     // CW Rotate
+            bindBtn('m-btn-up', 'y');                             // Move Up (y in puzzle)
+            bindBtn('m-btn-left', 'ArrowLeft');                   // Move Left (f / ArrowLeft)
+            bindBtn('m-btn-right', 'ArrowRight');                 // Move Right (h / ArrowRight)
+            bindBtn('m-btn-down', 'ArrowDown');                   // Move Down / Soft Drop (v / ArrowDown)
+            bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
         }
     }
 };
