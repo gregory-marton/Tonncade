@@ -13,6 +13,7 @@ const App = {
         
         this.setupMobileControls();
         this.setupTouchGestures();
+        this.updateVersionTag();
 
         // Start in Chop Mode
         ChopMode.init();
@@ -235,6 +236,37 @@ const App = {
                 isGesture = false;
             }
         });
+    },
+
+    updateVersionTag: async function() {
+        const el = document.querySelector('.version-tag');
+        if (!el) return;
+
+        const host = window.location.hostname;
+        const path = window.location.pathname;
+
+        if (host.includes('github.io')) {
+            const username = host.split('.')[0];
+            const repo = path.split('/').filter(Boolean)[0] || 'Tonntris';
+
+            const cachedSha = sessionStorage.getItem('tonntris_commit_sha');
+            if (cachedSha) {
+                el.textContent = `git-${cachedSha}`;
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.github.com/repos/${username}/${repo}/commits/main`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const shortSha = data.sha.substring(0, 7);
+                    sessionStorage.setItem('tonntris_commit_sha', shortSha);
+                    el.textContent = `git-${shortSha}`;
+                }
+            } catch (err) {
+                console.warn('Could not fetch git version:', err);
+            }
+        }
     }
 };
 
