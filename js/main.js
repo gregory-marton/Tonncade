@@ -242,6 +242,10 @@ const App = {
         const el = document.querySelector('.version-tag');
         if (!el) return;
 
+        // Set initial display to local commit version
+        const localVer = typeof GIT_VERSION !== 'undefined' ? GIT_VERSION : 'local';
+        el.textContent = localVer;
+
         const host = window.location.hostname;
         const path = window.location.pathname;
 
@@ -251,7 +255,10 @@ const App = {
 
             const cachedSha = sessionStorage.getItem('tonntris_commit_sha');
             if (cachedSha) {
-                el.textContent = `git-${cachedSha}`;
+                const currentSha = localVer.replace('git-', '');
+                if (cachedSha !== currentSha) {
+                    el.textContent = `${localVer} (update available: git-${cachedSha})`;
+                }
                 return;
             }
 
@@ -261,7 +268,11 @@ const App = {
                     const data = await response.json();
                     const shortSha = data.sha.substring(0, 7);
                     sessionStorage.setItem('tonntris_commit_sha', shortSha);
-                    el.textContent = `git-${shortSha}`;
+                    
+                    const currentSha = localVer.replace('git-', '');
+                    if (shortSha !== currentSha) {
+                        el.textContent = `${localVer} (update available: git-${shortSha})`;
+                    }
                 }
             } catch (err) {
                 console.warn('Could not fetch git version:', err);

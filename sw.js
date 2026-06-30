@@ -1,8 +1,9 @@
-const CACHE_NAME = 'tonntris-v1';
+const CACHE_NAME = 'tonntris-v2';
 const ASSETS = [
     './',
     './index.html',
     './css/style.css',
+    './js/version.js',
     './js/tonnetz.js',
     './js/synth.js',
     './js/pieces.js',
