@@ -57,6 +57,26 @@ const App = {
             }
         }
 
+        // Configure mobile navigation buttons based on active mode (hex layout)
+        const btnUl = document.getElementById('m-btn-ul');
+        const btnUr = document.getElementById('m-btn-ur');
+        const btnDr = document.getElementById('m-btn-dr');
+        const btnDl = document.getElementById('m-btn-dl');
+
+        if (btnUl && btnUr && btnDr && btnDl) {
+            if (mode === 'gravity') {
+                btnUl.style.display = 'none';
+                btnUr.style.display = 'none';
+                btnDr.style.display = 'none';
+                btnDl.textContent = '▼'; // Label as vertical down-arrow for gravity soft-drop
+            } else {
+                btnUl.style.display = 'block';
+                btnUr.style.display = 'block';
+                btnDr.style.display = 'block';
+                btnDl.textContent = '↙';
+            }
+        }
+
         if (mode === 'chop') {
             stats.style.display = 'none';
             document.getElementById('gravity-controls').style.display = 'none';
@@ -107,12 +127,14 @@ const App = {
                 btn.onclick = trigger;
             };
 
-            bindBtn('m-btn-ccw', 'ArrowLeft', 'ArrowLeft', true); // CCW Rotate
-            bindBtn('m-btn-cw', 'ArrowUp', 'ArrowUp', false);     // CW Rotate
-            bindBtn('m-btn-up', 'y');                             // Move Up (y in puzzle)
-            bindBtn('m-btn-left', 'ArrowLeft');                   // Move Left (f / ArrowLeft)
-            bindBtn('m-btn-right', 'ArrowRight');                 // Move Right (h / ArrowRight)
-            bindBtn('m-btn-down', 'ArrowDown');                   // Move Down / Soft Drop (v / ArrowDown)
+            bindBtn('m-btn-ccw', 'ArrowLeft', 'ArrowLeft', true); // CCW Rotate fallback
+            bindBtn('m-btn-cw', 'ArrowUp', 'ArrowUp', false);     // CW Rotate fallback
+            bindBtn('m-btn-ul', 't');                             // Up-Left (t)
+            bindBtn('m-btn-ur', 'y');                             // Up-Right (y)
+            bindBtn('m-btn-left', 'f');                           // Left (f)
+            bindBtn('m-btn-right', 'h');                          // Right (h)
+            bindBtn('m-btn-dl', 'v');                             // Down-Left (v) / Soft-drop in Gravity
+            bindBtn('m-btn-dr', 'b');                             // Down-Right (b)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
         }
     }
