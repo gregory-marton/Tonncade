@@ -142,7 +142,7 @@ const App = {
     },
 
     setupTouchGestures: function() {
-        const svg = Render.svg;
+        const svg = document.getElementById('tonnetz-svg');
         if (!svg) return;
 
         let startAngle = 0;
