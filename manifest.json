@@ -1,0 +1,18 @@
+{
+  "name": "Tonnetz Tetris",
+  "short_name": "TonnetzTetris",
+  "description": "A musical Tetris game played on Euler's Tonnetz hex lattice grid.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#14161c",
+  "theme_color": "#7fe0d0",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
