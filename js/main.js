@@ -129,8 +129,8 @@ const App = {
                 btn.onclick = trigger;
             };
 
-            bindBtn('m-btn-ccw', 'ArrowLeft', 'ArrowLeft', true); // CCW Rotate fallback
-            bindBtn('m-btn-cw', 'ArrowUp', 'ArrowUp', false);     // CW Rotate fallback
+            bindBtn('m-btn-ccw', ' ', 'Space', true);  // CCW Rotate (Shift + Space)
+            bindBtn('m-btn-cw', ' ', 'Space', false);   // CW Rotate (Space)
             bindBtn('m-btn-ul', 't');                             // Up-Left (t)
             bindBtn('m-btn-ur', 'y');                             // Up-Right (y)
             bindBtn('m-btn-left', 'f');                           // Left (f)
