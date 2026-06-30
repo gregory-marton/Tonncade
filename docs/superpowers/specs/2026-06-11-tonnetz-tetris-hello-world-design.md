@@ -1,11 +1,11 @@
-# Design Spec: Tonnetz Tetris "Chop Mode" (Hello World)
+# Design Spec: Tonntris "Chop Mode" (Hello World)
 
 **Date:** 2026-06-11  
 **Status:** Draft  
 **Target:** Chop Mode (Infinite Sandbox)
 
 ## 1. Vision
-The "Hello World" of Tonnetz Tetris. A pure sandbox where the player can explore Euler's Tonnetz, hear the harmonic relationships, and place pieces (tetrahexes) to hear them as chords. No gravity, no line clears, no score—just harmony and geometry.
+The "Hello World" of Tonntris. A pure sandbox where the player can explore Euler's Tonnetz, hear the harmonic relationships, and place pieces (tetrahexes) to hear them as chords. No gravity, no line clears, no score—just harmony and geometry.
 
 ## 2. Core Mechanics
 

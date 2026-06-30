@@ -1,5 +1,5 @@
 /**
- * render.js - SVG rendering for Tonnetz Tetris.
+ * render.js - SVG rendering for Tonntris.
  * Handles lattice drawing, piece ghosting, and labeling.
  */
 

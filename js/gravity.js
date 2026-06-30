@@ -1,5 +1,5 @@
 /**
- * gravity.js - Controller for Gravity Mode (falling Tetris with slide physics).
+ * gravity.js - Controller for Gravity Mode (falling blocks with slide physics).
  */
 
 const GravityMode = {

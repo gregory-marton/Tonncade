@@ -1,5 +1,5 @@
 /**
- * synth.js - Web Audio engine for Tonnetz Tetris.
+ * synth.js - Web Audio engine for Tonntris.
  * Ported and expanded from mockup.
  */
 

@@ -1,7 +1,7 @@
 {
-  "name": "Tonnetz Tetris",
-  "short_name": "TonnetzTetris",
-  "description": "A musical Tetris game played on Euler's Tonnetz hex lattice grid.",
+  "name": "Tonntris",
+  "short_name": "Tonntris",
+  "description": "A musical falling-block game played on Euler's Tonnetz hex lattice grid.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#14161c",

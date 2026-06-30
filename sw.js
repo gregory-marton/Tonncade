@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tonnetz-tetris-v1';
+const CACHE_NAME = 'tonntris-v1';
 const ASSETS = [
     './',
     './index.html',

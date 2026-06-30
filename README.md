@@ -1,6 +1,6 @@
-# Tonnetz Tetris
+# Tonntris
 
-A musical Tetris game played on Euler's *Tonnetz* — a hexagonal lattice of consonant musical intervals. Placing, moving, and rotating pieces behaves both as a spatial geometry puzzle **and** a music sequencer. 
+A musical falling-block game played on Euler's *Tonnetz* — a hexagonal lattice of consonant musical intervals. Placing, moving, and rotating pieces behaves both as a spatial geometry puzzle **and** a music sequencer. 
 
 Built in pure vanilla JavaScript, HTML5 SVG, and Web Audio API, the game runs completely client-side and can be run locally via a `file://` URL (no server or build steps needed) or installed as a standalone offline mobile app.
 
@@ -29,7 +29,7 @@ Select any piece from the palette or keyboard letters, position and rotate it fr
 ### 2. Puzzle Mode (Hex Bounded Board)
 A strategic mode on a radius-5 hexagonal board. You are fed random pieces from a queue to fit into the grid. Completing a full axis-line of cells clears them. Game over occurs when no further pieces can be placed.
 
-### 3. Gravity Mode (Falling Cup Tetris)
+### 3. Gravity Mode (Falling Cup Block Mode)
 A fast-paced falling block mode inside a 10x15 cup-shaped board:
 *   **Falling Physics:** Pieces spawn at row 20 and drop down. On a hex grid, vertical paths alternate down-left and down-right steps to maintain columns.
 *   **Rigid Piece Sliding:** If the vertical path is blocked, the active piece slides diagonally down as a single rigid body if there is a slope valley available.

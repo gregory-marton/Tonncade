@@ -1,5 +1,5 @@
 /**
- * tonnetz.js - Core coordinate and music math for Tonnetz Tetris.
+ * tonnetz.js - Core coordinate and music math for Tonntris.
  * 
  * Lattice Geometry:
  * - p-axis (horizontal): Perfect Fifths (+7 semitones)
