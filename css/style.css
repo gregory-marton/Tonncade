@@ -271,6 +271,14 @@ button:hover {
     margin-bottom: 8px;
 }
 
+.version-tag {
+    font-size: 11px;
+    color: var(--dim);
+    font-weight: normal;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
 /* Mobile virtual controller buttons styling */
 #mobile-controls {
     margin-top: auto;
