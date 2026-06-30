@@ -1,5 +1,5 @@
 /**
- * main.js - Entry point and mode switching logic.
+ * main.js - Entry point, mode switching, and touch gesture handling.
  */
 
 const App = {
@@ -12,6 +12,7 @@ const App = {
         });
         
         this.setupMobileControls();
+        this.setupTouchGestures();
 
         // Start in Chop Mode
         ChopMode.init();
@@ -137,6 +138,103 @@ const App = {
             bindBtn('m-btn-dr', 'b');                             // Down-Right (b)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
         }
+    },
+
+    setupTouchGestures: function() {
+        const svg = Render.svg;
+        if (!svg) return;
+
+        let startAngle = 0;
+        let lastAngle = 0;
+        let isGesture = false;
+
+        const getAngle = (t1, t2) => {
+            return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
+        };
+
+        const getCellFromTouch = (touch) => {
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (element && element.tagName.toLowerCase() === 'polygon') {
+                const p = parseInt(element.getAttribute('data-p'));
+                const q = parseInt(element.getAttribute('data-q'));
+                return { p, q };
+            }
+            return null;
+        };
+
+        svg.addEventListener('touchstart', (e) => {
+            if (this.currentMode === 'gravity') return; // Gravity mode handles falling loops, skip touch drag/twist
+
+            if (e.touches.length === 1) {
+                isGesture = false;
+                const cell = getCellFromTouch(e.touches[0]);
+                if (cell) {
+                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
+                    modeObj.state.hoverCell = cell;
+                    modeObj.updateGhost();
+                }
+            } else if (e.touches.length === 2) {
+                isGesture = true;
+                startAngle = getAngle(e.touches[0], e.touches[1]);
+                lastAngle = startAngle;
+                e.preventDefault(); // Stop viewport scaling/panning while twisting
+            }
+        }, { passive: false });
+
+        svg.addEventListener('touchmove', (e) => {
+            if (this.currentMode === 'gravity') return;
+
+            if (e.touches.length === 1 && !isGesture) {
+                const cell = getCellFromTouch(e.touches[0]);
+                if (cell) {
+                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
+
+                    // Disable standard page panning/scrolling while dragging an active piece
+                    if (this.currentMode === 'puzzle' || (this.currentMode === 'chop' && ChopMode.state.selectedPiece)) {
+                        e.preventDefault();
+                        modeObj.state.hoverCell = cell;
+                        modeObj.updateGhost();
+                    }
+                }
+            } else if (e.touches.length === 2) {
+                e.preventDefault(); // Block double-finger zooming gestures
+                const currentAngle = getAngle(e.touches[0], e.touches[1]);
+                let diff = currentAngle - lastAngle;
+
+                // Handle angular boundary wrap around
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+
+                // Twist angle threshold: 30 degrees
+                if (Math.abs(diff) > 30) {
+                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
+                    const rotateDir = diff > 0 ? 1 : -1;
+                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
+
+                    if (pieceType) {
+                        if (rotateDir > 0) {
+                            modeObj.state.rotation = (modeObj.state.rotation + 1) % 6;
+                        } else {
+                            modeObj.state.rotation = (modeObj.state.rotation + 5) % 6;
+                        }
+                        modeObj.updateGhost();
+
+                        // Sound confirmation of twist rotation
+                        const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
+                        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+                        Synth.playChord(midis, true, 0.08, 0.4);
+                    }
+
+                    lastAngle = currentAngle;
+                }
+            }
+        }, { passive: false });
+
+        svg.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0) {
+                isGesture = false;
+            }
+        });
     }
 };
 
