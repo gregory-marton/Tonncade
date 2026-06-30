@@ -254,9 +254,10 @@ const App = {
             const repo = path.split('/').filter(Boolean)[0] || 'Tonntris';
 
             const cachedSha = sessionStorage.getItem('tonntris_commit_sha');
+            const cachedParentSha = sessionStorage.getItem('tonntris_parent_sha') || '';
             if (cachedSha) {
                 const currentSha = localVer.replace('git-', '');
-                if (cachedSha !== currentSha) {
+                if (currentSha !== cachedSha && currentSha !== cachedParentSha) {
                     el.textContent = `${localVer} (update available: git-${cachedSha})`;
                 }
                 return;
@@ -267,10 +268,13 @@ const App = {
                 if (response.ok) {
                     const data = await response.json();
                     const shortSha = data.sha.substring(0, 7);
+                    const parentSha = data.parents && data.parents[0] ? data.parents[0].sha.substring(0, 7) : '';
+                    
                     sessionStorage.setItem('tonntris_commit_sha', shortSha);
+                    sessionStorage.setItem('tonntris_parent_sha', parentSha);
                     
                     const currentSha = localVer.replace('git-', '');
-                    if (shortSha !== currentSha) {
+                    if (currentSha !== shortSha && currentSha !== parentSha) {
                         el.textContent = `${localVer} (update available: git-${shortSha})`;
                     }
                 }
