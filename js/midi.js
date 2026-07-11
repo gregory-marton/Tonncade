@@ -420,11 +420,16 @@ const MidiMode = {
     },
 
     celebrate: function() {
-        // Play a nice victory chord
-        const victoryChord = [60, 64, 67, 72]; // C major chord
-        Synth.playChord(victoryChord, true, 0.2, 2.0);
+        // Get unique notes present in the melody, sorted from lowest to highest
+        const songNotes = [...new Set(this.state.melody.map(n => n.midi))];
+        songNotes.sort((a, b) => a - b);
 
-        // Flash cells
+        const victoryChord = songNotes.length > 0 ? songNotes : [60, 64, 67, 72];
+        
+        // Play the rolled notes of the song
+        Synth.playChord(victoryChord, true, 0.18, 2.0);
+
+        // Flash corresponding cells on the lattice
         for (let i = 0; i < 5; i++) {
             setTimeout(() => {
                 victoryChord.forEach(note => this.highlightCellByMidi(note, 150));
