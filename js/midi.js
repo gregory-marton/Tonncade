@@ -13,7 +13,38 @@ const MidiMode = {
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
         bestStreak: 0,         // Longest streak achieved
-        hoverCell: { p: 0, q: 0 } // Keyboard navigation hover cell
+        hoverCell: { p: 0, q: 0 }, // Keyboard navigation hover cell
+        reverseQwertyMap: {},      // Reverse mapping built in init()
+
+        qwertyMap: {
+            // Row q = 3 (Shift + Top Letter)
+            'Q': { p: -5, q: 3 }, 'W': { p: -4, q: 3 }, 'E': { p: -3, q: 3 }, 'R': { p: -2, q: 3 }, 'T': { p: -1, q: 3 },
+            'Y': { p: 0, q: 3 },  'U': { p: 1, q: 3 },  'I': { p: 2, q: 3 },  'O': { p: 3, q: 3 },  'P': { p: 4, q: 3 },
+
+            // Row q = 2 (Shift + Middle Letter)
+            'A': { p: -4, q: 2 }, 'S': { p: -3, q: 2 }, 'D': { p: -2, q: 2 }, 'F': { p: -1, q: 2 }, 'G': { p: 0, q: 2 },
+            'H': { p: 1, q: 2 },  'J': { p: 2, q: 2 },  'K': { p: 3, q: 2 },  'L': { p: 4, q: 2 },  ':': { p: 5, q: 2 },
+
+            // Row q = 1 (Shift + Bottom Letter)
+            'Z': { p: -3, q: 1 }, 'X': { p: -2, q: 1 }, 'C': { p: -1, q: 1 }, 'V': { p: 0, q: 1 },  'B': { p: 1, q: 1 },
+            'N': { p: 2, q: 1 },  'M': { p: 3, q: 1 },  '<': { p: 4, q: 1 },  '>': { p: 5, q: 1 },  '?': { p: 6, q: 1 },
+
+            // Row q = 0 (Number Row)
+            '1': { p: -5, q: 0 }, '2': { p: -4, q: 0 }, '3': { p: -3, q: 0 }, '4': { p: -2, q: 0 }, '5': { p: -1, q: 0 },
+            '6': { p: 0, q: 0 },  '7': { p: 1, q: 0 },  '8': { p: 2, q: 0 },  '9': { p: 3, q: 0 },  '0': { p: 4, q: 0 },
+
+            // Row q = -1 (Top Letter)
+            'q': { p: -5, q: -1 }, 'w': { p: -4, q: -1 }, 'e': { p: -3, q: -1 }, 'r': { p: -2, q: -1 }, 't': { p: -1, q: -1 },
+            'y': { p: 0, q: -1 },  'u': { p: 1, q: -1 },  'i': { p: 2, q: -1 },  'o': { p: 3, q: -1 },  'p': { p: 4, q: -1 },
+
+            // Row q = -2 (Middle Letter)
+            'a': { p: -4, q: -2 }, 's': { p: -3, q: -2 }, 'd': { p: -2, q: -2 }, 'f': { p: -1, q: -2 }, 'g': { p: 0, q: -2 },
+            'h': { p: 1, q: -2 },  'j': { p: 2, q: -2 },  'k': { p: 3, q: -2 },  'l': { p: 4, q: -2 },  ';': { p: 5, q: -2 },
+
+            // Row q = -3 (Bottom Letter)
+            'z': { p: -3, q: -3 }, 'x': { p: -2, q: -3 }, 'c': { p: -1, q: -3 }, 'v': { p: 0, q: -3 },  'b': { p: 1, q: -3 },
+            'n': { p: 2, q: -3 },  'm': { p: 3, q: -3 },  ',': { p: 4, q: -3 },  '.': { p: 5, q: -3 },  '/': { p: 6, q: -3 }
+        }
     },
 
     // Default built-in melody: Hot Cross Buns
@@ -51,6 +82,13 @@ const MidiMode = {
         // Load default melody if none is loaded
         if (this.state.melody.length === 0) {
             this.state.melody = JSON.parse(JSON.stringify(this.defaultMelody));
+        }
+
+        // Build reverse map for rendering labels
+        this.state.reverseQwertyMap = {};
+        for (const key in this.state.qwertyMap) {
+            const { p, q } = this.state.qwertyMap[key];
+            this.state.reverseQwertyMap[`${p},${q}`] = key;
         }
 
         this.setupDOMEvents();
@@ -129,29 +167,18 @@ const MidiMode = {
         window.onkeydown = (e) => {
             if (this.state.isPlayingPreview || this.state.isPlayingSequence) return;
 
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key) || e.code === 'Space') {
+            // Block default scroll action for Space/Arrow keys
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || e.code === 'Space') {
                 e.preventDefault();
             }
 
-            const key = e.key.toLowerCase();
-
-            // 1. Navigation (ftyhbv cluster)
-            const move = {
-                'f': {p:-1, q:0}, 'h': {p:1, q:0},
-                'y': {p:0, q:1},  'v': {p:0, q:-1},
-                't': {p:-1, q:1}, 'b': {p:1, q:-1}
-            }[key];
-
-            if (move) {
-                this.state.hoverCell.p += move.p;
-                this.state.hoverCell.q += move.q;
+            // Direct qwerty layout note playing
+            const mapped = this.state.qwertyMap[e.key];
+            if (mapped) {
+                e.preventDefault();
+                const { p, q } = mapped;
+                this.state.hoverCell = { p, q };
                 this.updateGhost();
-                return;
-            }
-
-            // 2. Play hovered note on Space / Enter / g
-            if (e.code === 'Space' || e.key === 'Enter' || key === 'g') {
-                const { p, q } = this.state.hoverCell;
                 const midi = Tonnetz.getMidi(p, q);
                 this.playUserNote(midi, p, q);
             }
@@ -205,6 +232,11 @@ const MidiMode = {
 
         // Feed to game logic
         this.handleUserInputNote(midi);
+    },
+
+    getQwertyKey: function(p, q) {
+        if (!this.state.reverseQwertyMap) return null;
+        return this.state.reverseQwertyMap[`${p},${q}`] || null;
     },
 
     highlightCell: function(p, q, duration = 300) {

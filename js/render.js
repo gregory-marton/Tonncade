@@ -70,6 +70,17 @@ const Render = {
         return t;
     },
 
+    createKeyboardLabel: function(p, q, text) {
+        const pos = this.getScreenPos(p, q);
+        const t = document.createElementNS(this.NS, 'text');
+        t.setAttribute('x', pos.x);
+        t.setAttribute('y', pos.y - 7); // Positioned slightly above the note name
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('class', 'qwerty-label');
+        t.textContent = text;
+        return t;
+    },
+
     drawLattice: function(viewport, options = {}) {
         this.svg.innerHTML = '';
         const group = document.createElementNS(this.NS, 'g');
@@ -104,6 +115,15 @@ const Render = {
                 if (opacity > 0.5) {
                     const label = this.createLabel(p, q, Tonnetz.getNoteName(midi));
                     group.appendChild(label);
+
+                    // Add QWERTY mapping label if in MIDI mode
+                    if (typeof App !== 'undefined' && App.currentMode === 'midi' && typeof MidiMode !== 'undefined') {
+                        const key = MidiMode.getQwertyKey(p, q);
+                        if (key) {
+                            const qLabel = this.createKeyboardLabel(p, q, key);
+                            group.appendChild(qLabel);
+                        }
+                    }
                 }
             }
         }
