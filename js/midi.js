@@ -492,9 +492,12 @@ const MidiMode = {
     },
 
     refreshBoard: function() {
-        // Render Standard Center hexagonal lattice (radius 5 hexagon)
-        const viewport = { minP: -6, maxP: 6, minQ: -6, maxQ: 6 };
-        Render.drawLattice(viewport, { isPuzzle: true });
+        // Render the full Chop Tonnetz layout
+        const viewport = {
+            minP: -15, maxP: 15,
+            minQ: -15, maxQ: 15
+        };
+        Render.drawLattice(viewport, {});
         Render.updateView(-400, -300, 1);
     },
 
