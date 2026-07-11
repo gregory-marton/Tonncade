@@ -457,9 +457,10 @@ const MidiMode = {
             // Mistake!
             this.setStatus("Oops! Let's listen again...", "error");
             
-            // If the user made progress going ahead, save checkpoint
-            if (this.state.userIndex > this.state.targetLength) {
-                this.state.targetLength = this.state.userIndex;
+            // If the user made progress up to or beyond the current target,
+            // advance the target to show the correct version of the note they missed.
+            if (this.state.userIndex >= this.state.targetLength) {
+                this.state.targetLength = this.state.userIndex + 1;
             }
             this.state.userIndex = 0;
             
