@@ -210,20 +210,35 @@ const MidiMode = {
     highlightCell: function(p, q, duration = 300) {
         const polygon = document.querySelector(`polygon[data-p="${p}"][data-q="${q}"]`);
         if (polygon) {
+            polygon.classList.remove('active-note');
+            void polygon.offsetWidth; // Force layout flush to register class removal
             polygon.classList.add('active-note');
-            setTimeout(() => {
+            
+            if (polygon.activeTimeoutId) {
+                clearTimeout(polygon.activeTimeoutId);
+            }
+            
+            polygon.activeTimeoutId = setTimeout(() => {
                 polygon.classList.remove('active-note');
+                polygon.activeTimeoutId = null;
             }, duration);
         }
     },
 
     highlightCellByMidi: function(midi, duration = 300) {
-        // Find cell(s) in the rendering matching this midi note
         const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
         polygons.forEach(p => {
+            p.classList.remove('active-note');
+            void p.offsetWidth; // Force layout flush
             p.classList.add('active-note');
-            setTimeout(() => {
+            
+            if (p.activeTimeoutId) {
+                clearTimeout(p.activeTimeoutId);
+            }
+            
+            p.activeTimeoutId = setTimeout(() => {
                 p.classList.remove('active-note');
+                p.activeTimeoutId = null;
             }, duration);
         });
     },
