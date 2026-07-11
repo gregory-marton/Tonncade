@@ -17,15 +17,29 @@ const Synth = {
         this.lowpass = this.ctx.createBiquadFilter();
         this.lowpass.type = 'lowpass';
         this.lowpass.frequency.value = 2600;
-        
-        this.master.connect(this.lowpass);
+
+        // Biquad lowshelf filter to boost bass on smaller speakers
+        this.lowshelf = this.ctx.createBiquadFilter();
+        this.lowshelf.type = 'lowshelf';
+        this.lowshelf.frequency.value = 320; // Boost frequencies below ~320Hz (E4)
+        this.lowshelf.gain.value = 8; // 8dB boost
+
+        this.master.connect(this.lowshelf);
+        this.lowshelf.connect(this.lowpass);
         this.lowpass.connect(this.ctx.destination);
     },
 
-    playNote: function(midi, t0 = 0, dur = 0.8, peak = 0.16) {
+    playNote: function(midi, t0 = 0, dur = 0.8, peak = 0.16, isHarmonic = false) {
         this.init();
         const now = this.ctx.currentTime;
         const startTime = now + t0;
+
+        // Progressive volume scaling for low notes:
+        let notePeak = peak;
+        if (!isHarmonic && midi < 60) {
+            const octavesBelow = (60 - midi) / 12;
+            notePeak = peak * (1.0 + octavesBelow * 0.6); // Up to 2.8x volume boost
+        }
         
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -34,7 +48,7 @@ const Synth = {
         osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
         
         gain.gain.setValueAtTime(0.0001, startTime);
-        gain.gain.linearRampToValueAtTime(peak, startTime + 0.012);
+        gain.gain.linearRampToValueAtTime(notePeak, startTime + 0.012);
         gain.gain.exponentialRampToValueAtTime(0.0006, startTime + dur);
         
         osc.connect(gain);
@@ -42,6 +56,11 @@ const Synth = {
         
         osc.start(startTime);
         osc.stop(startTime + dur + 0.05);
+
+        // Psychoacoustic bass enhancement: add a subtle higher-octave harmonic for low notes
+        if (!isHarmonic && midi < 50) {
+            this.playNote(midi + 12, t0, dur, notePeak * 0.4, true);
+        }
     },
 
     playChord: function(midis, rolled = true, peak = 0.16, dur = 1.2) {
