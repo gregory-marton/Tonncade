@@ -11,6 +11,7 @@ const MidiMode = {
         isPlayingSequence: false,
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
+        mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
         bestStreak: 0,         // Longest streak achieved
         hoverCell: { p: 0, q: 0 } // Keyboard navigation hover cell
     },
@@ -395,13 +396,10 @@ const MidiMode = {
                 this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
 
                 this.state.userRepeatTimeoutId = setTimeout(() => {
-                    // Timeout fired: User stopped playing ahead
+                    // Timeout fired: User stopped playing ahead.
+                    // Immediately transition to playing the new sequence (Silence is golden).
                     this.state.targetLength = this.state.userIndex + 1;
-                    this.setStatus("Time's up! Let's play the new sequence...", "info");
-                    
-                    setTimeout(() => {
-                        this.playTargetSequence();
-                    }, 1000);
+                    this.playTargetSequence();
                 }, 2000);
             } else {
                 // Still repeating the target sequence
@@ -410,12 +408,28 @@ const MidiMode = {
             }
         } else {
             // Mistake!
-            this.setStatus(`Oops! Start again from the first note: ${Tonnetz.getNoteName(this.state.melody[0].midi)}`, "error");
+            this.setStatus("Oops! Let's listen again...", "error");
             this.state.userIndex = 0;
+            
             if (this.state.userRepeatTimeoutId) {
                 clearTimeout(this.state.userRepeatTimeoutId);
                 this.state.userRepeatTimeoutId = null;
             }
+
+            if (this.state.mistakeTimeoutId) {
+                clearTimeout(this.state.mistakeTimeoutId);
+            }
+
+            // Temporarily block inputs by setting isPlayingSequence
+            this.state.isPlayingSequence = true;
+
+            // Replay the target sequence after a 1.2s delay to let the wrong note decay
+            this.state.mistakeTimeoutId = setTimeout(() => {
+                this.state.mistakeTimeoutId = null;
+                if (App.currentMode === 'midi' && !this.state.isPlayingPreview) {
+                    this.playTargetSequence();
+                }
+            }, 1200);
         }
     },
 
@@ -447,6 +461,10 @@ const MidiMode = {
         if (this.state.userRepeatTimeoutId) {
             clearTimeout(this.state.userRepeatTimeoutId);
             this.state.userRepeatTimeoutId = null;
+        }
+        if (this.state.mistakeTimeoutId) {
+            clearTimeout(this.state.mistakeTimeoutId);
+            this.state.mistakeTimeoutId = null;
         }
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
