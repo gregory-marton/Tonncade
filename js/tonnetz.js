@@ -15,6 +15,9 @@ const Tonnetz = {
     // q-axis (sw-ne): +3 (Minor Third)
     // Resultant (nw-se): +4 (Major Third)  [ (p+1, q-1) -> 7-3=4 ]
     getMidi: function(p, q) {
+        if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
+            return 35 + (p * -3) + (q * 4);
+        }
         return 60 + (p * 7) + (q * 3);
     },
 

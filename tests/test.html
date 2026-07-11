@@ -62,6 +62,29 @@
         assert(Tonnetz.isValid(0, 0) === true, "(0,0) is valid");
         assert(Tonnetz.isValid(100, 100) === false, "(100,100) is out of MIDI range");
 
+        // Test Gravity Mode (rotated)
+        log('Testing Gravity Mode (rotated) Tonnetz...', 'group');
+        window.App = { currentMode: 'gravity' };
+        
+        // Origin (0,0) should be MIDI 35
+        assert(Tonnetz.getMidi(0, 0) === 35, "Origin (0,0) in gravity should be MIDI 35");
+        assert(Tonnetz.getNoteName(35) === 'B', "MIDI 35 should be 'B'");
+        
+        // p-axis (horizontal) step right (1,0) should be -3 semitones (32)
+        assert(Tonnetz.getMidi(1, 0) === 32, "(1,0) in gravity should be G#1 (32)");
+        assert(Tonnetz.getNoteName(32) === 'G#', "MIDI 32 should be 'G#'");
+        
+        // q-axis (up-right) step (0,1) should be +4 semitones (39)
+        assert(Tonnetz.getMidi(0, 1) === 39, "(0,1) in gravity should be D#2 (39)");
+        assert(Tonnetz.getNoteName(39) === 'D#', "MIDI 39 should be 'D#'");
+        
+        // resultant (up-left) step (-1,1) should be +7 semitones (42)
+        assert(Tonnetz.getMidi(-1, 1) === 42, "(-1,1) in gravity should be F#2 (42)");
+        assert(Tonnetz.getNoteName(42) === 'F#', "MIDI 42 should be 'F#'");
+
+        // Clean up mock
+        delete window.App;
+
         // Test Pieces
         log('Testing Pieces.js...', 'group');
         
