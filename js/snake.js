@@ -229,6 +229,18 @@ const SnakeMode = {
 
         const randIdx = Math.floor(Math.random() * candidates.length);
         this.state.gem = candidates[randIdx];
+
+        // Sound the gem appearance!
+        const gemMidi = Tonnetz.getMidi(this.state.gem.p, this.state.gem.q);
+        this.playGemSpawnSound(gemMidi);
+    },
+
+    playGemSpawnSound: function(midi) {
+        const playableMidi = Math.max(21, Math.min(108, midi));
+        // Triple sound: three fast notes scheduled via Web Audio API time offsets
+        Synth.playNote(playableMidi, 0.0, 0.08, 0.12);
+        Synth.playNote(playableMidi, 0.07, 0.08, 0.12);
+        Synth.playNote(playableMidi, 0.14, 0.12, 0.18);
     },
 
     isInBounds: function(p, q) {
