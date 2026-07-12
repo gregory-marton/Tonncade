@@ -168,7 +168,7 @@ svg {
     padding: 2px;
     cursor: pointer;
     user-select: none;
-    width: 320px;
+    width: 400px;
 }
 
 .mode-option {
@@ -195,7 +195,7 @@ svg {
     top: 2px;
     bottom: 2px;
     left: 2px;
-    width: calc(25% - 2.666px); /* 1/4 minus padding adjustments */
+    width: calc(20% - 2.666px); /* 1/5 minus padding adjustments */
     background: var(--accent);
     border-radius: 18px;
     z-index: 1;
@@ -242,6 +242,14 @@ svg {
     font-weight: bold;
     pointer-events: none;
     user-select: none;
+}
+
+/* Custom styles for Snake mode */
+.cell.active-segment {
+    fill: #ffffff !important;
+    stroke: #7fe0d0 !important;
+    stroke-width: 2.5px !important;
+    transition: fill 0.05s ease-out, stroke 0.05s ease-out;
 }
 
 button {

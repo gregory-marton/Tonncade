@@ -50,6 +50,10 @@ const App = {
             MidiMode.cleanup();
         }
 
+        if (typeof SnakeMode !== 'undefined') {
+            SnakeMode.cleanup();
+        }
+
         this.currentMode = mode;
 
         // Configure mobile action button text based on active mode
@@ -86,13 +90,13 @@ const App = {
         // Hide/show palette
         const palette = document.getElementById('palette');
         if (palette) {
-            palette.style.display = mode === 'midi' ? 'none' : 'block';
+            palette.style.display = (mode === 'midi' || mode === 'snake') ? 'none' : 'block';
         }
 
         // Hide/show mobile controls
         const mobileContainer = document.getElementById('mobile-controls');
         if (mobileContainer) {
-            if (mode === 'midi') {
+            if (mode === 'midi' || mode === 'snake') {
                 mobileContainer.style.display = 'none';
             } else {
                 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -105,6 +109,9 @@ const App = {
         document.getElementById('gravity-controls').style.display = 'none';
         if (document.getElementById('midi-controls')) {
             document.getElementById('midi-controls').style.display = 'none';
+        }
+        if (document.getElementById('snake-controls')) {
+            document.getElementById('snake-controls').style.display = 'none';
         }
         document.getElementById('placement-controls').style.display = 'none';
         chopCtrls.style.display = 'none';
@@ -125,6 +132,9 @@ const App = {
         } else if (mode === 'midi') {
             document.getElementById('midi-controls').style.display = 'block';
             MidiMode.init();
+        } else if (mode === 'snake') {
+            document.getElementById('snake-controls').style.display = 'block';
+            SnakeMode.init();
         }
     },
 
@@ -192,6 +202,11 @@ const App = {
         };
 
         svg.addEventListener('touchstart', (e) => {
+            if (this.currentMode === 'snake') {
+                e.preventDefault();
+                return;
+            }
+
             if (this.currentMode === 'midi') {
                 if (e.touches.length === 1) {
                     const cell = getCellFromTouch(e.touches[0]);
@@ -268,7 +283,7 @@ const App = {
         }, { passive: false });
 
         svg.addEventListener('touchmove', (e) => {
-            if (this.currentMode === 'midi') {
+            if (this.currentMode === 'midi' || this.currentMode === 'snake') {
                 e.preventDefault();
                 return;
             }

@@ -104,6 +104,11 @@ const Render = {
                         continue;
                     }
                 }
+                if (options.isSnake) {
+                    if (typeof SnakeMode !== 'undefined' && !SnakeMode.isInBounds(p, q)) {
+                        continue;
+                    }
+                }
 
                 const hex = this.createHex(p, q, {
                     fill: fill,

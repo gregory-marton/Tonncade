@@ -20,6 +20,7 @@
                     <div class="mode-option" data-mode="puzzle">Puzzle</div>
                     <div class="mode-option" data-mode="gravity">Gravity</div>
                     <div class="mode-option" data-mode="midi">MIDI</div>
+                    <div class="mode-option" data-mode="snake">Snake</div>
                 </div>
             </div>
         </header>
@@ -69,6 +70,28 @@
                         <p style="margin: 2px 0;"><strong>Row a-;</strong>: Middle letter row</p>
                         <p style="margin: 2px 0;"><strong>Row z-/</strong>: Bottom letter row</p>
                         <p style="margin: 2px 0;"><strong>Shift + Letters</strong>: Higher octaves</p>
+                    </div>
+                </div>
+
+                <!-- Snake Mode Controls & Stats -->
+                <div id="snake-controls" style="display: none;">
+                    <div class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        <button id="snake-start-pause">Pause</button>
+                        <button id="snake-reset">Restart</button>
+                    </div>
+                    <div class="stats-panel" style="margin-top: 15px;">
+                        <p>Score: <span id="snake-score">0</span></p>
+                        <p>Best: <span id="snake-best-score">0</span></p>
+                        <p id="snake-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Use T Y F H V B to steer!</p>
+                    </div>
+                    <div id="snake-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
+                        <p style="margin: 0 0 5px 0;"><strong>Keyboard Steering (surrounds G):</strong></p>
+                        <p style="margin: 2px 0;"><strong>T</strong>: Up-Left (↖)</p>
+                        <p style="margin: 2px 0;"><strong>Y</strong>: Up-Right (↗)</p>
+                        <p style="margin: 2px 0;"><strong>F</strong>: Left (◀)</p>
+                        <p style="margin: 2px 0;"><strong>H</strong>: Right (▶)</p>
+                        <p style="margin: 2px 0;"><strong>V</strong>: Down-Left (↙)</p>
+                        <p style="margin: 2px 0;"><strong>B</strong>: Down-Right (↘)</p>
                     </div>
                 </div>
 
@@ -124,6 +147,7 @@
     <script src="js/puzzle.js"></script>
     <script src="js/gravity.js"></script>
     <script src="js/midi.js"></script>
+    <script src="js/snake.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
