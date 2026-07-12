@@ -1,5 +1,5 @@
 /**
- * midi.js - MIDI File Parser and Simon-like Game Mode.
+ * midi.js - MIDI File Parser and Melody Game Mode.
  */
 
 const MidiMode = {
