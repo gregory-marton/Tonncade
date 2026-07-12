@@ -280,8 +280,6 @@ const SnakeMode = {
 
     setupKeyboardEvents: function() {
         window.onkeydown = (e) => {
-            if (this.state.isGameOver) return;
-
             const key = e.key.toLowerCase();
 
             // Toggle pause on Escape or P
@@ -291,6 +289,18 @@ const SnakeMode = {
                 return;
             }
 
+            // Spacebar: Reset if game over, otherwise toggle pause
+            if (e.code === 'Space' || e.key === ' ' || key === 'spacebar') {
+                e.preventDefault();
+                if (this.state.isGameOver) {
+                    this.reset();
+                } else {
+                    this.togglePause();
+                }
+                return;
+            }
+
+            if (this.state.isGameOver) return;
             if (this.state.isPaused || this.state.isFlourishing) return;
 
             // Map keys surrounding G:
