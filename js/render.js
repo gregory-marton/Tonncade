@@ -100,7 +100,7 @@ const Render = {
                 }
                 if (options.isGravity) {
                     const col = p + Math.floor(q / 2);
-                    if (q < 0 || q >= 15 || col < -5 || col > 4) {
+                    if (q < 0 || q >= 22 || col < -5 || col > 4) {
                         continue;
                     }
                 }

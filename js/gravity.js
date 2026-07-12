@@ -318,7 +318,7 @@ const GravityMode = {
         // Render settled cells from Board
         Board.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
-            if (q < 15) {
+            if (q < 22) {
                 const hex = Render.createHex(p, q, {
                     fill: val.color,
                     stroke: 'white',
