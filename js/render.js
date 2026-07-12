@@ -90,7 +90,7 @@ const Render = {
         for (let p = viewport.minP; p <= viewport.maxP; p++) {
             for (let q = viewport.minQ; q <= viewport.maxQ; q++) {
                 const midi = Tonnetz.getMidi(p, q);
-                if (midi < 0 || midi > 127) continue;
+                if (!options.isSnake && (midi < 0 || midi > 127)) continue;
 
                 // For Puzzle Mode, dim cells outside the radius
                 let fill = '#1c1f28';

@@ -145,9 +145,10 @@ const SnakeMode = {
         // Move head forward
         this.state.snake.unshift(newHead);
 
-        // Sound the head note
+        // Sound the head note (clamp to standard 88-key piano range for audibility)
         const midi = Tonnetz.getMidi(newHead.p, newHead.q);
-        Synth.playNote(midi, 0, 0.35, 0.16);
+        const playableMidi = Math.max(21, Math.min(108, midi));
+        Synth.playNote(playableMidi, 0, 0.35, 0.16);
         this.highlightSegment(newHead.p, newHead.q, 200);
 
         // Check food collision
@@ -186,7 +187,8 @@ const SnakeMode = {
         const noteDelay = 100; // ms between notes
         notes.forEach((note, index) => {
             const tId = setTimeout(() => {
-                Synth.playNote(note.midi, 0, 0.4, 0.18);
+                const playableMidi = Math.max(21, Math.min(108, note.midi));
+                Synth.playNote(playableMidi, 0, 0.4, 0.18);
                 this.highlightSegment(note.p, note.q, 150);
             }, index * noteDelay);
             this.state.flourishTimeouts.push(tId);
