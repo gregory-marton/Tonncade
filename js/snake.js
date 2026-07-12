@@ -28,7 +28,6 @@ const SnakeMode = {
 
         this.setupDOMEvents();
         this.reset();
-        this.setupKeyboardEvents();
     },
 
     cleanup: function() {
@@ -88,6 +87,7 @@ const SnakeMode = {
         const pauseBtn = document.getElementById('snake-start-pause');
         if (pauseBtn) pauseBtn.textContent = "Pause";
 
+        this.setupKeyboardEvents();
         this.startTimer();
     },
 
