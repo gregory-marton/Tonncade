@@ -123,7 +123,6 @@ const SnakeMode = {
 
         // Apply heading update
         this.state.direction = this.state.nextDirection;
-        console.log("Snake tick. Direction:", JSON.stringify(this.state.direction), "Head:", JSON.stringify(this.state.snake[0]));
 
         const head = this.state.snake[0];
         const newHead = {
@@ -250,7 +249,6 @@ const SnakeMode = {
 
     gameOver: function() {
         this.state.isGameOver = true;
-        console.log("Snake Game Over triggered!");
         if (this.state.timer) {
             clearInterval(this.state.timer);
             this.state.timer = null;
@@ -283,7 +281,6 @@ const SnakeMode = {
     setupKeyboardEvents: function() {
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
-            console.log("Snake Mode onkeydown registered key:", key, "code:", e.code, "isGameOver:", this.state.isGameOver);
 
             // Toggle pause on Escape or P
             if (key === 'escape' || key === 'p') {
