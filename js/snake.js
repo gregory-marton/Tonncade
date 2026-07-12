@@ -207,7 +207,7 @@ const SnakeMode = {
     },
 
     spawnGem: function() {
-        const radius = 8;
+        const radius = 7;
         const candidates = [];
 
         for (let p = -radius; p <= radius; p++) {
@@ -244,7 +244,7 @@ const SnakeMode = {
     },
 
     isInBounds: function(p, q) {
-        const radius = 8;
+        const radius = 7;
         return Math.abs(p) <= radius && 
                Math.abs(q) <= radius && 
                Math.abs(p + q) <= radius;
@@ -343,8 +343,8 @@ const SnakeMode = {
     },
 
     refreshBoard: function() {
-        // Draw standard radius 8 hex lattice
-        const viewport = { minP: -9, maxP: 9, minQ: -9, maxQ: 9 };
+        // Draw standard radius 7 hex lattice (viewport -8 to 8)
+        const viewport = { minP: -8, maxP: 8, minQ: -8, maxQ: 8 };
         Render.drawLattice(viewport, { isSnake: true });
 
         // Draw gem
@@ -384,7 +384,7 @@ const SnakeMode = {
             Render.svg.appendChild(label);
         }
 
-        Render.updateView(-400, -300, 1);
+        Render.updateView(-440, -330, 1.1);
     },
 
     updateScore: function(score) {
