@@ -13,7 +13,7 @@ const SnakeMode = {
         isGameOver: false,
         isPaused: false,
         isFlourishing: false,  // True during gem eating arpeggio
-        speed: 350,            // Tick speed in ms
+        speed: 700,            // Tick speed in ms
         timer: null,           // Movement interval timer ID
         flourishTimeouts: [],  // Scheduled timeouts for arpeggio
         lastHighlightTimeouts: [] // Highlighting timeouts
@@ -77,7 +77,7 @@ const SnakeMode = {
         this.state.isGameOver = false;
         this.state.isPaused = false;
         this.state.isFlourishing = false;
-        this.state.speed = 350;
+        this.state.speed = 700;
 
         this.updateScoreUI();
         this.spawnGem();
@@ -160,7 +160,7 @@ const SnakeMode = {
             this.spawnGem();
 
             // Increase speed slightly
-            this.state.speed = Math.max(120, 350 - this.state.score * 12);
+            this.state.speed = Math.max(250, 700 - this.state.score * 6);
         } else {
             // Standard step: pop tail
             this.state.snake.pop();
