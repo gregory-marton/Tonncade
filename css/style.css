@@ -245,11 +245,25 @@ svg {
 }
 
 /* Custom styles for Snake mode */
+@keyframes segment-bounce {
+    0% {
+        transform: scale(1.0);
+    }
+    30% {
+        transform: scale(1.35); /* Scale up */
+    }
+    100% {
+        transform: scale(1.0);
+    }
+}
+
 .cell.active-segment {
     fill: #ffffff !important;
     stroke: #7fe0d0 !important;
-    stroke-width: 2.5px !important;
-    transition: fill 0.05s ease-out, stroke 0.05s ease-out;
+    stroke-width: 3.5px !important;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: segment-bounce 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 button {

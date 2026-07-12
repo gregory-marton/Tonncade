@@ -149,7 +149,7 @@ const SnakeMode = {
         const midi = Tonnetz.getMidi(newHead.p, newHead.q);
         const playableMidi = Math.max(21, Math.min(108, midi));
         Synth.playNote(playableMidi, 0, 0.35, 0.16);
-        this.highlightSegment(newHead.p, newHead.q, 200);
+        this.highlightSegment(newHead.p, newHead.q, 300);
 
         // Check food collision
         if (newHead.p === this.state.gem.p && newHead.q === this.state.gem.q) {
@@ -189,7 +189,7 @@ const SnakeMode = {
             const tId = setTimeout(() => {
                 const playableMidi = Math.max(21, Math.min(108, note.midi));
                 Synth.playNote(playableMidi, 0, 0.4, 0.18);
-                this.highlightSegment(note.p, note.q, 150);
+                this.highlightSegment(note.p, note.q, 300);
             }, index * noteDelay);
             this.state.flourishTimeouts.push(tId);
         });
