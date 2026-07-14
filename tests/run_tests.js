@@ -93,8 +93,47 @@ console.log("Running App.init() test...");
 try {
     App.init();
     console.log("PASS: App.init() succeeded!");
+    
+    // TDD Gravity Mode cup dimensions test case
+    console.log("Running Gravity Mode cup dimensions (10x20) test...");
+    App.currentMode = 'gravity';
+    const Board = vm.runInContext("Board", context);
+
+    Board.cells.clear();
+
+    // Fill row q = 19 (20th row)
+    const rowQ = 19;
+    for (let col = -5; col <= 4; col++) {
+        const p = col - Math.floor(rowQ / 2);
+        Board.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' });
+    }
+    const fullLines = Board.findFullLines();
+    if (fullLines.length !== 1) {
+        console.error(`FAIL: 20th row (q = ${rowQ}) not detected! Length was: ${fullLines.length}`);
+        process.exit(1);
+    }
+    if (fullLines[0].length !== 10) {
+        console.error(`FAIL: Row width was not 10 cells! Width was: ${fullLines[0].length}`);
+        process.exit(1);
+    }
+
+    // Fill row q = 20 (21st row - spawn zone)
+    Board.cells.clear();
+    const bufferQ = 20;
+    for (let col = -5; col <= 4; col++) {
+        const p = col - Math.floor(bufferQ / 2);
+        Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
+    }
+    const fullLinesBuffer = Board.findFullLines();
+    if (fullLinesBuffer.length !== 0) {
+        console.error(`FAIL: Row in spawn zone (q = ${bufferQ}) was incorrectly detected as clearable!`);
+        process.exit(1);
+    }
+
+    Board.cells.clear();
+    console.log("PASS: Gravity Mode cup is correctly 10x20!");
     process.exit(0);
 } catch (err) {
-    console.error("FAIL: App.init() crashed with error:", err.message);
+    console.error("FAIL: App test failed with error:", err.stack || err.message);
     process.exit(1);
 }

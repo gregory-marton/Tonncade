@@ -137,6 +137,37 @@
         assert(Tonnetz.getMidi(-1, 1) === 42, "(-1,1) in gravity should be F#2 (42)");
         assert(Tonnetz.getNoteName(42) === 'F#', "MIDI 42 should be 'F#'");
 
+        // Test Gravity Mode Cup Height (10 columns, 20 rows)
+        log('Testing Gravity Mode Cup Dimensions (10x20)...', 'group');
+        
+        // Mock cells
+        Board.cells.clear();
+        
+        // Fill a complete row at q = 19 (the 20th row)
+        const rowQ = 19;
+        const line = [];
+        for (let col = -5; col <= 4; col++) {
+            const p = col - Math.floor(rowQ / 2);
+            Board.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' });
+            line.push({ p, q: rowQ });
+        }
+        
+        const fullLines = Board.findFullLines();
+        assert(fullLines.length === 1, "Completed 20th row (q = 19) should be detected");
+        assert(fullLines[0].length === 10, "Row width should be 10 cells");
+        
+        // Fill a row at q = 20 (which is in the buffer/spawn zone, so it shouldn't clear)
+        Board.cells.clear();
+        const bufferQ = 20;
+        for (let col = -5; col <= 4; col++) {
+            const p = col - Math.floor(bufferQ / 2);
+            Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
+        }
+        const fullLinesBuffer = Board.findFullLines();
+        assert(fullLinesBuffer.length === 0, "Row in spawn zone (q = 20) should NOT be detected as a clearable line");
+        
+        Board.cells.clear();
+
         // Clean up mock
         delete window.App;
 
