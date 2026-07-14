@@ -454,11 +454,37 @@ const ChopMode = {
             return;
         }
 
+        const getWikipediaUrl = (genericName) => {
+            const name = genericName.replace('Root ', '').trim();
+            if (name.startsWith('Major') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Major_triad';
+            if (name.startsWith('minor') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Minor_triad';
+            if (name.includes('m7b5')) return 'https://en.wikipedia.org/wiki/Half-diminished_seventh_chord';
+            if (name.includes('m7')) return 'https://en.wikipedia.org/wiki/Minor_seventh_chord';
+            if (name.includes('Maj7')) return 'https://en.wikipedia.org/wiki/Major_seventh_chord';
+            if (name.includes('m(Maj7)')) return 'https://en.wikipedia.org/wiki/Minor_major_seventh_chord';
+            if (name.includes('7')) return 'https://en.wikipedia.org/wiki/Dominant_seventh_chord';
+            if (name.includes('5 (Fifth)')) return 'https://en.wikipedia.org/wiki/Power_chord';
+            if (name.includes('Sus4') || name.includes('Sus2')) return 'https://en.wikipedia.org/wiki/Suspended_chord';
+            if (name.includes('Pentatonic Stack')) return 'https://en.wikipedia.org/wiki/Quintal_harmony';
+            if (name.includes('dim')) return 'https://en.wikipedia.org/wiki/Diminished_triad';
+            if (name.includes('aug')) return 'https://en.wikipedia.org/wiki/Augmented_triad';
+            if (name.includes('Major 3rd') || name.includes('minor 3rd') || name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Third_(music)';
+            if (name.includes('4th')) return 'https://en.wikipedia.org/wiki/Fourth';
+            return `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(name)}`;
+        };
+
         resultsDiv.innerHTML = matches.map(match => `
             <div class="chord-match-item" data-type="${match.type}" data-rotation="${match.rotation}" 
                  style="padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; background: #1c202a; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.15s ease;">
                 <div>
-                    <strong style="color: #7fe0d0; font-size: 13px;">${match.genericName}</strong>
+                    <strong style="font-size: 13px;">
+                        <a href="${getWikipediaUrl(match.genericName)}" target="_blank" rel="noopener noreferrer" 
+                           onclick="event.stopPropagation();" 
+                           style="color: #7fe0d0; text-decoration: none; border-bottom: 1px dashed rgba(127, 224, 208, 0.4);" 
+                           title="Read about this chord type on Wikipedia">
+                            ${match.genericName} ↗
+                        </a>
+                    </strong>
                     <div style="font-size: 11px; color: var(--dim); margin-top: 2px;">Piece: <span style="color: #fff; font-weight: bold;">${match.type}</span> | Rotation: ${match.rotation}</div>
                 </div>
                 <span style="font-size: 11px; color: var(--accent); font-weight: bold; border: 1px solid var(--accent); padding: 2px 6px; border-radius: 4px; background: rgba(127, 224, 208, 0.05);">Use</span>
