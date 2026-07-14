@@ -83,6 +83,11 @@ const Pieces = {
             name: 'V',
             color: '#fee440',
             cells: [{p:-1, q:0}, {p:0, q:0}, {p:-1, q:1}]
+        },
+        '.': {
+            name: '.',
+            color: '#b0b0b0',
+            cells: [{p:0, q:0}]
         }
     },
 

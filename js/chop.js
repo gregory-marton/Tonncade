@@ -96,6 +96,11 @@ const ChopMode = {
         };
         Render.drawLattice(viewport, {});
         this.renderPlacedPieces();
+        
+        // Re-append note and keyboard labels to the end of the SVG so they render on top of placed pieces
+        const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
+        labels.forEach(lbl => Render.svg.appendChild(lbl));
+
         Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
     },
 
@@ -277,6 +282,10 @@ const ChopMode = {
                 hex.style.pointerEvents = 'none';
                 Render.svg.appendChild(hex);
             });
+
+            // Re-append note and keyboard labels so they stay on top of the ghost piece
+            const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
+            labels.forEach(lbl => Render.svg.appendChild(lbl));
         }
     },
 
