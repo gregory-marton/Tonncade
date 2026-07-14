@@ -64,13 +64,13 @@ const Pieces = {
             color: '#f15bb5',
             cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}]
         },
-        '/': {
-            name: '/',
+        '>': {
+            name: '>',
             color: '#00bbf9',
             cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}]
         },
-        '\\': {
-            name: '\\',
+        '<': {
+            name: '<',
             color: '#00f5d4',
             cells: [{p:-1, q:0}, {p:0, q:0}, {p:0, q:1}]
         },
