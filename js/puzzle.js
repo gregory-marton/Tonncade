@@ -236,7 +236,7 @@ const PuzzleMode = {
         
         if (Board.checkGameOver(this.state.activePiece)) {
             this.state.isGameOver = true;
-            setTimeout(() => alert("Game Over! Lines cleared: " + this.state.linesCleared), 100);
+            setTimeout(() => alert(`Game Over! Cannot place piece: ${this.state.activePiece}\nLines cleared: ${this.state.linesCleared}`), 100);
         }
         
         this.refreshUI();
