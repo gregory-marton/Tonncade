@@ -250,11 +250,6 @@ const ChopMode = {
             
             const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
             const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-            const chordName = Tonnetz.analyzeChord(midis);
-            if (chordName) {
-                this.spawnTransientTooltip('Removed: ' + chordName, piece.p, piece.q, 'removed');
-            }
-            
             Synth.playChord(midis);
             return;
         }
@@ -336,11 +331,6 @@ const ChopMode = {
         
         const cells = Pieces.getAbsoluteCells(piece.type, p, q, piece.rotation);
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-        const chordName = Tonnetz.analyzeChord(midis);
-        if (chordName) {
-            this.spawnTransientTooltip('Placed: ' + chordName, p, q, 'placed');
-        }
-        
         Synth.playChord(midis);
         
         this.refreshLattice();
@@ -352,10 +342,6 @@ const ChopMode = {
         if (tooltip && tooltip.classList) {
             tooltip.classList.remove('visible');
         }
-        // Remove any remaining transient tooltips
-        document.querySelectorAll('.transient-tooltip').forEach(el => {
-            if (el && typeof el.remove === 'function') el.remove();
-        });
     },
 
     showPlacedTooltip: function(e, piece, cells) {
@@ -403,41 +389,5 @@ const ChopMode = {
             tooltip.style.left = `${e.pageX}px`;
             tooltip.style.top = `${e.pageY}px`;
         }
-    },
-
-    spawnTransientTooltip: function(text, p, q, type = 'placed') {
-        const tip = document.createElement('div');
-        tip.className = `transient-tooltip ${type}`;
-        tip.textContent = text;
-        document.body.appendChild(tip);
-
-        // Position at cell screen coordinates converted to page viewport coordinates
-        const pos = Render.getScreenPos(p, q);
-        const svgEl = Render.svg;
-        if (svgEl && svgEl.createSVGPoint) {
-            const pt = svgEl.createSVGPoint();
-            pt.x = pos.x;
-            pt.y = pos.y;
-            try {
-                const clientPt = pt.matrixTransform(svgEl.getScreenCTM());
-                tip.style.left = `${clientPt.x + window.scrollX}px`;
-                tip.style.top = `${clientPt.y + window.scrollY}px`;
-            } catch (err) {
-                // Fallback client/page coordinates
-                const rect = svgEl.getBoundingClientRect();
-                tip.style.left = `${rect.left + pos.x + window.scrollX}px`;
-                tip.style.top = `${rect.top + pos.y + window.scrollY}px`;
-            }
-        }
-
-        // Trigger transition
-        setTimeout(() => {
-            if (tip && tip.classList) tip.classList.add('fade-up');
-        }, 10);
-
-        // Remove element after animation finishes
-        setTimeout(() => {
-            if (tip && typeof tip.remove === 'function') tip.remove();
-        }, 1200);
     }
 };
