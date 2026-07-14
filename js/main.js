@@ -40,7 +40,9 @@ const App = {
         // Clean up global listeners
         window.onkeydown = null;
         window.onmousemove = null;
-        Render.svg.onmousedown = null;
+        if (Render.svg) {
+            Render.svg.onmousedown = null;
+        }
 
         if (typeof GravityMode !== 'undefined' && GravityMode.state.timer) {
             clearInterval(GravityMode.state.timer);

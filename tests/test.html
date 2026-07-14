@@ -13,8 +13,63 @@
     <h1>Lattice Math Tests</h1>
     <div id="results"></div>
 
+    <!-- Mock DOM elements for App setup -->
+    <div style="display:none;">
+        <svg id="tonnetz-svg"></svg>
+        <div id="puzzle-stats"></div>
+        <div id="chop-controls"></div>
+        <div id="click-action"></div>
+        <div class="mode-slider-active"></div>
+        <div class="mode-option" data-mode="midi"></div>
+        <div class="mode-option" data-mode="chop"></div>
+        <div class="mode-option" data-mode="snake"></div>
+        <div class="mode-option" data-mode="puzzle"></div>
+        <div class="mode-option" data-mode="gravity"></div>
+        <div id="mobile-controls"></div>
+        <div id="gravity-controls"></div>
+        <div id="midi-controls"></div>
+        <div id="snake-controls"></div>
+        <div id="placement-controls"></div>
+        <button id="m-btn-ccw"></button>
+        <button id="m-btn-cw"></button>
+        <button id="m-btn-ul"></button>
+        <button id="m-btn-ur"></button>
+        <button id="m-btn-left"></button>
+        <button id="m-btn-right"></button>
+        <button id="m-btn-dl"></button>
+        <button id="m-btn-dr"></button>
+        <button id="m-btn-action"></button>
+        <!-- MIDI mode stats -->
+        <span id="midi-current-streak"></span>
+        <span id="midi-best-streak"></span>
+        <span id="midi-game-status"></span>
+        <!-- Snake mode stats -->
+        <span id="snake-score"></span>
+        <span id="snake-best-score"></span>
+        <span id="snake-game-status"></span>
+        <!-- Gravity mode stats -->
+        <span id="gravity-lines-count"></span>
+        <span id="gravity-best-count"></span>
+        <span id="gravity-speed-level"></span>
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="../js/version.js"></script>
     <script src="../js/tonnetz.js"></script>
+    <script src="../js/synth.js"></script>
     <script src="../js/pieces.js"></script>
+    <script src="../js/board.js"></script>
+    <script src="../js/render.js"></script>
+    <script src="../js/chop.js"></script>
+    <script src="../js/puzzle.js"></script>
+    <script src="../js/gravity.js"></script>
+    <script src="../js/midi.js"></script>
+    <script src="../js/snake.js"></script>
+    <script src="../js/main.js"></script>
+    <script>
+        // Override onload so we can run App.init manually in a controlled test case
+        window.onload = null;
+    </script>
     <script>
         const results = document.getElementById('results');
         function log(msg, type = '') {
@@ -104,6 +159,16 @@
         const barRotated2 = Pieces.rotate(barRotated);
         const midisRot2 = barRotated2.map(c => Tonnetz.getMidi(c.p, c.q));
         assert(midisRot2[1] - midisRot2[0] === 3, "Double Rotated Bar is minor thirds (+3)");
+
+        // Test App initialization and setMode crash prevention
+        log('Testing App initialization...', 'group');
+        window.App = App;
+        try {
+            App.init();
+            log('✓ App.init() succeeded without crash', 'pass');
+        } catch (err) {
+            log('✗ App.init() failed with crash: ' + err.message, 'fail');
+        }
 
         log('Lattice math and piece tests complete.');
     </script>

@@ -42,7 +42,9 @@ const SnakeMode = {
         
         window.onkeydown = null;
         window.onmousemove = null;
-        Render.svg.onmousedown = null;
+        if (Render.svg) {
+            Render.svg.onmousedown = null;
+        }
     },
 
     setupDOMEvents: function() {
