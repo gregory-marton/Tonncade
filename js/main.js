@@ -26,8 +26,8 @@ const App = {
         this.setupTouchGestures();
         this.updateVersionTag();
 
-        // Start in Melody Mode
-        this.setMode('midi', 0);
+        // Start in Sandbox Mode
+        this.setMode('chop', 0);
     },
 
     setMode: function(mode, idx) {

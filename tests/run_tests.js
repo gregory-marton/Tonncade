@@ -9,7 +9,8 @@ global.document = {
         style: {},
         setAttribute: () => {},
         appendChild: () => {},
-        addEventListener: () => {}
+        addEventListener: () => {},
+        querySelector: () => ({ setAttribute: () => {}, appendChild: () => {} })
     }),
     createElementNS: (ns, tag) => ({
         style: {},
@@ -26,14 +27,15 @@ global.document = {
             setAttribute: () => {},
             appendChild: () => {},
             addEventListener: () => {},
-            classList: { add: () => {}, remove: () => {} }
+            classList: { add: () => {}, remove: () => {} },
+            querySelectorAll: () => []
         };
     },
     querySelectorAll: (selector) => {
         if (selector === '.mode-option') {
             return [
-                { getAttribute: () => 'midi', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'chop', classList: { add: () => {}, remove: () => {} } },
+                { getAttribute: () => 'midi', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'snake', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'puzzle', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'gravity', classList: { add: () => {}, remove: () => {} } }
