@@ -29,7 +29,7 @@ const PuzzleMode = {
     },
 
     randomPiece: function() {
-        const keys = Object.keys(Pieces.TYPES);
+        const keys = Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
     },
 

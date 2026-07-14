@@ -208,6 +208,12 @@
         // Test Pieces
         log('Testing Pieces.js...', 'group');
         
+        assert(Pieces.TYPES['-'].cells.length === 2, "Dimino '-' should have 2 cells");
+        assert(Pieces.TYPES['|'].cells.length === 3, "Trimino '|' should have 3 cells");
+        assert(Pieces.TYPES['/'].cells.length === 3, "Trimino '/' should have 3 cells");
+        assert(Pieces.TYPES['\\'].cells.length === 3, "Trimino '\\' should have 3 cells");
+        assert(Pieces.TYPES['V'].cells.length === 3, "Trimino 'V' should have 3 cells");
+
         const bar = Pieces.TYPES['I'].cells;
         assert(bar.length === 4, "Bar piece should have 4 cells");
         

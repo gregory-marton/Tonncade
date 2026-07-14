@@ -58,8 +58,35 @@ const Pieces = {
             name: 'X',
             color: '#4b9f4b',
             cells: [{p:0, q:0}, {p:1, q:0}, {p:-1, q:1}, {p:0, q:-1}]
+        },
+        '-': {
+            name: '-',
+            color: '#9b5de5',
+            cells: [{p:-1, q:0}, {p:0, q:0}]
+        },
+        '|': {
+            name: '|',
+            color: '#f15bb5',
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}]
+        },
+        '/': {
+            name: '/',
+            color: '#00bbf9',
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}]
+        },
+        '\\': {
+            name: '\\',
+            color: '#00f5d4',
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:0, q:1}]
+        },
+        'V': {
+            name: 'V',
+            color: '#fee440',
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:-1, q:1}]
         }
     },
+
+    TETRAHEX_KEYS: ['P', 'Q', 'L', 'J', 'S', 'Z', 'I', 'O', 'C', 'X'],
 
     // Rotate 60 degrees clockwise
     rotate: function(cells) {
