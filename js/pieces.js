@@ -67,12 +67,12 @@ const Pieces = {
         '>': {
             name: '>',
             color: '#00bbf9',
-            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:0, q:1}]
         },
         '<': {
             name: '<',
             color: '#00f5d4',
-            cells: [{p:-1, q:0}, {p:0, q:0}, {p:0, q:1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}]
         },
         'V': {
             name: 'V',
