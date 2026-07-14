@@ -48,14 +48,13 @@ const Tonnetz = {
         return midi >= 0 && midi <= 127;
     },
 
-    // Analyze Chord name from list of MIDI notes
     analyzeChord: function(midis) {
-        if (!midis || midis.length === 0) return 'Silence';
+        if (!midis || midis.length === 0) return null;
         const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
         const uniquePitches = [...new Set(midis.map(m => ((m % 12) + 12) % 12))];
 
-        if (uniquePitches.length === 1) {
-            return noteNames[uniquePitches[0]];
+        if (uniquePitches.length <= 1) {
+            return null; // Single note is not a chord combination
         }
 
         const templates = [
@@ -100,8 +99,7 @@ const Tonnetz = {
             }
         }
 
-        // Fallback: list pitches
-        return uniquePitches.map(p => noteNames[p]).join('-');
+        return null; // Not a named chord combination
     }
 };
 

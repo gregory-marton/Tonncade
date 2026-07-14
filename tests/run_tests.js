@@ -191,8 +191,12 @@ try {
 
     // Test Tonnetz.analyzeChord
     console.log("Running Tonnetz.analyzeChord tests...");
-    if (TonnetzObj.analyzeChord([60]) !== 'C') {
-        console.error("FAIL: Single note [60] should be analyzed as 'C'");
+    if (TonnetzObj.analyzeChord([60]) !== null) {
+        console.error("FAIL: Single note [60] should return null");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([60, 61, 62]) !== null) {
+        console.error("FAIL: Unnamed combination [60, 61, 62] should return null");
         process.exit(1);
     }
     if (TonnetzObj.analyzeChord([60, 67]) !== 'C 5 (Fifth)') {

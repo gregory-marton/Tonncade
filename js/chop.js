@@ -250,7 +250,9 @@ const ChopMode = {
             const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
             const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
             const chordName = Tonnetz.analyzeChord(midis);
-            this.spawnTransientTooltip('Removed: ' + chordName, piece.p, piece.q, 'removed');
+            if (chordName) {
+                this.spawnTransientTooltip('Removed: ' + chordName, piece.p, piece.q, 'removed');
+            }
             
             Synth.playChord(midis);
             return;
@@ -334,7 +336,9 @@ const ChopMode = {
         const cells = Pieces.getAbsoluteCells(piece.type, p, q, piece.rotation);
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         const chordName = Tonnetz.analyzeChord(midis);
-        this.spawnTransientTooltip('Placed: ' + chordName, p, q, 'placed');
+        if (chordName) {
+            this.spawnTransientTooltip('Placed: ' + chordName, p, q, 'placed');
+        }
         
         Synth.playChord(midis);
         
@@ -370,9 +374,11 @@ const ChopMode = {
         if (tooltip) {
             const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
             const chordName = Tonnetz.analyzeChord(midis);
-            tooltip.textContent = chordName;
-            if (tooltip.classList) tooltip.classList.add('visible');
-            this.movePlacedTooltip(e);
+            if (chordName) {
+                tooltip.textContent = chordName;
+                if (tooltip.classList) tooltip.classList.add('visible');
+                this.movePlacedTooltip(e);
+            }
         }
     },
 
