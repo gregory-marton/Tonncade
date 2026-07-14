@@ -232,6 +232,15 @@
         const midisRot2 = barRotated2.map(c => Tonnetz.getMidi(c.p, c.q));
         assert(midisRot2[1] - midisRot2[0] === 3, "Double Rotated Bar is minor thirds (+3)");
 
+        // Test Tonnetz.analyzeChord
+        log('Testing Tonnetz.analyzeChord...', 'group');
+        assert(Tonnetz.analyzeChord([60]) === 'C', "Single note [60] should be analyzed as 'C'");
+        assert(Tonnetz.analyzeChord([60, 67]) === 'C 5 (Fifth)', "Fifth [60, 67] should be analyzed as 'C 5 (Fifth)'");
+        assert(Tonnetz.analyzeChord([60, 64, 67]) === 'C Major', "Major triad [60, 64, 67] should be analyzed as 'C Major'");
+        assert(Tonnetz.analyzeChord([60, 63, 67]) === 'C minor', "Minor triad [60, 63, 67] should be analyzed as 'C minor'");
+        assert(Tonnetz.analyzeChord([60, 64, 67, 71]) === 'C Maj7', "Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
+        assert(Tonnetz.analyzeChord([57, 60, 64, 67]) === 'A m7', "Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
+
         // Test App initialization and setMode crash prevention
         log('Testing App initialization...', 'group');
         window.App = App;

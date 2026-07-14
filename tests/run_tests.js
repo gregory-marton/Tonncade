@@ -186,6 +186,34 @@ try {
         }
     }
     console.log("PASS: Gravity Tonnetz remains perfectly translationally isomorphic!");
+
+    // Test Tonnetz.analyzeChord
+    console.log("Running Tonnetz.analyzeChord tests...");
+    if (TonnetzObj.analyzeChord([60]) !== 'C') {
+        console.error("FAIL: Single note [60] should be analyzed as 'C'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([60, 67]) !== 'C 5 (Fifth)') {
+        console.error("FAIL: Fifth [60, 67] should be analyzed as 'C 5 (Fifth)'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([60, 64, 67]) !== 'C Major') {
+        console.error("FAIL: Major triad [60, 64, 67] should be analyzed as 'C Major'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([60, 63, 67]) !== 'C minor') {
+        console.error("FAIL: Minor triad [60, 63, 67] should be analyzed as 'C minor'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([60, 64, 67, 71]) !== 'C Maj7') {
+        console.error("FAIL: Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([57, 60, 64, 67]) !== 'A m7') {
+        console.error("FAIL: Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
+        process.exit(1);
+    }
+    console.log("PASS: Tonnetz.analyzeChord is fully correct!");
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

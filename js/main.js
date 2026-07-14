@@ -67,6 +67,10 @@ const App = {
             SnakeMode.cleanup();
         }
 
+        if (typeof ChopMode !== 'undefined' && ChopMode.cleanup) {
+            ChopMode.cleanup();
+        }
+
         this.currentMode = mode;
 
         // Configure mobile action button text based on active mode

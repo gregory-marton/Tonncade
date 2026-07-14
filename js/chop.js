@@ -20,6 +20,13 @@ const ChopMode = {
         this.renderPalette();
         this.refreshLattice();
         this.setupEvents();
+
+        // Ensure single game-tooltip exists in DOM
+        if (!document.querySelector('.game-tooltip')) {
+            const tip = document.createElement('div');
+            tip.className = 'game-tooltip';
+            document.body.appendChild(tip);
+        }
     },
 
     renderPalette: function() {
@@ -116,6 +123,12 @@ const ChopMode = {
                     className: 'placed-piece',
                     data: { placed: true, p: c.p, q: c.q }
                 });
+                
+                // Attach hover listeners for placed piece chord tooltips
+                hex.onmouseenter = (e) => this.showPlacedTooltip(e, piece, cells);
+                hex.onmouseleave = () => this.hidePlacedTooltip();
+                hex.onmousemove = (e) => this.movePlacedTooltip(e);
+
                 Render.svg.appendChild(hex);
             });
         });
@@ -234,8 +247,11 @@ const ChopMode = {
             this.refreshLattice();
             this.updateGhost();
             
-            const cells = Pieces.getAbsoluteCells(piece.type, p, q, piece.rotation);
+            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
             const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+            const chordName = Tonnetz.analyzeChord(midis);
+            this.spawnTransientTooltip('Removed: ' + chordName, piece.p, piece.q, 'removed');
+            
             Synth.playChord(midis);
             return;
         }
@@ -317,8 +333,104 @@ const ChopMode = {
         
         const cells = Pieces.getAbsoluteCells(piece.type, p, q, piece.rotation);
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+        const chordName = Tonnetz.analyzeChord(midis);
+        this.spawnTransientTooltip('Placed: ' + chordName, p, q, 'placed');
+        
         Synth.playChord(midis);
         
         this.refreshLattice();
+    },
+
+    cleanup: function() {
+        // Hide the game-tooltip if it exists
+        const tooltip = document.querySelector('.game-tooltip');
+        if (tooltip && tooltip.classList) {
+            tooltip.classList.remove('visible');
+        }
+        // Remove any remaining transient tooltips
+        document.querySelectorAll('.transient-tooltip').forEach(el => {
+            if (el && typeof el.remove === 'function') el.remove();
+        });
+    },
+
+    showPlacedTooltip: function(e, piece, cells) {
+        // Highlight the entire placed piece's cells
+        const placedHexes = document.querySelectorAll('.placed-piece');
+        placedHexes.forEach(hex => {
+            const hp = parseInt(hex.getAttribute('data-p'));
+            const hq = parseInt(hex.getAttribute('data-q'));
+            if (cells.some(c => c.p === hp && c.q === hq)) {
+                hex.style.stroke = '#7fe0d0';
+                hex.style.strokeWidth = '3';
+            }
+        });
+
+        // Populate and show tooltip
+        const tooltip = document.querySelector('.game-tooltip');
+        if (tooltip) {
+            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+            const chordName = Tonnetz.analyzeChord(midis);
+            tooltip.textContent = chordName;
+            if (tooltip.classList) tooltip.classList.add('visible');
+            this.movePlacedTooltip(e);
+        }
+    },
+
+    hidePlacedTooltip: function() {
+        // Reset stroke styles on placed pieces
+        const placedHexes = document.querySelectorAll('.placed-piece');
+        placedHexes.forEach(hex => {
+            hex.style.stroke = 'white';
+            hex.style.strokeWidth = '2';
+        });
+
+        const tooltip = document.querySelector('.game-tooltip');
+        if (tooltip && tooltip.classList) {
+            tooltip.classList.remove('visible');
+        }
+    },
+
+    movePlacedTooltip: function(e) {
+        const tooltip = document.querySelector('.game-tooltip');
+        if (tooltip && tooltip.classList && tooltip.classList.contains('visible')) {
+            tooltip.style.left = `${e.pageX}px`;
+            tooltip.style.top = `${e.pageY}px`;
+        }
+    },
+
+    spawnTransientTooltip: function(text, p, q, type = 'placed') {
+        const tip = document.createElement('div');
+        tip.className = `transient-tooltip ${type}`;
+        tip.textContent = text;
+        document.body.appendChild(tip);
+
+        // Position at cell screen coordinates converted to page viewport coordinates
+        const pos = Render.getScreenPos(p, q);
+        const svgEl = Render.svg;
+        if (svgEl && svgEl.createSVGPoint) {
+            const pt = svgEl.createSVGPoint();
+            pt.x = pos.x;
+            pt.y = pos.y;
+            try {
+                const clientPt = pt.matrixTransform(svgEl.getScreenCTM());
+                tip.style.left = `${clientPt.x + window.scrollX}px`;
+                tip.style.top = `${clientPt.y + window.scrollY}px`;
+            } catch (err) {
+                // Fallback client/page coordinates
+                const rect = svgEl.getBoundingClientRect();
+                tip.style.left = `${rect.left + pos.x + window.scrollX}px`;
+                tip.style.top = `${rect.top + pos.y + window.scrollY}px`;
+            }
+        }
+
+        // Trigger transition
+        setTimeout(() => {
+            if (tip && tip.classList) tip.classList.add('fade-up');
+        }, 10);
+
+        // Remove element after animation finishes
+        setTimeout(() => {
+            if (tip && typeof tip.remove === 'function') tip.remove();
+        }, 1200);
     }
 };

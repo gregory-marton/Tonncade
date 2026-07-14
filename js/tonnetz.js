@@ -46,6 +46,62 @@ const Tonnetz = {
     isValid: function(p, q) {
         const midi = this.getMidi(p, q);
         return midi >= 0 && midi <= 127;
+    },
+
+    // Analyze Chord name from list of MIDI notes
+    analyzeChord: function(midis) {
+        if (!midis || midis.length === 0) return 'Silence';
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const uniquePitches = [...new Set(midis.map(m => ((m % 12) + 12) % 12))];
+
+        if (uniquePitches.length === 1) {
+            return noteNames[uniquePitches[0]];
+        }
+
+        const templates = [
+            // 4-note
+            { intervals: [0, 4, 7, 11], name: 'Maj7' },
+            { intervals: [0, 3, 7, 10], name: 'm7' },
+            { intervals: [0, 4, 7, 10], name: '7' },
+            { intervals: [0, 3, 6, 10], name: 'm7b5' },
+            { intervals: [0, 3, 6, 9], name: 'dim7' },
+            { intervals: [0, 4, 7, 9], name: '6' },
+            { intervals: [0, 3, 7, 9], name: 'm6' },
+            { intervals: [0, 2, 7, 9], name: 'Pentatonic Stack' },
+            // 3-note
+            { intervals: [0, 4, 7], name: 'Major' },
+            { intervals: [0, 3, 7], name: 'minor' },
+            { intervals: [0, 2, 7], name: 'Sus2' },
+            { intervals: [0, 5, 7], name: 'Sus4' },
+            { intervals: [0, 7, 11], name: 'Maj7 (shell)' },
+            { intervals: [0, 7, 10], name: '7 (shell)' },
+            { intervals: [0, 3, 6], name: 'dim' },
+            { intervals: [0, 4, 8], name: 'aug' },
+            // 2-note
+            { intervals: [0, 7], name: '5 (Fifth)' },
+            { intervals: [0, 4], name: 'Major 3rd' },
+            { intervals: [0, 3], name: 'minor 3rd' },
+            { intervals: [0, 5], name: '4th' },
+            { intervals: [0, 9], name: '6th' },
+            { intervals: [0, 10], name: 'm7 (interval)' },
+            { intervals: [0, 11], name: 'Maj7 (interval)' },
+            { intervals: [0, 2], name: 'Major 2nd' },
+            { intervals: [0, 8], name: 'minor 6th' },
+            { intervals: [0, 6], name: 'Tritone' }
+        ];
+
+        // Try each pitch as root
+        for (const root of uniquePitches) {
+            const rel = uniquePitches.map(p => (p - root + 12) % 12).sort((a, b) => a - b);
+            for (const t of templates) {
+                if (rel.length === t.intervals.length && rel.every((v, i) => v === t.intervals[i])) {
+                    return `${noteNames[root]} ${t.name}`;
+                }
+            }
+        }
+
+        // Fallback: list pitches
+        return uniquePitches.map(p => noteNames[p]).join('-');
     }
 };
 

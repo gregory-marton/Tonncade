@@ -446,3 +446,58 @@ button:hover {
         display: none; /* Hide keyboard shortcut text on mobile portrait */
     }
 }
+
+/* Tooltip styles for Chop Mode */
+.game-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(20, 22, 28, 0.95);
+    border: 1px solid #2d3240;
+    color: #7fe0d0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    transition: opacity 0.1s ease, transform 0.1s ease;
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(-10px);
+}
+
+.game-tooltip.visible {
+    opacity: 1;
+}
+
+.transient-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(20, 22, 28, 0.9);
+    border: 1px solid #2d3240;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 1001;
+    transform: translate(-50%, -50%);
+    opacity: 1;
+    transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1), opacity 1.2s ease;
+}
+
+.transient-tooltip.placed {
+    color: #7fe0d0;
+    border-color: #3e9e8f;
+}
+
+.transient-tooltip.removed {
+    color: #f0b97f;
+    border-color: #a6723c;
+}
+
+.transient-tooltip.fade-up {
+    transform: translate(-50%, -150%) scale(1.1);
+    opacity: 0;
+}
