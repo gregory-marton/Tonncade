@@ -74,6 +74,7 @@ const Tonnetz = {
             { intervals: [0, 4, 7, 9], name: '6' },
             { intervals: [0, 3, 7, 9], name: 'm6' },
             { intervals: [0, 2, 7, 9], name: 'Pentatonic Stack' },
+            { intervals: [0, 5, 7, 10], name: '7sus4' },
             // 3-note
             { intervals: [0, 4, 7], name: 'Major' },
             { intervals: [0, 3, 7], name: 'Minor' },

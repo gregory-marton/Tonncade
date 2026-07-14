@@ -253,6 +253,8 @@
         assert(pentAll.includes('C Pentatonic Stack'), "C-G-D-A should return C Pentatonic Stack");
         const m7b5All = Tonnetz.analyzeAllChords([57, 60, 63, 67]);
         assert(m7b5All.includes('A m7b5'), "A-C-Eb-G should return A m7b5");
+        const sus7All = Tonnetz.analyzeAllChords([60, 65, 67, 70]);
+        assert(sus7All.includes('C 7sus4'), "C-F-G-Bb should return C 7sus4");
 
         // Test App initialization and setMode crash prevention
         log('Testing App initialization...', 'group');

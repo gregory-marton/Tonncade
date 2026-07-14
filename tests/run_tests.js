@@ -257,6 +257,13 @@ try {
         process.exit(1);
     }
 
+    // 4. C - F - G - Bb (60, 65, 67, 70) is C 7sus4
+    const sus7All = TonnetzObj.analyzeAllChords([60, 65, 67, 70]);
+    if (!sus7All.includes('C 7sus4')) {
+        console.error("FAIL: [60, 65, 67, 70] should yield C 7sus4! Got:", sus7All);
+        process.exit(1);
+    }
+
     console.log("PASS: Tonnetz.analyzeAllChords is fully correct!");
     process.exit(0);
 } catch (err) {
