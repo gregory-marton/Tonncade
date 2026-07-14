@@ -347,10 +347,8 @@ const GravityMode = {
             // Draw active piece labels
             cells.forEach(c => {
                 const midi = Tonnetz.getMidi(c.p, c.q);
-                if (midi >= 0 && midi <= 127) {
-                    const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
-                    Render.svg.appendChild(label);
-                }
+                const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
+                Render.svg.appendChild(label);
             });
 
             // Render ghost projection

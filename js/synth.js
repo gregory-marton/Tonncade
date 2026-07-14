@@ -31,13 +31,20 @@ const Synth = {
 
     playNote: function(midi, t0 = 0, dur = 0.8, peak = 0.16, isHarmonic = false) {
         this.init();
+        
+        let playableMidi = midi;
+        if (!isHarmonic) {
+            while (playableMidi < 21) playableMidi += 12;
+            while (playableMidi > 108) playableMidi -= 12;
+        }
+
         const now = this.ctx.currentTime;
         const startTime = now + t0;
 
         // Progressive volume scaling for low notes:
         let notePeak = peak;
-        if (!isHarmonic && midi < 60) {
-            const octavesBelow = (60 - midi) / 12;
+        if (!isHarmonic && playableMidi < 60) {
+            const octavesBelow = (60 - playableMidi) / 12;
             notePeak = peak * (1.0 + octavesBelow * 0.6); // Up to 2.8x volume boost
         }
         
@@ -45,7 +52,7 @@ const Synth = {
         const gain = this.ctx.createGain();
         
         osc.type = 'triangle';
-        osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        osc.frequency.value = 440 * Math.pow(2, (playableMidi - 69) / 12);
         
         gain.gain.setValueAtTime(0.0001, startTime);
         gain.gain.linearRampToValueAtTime(notePeak, startTime + 0.012);
@@ -58,8 +65,8 @@ const Synth = {
         osc.stop(startTime + dur + 0.05);
 
         // Psychoacoustic bass enhancement: add a subtle higher-octave harmonic for low notes
-        if (!isHarmonic && midi < 50) {
-            this.playNote(midi + 12, t0, dur, notePeak * 0.4, true);
+        if (!isHarmonic && playableMidi < 50) {
+            this.playNote(playableMidi + 12, t0, dur, notePeak * 0.4, true);
         }
     },
 
