@@ -10,7 +10,7 @@ const GravityMode = {
         isPaused: false,
         activePiece: null, // Piece type key ('I', 'O', etc.)
         p: 0,
-        q: 25,
+        q: 17,
         rotation: 0,
         dropInterval: 1000, // ms
         timer: null
@@ -72,10 +72,10 @@ const GravityMode = {
         this.state.activePiece = this.state.nextQueue.shift();
         this.state.nextQueue.push(this.randomPiece());
         
-        // Spawn at height 25 (q = 25), centered column index (col = 0)
-        // Since col = p + floor(q/2) => 0 = p + 12 => p = -12
-        this.state.p = -12;
-        this.state.q = 25;
+        // Spawn at height 17 (q = 17), centered column index (col = 0)
+        // Since col = p + floor(q/2) => 0 = p + 8 => p = -8
+        this.state.p = -8;
+        this.state.q = 17;
         this.state.rotation = 0;
 
         // Check if spawn position is blocked (using active placement with wider bounds)
@@ -311,14 +311,14 @@ const GravityMode = {
     },
 
     refreshBoard: function() {
-        // Draw 10-wide, 20-high cup background (q from 0 to 19, spawn area up to 27)
-        const viewport = { minP: -15, maxP: 15, minQ: -2, maxQ: 27 };
+        // Draw 10-wide, 20-high cup background (q from 0 to 19, spawn area up to 19)
+        const viewport = { minP: -20, maxP: 10, minQ: -2, maxQ: 20 };
         Render.drawLattice(viewport, { isGravity: true });
 
         // Render settled cells from Board
         Board.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
-            if (q < 28) {
+            if (q < 20) {
                 const hex = Render.createHex(p, q, {
                     fill: val.color,
                     stroke: 'white',
@@ -356,7 +356,7 @@ const GravityMode = {
         }
 
         // Center viewBox on the cup and spawn area
-        Render.updateView(-960, -1280, 2.4);
+        Render.updateView(-720, -940, 1.8);
     },
 
     updateGhost: function() {

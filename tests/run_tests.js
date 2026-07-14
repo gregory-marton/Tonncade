@@ -95,21 +95,21 @@ try {
     console.log("PASS: App.init() succeeded!");
     
     // TDD Gravity Mode cup dimensions test case
-    console.log("Running Gravity Mode cup dimensions (10x20) test...");
+    console.log("Running Gravity Mode cup dimensions (10x20 visible, 10x15 playable) test...");
     App.currentMode = 'gravity';
     const Board = vm.runInContext("Board", context);
 
     Board.cells.clear();
 
-    // Fill row q = 19 (20th row)
-    const rowQ = 19;
+    // Fill row q = 14 (15th row, top playable row)
+    const rowQ = 14;
     for (let col = -5; col <= 4; col++) {
         const p = col - Math.floor(rowQ / 2);
         Board.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' });
     }
     const fullLines = Board.findFullLines();
     if (fullLines.length !== 1) {
-        console.error(`FAIL: 20th row (q = ${rowQ}) not detected! Length was: ${fullLines.length}`);
+        console.error(`FAIL: 15th row (q = ${rowQ}) not detected! Length was: ${fullLines.length}`);
         process.exit(1);
     }
     if (fullLines[0].length !== 10) {
@@ -117,9 +117,9 @@ try {
         process.exit(1);
     }
 
-    // Fill row q = 20 (21st row - spawn zone)
+    // Fill row q = 15 (16th row - spawn/buffer zone)
     Board.cells.clear();
-    const bufferQ = 20;
+    const bufferQ = 15;
     for (let col = -5; col <= 4; col++) {
         const p = col - Math.floor(bufferQ / 2);
         Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
@@ -131,7 +131,61 @@ try {
     }
 
     Board.cells.clear();
-    console.log("PASS: Gravity Mode cup is correctly 10x20!");
+    console.log("PASS: Gravity Mode cup is correctly 10x20 visible, 10x15 playable!");
+
+    // Test Tonnetz Isomorphism
+    console.log("Running Tonnetz isomorphism tests...");
+    const TonnetzObj = vm.runInContext("Tonnetz", context);
+
+    // Standard Mode Tonnetz Isomorphism Test
+    App.currentMode = 'midi'; // Standard mode formula
+    for (let p = -50; p <= 50; p++) {
+        for (let q = -50; q <= 50; q++) {
+            const currentMidi = TonnetzObj.getMidi(p, q);
+            const stepP = TonnetzObj.getMidi(p + 1, q) - currentMidi;
+            const stepQ = TonnetzObj.getMidi(p, q + 1) - currentMidi;
+            const stepResultant = TonnetzObj.getMidi(p - 1, q + 1) - currentMidi;
+
+            if (stepP !== 7) {
+                console.error(`FAIL: Standard Tonnetz is not isomorphic at (${p}, ${q}) on p-axis! Step: ${stepP}`);
+                process.exit(1);
+            }
+            if (stepQ !== 3) {
+                console.error(`FAIL: Standard Tonnetz is not isomorphic at (${p}, ${q}) on q-axis! Step: ${stepQ}`);
+                process.exit(1);
+            }
+            if (stepResultant !== -4) {
+                console.error(`FAIL: Standard Tonnetz is not isomorphic at (${p}, ${q}) on resultant axis! Step: ${stepResultant}`);
+                process.exit(1);
+            }
+        }
+    }
+    console.log("PASS: Standard Tonnetz remains perfectly translationally isomorphic!");
+
+    // Gravity Mode Tonnetz Isomorphism Test
+    App.currentMode = 'gravity'; // Gravity mode formula
+    for (let p = -50; p <= 50; p++) {
+        for (let q = -50; q <= 50; q++) {
+            const currentMidi = TonnetzObj.getMidi(p, q);
+            const stepP = TonnetzObj.getMidi(p + 1, q) - currentMidi;
+            const stepQ = TonnetzObj.getMidi(p, q + 1) - currentMidi;
+            const stepResultant = TonnetzObj.getMidi(p - 1, q + 1) - currentMidi;
+
+            if (stepP !== -3) {
+                console.error(`FAIL: Gravity Tonnetz is not isomorphic at (${p}, ${q}) on p-axis! Step: ${stepP}`);
+                process.exit(1);
+            }
+            if (stepQ !== 4) {
+                console.error(`FAIL: Gravity Tonnetz is not isomorphic at (${p}, ${q}) on q-axis! Step: ${stepQ}`);
+                process.exit(1);
+            }
+            if (stepResultant !== 7) {
+                console.error(`FAIL: Gravity Tonnetz is not isomorphic at (${p}, ${q}) on resultant axis! Step: ${stepResultant}`);
+                process.exit(1);
+            }
+        }
+    }
+    console.log("PASS: Gravity Tonnetz remains perfectly translationally isomorphic!");
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

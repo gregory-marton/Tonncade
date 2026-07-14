@@ -12,37 +12,37 @@ const Pieces = {
         'P': {
             name: 'P',
             color: '#4b4bff',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:0}, {p:0, q:1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}, {p:-1, q:1}]
         },
         'Q': {
             name: 'Q',
             color: '#ff9c4b',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:0}, {p:1, q:1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}, {p:0, q:1}]
         },
         'L': {
             name: 'L',
             color: '#4bff4b',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:0}, {p:2, q:1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}, {p:1, q:1}]
         },
         'J': {
             name: 'J',
             color: '#ff4bff',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:0}, {p:3, q:-1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}, {p:2, q:-1}]
         },
         'S': {
             name: 'S',
             color: '#9c4b4b',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:1, q:1}, {p:2, q:1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:0, q:1}, {p:1, q:1}]
         },
         'Z': {
             name: 'Z',
             color: '#ff4b9c',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:-1}, {p:3, q:-1}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}, {p:2, q:-1}]
         },
         'I': {
             name: 'I',
             color: '#ff4b4b',
-            cells: [{p:0, q:0}, {p:1, q:0}, {p:2, q:0}, {p:3, q:0}]
+            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}, {p:2, q:0}]
         },
         'O': {
             name: 'O',

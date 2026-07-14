@@ -49,8 +49,8 @@ const Board = {
         const fullLines = [];
 
         if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
-            // Find completed horizontal rows in the cup (q: 0 to 19)
-            for (let q = 0; q < 20; q++) {
+            // Find completed horizontal rows in the cup (q: 0 to 14)
+            for (let q = 0; q < 15; q++) {
                 const line = [];
                 let complete = true;
                 for (let col = -5; col <= 4; col++) {

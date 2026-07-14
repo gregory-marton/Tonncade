@@ -137,14 +137,48 @@
         assert(Tonnetz.getMidi(-1, 1) === 42, "(-1,1) in gravity should be F#2 (42)");
         assert(Tonnetz.getNoteName(42) === 'F#', "MIDI 42 should be 'F#'");
 
-        // Test Gravity Mode Cup Height (10 columns, 20 rows)
-        log('Testing Gravity Mode Cup Dimensions (10x20)...', 'group');
+        // Test Isomorphism for Standard Mode
+        log('Testing Standard Tonnetz Isomorphism...', 'group');
+        let standardIsomorphic = true;
+        for (let p = -20; p <= 20; p++) {
+            for (let q = -20; q <= 20; q++) {
+                const base = Tonnetz.getMidi(p, q);
+                if (Tonnetz.getMidi(p + 1, q) - base !== 7 ||
+                    Tonnetz.getMidi(p, q + 1) - base !== 3 ||
+                    Tonnetz.getMidi(p - 1, q + 1) - base !== -4) {
+                    standardIsomorphic = false;
+                    break;
+                }
+            }
+        }
+        assert(standardIsomorphic === true, "Standard Tonnetz should be translationally isomorphic (p:+7, q:+3, resultant:-4) everywhere");
+
+        // Test Isomorphism for Gravity Mode
+        log('Testing Gravity Tonnetz Isomorphism...', 'group');
+        window.App = { currentMode: 'gravity' };
+        let gravityIsomorphic = true;
+        for (let p = -20; p <= 20; p++) {
+            for (let q = -20; q <= 20; q++) {
+                const base = Tonnetz.getMidi(p, q);
+                if (Tonnetz.getMidi(p + 1, q) - base !== -3 ||
+                    Tonnetz.getMidi(p, q + 1) - base !== 4 ||
+                    Tonnetz.getMidi(p - 1, q + 1) - base !== 7) {
+                    gravityIsomorphic = false;
+                    break;
+                }
+            }
+        }
+        assert(gravityIsomorphic === true, "Gravity Tonnetz should be translationally isomorphic (p:-3, q:+4, resultant:+7) everywhere");
+        delete window.App;
+
+        // Test Gravity Mode Cup Height (10 columns, 20 rows visible, 15 rows playable)
+        log('Testing Gravity Mode Cup Dimensions (10x20 visible, 10x15 playable)...', 'group');
         
         // Mock cells
         Board.cells.clear();
         
-        // Fill a complete row at q = 19 (the 20th row)
-        const rowQ = 19;
+        // Fill a complete row at q = 14 (the 15th row, top of playable cup)
+        const rowQ = 14;
         const line = [];
         for (let col = -5; col <= 4; col++) {
             const p = col - Math.floor(rowQ / 2);
@@ -153,18 +187,18 @@
         }
         
         const fullLines = Board.findFullLines();
-        assert(fullLines.length === 1, "Completed 20th row (q = 19) should be detected");
+        assert(fullLines.length === 1, "Completed 15th row (q = 14) should be detected");
         assert(fullLines[0].length === 10, "Row width should be 10 cells");
         
-        // Fill a row at q = 20 (which is in the buffer/spawn zone, so it shouldn't clear)
+        // Fill a row at q = 15 (which is in the buffer/spawn zone, so it shouldn't clear)
         Board.cells.clear();
-        const bufferQ = 20;
+        const bufferQ = 15;
         for (let col = -5; col <= 4; col++) {
             const p = col - Math.floor(bufferQ / 2);
             Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
         }
         const fullLinesBuffer = Board.findFullLines();
-        assert(fullLinesBuffer.length === 0, "Row in spawn zone (q = 20) should NOT be detected as a clearable line");
+        assert(fullLinesBuffer.length === 0, "Row in spawn zone (q = 15) should NOT be detected as a clearable line");
         
         Board.cells.clear();
 
@@ -179,7 +213,7 @@
         
         // Rotate Bar
         const barRotated = Pieces.rotate(bar);
-        assert(barRotated[1].p === 0 && barRotated[1].q === 1, "Rotation: (1,0) should become (0,1)");
+        assert(barRotated[2].p === 0 && barRotated[2].q === 1, "Rotation: (1,0) should become (0,1)");
         
         const midisOrig = bar.map(c => Tonnetz.getMidi(c.p, c.q));
         const midisRot = barRotated.map(c => Tonnetz.getMidi(c.p, c.q));
