@@ -245,6 +245,15 @@
         assert(Tonnetz.analyzeChord([60, 64, 67, 71]) === 'C Maj7', "Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
         assert(Tonnetz.analyzeChord([57, 60, 64, 67]) === 'A m7', "Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
 
+        // Test Tonnetz.analyzeAllChords
+        log('Testing Tonnetz.analyzeAllChords...', 'group');
+        const susAll = Tonnetz.analyzeAllChords([60, 67, 74]);
+        assert(susAll.includes('C Sus2') && susAll.includes('G Sus4'), "C-G-D should return both C Sus2 and G Sus4");
+        const pentAll = Tonnetz.analyzeAllChords([60, 67, 74, 81]);
+        assert(pentAll.includes('C Pentatonic Stack'), "C-G-D-A should return C Pentatonic Stack");
+        const m7b5All = Tonnetz.analyzeAllChords([57, 60, 63, 67]);
+        assert(m7b5All.includes('A m7b5'), "A-C-Eb-G should return A m7b5");
+
         // Test App initialization and setMode crash prevention
         log('Testing App initialization...', 'group');
         window.App = App;

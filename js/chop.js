@@ -419,15 +419,15 @@ const ChopMode = {
             for (let r = 0; r < 6; r++) {
                 const cells = Pieces.getAbsoluteCells(typeKey, 0, 0, r);
                 const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-                const chordName = Tonnetz.analyzeChord(midis);
-                if (chordName) {
+                const chordNames = Tonnetz.analyzeAllChords(midis);
+                for (const chordName of chordNames) {
                     let isMatch = false;
                     if (val === 'major') isMatch = chordName.endsWith('Major');
                     else if (val === 'minor') isMatch = chordName.endsWith('minor');
-                    else if (val === 'm7') isMatch = chordName.includes('m7');
+                    else if (val === 'm7') isMatch = chordName.includes('m7') && !chordName.includes('m7b5');
                     else if (val === 'maj7') isMatch = chordName.includes('Maj7');
                     else if (val === '7') isMatch = chordName.includes(' 7') && !chordName.includes('Maj7') && !chordName.includes('m7');
-                    else if (val === '5') isMatch = chordName.includes('5');
+                    else if (val === '5') isMatch = chordName.includes('5') || chordName.includes('Pentatonic Stack');
                     else if (val === 'sus4') isMatch = chordName.includes('Sus4');
                     else if (val === 'sus2') isMatch = chordName.includes('Sus2');
 

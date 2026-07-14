@@ -232,6 +232,32 @@ try {
         process.exit(1);
     }
     console.log("PASS: Tonnetz.analyzeChord is fully correct!");
+
+    // Test Tonnetz.analyzeAllChords
+    console.log("Running Tonnetz.analyzeAllChords tests...");
+    
+    // 1. C - G - D (60, 67, 74) is both C Sus2 and G Sus4
+    const susAll = TonnetzObj.analyzeAllChords([60, 67, 74]);
+    if (!susAll.includes('C Sus2') || !susAll.includes('G Sus4')) {
+        console.error("FAIL: [60, 67, 74] should yield both C Sus2 and G Sus4! Got:", susAll);
+        process.exit(1);
+    }
+
+    // 2. C - G - D - A (60, 67, 74, 81) is C Pentatonic Stack
+    const pentAll = TonnetzObj.analyzeAllChords([60, 67, 74, 81]);
+    if (!pentAll.includes('C Pentatonic Stack')) {
+        console.error("FAIL: [60, 67, 74, 81] should yield C Pentatonic Stack! Got:", pentAll);
+        process.exit(1);
+    }
+
+    // 3. A - C - Eb - G (57, 60, 63, 67) is A m7b5 (half-diminished)
+    const m7b5All = TonnetzObj.analyzeAllChords([57, 60, 63, 67]);
+    if (!m7b5All.includes('A m7b5')) {
+        console.error("FAIL: [57, 60, 63, 67] should yield A m7b5! Got:", m7b5All);
+        process.exit(1);
+    }
+
+    console.log("PASS: Tonnetz.analyzeAllChords is fully correct!");
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);
