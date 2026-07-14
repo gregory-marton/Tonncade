@@ -199,16 +199,16 @@ try {
         console.error("FAIL: Unnamed combination [60, 61, 62] should return null");
         process.exit(1);
     }
-    if (TonnetzObj.analyzeChord([60, 67]) !== 'C 5 (Fifth)') {
-        console.error("FAIL: Fifth [60, 67] should be analyzed as 'C 5 (Fifth)'");
+    if (TonnetzObj.analyzeChord([60, 67]) !== 'C 5 (Fifth) / G 4th') {
+        console.error("FAIL: Fifth [60, 67] should be analyzed as 'C 5 (Fifth) / G 4th'");
         process.exit(1);
     }
-    if (TonnetzObj.analyzeChord([67, 74]) !== 'G 5 (Fifth)') {
-        console.error("FAIL: Fifth [67, 74] (G & D) should be analyzed as 'G 5 (Fifth)'");
+    if (TonnetzObj.analyzeChord([67, 74]) !== 'G 5 (Fifth) / D 4th') {
+        console.error("FAIL: Fifth [67, 74] (G & D) should be analyzed as 'G 5 (Fifth) / D 4th'");
         process.exit(1);
     }
-    if (TonnetzObj.analyzeChord([74, 67]) !== 'G 5 (Fifth)') {
-        console.error("FAIL: Inverted Fifth [74, 67] (D & G) should be analyzed as 'G 5 (Fifth)'");
+    if (TonnetzObj.analyzeChord([74, 67]) !== 'G 5 (Fifth) / D 4th') {
+        console.error("FAIL: Inverted Fifth [74, 67] (D & G) should be analyzed as 'G 5 (Fifth) / D 4th'");
         process.exit(1);
     }
     if (TonnetzObj.analyzeChord([60, 64, 67]) !== 'C Major') {
@@ -227,8 +227,8 @@ try {
         console.error("FAIL: Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
         process.exit(1);
     }
-    if (TonnetzObj.analyzeChord([57, 60, 64, 67]) !== 'A m7') {
-        console.error("FAIL: Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
+    if (TonnetzObj.analyzeChord([57, 60, 64, 67]) !== 'A m7 / C 6') {
+        console.error("FAIL: Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7 / C 6'");
         process.exit(1);
     }
     console.log("PASS: Tonnetz.analyzeChord is fully correct!");

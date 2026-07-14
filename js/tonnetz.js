@@ -49,61 +49,9 @@ const Tonnetz = {
     },
 
     analyzeChord: function(midis) {
-        if (!midis || midis.length === 0) return null;
-        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const uniquePitches = [...new Set(midis.map(m => ((m % 12) + 12) % 12))];
-
-        if (uniquePitches.length <= 1) {
-            return null; // Single note is not a chord combination
-        }
-
-        const templates = [
-            // 4-note
-            { intervals: [0, 4, 7, 11], name: 'Maj7' },
-            { intervals: [0, 3, 7, 10], name: 'm7' },
-            { intervals: [0, 4, 7, 10], name: '7' },
-            { intervals: [0, 3, 6, 10], name: 'm7b5' },
-            { intervals: [0, 3, 6, 9], name: 'dim7' },
-            { intervals: [0, 4, 7, 9], name: '6' },
-            { intervals: [0, 3, 7, 9], name: 'm6' },
-            { intervals: [0, 2, 7, 9], name: 'Pentatonic Stack' },
-            // 3-note
-            { intervals: [0, 4, 7], name: 'Major' },
-            { intervals: [0, 3, 7], name: 'minor' },
-            { intervals: [0, 2, 7], name: 'Sus2' },
-            { intervals: [0, 5, 7], name: 'Sus4' },
-            { intervals: [0, 7, 11], name: 'Maj7 (shell)' },
-            { intervals: [0, 7, 10], name: '7 (shell)' },
-            { intervals: [0, 4, 11], name: 'Maj7 (shell)' },
-            { intervals: [0, 4, 10], name: '7 (shell)' },
-            { intervals: [0, 3, 10], name: 'm7 (shell)' },
-            { intervals: [0, 3, 11], name: 'm(Maj7) (shell)' },
-            { intervals: [0, 3, 6], name: 'dim' },
-            { intervals: [0, 4, 8], name: 'aug' },
-            // 2-note
-            { intervals: [0, 7], name: '5 (Fifth)' },
-            { intervals: [0, 4], name: 'Major 3rd' },
-            { intervals: [0, 3], name: 'minor 3rd' },
-            { intervals: [0, 5], name: '4th' },
-            { intervals: [0, 9], name: '6th' },
-            { intervals: [0, 10], name: 'm7 (interval)' },
-            { intervals: [0, 11], name: 'Maj7 (interval)' },
-            { intervals: [0, 2], name: 'Major 2nd' },
-            { intervals: [0, 8], name: 'minor 6th' },
-            { intervals: [0, 6], name: 'Tritone' }
-        ];
-
-        // Match against templates first to prioritize higher-ranked chord qualities (e.g. Fifths over Fourths)
-        for (const t of templates) {
-            for (const root of uniquePitches) {
-                const rel = uniquePitches.map(p => (p - root + 12) % 12).sort((a, b) => a - b);
-                if (rel.length === t.intervals.length && rel.every((v, i) => v === t.intervals[i])) {
-                    return `${noteNames[root]} ${t.name}`;
-                }
-            }
-        }
-
-        return null; // Not a named chord combination
+        const matches = this.analyzeAllChords(midis);
+        if (matches.length === 0) return null;
+        return matches.join(' / ');
     },
 
     // Analyze all possible chord names for a list of MIDI notes

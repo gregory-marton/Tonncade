@@ -236,14 +236,14 @@
         log('Testing Tonnetz.analyzeChord...', 'group');
         assert(Tonnetz.analyzeChord([60]) === null, "Single note [60] should return null");
         assert(Tonnetz.analyzeChord([60, 61, 62]) === null, "Unnamed combination [60, 61, 62] should return null");
-        assert(Tonnetz.analyzeChord([60, 67]) === 'C 5 (Fifth)', "Fifth [60, 67] should be analyzed as 'C 5 (Fifth)'");
-        assert(Tonnetz.analyzeChord([67, 74]) === 'G 5 (Fifth)', "Fifth [67, 74] (G & D) should be analyzed as 'G 5 (Fifth)'");
-        assert(Tonnetz.analyzeChord([74, 67]) === 'G 5 (Fifth)', "Inverted Fifth [74, 67] (D & G) should prioritize the Fifth: 'G 5 (Fifth)'");
+        assert(Tonnetz.analyzeChord([60, 67]) === 'C 5 (Fifth) / G 4th', "Fifth [60, 67] should be analyzed as 'C 5 (Fifth) / G 4th'");
+        assert(Tonnetz.analyzeChord([67, 74]) === 'G 5 (Fifth) / D 4th', "Fifth [67, 74] (G & D) should be analyzed as 'G 5 (Fifth) / D 4th'");
+        assert(Tonnetz.analyzeChord([74, 67]) === 'G 5 (Fifth) / D 4th', "Inverted Fifth [74, 67] (D & G) should be analyzed as 'G 5 (Fifth) / D 4th'");
         assert(Tonnetz.analyzeChord([60, 64, 67]) === 'C Major', "Major triad [60, 64, 67] should be analyzed as 'C Major'");
         assert(Tonnetz.analyzeChord([60, 63, 67]) === 'C minor', "Minor triad [60, 63, 67] should be analyzed as 'C minor'");
         assert(Tonnetz.analyzeChord([62, 65, 72]) === 'D m7 (shell)', "D F C [62, 65, 72] should be analyzed as 'D m7 (shell)'");
         assert(Tonnetz.analyzeChord([60, 64, 67, 71]) === 'C Maj7', "Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
-        assert(Tonnetz.analyzeChord([57, 60, 64, 67]) === 'A m7', "Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
+        assert(Tonnetz.analyzeChord([57, 60, 64, 67]) === 'A m7 / C 6', "Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7 / C 6'");
 
         // Test Tonnetz.analyzeAllChords
         log('Testing Tonnetz.analyzeAllChords...', 'group');
