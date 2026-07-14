@@ -74,6 +74,10 @@ const Tonnetz = {
             { intervals: [0, 5, 7], name: 'Sus4' },
             { intervals: [0, 7, 11], name: 'Maj7 (shell)' },
             { intervals: [0, 7, 10], name: '7 (shell)' },
+            { intervals: [0, 4, 11], name: 'Maj7 (shell)' },
+            { intervals: [0, 4, 10], name: '7 (shell)' },
+            { intervals: [0, 3, 10], name: 'm7 (shell)' },
+            { intervals: [0, 3, 11], name: 'm(Maj7) (shell)' },
             { intervals: [0, 3, 6], name: 'dim' },
             { intervals: [0, 4, 8], name: 'aug' },
             // 2-note

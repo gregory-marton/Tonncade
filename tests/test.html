@@ -241,6 +241,7 @@
         assert(Tonnetz.analyzeChord([74, 67]) === 'G 5 (Fifth)', "Inverted Fifth [74, 67] (D & G) should prioritize the Fifth: 'G 5 (Fifth)'");
         assert(Tonnetz.analyzeChord([60, 64, 67]) === 'C Major', "Major triad [60, 64, 67] should be analyzed as 'C Major'");
         assert(Tonnetz.analyzeChord([60, 63, 67]) === 'C minor', "Minor triad [60, 63, 67] should be analyzed as 'C minor'");
+        assert(Tonnetz.analyzeChord([62, 65, 72]) === 'D m7 (shell)', "D F C [62, 65, 72] should be analyzed as 'D m7 (shell)'");
         assert(Tonnetz.analyzeChord([60, 64, 67, 71]) === 'C Maj7', "Major 7th chord [60, 64, 67, 71] should be analyzed as 'C Maj7'");
         assert(Tonnetz.analyzeChord([57, 60, 64, 67]) === 'A m7', "Minor 7th chord [57, 60, 64, 67] should be analyzed as 'A m7'");
 
