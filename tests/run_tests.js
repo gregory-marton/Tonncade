@@ -215,8 +215,8 @@ try {
         console.error("FAIL: Major triad [60, 64, 67] should be analyzed as 'C Major'");
         process.exit(1);
     }
-    if (TonnetzObj.analyzeChord([60, 63, 67]) !== 'C minor') {
-        console.error("FAIL: Minor triad [60, 63, 67] should be analyzed as 'C minor'");
+    if (TonnetzObj.analyzeChord([60, 63, 67]) !== 'C Minor') {
+        console.error("FAIL: Minor triad [60, 63, 67] should be analyzed as 'C Minor'");
         process.exit(1);
     }
     if (TonnetzObj.analyzeChord([62, 65, 72]) !== 'D m7 (shell)') {

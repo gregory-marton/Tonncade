@@ -423,7 +423,7 @@ const ChopMode = {
                 for (const chordName of chordNames) {
                     let isMatch = false;
                     if (val === 'major') isMatch = chordName.endsWith('Major');
-                    else if (val === 'minor') isMatch = chordName.endsWith('minor');
+                    else if (val === 'minor') isMatch = chordName.endsWith('Minor');
                     else if (val === 'm7') isMatch = chordName.includes('m7') && !chordName.includes('m7b5');
                     else if (val === 'maj7') isMatch = chordName.includes('Maj7');
                     else if (val === '7') isMatch = chordName.includes(' 7') && !chordName.includes('Maj7') && !chordName.includes('m7');

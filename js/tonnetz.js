@@ -76,7 +76,7 @@ const Tonnetz = {
             { intervals: [0, 2, 7, 9], name: 'Pentatonic Stack' },
             // 3-note
             { intervals: [0, 4, 7], name: 'Major' },
-            { intervals: [0, 3, 7], name: 'minor' },
+            { intervals: [0, 3, 7], name: 'Minor' },
             { intervals: [0, 2, 7], name: 'Sus2' },
             { intervals: [0, 5, 7], name: 'Sus4' },
             { intervals: [0, 7, 11], name: 'Maj7 (shell)' },
@@ -90,13 +90,13 @@ const Tonnetz = {
             // 2-note
             { intervals: [0, 7], name: '5 (Fifth)' },
             { intervals: [0, 4], name: 'Major 3rd' },
-            { intervals: [0, 3], name: 'minor 3rd' },
+            { intervals: [0, 3], name: 'Minor 3rd' },
             { intervals: [0, 5], name: '4th' },
             { intervals: [0, 9], name: '6th' },
             { intervals: [0, 10], name: 'm7 (interval)' },
             { intervals: [0, 11], name: 'Maj7 (interval)' },
             { intervals: [0, 2], name: 'Major 2nd' },
-            { intervals: [0, 8], name: 'minor 6th' },
+            { intervals: [0, 8], name: 'Minor 6th' },
             { intervals: [0, 6], name: 'Tritone' }
         ];
 
