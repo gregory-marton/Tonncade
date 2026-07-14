@@ -90,10 +90,10 @@ const Tonnetz = {
             { intervals: [0, 6], name: 'Tritone' }
         ];
 
-        // Try each pitch as root
-        for (const root of uniquePitches) {
-            const rel = uniquePitches.map(p => (p - root + 12) % 12).sort((a, b) => a - b);
-            for (const t of templates) {
+        // Match against templates first to prioritize higher-ranked chord qualities (e.g. Fifths over Fourths)
+        for (const t of templates) {
+            for (const root of uniquePitches) {
+                const rel = uniquePitches.map(p => (p - root + 12) % 12).sort((a, b) => a - b);
                 if (rel.length === t.intervals.length && rel.every((v, i) => v === t.intervals[i])) {
                     return `${noteNames[root]} ${t.name}`;
                 }

@@ -199,6 +199,14 @@ try {
         console.error("FAIL: Fifth [60, 67] should be analyzed as 'C 5 (Fifth)'");
         process.exit(1);
     }
+    if (TonnetzObj.analyzeChord([67, 74]) !== 'G 5 (Fifth)') {
+        console.error("FAIL: Fifth [67, 74] (G & D) should be analyzed as 'G 5 (Fifth)'");
+        process.exit(1);
+    }
+    if (TonnetzObj.analyzeChord([74, 67]) !== 'G 5 (Fifth)') {
+        console.error("FAIL: Inverted Fifth [74, 67] (D & G) should be analyzed as 'G 5 (Fifth)'");
+        process.exit(1);
+    }
     if (TonnetzObj.analyzeChord([60, 64, 67]) !== 'C Major') {
         console.error("FAIL: Major triad [60, 64, 67] should be analyzed as 'C Major'");
         process.exit(1);
