@@ -879,6 +879,27 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(queueBox.y).toBeGreaterThanOrEqual(headerBottom - 5);
   });
 
+  test('blast next-piece queue reorients vertically under the score, active item at bottom-left, in landscape', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    const mainContentBox = await page.locator('#main-content').boundingBox();
+    const statsBox = await page.locator('#blast-stats').boundingBox();
+    const activeItemBox = await page.locator('.active-item').boundingBox();
+    const nextItemBox = await page.locator('.next-item').first().boundingBox();
+    const secondNextItemBox = await page.locator('.next-item').nth(1).boundingBox();
+
+    // Active item (the place button) sits near the bottom-left of the game area
+    expect(activeItemBox.x - mainContentBox.x).toBeLessThan(100);
+    expect(mainContentBox.y + mainContentBox.height - (activeItemBox.y + activeItemBox.height)).toBeLessThan(100);
+
+    // Queue sits below the score, not overlapping it
+    expect(nextItemBox.y).toBeGreaterThan(statsBox.y + statsBox.height - 5);
+
+    // Queue items stack vertically now (second item is below, not beside, the first)
+    expect(secondNextItemBox.y).toBeGreaterThan(nextItemBox.y + nextItemBox.height - 5);
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // E. Drawer and Device Layout
   // ────────────────────────────────────────────────────────────────────────

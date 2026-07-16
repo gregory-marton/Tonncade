@@ -89,6 +89,7 @@ const App = {
         }
 
         this.currentMode = mode;
+        document.getElementById('app').setAttribute('data-mode', mode);
 
         // Configure mobile action button text based on active mode
         const actionBtn = document.getElementById('m-btn-action');

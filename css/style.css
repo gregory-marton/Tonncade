@@ -429,6 +429,66 @@ button:hover {
     border: 1px solid var(--border);
 }
 
+/* Shared floating-overlay chrome for stats/queue panels, applying to BOTH mobile
+   breakpoints (portrait and landscape) — the per-orientation media queries below only
+   override the properties that genuinely differ (top/left/right/bottom/sizing). Without
+   this, position:absolute (and everything else here) only existed inside the portrait-only
+   block, so these panels fell back to position:static — and effectively broke — in
+   landscape, the same root cause fixed for #mobile-controls/#snake-mobile-controls earlier. */
+@media (max-width: 767px), (max-width: 950px) and (orientation: landscape) {
+    #blast-stats, #gravity-controls, #snake-controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-family: monospace;
+        color: #fff;
+        margin-top: 0 !important;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    #palette.floating-queue {
+        position: absolute;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    #midi-controls {
+        position: absolute;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+        padding: 10px;
+        box-sizing: border-box;
+        font-family: monospace;
+        color: #fff;
+        margin-top: 0 !important;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+    }
+}
+
 .mobile-control-row {
     display: flex;
     gap: 8px;
@@ -1167,5 +1227,34 @@ button:hover {
 
     #m-btn-action-2 {
         display: flex;
+    }
+
+    /* Blast's next-piece queue reorients vertically under the score in landscape. The
+       active-piece/place item breaks out of the queue's own normal flow (position:absolute)
+       to dock at the bottom of this same tall column — landing at the game area's
+       bottom-left without any DOM changes, since #palette.floating-queue itself now spans
+       from just below #blast-stats down to the safe-bottom offset. Scoped to Blast mode via
+       #app[data-mode="blast"] — #palette.floating-queue is shared with Gravity's queue, whose
+       landscape control pad already occupies the left edge and would otherwise collide. */
+    #app[data-mode="blast"] #palette.floating-queue {
+        top: 70px;
+        bottom: var(--mobile-pad-safe-bottom);
+        right: auto;
+        left: 10px;
+        max-width: 110px;
+        max-height: none;
+        padding-bottom: 70px; /* reserve room for the docked .active-item below */
+    }
+
+    #app[data-mode="blast"] #palette.floating-queue #piece-list {
+        flex-direction: column;
+    }
+
+    #app[data-mode="blast"] #palette.floating-queue .active-item {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        width: auto;
     }
 }
