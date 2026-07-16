@@ -435,7 +435,7 @@ const SandboxMode = {
         if (!resultsDiv) return;
 
         if (!val) {
-            resultsDiv.innerHTML = 'Select a chord to see which pieces and rotations create it.';
+            resultsDiv.innerHTML = '';
             return;
         }
 
