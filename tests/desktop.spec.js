@@ -176,6 +176,29 @@ test('Render.getFitView sizes zoom to snugly fit larger cell sets, not a fixed v
   expect(result.largeZoom).toBeGreaterThan(result.smallZoom);
 });
 
+test('Render.getFitView scale parameter zooms in further while staying centered', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const cells = [{ p: -5, q: 0 }, { p: 5, q: 0 }, { p: 0, q: 5 }, { p: 0, q: -5 }];
+    const unscaled = Render.getFitView(cells, 20);
+    const scaled = Render.getFitView(cells, 20, 1.25);
+    return {
+      unscaledZoom: unscaled.zoom,
+      scaledZoom: scaled.zoom,
+      unscaledCenterX: unscaled.viewX + (800 * unscaled.zoom) / 2,
+      unscaledCenterY: unscaled.viewY + (600 * unscaled.zoom) / 2,
+      scaledCenterX: scaled.viewX + (800 * scaled.zoom) / 2,
+      scaledCenterY: scaled.viewY + (600 * scaled.zoom) / 2,
+    };
+  });
+
+  // A scale of 1.25 means 1.25x bigger on screen, i.e. 1.25x smaller zoom (more world-space
+  // detail per screen pixel), while remaining centered on the same content midpoint.
+  expect(result.scaledZoom).toBeCloseTo(result.unscaledZoom / 1.25, 5);
+  expect(result.scaledCenterX).toBeCloseTo(result.unscaledCenterX, 5);
+  expect(result.scaledCenterY).toBeCloseTo(result.unscaledCenterY, 5);
+});
+
 test('panning cannot scroll far past the edge of the audible tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());

@@ -112,7 +112,7 @@ const BlastMode = {
                 if (Board.isInBounds(p, q)) boardCells.push({ p, q });
             }
         }
-        const fit = Render.getFitView(boardCells, Render.HEX_R * 2);
+        const fit = Render.getFitView(boardCells, Render.HEX_R * 2, 1.25);
         Render.updateView(fit.viewX, fit.viewY, fit.zoom);
     },
 

@@ -174,8 +174,9 @@ const Render = {
 
     // Computes {viewX, viewY, zoom} that centers and snugly fits the given {p, q} cells into
     // the 800x600 reference viewBox, padded by `padding` screen-space units around the
-    // content's bounding box.
-    getFitView: function(cells, padding = 0) {
+    // content's bounding box. `scale` makes the result that much bigger on screen (e.g. 1.25
+    // renders 1.25x bigger) while staying centered on the same content midpoint.
+    getFitView: function(cells, padding = 0, scale = 1) {
         if (!cells || cells.length === 0) {
             return { viewX: -400, viewY: -300, zoom: 1 };
         }
@@ -194,7 +195,7 @@ const Render = {
         minY -= padding;
         maxY += padding;
 
-        const zoom = Math.max((maxX - minX) / 800, (maxY - minY) / 600);
+        const zoom = Math.max((maxX - minX) / 800, (maxY - minY) / 600) / scale;
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
