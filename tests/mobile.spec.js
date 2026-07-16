@@ -207,6 +207,29 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(touchActions.board).toBe('none');
   });
 
+  test('#palette actually clips its overflow instead of ballooning past the viewport', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const widths = await page.evaluate(() => {
+      const palette = document.getElementById('palette');
+      const tools = document.getElementById('sandbox-mobile-tools');
+      return {
+        paletteClientWidth: palette.clientWidth,
+        paletteScrollWidth: palette.scrollWidth,
+        toolsClientWidth: tools.clientWidth,
+      };
+    });
+
+    // If #sandbox-mobile-tools (a flex row-item) isn't constrained to the viewport, it and
+    // #palette balloon to the carousel's full content width instead of clipping/scrolling it —
+    // the rest of the pieces become permanently unreachable, with no scroll affordance anywhere.
+    expect(widths.toolsClientWidth).toBeLessThanOrEqual(width + 1);
+    expect(widths.paletteClientWidth).toBeLessThan(widths.paletteScrollWidth);
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // D. Touch Gesture Semantics — the core behavioral tests
   // ────────────────────────────────────────────────────────────────────────

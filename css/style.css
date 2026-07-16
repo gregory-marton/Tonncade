@@ -528,6 +528,8 @@ button:hover {
         display: flex;
         flex-direction: column;
         gap: 10px;
+        min-width: 0; /* Allow this flex row-item to shrink to its container's width instead of
+                         growing to fit the carousel's full unscrolled content width */
     }
 
     /* Chord guide dropdown always-visible on mobile */
