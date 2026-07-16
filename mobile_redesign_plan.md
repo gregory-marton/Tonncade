@@ -35,6 +35,7 @@ Raw notes from real-device feedback, captured for the next brainstorming pass �
 - **Gravity and Blast modes** both need to show upcoming pieces (Blast already has a next-piece queue on desktop via `renderNextQueue`/`#piece-list` — needs a mobile-visible equivalent; Gravity has none at all).
 - **Snake mode**: no visible on-screen controls on mobile — needs a bottom control set similar to Gravity's pad. The existing tap/drag/turn touch-steering gesture (in `main.js`'s `touchstart` snake-mode branch) doesn't work predictably and needs investigation.
 - **Pause button** should be visible on mobile (currently not surfaced there).
+- **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
 
 ---
 
