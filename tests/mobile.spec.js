@@ -472,6 +472,140 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placedCount).toBe(0);
   });
 
+  test('tap on an empty cell elsewhere moves the candidate there instead of rotating', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+
+    await page.locator('.piece-item').first().click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 0, q: 0 };
+      SandboxMode.updateGhost();
+    });
+
+    const rotBefore = await page.evaluate(() => SandboxMode.state.rotation);
+
+    // Find an on-screen, non-ghost cell to tap — coordinates must actually be within the
+    // viewport for elementFromPoint (and thus getCellFromTouch) to resolve anything at all.
+    // Find an on-screen, non-ghost, non-occluded cell to tap: getBoundingClientRect() alone
+    // isn't enough since hex axial coordinates can "wrap" into on-screen pixels for cells far
+    // outside the actually-rendered board area, and other page chrome (e.g. the carousel) can
+    // occlude that pixel — elementFromPoint at the candidate's own center is the real test.
+    const target = await page.evaluate(() => {
+      const ghostCells = Pieces.getAbsoluteCells(SandboxMode.state.selectedPiece, 0, 0, SandboxMode.state.rotation);
+      const cells = Array.from(document.querySelectorAll('#tonnetz-svg polygon.cell:not(.ghost)'));
+      for (const el of cells) {
+        const p = parseInt(el.getAttribute('data-p'));
+        const q = parseInt(el.getAttribute('data-q'));
+        if (ghostCells.some(c => c.p === p && c.q === q)) continue;
+        const r = el.getBoundingClientRect();
+        if (r.left < 0 || r.right > window.innerWidth || r.top < 0 || r.bottom > window.innerHeight) continue;
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const hit = document.elementFromPoint(cx, cy);
+        if (hit === el) {
+          return { p, q, cx, cy };
+        }
+      }
+      return null;
+    });
+    expect(target).not.toBeNull();
+    const targetPQ = { p: target.p, q: target.q };
+    const cx = target.cx;
+    const cy = target.cy;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+
+    const rotAfter = await page.evaluate(() => SandboxMode.state.rotation);
+    expect(rotAfter).toBe(rotBefore);
+
+    const hoverAfter = await page.evaluate(() => SandboxMode.state.hoverCell);
+    expect(hoverAfter).toEqual(targetPQ);
+
+    const placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBe(0);
+  });
+
+  test('tap on an existing placed piece picks it up as the new candidate (Sandbox)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+
+    await page.locator('.piece-item').first().click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 0, q: 0 };
+      SandboxMode.placePiece(0, 0);
+    });
+    let placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBeGreaterThan(0);
+
+    // Select a second candidate, positioned well away from the placed piece
+    await page.locator('.piece-item').nth(1).click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 5, q: 5 };
+      SandboxMode.updateGhost();
+    });
+    const secondType = await page.evaluate(() => SandboxMode.state.selectedPiece);
+
+    const placedCell = page.locator('polygon.placed-piece[data-p="0"][data-q="0"]').first();
+    const box = await placedCell.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+
+    placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBe(0);
+
+    const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selectedAfter).not.toBe(secondType);
+  });
+
+  test('tap on a locked cell in Blast Mode is ignored (no pickup, no rotation)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+    await page.evaluate(touchHelpers);
+
+    await page.evaluate(() => {
+      BlastMode.state.hoverCell = { p: 0, q: 0 };
+      BlastMode.placePiece(0, 0);
+    });
+    let placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBeGreaterThan(0);
+
+    // Move the new active piece's ghost away so the locked cell isn't part of it
+    await page.evaluate(() => {
+      BlastMode.state.hoverCell = { p: 5, q: 5 };
+      BlastMode.updateGhost();
+    });
+    const rotBefore = await page.evaluate(() => BlastMode.state.rotation);
+    const activeBefore = await page.evaluate(() => BlastMode.state.activePiece);
+
+    const lockedCell = page.locator('polygon.placed-piece[data-p="0"][data-q="0"]').first();
+    const box = await lockedCell.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+
+    const rotAfter = await page.evaluate(() => BlastMode.state.rotation);
+    const activeAfter = await page.evaluate(() => BlastMode.state.activePiece);
+    expect(rotAfter).toBe(rotBefore);
+    expect(activeAfter).toBe(activeBefore);
+
+    placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBeGreaterThan(0);
+  });
+
   test('swipe DOWN places a piece, swipe UP picks it back up', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

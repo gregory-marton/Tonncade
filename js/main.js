@@ -695,14 +695,35 @@ const App = {
                     }
                 } else if (isTap) {
                     if (pieceType) {
-                        // Tap to rotate clockwise
-                        modeObj.state.rotation = (modeObj.state.rotation + 1) % 6;
-                        modeObj.updateGhost();
-                        
-                        // Sound confirmation of rotation
-                        const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
-                        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-                        Synth.playChord(midis, true, 0.08, 0.4);
+                        const tapCell = touchStartCell;
+                        const ghostCells = tapCell
+                            ? Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)
+                            : [];
+                        const tappedGhost = tapCell && ghostCells.some(c => c.p === tapCell.p && c.q === tapCell.q);
+
+                        if (!tapCell || tappedGhost) {
+                            // Tap on the candidate itself (or couldn't resolve a cell) -> rotate clockwise
+                            modeObj.state.rotation = (modeObj.state.rotation + 1) % 6;
+                            modeObj.updateGhost();
+
+                            // Sound confirmation of rotation
+                            const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
+                            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+                            Synth.playChord(midis, true, 0.08, 0.4);
+                        } else if (this.currentMode === 'sandbox' && SandboxMode.state.placedPieces.some(piece => {
+                            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+                            return cells.some(c => c.p === tapCell.p && c.q === tapCell.q);
+                        })) {
+                            // Tap on an already-placed piece -> pick it up as the new candidate
+                            modeObj.state.hoverCell = tapCell;
+                            SandboxMode.pickupPieceAt(tapCell.p, tapCell.q);
+                        } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) {
+                            // Blast has no pickup — ignore taps on locked cells
+                        } else {
+                            // Tap elsewhere on an empty cell -> move the candidate here instead of rotating
+                            modeObj.state.hoverCell = tapCell;
+                            modeObj.updateGhost();
+                        }
                     } else {
                         // Tap note keyboard behavior when no active piece is selected
                         if (touchStartCell) {
