@@ -138,6 +138,9 @@ h1 { font-size: 20px; margin: 0; }
 svg {
     width: 100%;
     height: 100%;
+}
+
+#tonnetz-svg {
     touch-action: none;
 }
 

@@ -184,6 +184,29 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(lastPiece).toBeInViewport();
   });
 
+  test('carousel piece icons allow native touch scrolling (not touch-action: none)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const touchActions = await page.evaluate(() => {
+      const preview = document.querySelector('.piece-item .piece-preview');
+      const board = document.getElementById('tonnetz-svg');
+      return {
+        preview: getComputedStyle(preview).touchAction,
+        board: getComputedStyle(board).touchAction,
+      };
+    });
+
+    // A touch's effective touch-action is the intersection across the touched element and its
+    // ancestors, so a "none" on the piece icon (which covers most of each carousel item) blocks
+    // native pan-x scrolling on #palette regardless of the ancestor's own touch-action.
+    expect(touchActions.preview).not.toBe('none');
+    // The interactive board itself should still block native browser gestures.
+    expect(touchActions.board).toBe('none');
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // D. Touch Gesture Semantics — the core behavioral tests
   // ────────────────────────────────────────────────────────────────────────
