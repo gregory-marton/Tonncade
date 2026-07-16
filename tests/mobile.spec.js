@@ -147,6 +147,26 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(resultCount).toBeGreaterThan(0);
   });
 
+  test('chord guide reset (X) button is reachable and dismisses the guide on mobile', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    await page.locator('#chord-guide-select').selectOption('major');
+    await expect(page.locator('.chord-match-item').first()).toBeVisible({ timeout: 3000 });
+
+    // The reset button lives in #sandbox-guide's markup alongside the <select>, but only the
+    // <select> and results div get moved into the always-visible mobile area — #sandbox-guide
+    // itself (still containing the reset button) then gets hidden, orphaning it.
+    const resetBtn = page.locator('#chord-guide-reset');
+    await expect(resetBtn).toBeVisible();
+
+    await resetBtn.click({ force: true });
+    await expect(page.locator('#chord-guide-select')).toHaveValue('');
+    await expect(page.locator('.chord-match-item')).toHaveCount(0);
+  });
+
   test('chord dropdown is NOT visible in non-Sandbox modes', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
@@ -1221,6 +1241,38 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(drawer).not.toHaveClass(/expanded/);
   });
 
+  test('closing the drawer via a tap with slight jitter is not undone by a duplicate click toggle', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const drawer = page.locator('#top-drawer');
+    const handle = page.locator('#drawer-handle');
+
+    await handle.click({ force: true });
+    await expect(drawer).toHaveClass(/expanded/);
+
+    // A real tap almost always drifts a few pixels — simulate touchstart/touchmove(past the
+    // 20px drag threshold)/touchend, followed by the browser's own synthesized click for that
+    // same physical tap. touchmove closes the drawer; if the click ALSO runs its own toggle,
+    // it reopens what the user just closed.
+    const handleBox = await handle.boundingBox();
+    const hx = handleBox.x + handleBox.width / 2;
+    const hy = handleBox.y + handleBox.height / 2;
+
+    await page.evaluate(({ x, y }) => {
+      const el = document.getElementById('drawer-handle');
+      const mk = (cx) => new Touch({ identifier: 3, target: el, clientX: cx, clientY: y, pageX: cx, pageY: y });
+      const t1 = mk(x);
+      el.dispatchEvent(new TouchEvent('touchstart', { touches: [t1], targetTouches: [t1], changedTouches: [t1], bubbles: true, cancelable: true }));
+      const t2 = mk(x - 25);
+      el.dispatchEvent(new TouchEvent('touchmove', { touches: [t2], targetTouches: [t2], changedTouches: [t2], bubbles: true, cancelable: true }));
+      el.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [t2], bubbles: true, cancelable: true }));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    }, { x: hx, y: hy });
+
+    await expect(drawer).not.toHaveClass(/expanded/);
+  });
+
   test('tapping the board in Snake mode no longer changes direction', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
@@ -1304,6 +1356,22 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     const mainContentBottom = mainContentBox.y + mainContentBox.height;
     expect(mainContentBottom - (leftBox.y + leftBox.height)).toBeLessThan(40);
     expect(mainContentBottom - (rightBox.y + rightBox.height)).toBeLessThan(40);
+  });
+
+  test('Snake stats/controls panel stays narrow in landscape even with the long game-over message', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+
+    // "Game Over! Click Restart to play again." is long enough that, with nothing constraining
+    // #snake-controls's width, the panel (and the flex:1 Pause/Restart buttons riding along
+    // with it) balloons to fit it on one line instead of the message wrapping.
+    await page.evaluate(() => SnakeMode.gameOver());
+
+    const panelBox = await page.locator('#snake-controls').boundingBox();
+    expect(panelBox.width).toBeLessThan(220);
+
+    const pauseBox = await page.locator('#snake-start-pause').boundingBox();
+    expect(pauseBox.width).toBeLessThan(100);
   });
 
   test('Snake and Gravity stats/controls panel uses compact button and text sizing in landscape', async ({ page }) => {

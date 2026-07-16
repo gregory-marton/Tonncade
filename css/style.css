@@ -455,6 +455,12 @@ button:hover {
         flex-direction: column;
         gap: 4px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        /* An auto-width absolutely-positioned box grows to fit its widest unwrapped line —
+           without this, Snake's "Game Over! Click Restart to play again." message drags the
+           whole panel (and its flex:1 buttons) out to that message's full width instead of
+           wrapping, ballooning it over a third of the board. */
+        max-width: 200px;
+        box-sizing: border-box;
     }
 
     #palette.floating-queue {
@@ -493,6 +499,10 @@ button:hover {
         padding: 4px 8px;
         font-size: 11px;
         height: 24px;
+        /* The global `button { width: 100% }` rule sets flex-basis:auto's resolved value, so
+           flex:none alone doesn't stop these from stretching — width must be overridden too. */
+        flex: none;
+        width: auto;
     }
 
     #midi-controls {

@@ -288,29 +288,43 @@ const App = {
                     
                     const drawerHandle = document.getElementById('drawer-handle');
                     if (drawerHandle) {
+                        let dragStartX = 0;
+                        let dragStartY = 0;
+                        // A real tap almost always drifts a few pixels, which the touchmove
+                        // handler below treats as a drag and toggles the drawer on its own. The
+                        // browser then still fires a synthesized click for that same physical
+                        // tap — without this flag, click's own unconditional toggle immediately
+                        // undoes what the drag just did, making the drawer feel impossible to
+                        // close reliably.
+                        let toggledByDrag = false;
                         drawerHandle.onclick = () => {
+                            if (toggledByDrag) {
+                                toggledByDrag = false;
+                                return;
+                            }
                             topDrawer.classList.toggle('expanded');
                             topDrawer.classList.toggle('collapsed');
                         };
-                        let dragStartX = 0;
-                        let dragStartY = 0;
                         drawerHandle.addEventListener('touchstart', (e) => {
                             dragStartX = e.touches[0].clientX;
                             dragStartY = e.touches[0].clientY;
+                            toggledByDrag = false;
                         }, { passive: true });
                         drawerHandle.addEventListener('touchmove', (e) => {
                             const dx = e.touches[0].clientX - dragStartX;
                             const dy = e.touches[0].clientY - dragStartY;
                             const isLandscape = window.innerWidth > window.innerHeight;
-                            
+
                             const delta = isLandscape ? dx : dy;
-                            
+
                             if (delta > 20 && !topDrawer.classList.contains('expanded')) {
                                 topDrawer.classList.add('expanded');
                                 topDrawer.classList.remove('collapsed');
+                                toggledByDrag = true;
                             } else if (delta < -20 && topDrawer.classList.contains('expanded')) {
                                 topDrawer.classList.remove('expanded');
                                 topDrawer.classList.add('collapsed');
+                                toggledByDrag = true;
                             }
                         }, { passive: true });
                     }
@@ -345,11 +359,15 @@ const App = {
                             palette.classList.remove('floating-queue');
                             sandboxTools.appendChild(palette);
                         }
-                        // Move just the chord dropdown (not the label/instructions) into the always-visible area
-                        const chordSelect = document.getElementById('chord-guide-select');
+                        // Move just the dropdown + its reset button (not the label/instructions)
+                        // into the always-visible area. Moving the whole .control-group (rather
+                        // than just the <select>) brings #chord-guide-reset along with it —
+                        // previously it stayed behind in #sandbox-guide, which gets hidden below,
+                        // orphaning the only way to dismiss/clear the chord guide on mobile.
+                        const chordControlGroup = document.querySelector('#sandbox-guide .control-group');
                         const chordResults = document.getElementById('chord-guide-results');
-                        if (chordSelect && !sandboxTools.contains(chordSelect)) {
-                            sandboxTools.appendChild(chordSelect);
+                        if (chordControlGroup && !sandboxTools.contains(chordControlGroup)) {
+                            sandboxTools.appendChild(chordControlGroup);
                         }
                         if (chordResults && !sandboxTools.contains(chordResults)) {
                             sandboxTools.appendChild(chordResults);
