@@ -227,6 +227,9 @@ const SandboxMode = {
                 this.state.viewY -= dy;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
                 Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
+                // Read back the clamped values so the next delta starts from where we actually are
+                this.state.viewX = Render.viewX;
+                this.state.viewY = Render.viewY;
             }
             
             if (this.state.selectedPiece) {

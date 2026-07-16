@@ -146,7 +146,46 @@ const Render = {
         return isPhone ? baseZoom / 1.5 : baseZoom;
     },
 
+    // Screen-space bounding box of every playable (MIDI 0-127) hex for the current mode,
+    // padded by one hex-width of slack. Only Sandbox/Blast/MIDI modes allow free panning;
+    // other modes return null and are left unclamped.
+    getPanBounds: function() {
+        if (typeof App === 'undefined') return null;
+        const mode = App.currentMode;
+        if (mode !== 'sandbox' && mode !== 'blast' && mode !== 'midi') return null;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let p = -15; p <= 15; p++) {
+            for (let q = -15; q <= 15; q++) {
+                const midi = Tonnetz.getMidi(p, q);
+                if (midi < 0 || midi > 127) continue;
+                const pos = this.getScreenPos(p, q);
+                minX = Math.min(minX, pos.x - this.HEX_R);
+                maxX = Math.max(maxX, pos.x + this.HEX_R);
+                minY = Math.min(minY, pos.y - this.HEX_R);
+                maxY = Math.max(maxY, pos.y + this.HEX_R);
+            }
+        }
+        if (minX === Infinity) return null;
+
+        const slack = this.HEX_R * 2; // ~1 hex-width of give past the edge
+        return { minX: minX - slack, maxX: maxX + slack, minY: minY - slack, maxY: maxY + slack };
+    },
+
     updateView: function(viewX, viewY, zoom = 1) {
+        const bounds = this.getPanBounds();
+        if (bounds) {
+            const vbWidth = 800 * zoom;
+            const vbHeight = 600 * zoom;
+            const maxViewX = bounds.maxX - vbWidth;
+            const maxViewY = bounds.maxY - vbHeight;
+            if (bounds.minX <= maxViewX) {
+                viewX = Math.min(Math.max(viewX, bounds.minX), maxViewX);
+            }
+            if (bounds.minY <= maxViewY) {
+                viewY = Math.min(Math.max(viewY, bounds.minY), maxViewY);
+            }
+        }
         this.viewX = viewX;
         this.viewY = viewY;
         this.zoom = zoom;

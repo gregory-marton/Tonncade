@@ -631,16 +631,16 @@ const App = {
                     const dy = currentCenter.y - twoFingerStartCenter.y;
                     
                     // Multiply delta by zoom since zoom scales coordinates
-                    Render.viewX = twoFingerStartView.x - dx * Render.zoom;
-                    Render.viewY = twoFingerStartView.y - dy * Render.zoom;
-                    
-                    // Keep SandboxMode.state in sync
+                    const newViewX = twoFingerStartView.x - dx * Render.zoom;
+                    const newViewY = twoFingerStartView.y - dy * Render.zoom;
+
+                    Render.updateView(newViewX, newViewY, Render.zoom);
+
+                    // Keep SandboxMode.state in sync with the (possibly clamped) result
                     if (this.currentMode === 'sandbox') {
                         SandboxMode.state.viewX = Render.viewX;
                         SandboxMode.state.viewY = Render.viewY;
                     }
-                    
-                    Render.updateView(Render.viewX, Render.viewY, Render.zoom);
                 }
             }
         }, { passive: false });
