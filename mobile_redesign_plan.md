@@ -35,6 +35,7 @@ Raw notes from real-device feedback, captured for the next brainstorming pass �
 - **Snake mode**: no visible on-screen controls on mobile — needs a bottom control set similar to Gravity's pad. The existing tap/drag/turn touch-steering gesture (in `main.js`'s `touchstart` snake-mode branch) doesn't work predictably and needs investigation. (In progress — plan approved 2026-07-16.)
 - **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
 - **Blast mode landscape overlap**: the puzzle board overlaps `#palette.floating-queue` in landscape mode on mobile. Reorient the queue to a vertical layout, place it under `#blast-stats` (the score), and put the active-piece/place item (`.active-item`) at the bottom-left instead of inline in the queue's first slot.
+- **Gravity mode landscape split**: `#mobile-controls` (◀ ↺ ▼ ↻ ▶) should split to either side of the board in landscape mode, freeing up screen real estate for the board itself — same two-cluster idea being built for Snake. To avoid handedness bias, duplicate the down/soft-drop button onto both sides rather than picking one side to host it alone.
 
 ---
 
