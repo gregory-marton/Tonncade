@@ -681,6 +681,110 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
+  // F. Blast Mode Mobile Layout
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('blast board is centered within its viewBox on mobile', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    const result = await page.evaluate(() => {
+      const cells = [];
+      for (let p = -Board.radius; p <= Board.radius; p++) {
+        for (let q = -Board.radius; q <= Board.radius; q++) {
+          if (Board.isInBounds(p, q)) cells.push({ p, q });
+        }
+      }
+      const positions = cells.map(c => Render.getScreenPos(c.p, c.q));
+      const boardCenterX = (Math.min(...positions.map(pos => pos.x)) + Math.max(...positions.map(pos => pos.x))) / 2;
+      const boardCenterY = (Math.min(...positions.map(pos => pos.y)) + Math.max(...positions.map(pos => pos.y))) / 2;
+
+      const viewBoxCenterX = Render.viewX + (800 * Render.zoom) / 2;
+      const viewBoxCenterY = Render.viewY + (600 * Render.zoom) / 2;
+
+      return { boardCenterX, boardCenterY, viewBoxCenterX, viewBoxCenterY };
+    });
+
+    expect(result.viewBoxCenterX).toBeCloseTo(result.boardCenterX, 0);
+    expect(result.viewBoxCenterY).toBeCloseTo(result.boardCenterY, 0);
+  });
+
+  test('every playable Blast board cell is visible on screen (none clipped by an undersized viewBox)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    const svgBox = await page.locator('#tonnetz-svg').boundingBox();
+
+    const result = await page.evaluate((containerRect) => {
+      const cells = [];
+      for (let p = -Board.radius; p <= Board.radius; p++) {
+        for (let q = -Board.radius; q <= Board.radius; q++) {
+          if (Board.isInBounds(p, q)) cells.push({ p, q });
+        }
+      }
+      let visible = 0;
+      cells.forEach(({ p, q }) => {
+        const el = document.querySelector(`#tonnetz-svg polygon.cell[data-p="${p}"][data-q="${q}"]`);
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const cx = (r.left + r.right) / 2;
+        const cy = (r.top + r.bottom) / 2;
+        const inView = cx >= containerRect.x && cx <= containerRect.x + containerRect.width &&
+          cy >= containerRect.y && cy <= containerRect.y + containerRect.height;
+        if (inView) visible++;
+      });
+      return { total: cells.length, visible };
+    }, svgBox);
+
+    expect(result.total).toBeGreaterThan(0);
+    expect(result.visible).toBe(result.total);
+  });
+
+  test('switching Sandbox -> Blast -> Sandbox on mobile leaves the piece palette visible in both', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await expect(page.locator('.piece-item').first()).toBeVisible();
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+    // Blast's next-piece queue reuses #piece-list too — it should now be visible, not stuck
+    // inside the (now-hidden) Sandbox carousel container. getComputedStyle(el).display only
+    // reflects the element's own rule, not an ancestor's display:none, so check actual
+    // rendered size instead.
+    const paletteBox = await page.locator('#palette').boundingBox();
+    expect(paletteBox).not.toBeNull();
+    expect(paletteBox.width).toBeGreaterThan(0);
+    expect(paletteBox.height).toBeGreaterThan(0);
+    const pieceListChildCount = await page.evaluate(() => document.getElementById('piece-list').children.length);
+    expect(pieceListChildCount).toBeGreaterThan(0);
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await expect(page.locator('.piece-item').first()).toBeVisible();
+  });
+
+  test('blast-stats and the next-piece queue are positioned within the visible game area, not behind the header', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    const headerBottom = await page.evaluate(() => document.getElementById('top-header').getBoundingClientRect().bottom);
+
+    const statsBox = await page.locator('#blast-stats').boundingBox();
+    expect(statsBox).not.toBeNull();
+    expect(statsBox.y).toBeGreaterThanOrEqual(headerBottom - 5);
+
+    const queueBox = await page.locator('#palette').boundingBox();
+    expect(queueBox).not.toBeNull();
+    expect(queueBox.y).toBeGreaterThanOrEqual(headerBottom - 5);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
   // E. Drawer and Device Layout
   // ────────────────────────────────────────────────────────────────────────
 

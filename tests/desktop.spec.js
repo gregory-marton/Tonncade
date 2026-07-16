@@ -155,6 +155,27 @@ test('stopping preview restores the note list to reflect actual game progress', 
   expect(currentName).toBe(expectedName);
 });
 
+test('Render.getFitView centers a set of cells within the reference viewBox', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => Render.getFitView([{ p: 0, q: 0 }], 20));
+
+  // A single cell's content box should end up centered on world-space (0,0)
+  expect(result.viewX + (800 * result.zoom) / 2).toBeCloseTo(0, 1);
+  expect(result.viewY + (600 * result.zoom) / 2).toBeCloseTo(0, 1);
+  expect(result.zoom).toBeGreaterThan(0);
+});
+
+test('Render.getFitView sizes zoom to snugly fit larger cell sets, not a fixed value', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const small = Render.getFitView([{ p: 0, q: 0 }], 20);
+    const large = Render.getFitView([{ p: -5, q: 0 }, { p: 5, q: 0 }, { p: 0, q: 5 }, { p: 0, q: -5 }], 20);
+    return { smallZoom: small.zoom, largeZoom: large.zoom };
+  });
+
+  expect(result.largeZoom).toBeGreaterThan(result.smallZoom);
+});
+
 test('panning cannot scroll far past the edge of the audible tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());

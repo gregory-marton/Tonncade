@@ -172,6 +172,39 @@ const Render = {
         return { minX: minX - slack, maxX: maxX + slack, minY: minY - slack, maxY: maxY + slack };
     },
 
+    // Computes {viewX, viewY, zoom} that centers and snugly fits the given {p, q} cells into
+    // the 800x600 reference viewBox, padded by `padding` screen-space units around the
+    // content's bounding box.
+    getFitView: function(cells, padding = 0) {
+        if (!cells || cells.length === 0) {
+            return { viewX: -400, viewY: -300, zoom: 1 };
+        }
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        cells.forEach(c => {
+            const pos = this.getScreenPos(c.p, c.q);
+            minX = Math.min(minX, pos.x - this.HEX_R);
+            maxX = Math.max(maxX, pos.x + this.HEX_R);
+            minY = Math.min(minY, pos.y - this.HEX_R);
+            maxY = Math.max(maxY, pos.y + this.HEX_R);
+        });
+
+        minX -= padding;
+        maxX += padding;
+        minY -= padding;
+        maxY += padding;
+
+        const zoom = Math.max((maxX - minX) / 800, (maxY - minY) / 600);
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        return {
+            viewX: centerX - (800 * zoom) / 2,
+            viewY: centerY - (600 * zoom) / 2,
+            zoom
+        };
+    },
+
     updateView: function(viewX, viewY, zoom = 1) {
         const bounds = this.getPanBounds();
         if (bounds) {

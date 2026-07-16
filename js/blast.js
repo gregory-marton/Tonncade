@@ -106,7 +106,14 @@ const BlastMode = {
             Render.svg.appendChild(hex);
         });
 
-        Render.updateView(-400, -300, Render.getResponsiveZoom());
+        const boardCells = [];
+        for (let p = -Board.radius; p <= Board.radius; p++) {
+            for (let q = -Board.radius; q <= Board.radius; q++) {
+                if (Board.isInBounds(p, q)) boardCells.push({ p, q });
+            }
+        }
+        const fit = Render.getFitView(boardCells, Render.HEX_R * 2);
+        Render.updateView(fit.viewX, fit.viewY, fit.zoom);
     },
 
     setupEvents: function() {
