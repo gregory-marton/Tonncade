@@ -324,10 +324,10 @@ const MidiMode = {
         }
     },
 
-    updateDifficultyUI: function() {
+    updateDifficultyUI: function(overrideIndex) {
         const listEl = document.getElementById('midi-note-list');
         const diff = this.state.difficulty;
-        
+
         // Clear old glows
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
@@ -340,40 +340,44 @@ const MidiMode = {
         }
 
         const melody = this.state.melody;
-        const current = this.state.userIndex;
-        
+        const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
+
         let displayNotes = [];
         const pastWindow = 3;
         const futureWindow = diff === 'easy' ? 4 : 0; // Current + 3 ahead
-        
-        // Add past notes
+        const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
+
+        // Add past notes, fading progressively with distance so the most recently
+        // played note reads as distinct from older history
         for (let i = Math.max(0, current - pastWindow); i < current; i++) {
             const midi = melody[i].midi;
             const name = Tonnetz.getNoteName(midi);
-            displayNotes.push(`<span style="opacity: 0.6;">${name}</span>`);
-            
+            const distance = current - i;
+            const opacity = pastOpacityByDistance[distance] || 0.3;
+            displayNotes.push(`<span data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>`);
+
             // Add past glow
             const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
             polygons.forEach(p => p.classList.add('glow-past'));
         }
-        
+
         // Add current/future notes
         if (diff === 'easy') {
             for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
                 const midi = melody[i].midi;
                 const name = Tonnetz.getNoteName(midi);
                 if (i === current) {
-                    displayNotes.push(`<span style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span>`);
+                    displayNotes.push(`<span data-note-role="current" style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span>`);
                 } else {
-                    displayNotes.push(`<span style="opacity: 0.8;">${name}</span>`);
+                    displayNotes.push(`<span data-note-role="future" style="opacity: 0.8;">${name}</span>`);
                 }
-                
+
                 // Add future glow
                 const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
                 polygons.forEach(p => p.classList.add('glow-future'));
             }
         }
-        
+
         listEl.innerHTML = displayNotes.join(' - ');
     },
 
@@ -413,6 +417,7 @@ const MidiMode = {
             const tId1 = setTimeout(() => {
                 Synth.playNote(note.midi);
                 this.highlightCellByMidi(note.midi, note.duration * 1000);
+                this.updateDifficultyUI(i);
             }, scheduledTime);
 
             this.state.playbackTimeoutIds.push(tId1);
@@ -452,6 +457,7 @@ const MidiMode = {
             const tId = setTimeout(() => {
                 Synth.playNote(note.midi);
                 this.highlightCellByMidi(note.midi, note.duration * 1000);
+                this.updateDifficultyUI(i);
             }, scheduledTime);
 
             this.state.playbackTimeoutIds.push(tId);
@@ -471,11 +477,12 @@ const MidiMode = {
     stopPreview: function() {
         this.cleanupPlayback();
         this.state.isPlayingPreview = false;
-        
+
         const playBtn = document.getElementById('midi-play-preview');
         if (playBtn) playBtn.textContent = "Play Melody";
 
         this.setStatus("Preview stopped. Ready.", "info");
+        this.updateDifficultyUI();
     },
 
     handleUserInputNote: function(midi) {

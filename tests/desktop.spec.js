@@ -67,6 +67,94 @@ test('chord guide X button resets the dropdown without touching a selected candi
   expect(selectedAfter).toBe(selectedBefore);
 });
 
+test('midi note list fades past notes progressively by recency', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  await page.evaluate(() => {
+    MidiMode.state.difficulty = 'easy';
+    MidiMode.state.userIndex = 3;
+    MidiMode.updateDifficultyUI();
+  });
+
+  const opacities = await page.evaluate(() => {
+    const spans = Array.from(document.querySelectorAll('#midi-note-list [data-note-role="past"]'));
+    const byDistance = {};
+    spans.forEach(s => { byDistance[s.getAttribute('data-distance')] = parseFloat(s.style.opacity); });
+    return byDistance;
+  });
+
+  expect(opacities['1']).toBeGreaterThan(opacities['2']);
+  expect(opacities['2']).toBeGreaterThan(opacities['3']);
+});
+
+test('updateDifficultyUI(overrideIndex) pivots the window on the override, not state.userIndex', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  const currentName = await page.evaluate(() => {
+    MidiMode.state.difficulty = 'easy';
+    MidiMode.state.userIndex = 0; // would normally show melody[0] as current
+    MidiMode.updateDifficultyUI(5); // override to pivot on index 5 instead
+    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    return el ? el.textContent : null;
+  });
+
+  const expectedName = await page.evaluate(() => Tonnetz.getNoteName(MidiMode.state.melody[5].midi));
+  expect(currentName).toBe(expectedName);
+});
+
+test('playing the full melody preview live-updates the note list as it plays', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => { MidiMode.state.difficulty = 'easy'; });
+
+  // resetGame() schedules an untracked 1s auto-kickoff of the "listen to the notes" teaching
+  // intro that cleanupPlayback() can't cancel — let it fully play out and finish first so it
+  // doesn't fire mid-test and wipe our own preview's scheduled timeouts via its own cleanup.
+  await page.clock.fastForward(2000);
+
+  await page.locator('#midi-play-preview').click();
+
+  // Advance to when the 3rd note (index 2, "buns", scheduled ~1.2s into the preview) should be sounding
+  await page.clock.fastForward(1300);
+
+  const currentName = await page.evaluate(() => {
+    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    return el ? el.textContent : null;
+  });
+  const expectedName = await page.evaluate(() => Tonnetz.getNoteName(MidiMode.state.melody[2].midi));
+  expect(currentName).toBe(expectedName);
+});
+
+test('stopping preview restores the note list to reflect actual game progress', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => {
+    MidiMode.state.difficulty = 'easy';
+    MidiMode.state.userIndex = 1; // simulate the player having already gotten 1 note right
+  });
+
+  // Let the auto-kickoff teaching intro (see comment in the preceding test) finish first.
+  await page.clock.fastForward(2000);
+  await page.evaluate(() => { MidiMode.state.userIndex = 1; }); // teaching intro reset it to 0
+
+  await page.locator('#midi-play-preview').click();
+  await page.clock.fastForward(1300); // let preview scrub ahead to index 2
+
+  // Manually stop the preview (button now reads "Stop Preview")
+  await page.locator('#midi-play-preview').click();
+
+  const currentName = await page.evaluate(() => {
+    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    return el ? el.textContent : null;
+  });
+  const expectedName = await page.evaluate(() => Tonnetz.getNoteName(MidiMode.state.melody[MidiMode.state.userIndex].midi));
+  expect(currentName).toBe(expectedName);
+});
+
 test('panning cannot scroll far past the edge of the audible tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
