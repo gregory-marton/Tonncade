@@ -8,66 +8,33 @@ It also tracks status: what's already shipped, how the implementation diverged f
 
 ## Status as of 2026-07-15
 
-The original plan (see "Goal Description" below) is substantially implemented and verified, and so is the round of renames/polish/carousel-fix work that followed it (renames, chord-guide placeholder text, mobile cell size, pan clamp, and the carousel scroll/drag-to-place fixes, including two follow-up root causes found post-launch: a `touch-action: none` rule that was unintentionally blocking the carousel's own scroll, and a flexbox `min-width: auto` trap that kept `#palette` from ever actually overflowing/clipping). Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-sandbox-blast-rename-and-mobile-polish.md`.
+The original plan (see "Goal Description" below) is substantially implemented and verified, and so are the two rounds of follow-up work that came after it:
+
+1. **Renames/polish/carousel fixes** — renames, chord-guide placeholder text, mobile cell size, pan clamp, and the carousel scroll/drag-to-place fixes, including two follow-up root causes found post-launch: a `touch-action: none` rule that was unintentionally blocking the carousel's own scroll, and a flexbox `min-width: auto` trap that kept `#palette` from ever actually overflowing/clipping. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-sandbox-blast-rename-and-mobile-polish.md`.
+2. **Chord Guide draggable pieces + tap-to-move candidate** — chord-guide results now show a correctly-oriented, draggable piece preview instead of a static "Use" badge (reusing a generalized version of the carousel's drag-to-candidate gesture), an X button resets the guide dropdown without disturbing a selected candidate, and touch taps on the board now move the candidate to wherever you tapped (or pick up an existing placed piece in Sandbox) instead of always rotating it. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-chord-guide-drag-and-tap-to-move.md`.
 
 - **8/8 unit tests pass** (`node tests/run_tests.js`)
-- **47/47 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`) — covering hex/label visibility, piece carousel (native scroll non-interference, drag-to-candidate, full-list reachability), chord dropdown, drag/tap/swipe gestures, pan clamping, mobile cell sizing, drawer handle, keyboard-hiding, MIDI/Snake touch, and more.
+- **57/57 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`) — covering hex/label visibility, piece carousel and chord-guide drag-to-candidate, chord dropdown (including the reset button), drag/tap/swipe/pickup gestures, pan clamping, mobile cell sizing, drawer handle, keyboard-hiding, MIDI/Snake touch, and more.
 
 The real implementation evolved past the original spec text below in a few ways — this is expected drift from iterative work, not a bug:
 
 - The bottom "Pieces / Chord Guide" tabbed drawer described below was **not** what got built. Instead, the sidebar controls collapse into a `#top-drawer` at the top of the screen (`drawer-handle`, swipe or tap to expand/collapse), and Sandbox mode's piece palette renders as a horizontally-scrolling **piece carousel** (`#sandbox-mobile-tools #palette` / `#piece-list`) inside that drawer's always-visible area, alongside the chord guide dropdown.
-- The floating gamepad-style `#mobile-controls` pad is shown **only in Gravity mode** on phones, not "Snake & Gravity" as originally planned — Snake mode uses its own touch-steering instead.
+- The floating gamepad-style `#mobile-controls` pad is shown **only in Gravity mode** on phones, not "Snake & Gravity" as originally planned — Snake mode uses its own touch-steering instead (see the Next Round backlog below — this hasn't held up in practice).
 - Chop Mode was renamed to Sandbox Mode and Puzzle Mode to Blast Mode in the code (`js/sandbox.js`/`SandboxMode`, `js/blast.js`/`BlastMode`, mode strings `'sandbox'`/`'blast'`), matching the UI display names that already said "Sandbox"/"Blast".
 - Dragging a carousel/chord-guide piece onto the board leaves a **candidate** placement (tap-to-rotate/tap-to-move/swipe-to-place still apply) rather than placing immediately on release — this diverged from the original "drag-to-place" framing below once real-device feedback showed immediate placement was too eager.
 
 ---
 
-## Next Round: Chord Guide draggable pieces + tap-to-move candidate (spec, 2026-07-15)
+## Next Round: Realtime-mode and Melody polish (backlog, not yet speced, 2026-07-15)
 
-Two small UX gaps in Sandbox Mode, reported after using the shipped work above on a real device:
+Raw notes from real-device feedback, captured for the next brainstorming pass — none of this has been designed or planned yet:
 
-1. The Chord Guide's result list (`#chord-guide-results`, populated by `SandboxMode.updateGuideResults` in `js/sandbox.js`) shows each matching piece/rotation as a text row with a static "Use" badge — no visual preview, and no touch drag-to-candidate the way the carousel now supports.
-2. Once a piece is a selected candidate, tapping the board on touch always rotates it (`js/main.js`, `touchend`'s `isTap` branch, ~line 696) — even when the intent was to move it somewhere else.
-
-### 1. Draggable, correctly-oriented piece previews in Chord Guide results
-
-Each result row already carries the matched piece's `type` and `rotation` (`data-type`/`data-rotation` on `.chord-match-item`). Replace the "Use" `<span>` with a small `<svg class="chord-match-preview">`, rendered the same way the carousel's `.piece-preview` icons are — but built from the *rotated* cells (`Pieces.getAbsoluteCells(type, 0, 0, rotation)`) instead of the piece's raw rotation-0 cells, so the preview visually matches the rotation that actually produces the chord.
-
-The bounds-computation/hex-drawing logic currently inlined in `renderPalette` should be extracted into a shared helper (e.g. `renderPiecePreview(svgEl, cells, color)`) used by both `renderPalette` and `updateGuideResults`.
-
-### 2. Drag-to-candidate from Chord Guide results
-
-Generalize the existing `setupCarouselTouchGestures` (currently hardcodes `#piece-list`, `.piece-item`, `data-key`, and rotation 0) into a reusable `setupDragToCandidate(containerId, itemSelector, getPieceInfo)`, where `getPieceInfo(item)` returns `{ key, rotation }`. Call it twice from `init()`:
-
-- `setupDragToCandidate('piece-list', '.piece-item', item => ({ key: item.dataset.key, rotation: 0 }))`
-- `setupDragToCandidate('chord-guide-results', '.chord-match-item', item => ({ key: item.dataset.type, rotation: parseInt(item.dataset.rotation) }))`
-
-Behavior is otherwise identical to the carousel's existing drag gesture: a predominantly-vertical drag on the item selects the piece (with the row's specific rotation, not always 0) and tracks `hoverCell`/`updateGhost()` as the finger moves over the board; releasing leaves it as a normal selected candidate. A predominantly-horizontal drag is left alone so the browser can scroll the results list natively. A plain tap/click on a result row is unchanged from today: selects the piece and sets its rotation immediately.
-
-### 3. X (reset) button for the Chord Guide
-
-An inline `✕` button sits next to `#chord-guide-select`, visible whenever a chord is chosen (hidden when the dropdown is blank). Clicking it resets the dropdown to `-- Choose a Chord --` and clears `#chord-guide-results` — exactly equivalent to manually re-selecting the blank option. It does not touch `SandboxMode.state.selectedPiece`: a candidate you already picked (via tap or drag) stays selected/on-board after the guide is reset.
-
-### 4. Tap elsewhere moves the candidate instead of rotating it
-
-In `js/main.js`, the `touchend` handler's `isTap` branch (currently: any tap while a piece/candidate is active always rotates it CW) is replaced with a 3-way classification of the tapped cell (`touchStartCell`, since `isTap` implies negligible movement):
-
-1. **Tapped cell is one of the candidate ghost's own cells** (`Pieces.getAbsoluteCells(pieceType, hoverCell.p, hoverCell.q, rotation)`) → rotate clockwise, exactly as today (including the confirmation chord sound). This also covers the case where no cell could be resolved from the tap.
-2. **Tapped cell is covered by an existing placed piece** (Sandbox: `SandboxMode.state.placedPieces`; Blast: `!Board.isCellEmpty(p, q)`) →
-   - Sandbox: pick that placed piece up as the new candidate, reusing `SandboxMode.pickupPieceAt(p, q)` (after setting `hoverCell` to the tapped cell so the ghost reappears at the right spot).
-   - Blast: ignored — Blast has no concept of picking a locked cell back up, so the tap is a no-op.
-3. **Anything else (an empty cell)** → move the candidate's anchor there: set `modeObj.state.hoverCell` to the tapped cell and call `updateGhost()`. No rotation, no sound.
-
-This branch is shared code for both Sandbox and Blast Mode (`modeObj`/`pieceType` are already mode-generic here), so the behavior applies uniformly except where called out above.
-
-### Testing
-
-- Playwright coverage (`tests/mobile.spec.js`, `tests/desktop.spec.js`) for:
-  - Chord Guide result rows render a piece preview at the correct rotation (spot-check one known chord/rotation pair's rendered cells against `Pieces.getAbsoluteCells`).
-  - Dragging a chord-guide result row onto the board leaves a candidate (not an immediate placement) at the dragged-to cell, with the row's specific rotation — mirrors the existing carousel drag-to-candidate test.
-  - The X button: appears only once a chord is selected, clears the select + results on click, and leaves an already-selected candidate untouched.
-  - Tap-to-move: with a candidate selected, tapping a cell outside the ghost moves the candidate there (no rotation); tapping a cell inside the ghost still rotates; tapping an existing placed piece (Sandbox) picks it up as the new candidate; tapping a locked cell (Blast) is a no-op.
-- Manual/real-device check (native touch scroll and drag still can't be driven by Playwright's synthetic `TouchEvent`s, per the existing carousel testing caveat above).
+- **Gravity mode**: the board should resize to fill the available space (it doesn't currently). Needs a "down" button in the center of the other four direction buttons on the mobile control pad.
+- **Blast mode**: the puzzle area should fill the available space instead of sitting off to one side. If the player pans it to a better fit, don't reset their pan (i.e. `refreshBoard()`'s hardcoded `Render.updateView(-400, -300, ...)` shouldn't clobber a manual pan).
+- **Gravity and Blast modes** both need to show upcoming pieces (Blast already has a next-piece queue on desktop via `renderNextQueue`/`#piece-list` — needs a mobile-visible equivalent; Gravity has none at all).
+- **Snake mode**: no visible on-screen controls on mobile — needs a bottom control set similar to Gravity's pad. The existing tap/drag/turn touch-steering gesture (in `main.js`'s `touchstart` snake-mode branch) doesn't work predictably and needs investigation.
+- **Pause button** should be visible on mobile (currently not surfaced there).
+- **Melody (MIDI) mode**: the "notes to repeat" line updates nicely as the player plays ahead, but it's not clear which note was just played vs. which is next. Playing the full melody (and the example playthrough the player is meant to follow) should update this line in real time too, the same way it does when the player plays it themselves.
 
 ---
 
