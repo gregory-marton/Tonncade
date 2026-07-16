@@ -318,6 +318,25 @@ button:hover {
     transform: none;
 }
 
+.active-item {
+    position: relative;
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(127, 224, 208, 0.3);
+}
+
+.active-item-arrow {
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    z-index: 2;
+}
+
 #gravity-controls {
     margin-bottom: 20px;
 }
@@ -715,28 +734,6 @@ button:hover {
         padding: 4px 8px;
         font-size: 11px;
         height: 24px;
-    }
-
-    /* Floating Next Pieces Queue for Blast Mode */
-    .blast-active #piece-list {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 100;
-        background: rgba(20, 22, 28, 0.85);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 8px;
-        display: flex;
-        flex-direction: row;
-        gap: 6px;
-        align-items: center;
-        pointer-events: none;
-        margin: 0;
-        overflow-x: visible;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
 
     #piece-list h3 {

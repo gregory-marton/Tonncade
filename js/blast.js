@@ -36,7 +36,8 @@ const BlastMode = {
     refreshUI: function() {
         this.renderNextQueue();
         this.refreshBoard();
-        
+        this.updateGhost();
+
         const linesEl = document.getElementById('lines-count');
         if (linesEl) linesEl.textContent = this.state.linesCleared;
 
@@ -53,9 +54,31 @@ const BlastMode = {
     renderNextQueue: function() {
         const list = document.getElementById('piece-list');
         if (!list) return;
-        
-        list.innerHTML = '<h3>Next Pieces</h3>';
-        this.state.nextQueue.forEach((key, i) => {
+
+        list.innerHTML = '';
+
+        if (this.state.activePiece) {
+            const piece = Pieces.TYPES[this.state.activePiece];
+            const div = document.createElement('div');
+            div.className = 'piece-item active-item';
+            div.title = 'Tap to place (same as swipe down)';
+            div.innerHTML = `
+                <div class="active-item-arrow">▼</div>
+                <svg class="piece-preview"></svg>
+                <div class="piece-name">${piece.name}</div>
+            `;
+            div.onclick = () => this.placeActiveGhost();
+            list.appendChild(div);
+
+            const svg = div.querySelector('.piece-preview');
+            SandboxMode.renderPiecePreview(svg, piece.cells, piece.color);
+        }
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Next Pieces';
+        list.appendChild(heading);
+
+        this.state.nextQueue.forEach((key) => {
             const piece = Pieces.TYPES[key];
             const div = document.createElement('div');
             div.className = 'piece-item next-item';
@@ -64,29 +87,20 @@ const BlastMode = {
                 <div class="piece-name">${piece.name}</div>
             `;
             list.appendChild(div);
-            
-            // Preview logic
-            const svg = div.querySelector('.piece-preview');
-            const positions = piece.cells.map(c => Render.getScreenPos(c.p, c.q));
-            const minX = Math.min(...positions.map(pos => pos.x));
-            const maxX = Math.max(...positions.map(pos => pos.x));
-            const minY = Math.min(...positions.map(pos => pos.y));
-            const maxY = Math.max(...positions.map(pos => pos.y));
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-            const padding = 40;
-            const size = Math.max(maxX - minX, maxY - minY) + padding * 2;
-            svg.setAttribute('viewBox', `${centerX - size/2} ${centerY - size/2} ${size} ${size}`);
 
-            piece.cells.forEach(c => {
-                const hex = Render.createHex(c.p, c.q, {
-                    fill: piece.color,
-                    stroke: 'white',
-                    strokeWidth: 2
-                });
-                svg.appendChild(hex);
-            });
+            const svg = div.querySelector('.piece-preview');
+            SandboxMode.renderPiecePreview(svg, piece.cells, piece.color);
         });
+    },
+
+    // Places the active piece's current ghost, same as swipe-down — no-op if the ghost's
+    // position isn't actually a valid placement.
+    placeActiveGhost: function() {
+        if (this.state.isGameOver || !this.state.activePiece) return;
+        const { p, q } = this.state.hoverCell;
+        if (Board.checkPlacement(this.state.activePiece, p, q, this.state.rotation)) {
+            this.placePiece(p, q);
+        }
     },
 
     refreshBoard: function() {

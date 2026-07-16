@@ -199,6 +199,53 @@ test('Render.getFitView scale parameter zooms in further while staying centered'
   expect(result.scaledCenterY).toBeCloseTo(result.unscaledCenterY, 5);
 });
 
+test('blast mode shows a ghost for the active piece immediately, without requiring interaction', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+  const ghostCount = await page.locator('.ghost').count();
+  expect(ghostCount).toBeGreaterThan(0);
+});
+
+test('blast queue shows the active piece as a distinct, clickable item that places it like swipe-down', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+  const activeItem = page.locator('.piece-item.active-item');
+  await expect(activeItem).toBeVisible();
+  await expect(activeItem.locator('.active-item-arrow')).toBeVisible();
+
+  let placedCount = await page.locator('.placed-piece').count();
+  expect(placedCount).toBe(0);
+
+  await activeItem.click();
+
+  placedCount = await page.locator('.placed-piece').count();
+  expect(placedCount).toBeGreaterThan(0);
+});
+
+test('clicking the active queue item does not place when the ghost position is invalid', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+  // Place once at the default hover cell, then point the (new) active piece's ghost back at
+  // that same now-occupied cell so a second placement there is guaranteed invalid.
+  await page.evaluate(() => {
+    const { p, q } = BlastMode.state.hoverCell;
+    BlastMode.placePiece(p, q);
+    BlastMode.state.hoverCell = { p, q };
+    BlastMode.updateGhost();
+  });
+
+  const placedBefore = await page.locator('.placed-piece').count();
+  expect(placedBefore).toBeGreaterThan(0);
+
+  await page.locator('.piece-item.active-item').click();
+
+  const placedAfter = await page.locator('.placed-piece').count();
+  expect(placedAfter).toBe(placedBefore);
+});
+
 test('panning cannot scroll far past the edge of the audible tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
