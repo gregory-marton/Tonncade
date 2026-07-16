@@ -8,14 +8,15 @@ It also tracks status: what's already shipped, how the implementation diverged f
 
 ## Status as of 2026-07-16
 
-The original plan (see "Goal Description" below) is substantially implemented and verified, and so are the three rounds of follow-up work that came after it:
+The original plan (see "Goal Description" below) is substantially implemented and verified, and so are the four rounds of follow-up work that came after it:
 
 1. **Renames/polish/carousel fixes** — renames, chord-guide placeholder text, mobile cell size, pan clamp, and the carousel scroll/drag-to-place fixes, including two follow-up root causes found post-launch: a `touch-action: none` rule that was unintentionally blocking the carousel's own scroll, and a flexbox `min-width: auto` trap that kept `#palette` from ever actually overflowing/clipping. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-sandbox-blast-rename-and-mobile-polish.md`.
 2. **Chord Guide draggable pieces + tap-to-move candidate** — chord-guide results now show a correctly-oriented, draggable piece preview instead of a static "Use" badge (reusing a generalized version of the carousel's drag-to-candidate gesture), an X button resets the guide dropdown without disturbing a selected candidate, and touch taps on the board now move the candidate to wherever you tapped (or pick up an existing placed piece in Sandbox) instead of always rotating it. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-chord-guide-drag-and-tap-to-move.md`.
 3. **Melody mode note-list clarity + live tracking** — `#midi-note-list`'s past notes now fade progressively by recency instead of a flat opacity, and `updateDifficultyUI()` takes an optional override index so `playTargetSequence()` (the teaching intro) and `playPreview()` (the "Play Melody" button) both scrub the note list live as they play, instead of leaving it frozen. `stopPreview()` restores the list to reflect actual game progress once playback stops.
+4. **Blast mode mobile layout** — `Render.getFitView(cells, padding)` centers and auto-fits the board to its actual radius-5 playable region (fixing both an off-center bug and a viewBox-too-small clipping bug that only manifested at the mobile responsive zoom); the next-piece queue (`#palette`/`#piece-list`, shared with Sandbox's carousel) no longer gets stranded inside a hidden container when switching away from Sandbox, and now shows as a floating overlay on mobile; `#main-content` got `position: relative` so floating overlays (`#blast-stats` and the new queue panel) anchor to the game area instead of falling back to the viewport and landing near/behind the header.
 
 - **8/8 unit tests pass** (`node tests/run_tests.js`)
-- **61/61 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`) — covering hex/label visibility, piece carousel and chord-guide drag-to-candidate, chord dropdown (including the reset button), drag/tap/swipe/pickup gestures, pan clamping, mobile cell sizing, drawer handle, keyboard-hiding, MIDI/Snake touch, Melody note-list rendering, and more.
+- **71/71 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`) — covering hex/label visibility, piece carousel and chord-guide drag-to-candidate, chord dropdown (including the reset button), drag/tap/swipe/pickup gestures, pan clamping, mobile cell sizing, drawer handle, keyboard-hiding, MIDI/Snake touch, Melody note-list rendering, Blast board centering/fit/queue visibility, and more.
 
 The real implementation evolved past the original spec text below in a few ways — this is expected drift from iterative work, not a bug:
 
@@ -36,30 +37,6 @@ Raw notes from real-device feedback, captured for the next brainstorming pass �
 - **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
 
 ---
-
-## Next Round: Blast mode mobile layout (spec, 2026-07-16)
-
-Investigated three compounding bugs behind "the puzzle area should fill the available space, not be off to one side" and "no upcoming-pieces view on mobile" (screenshot-confirmed: the board renders shifted toward the bottom-right with a large empty region top-left):
-
-1. **Off-center board.** `BlastMode.refreshBoard()` calls `Render.updateView(-400, -300, Render.getResponsiveZoom())` — a *fixed* offset regardless of `zoom`. Centering the origin actually requires `-400*zoom, -300*zoom`: at `zoom=1` (desktop) that's coincidentally centered, but at the mobile responsive `zoom≈0.667` it isn't, since the viewBox (`800*zoom × 600*zoom`) shrinks while the offset doesn't shrink with it.
-2. **Board doesn't fill available space.** Even once centered, Blast's compact radius-5 hex board (`Board.radius = 5`, `Board.isInBounds`) is drawn with the same generic responsive zoom used everywhere else, unrelated to the board's actual size — wasting most of the reference viewBox on empty margin.
-3. **Next-piece queue invisible on mobile, despite rendering correctly.** Diagnosed via a temporary Playwright assertion: `#palette` (which `BlastMode.renderNextQueue()` populates into `#piece-list`, confirmed non-empty) gets moved into `#sandbox-mobile-tools` whenever the app is in Sandbox mode (the default starting mode) on mobile, and nothing ever moves it back out when switching to Blast — so it sits inside a `display:none` ancestor left over from Sandbox. A related, previously-undiscovered bug: neither `#blast-stats` nor a new floating queue panel would anchor correctly even once visible, because `#blast-stats`'s actual DOM ancestor chain (`#sidebar` → `#main-content` → `#app` → `body`) has no `position` other than `static` set anywhere — confirmed via `getComputedStyle` walking the ancestor chain in a Playwright test — so `position: absolute; top: 10px; left: 10px` falls back to the viewport as its containing block instead of the game area, landing near/behind the header instead of over the board.
-
-(Per discussion: manual pan support for Blast is explicitly **out of scope** — once the board is correctly sized and centered on every render, there's nothing to pan away from, so "don't reset pan" was solving the wrong problem.)
-
-### Fix
-
-1. **`Render.getFitView(cells, padding)`** (new, in `js/render.js`, alongside `getPanBounds`): computes the screen-space bounding box of the given `{p,q}` cells via `getScreenPos`, adds padding, and returns `{viewX, viewY, zoom}` that centers and snugly fits those cells into the `800×600` reference box (`zoom = max(width/800, height/600)`, `viewX/viewY` centered on the bounding box's midpoint).
-2. **`BlastMode.refreshBoard()`** builds the list of all `{p,q}` with `Board.isInBounds(p,q)` (the actual radius-5 playable region) and calls `Render.updateView(...)` with `Render.getFitView(cells, HEX_R*2)` instead of the hardcoded `-400, -300`.
-3. **`main.js`'s `setupMobileControls()`** mobile-width dispatch: every mode branch (not just Sandbox) now explicitly manages `#palette` — Sandbox moves it into the carousel as today; Blast moves it back to `#sidebar`, shows it, and adds a `floating-queue` class; every other mode (MIDI, Gravity, Snake) moves it back to `#sidebar` and hides it, so stale content never leaks between modes.
-4. **CSS**: add `position: relative;` to `#main-content` inside the `@media (max-width: 767px)` block, giving both `#blast-stats` and the new `.floating-queue` panel a sane containing block (the game area, below the header) instead of falling back to the viewport. Add a `#palette.floating-queue` rule (mirrors `#blast-stats`'s floating panel styling, positioned `top: 10px; right: 10px` to avoid the stats badge) with a compact horizontal `#piece-list` layout inside it (small preview icons, no grid).
-
-### Testing
-
-- Unit/Playwright coverage for: `Render.getFitView` centers and sizes a known small cell set correctly; Blast's board renders centered (bounding box of rendered cells is symmetric around the SVG's visible center) at both desktop and mobile viewport widths; switching Sandbox → Blast → Sandbox on mobile leaves `#palette` visible and correctly parented in both cases (regression test for the reparenting bug); `#blast-stats` and the next-piece queue both report a bounding box within the viewport and below the header (regression test for the positioned-ancestor bug).
-
----
-
 
 ## Goal Description (original)
 Mobile devices do not have a cursor hover state. In Desktop mode, hover is used to show piece previews/ghosts and trigger chord tooltips. 
