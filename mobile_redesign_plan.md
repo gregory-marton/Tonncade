@@ -33,8 +33,9 @@ Raw notes from real-device feedback, captured for the next brainstorming pass �
 
 - **Gravity mode**: the board should resize to fill the available space (it doesn't currently). Needs a "down" button in the center of the other four direction buttons on the mobile control pad. Also needs an upcoming-pieces view (has none at all, unlike Blast).
 - **Snake mode**: no visible on-screen controls on mobile — needs a bottom control set similar to Gravity's pad. The existing tap/drag/turn touch-steering gesture (in `main.js`'s `touchstart` snake-mode branch) doesn't work predictably and needs investigation.
-- **Pause button** should be visible on mobile (currently not surfaced there).
 - **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
+
+~~Pause button should be visible on mobile~~ — already fixed as a side effect of the Blast round's `#main-content { position: relative }` fix (Gravity/Snake's floating stats panels share the same containing-block mechanism as `#blast-stats`). Confirmed via a regression test (`tests/mobile.spec.js`, "Gravity and Snake pause buttons are visible and positioned below the header on mobile").
 
 ---
 
