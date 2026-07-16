@@ -1,0 +1,26 @@
+{
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  },
+  "name": "tonncade",
+  "version": "1.0.0",
+  "description": "A musical hexagonal arcade game played on Euler's *Tonnetz* — a hexagonal lattice of consonant musical intervals. Placing, moving, and rotating pieces behaves both as a spatial geometry puzzle **and** a music sequencer.",
+  "main": "sw.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gregory-marton/Tonncade.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/gregory-marton/Tonncade/issues"
+  },
+  "homepage": "https://github.com/gregory-marton/Tonncade#readme"
+}
