@@ -113,6 +113,7 @@ const SandboxMode = {
         const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
         labels.forEach(lbl => Render.svg.appendChild(lbl));
 
+        this.state.zoom = Render.getResponsiveZoom();
         Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
     },
 

@@ -106,7 +106,7 @@ const BlastMode = {
             Render.svg.appendChild(hex);
         });
 
-        Render.updateView(-400, -300, 1);
+        Render.updateView(-400, -300, Render.getResponsiveZoom());
     },
 
     setupEvents: function() {

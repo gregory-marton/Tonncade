@@ -140,6 +140,12 @@ const Render = {
     viewY: -300,
     zoom: 1,
 
+    // On phones, shrink the viewBox (relative to baseZoom) so each hex renders ~1.5x bigger.
+    getResponsiveZoom: function(baseZoom = 1) {
+        const isPhone = window.matchMedia('(max-width: 767px)').matches;
+        return isPhone ? baseZoom / 1.5 : baseZoom;
+    },
+
     updateView: function(viewX, viewY, zoom = 1) {
         this.viewX = viewX;
         this.viewY = viewY;

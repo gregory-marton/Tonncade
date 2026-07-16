@@ -58,6 +58,32 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(svgBox.y + svgBox.height).toBeLessThanOrEqual(page.viewportSize().height + 5);
   });
 
+  test('mobile hexagons are big enough that at most ~19 rows are visible', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const visibleRowCount = await page.evaluate(() => {
+      const svg = document.getElementById('tonnetz-svg');
+      const containerRect = document.getElementById('game-container').getBoundingClientRect();
+      const hexes = Array.from(svg.querySelectorAll('polygon.cell'));
+      const qSet = new Set();
+      for (const h of hexes) {
+        const r = h.getBoundingClientRect();
+        const cy = (r.top + r.bottom) / 2;
+        const cx = (r.left + r.right) / 2;
+        if (cy >= containerRect.top && cy <= containerRect.bottom && cx >= containerRect.left && cx <= containerRect.right) {
+          qSet.add(h.getAttribute('data-q'));
+        }
+      }
+      return qSet.size;
+    });
+
+    expect(visibleRowCount).toBeLessThanOrEqual(19);
+    expect(visibleRowCount).toBeGreaterThanOrEqual(10);
+  });
+
   test('piece carousel is visible with piece names in Sandbox mode on phone', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

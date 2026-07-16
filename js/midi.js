@@ -610,7 +610,7 @@ const MidiMode = {
             minQ: -15, maxQ: 15
         };
         Render.drawLattice(viewport, {});
-        Render.updateView(-400, -300, 1);
+        Render.updateView(-400, -300, Render.getResponsiveZoom());
     },
 
     // MIDI parser logic (SMF format)
