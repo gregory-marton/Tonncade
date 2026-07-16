@@ -34,7 +34,7 @@ const SandboxMode = {
     renderPalette: function() {
         const list = document.getElementById('piece-list');
         list.innerHTML = '';
-        
+
         for (const key in Pieces.TYPES) {
             const piece = Pieces.TYPES[key];
             const div = document.createElement('div');
@@ -44,36 +44,37 @@ const SandboxMode = {
                 <svg class="piece-preview"></svg>
                 <div class="piece-name">${piece.name}</div>
             `;
-            
+
             div.onclick = () => this.togglePiece(key);
             list.appendChild(div);
-            
-            // Render small preview
-            const previewSvg = div.querySelector('.piece-preview');
-            
-            // Find bounds of the piece to center it
-            const positions = piece.cells.map(c => Render.getScreenPos(c.p, c.q));
-            const minX = Math.min(...positions.map(pos => pos.x));
-            const maxX = Math.max(...positions.map(pos => pos.x));
-            const minY = Math.min(...positions.map(pos => pos.y));
-            const maxY = Math.max(...positions.map(pos => pos.y));
-            
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-            const padding = 40;
-            const size = Math.max(maxX - minX, maxY - minY) + padding * 2;
-            
-            previewSvg.setAttribute('viewBox', `${centerX - size/2} ${centerY - size/2} ${size} ${size}`);
 
-            piece.cells.forEach(c => {
-                const hex = Render.createHex(c.p, c.q, {
-                    fill: piece.color,
-                    stroke: 'white',
-                    strokeWidth: 2
-                });
-                previewSvg.appendChild(hex);
-            });
+            const previewSvg = div.querySelector('.piece-preview');
+            this.renderPiecePreview(previewSvg, piece.cells, piece.color);
         }
+    },
+
+    renderPiecePreview: function(svgEl, cells, color) {
+        const positions = cells.map(c => Render.getScreenPos(c.p, c.q));
+        const minX = Math.min(...positions.map(pos => pos.x));
+        const maxX = Math.max(...positions.map(pos => pos.x));
+        const minY = Math.min(...positions.map(pos => pos.y));
+        const maxY = Math.max(...positions.map(pos => pos.y));
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const padding = 40;
+        const size = Math.max(maxX - minX, maxY - minY) + padding * 2;
+
+        svgEl.setAttribute('viewBox', `${centerX - size / 2} ${centerY - size / 2} ${size} ${size}`);
+
+        cells.forEach(c => {
+            const hex = Render.createHex(c.p, c.q, {
+                fill: color,
+                stroke: 'white',
+                strokeWidth: 2
+            });
+            svgEl.appendChild(hex);
+        });
     },
 
     togglePiece: function(key) {
@@ -582,14 +583,19 @@ const SandboxMode = {
                     </strong>
                     <div style="font-size: 11px; color: var(--dim); margin-top: 2px;">Piece: <span style="color: #fff; font-weight: bold;">${match.type}</span> | Rotation: ${match.rotation}</div>
                 </div>
-                <span style="font-size: 11px; color: var(--accent); font-weight: bold; border: 1px solid var(--accent); padding: 2px 6px; border-radius: 4px; background: rgba(127, 224, 208, 0.05);">Use</span>
+                <svg class="chord-match-preview"></svg>
             </div>
         `).join('');
 
         resultsDiv.querySelectorAll('.chord-match-item').forEach(item => {
+            const type = item.getAttribute('data-type');
+            const rotation = parseInt(item.getAttribute('data-rotation'));
+
+            const preview = item.querySelector('.chord-match-preview');
+            const cells = Pieces.getAbsoluteCells(type, 0, 0, rotation);
+            this.renderPiecePreview(preview, cells, Pieces.TYPES[type].color);
+
             item.onclick = () => {
-                const type = item.getAttribute('data-type');
-                const rotation = parseInt(item.getAttribute('data-rotation'));
                 this.selectPiece(type);
                 this.state.rotation = rotation;
                 this.updateGhost();

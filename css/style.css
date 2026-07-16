@@ -874,6 +874,13 @@ button:hover {
     transform: translateY(0px);
 }
 
+.chord-match-preview {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
 /* Touch-primary device styles: hide keyboard controls and desktop-only instructions */
 @media (hover: none) and (pointer: coarse) {
     .desktop-only {
