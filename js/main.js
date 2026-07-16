@@ -93,10 +93,10 @@ const App = {
         // Configure mobile action button text based on active mode
         const actionBtn = document.getElementById('m-btn-action');
         if (actionBtn) {
+            actionBtn.style.display = 'block';
             if (mode === 'gravity') {
-                actionBtn.style.display = 'none'; // The down arrow is sufficient for Gravity
+                actionBtn.textContent = '▼'; // Reused as the soft-drop button in Gravity
             } else {
-                actionBtn.style.display = 'block';
                 actionBtn.textContent = mode === 'sandbox' ? 'Place / Pick up' : 'Place Piece';
             }
         }
@@ -234,6 +234,24 @@ const App = {
             bindBtn('m-btn-dl', 'v');                             // Down-Left (v) / Soft-drop in Gravity
             bindBtn('m-btn-dr', 'b');                             // Down-Right (b)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
+
+            // Gravity has no "place" action — reuse this same button/slot as its soft-drop
+            // button instead, dispatching 'v' (the key GravityMode's own handler already
+            // listens for) whenever the player is in Gravity mode.
+            const actionBtnEl = document.getElementById('m-btn-action');
+            if (actionBtnEl) {
+                const placeTrigger = actionBtnEl.onclick;
+                const dispatchTrigger = (e) => {
+                    if (this.currentMode === 'gravity') {
+                        e.preventDefault();
+                        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v', bubbles: true }));
+                    } else {
+                        placeTrigger(e);
+                    }
+                };
+                actionBtnEl.ontouchstart = dispatchTrigger;
+                actionBtnEl.onclick = dispatchTrigger;
+            }
         }
 
         const topDrawer = document.getElementById('top-drawer');

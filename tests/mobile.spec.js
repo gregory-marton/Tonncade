@@ -906,6 +906,24 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(page.locator('#snake-keyboard-instructions')).toBeHidden();
   });
 
+  test('gravity mobile down button triggers soft-drop; other modes keep their place-piece label', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    const actionBtn = page.locator('#m-btn-action');
+    await expect(actionBtn).toBeVisible();
+    await expect(actionBtn).toHaveText('▼');
+
+    const qBefore = await page.evaluate(() => GravityMode.state.q);
+    await actionBtn.click();
+    const qAfter = await page.evaluate(() => GravityMode.state.q);
+    expect(qAfter).toBeLessThan(qBefore);
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await expect(actionBtn).toHaveText('Place / Pick up');
+  });
+
   test('Gravity and Snake pause buttons are visible and positioned below the header on mobile', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
