@@ -9,8 +9,22 @@ const Synth = {
     lowpass: null,
 
     init: function() {
-        if (this.ctx) return;
+        if (this.ctx) {
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+            return;
+        }
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const resumeAudio = () => {
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        };
+        window.addEventListener('click', resumeAudio, { once: true });
+        window.addEventListener('touchstart', resumeAudio, { once: true });
+
         this.master = this.ctx.createGain();
         this.master.gain.value = 0.6;
         
