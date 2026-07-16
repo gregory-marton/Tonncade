@@ -148,6 +148,13 @@ const Render = {
         return window.matchMedia('(max-width: 767px), (max-width: 950px) and (orientation: landscape)').matches;
     },
 
+    // True specifically for the landscape-phone breakpoint — used where mobile UI needs to
+    // know which of the two mobile layouts it's in (e.g. the carousel is a horizontal row in
+    // portrait but a vertical column in landscape), not just "is this mobile at all."
+    isMobileLandscape: function() {
+        return window.matchMedia('(max-width: 950px) and (orientation: landscape)').matches;
+    },
+
     // On phones, shrink the viewBox (relative to baseZoom) so each hex renders ~1.5x bigger.
     getResponsiveZoom: function(baseZoom = 1) {
         return this.isMobileViewport() ? baseZoom / 1.5 : baseZoom;

@@ -481,13 +481,19 @@ const SandboxMode = {
             const dy = e.touches[0].clientY - dragStartY;
 
             if (!isPlacingDrag) {
-                if (Math.abs(dy) > 20 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+                // The carousel scrolls vertically in landscape (a tall column) but horizontally
+                // in portrait (a wide row) — "drag out to place" is whichever axis ISN'T the
+                // native scroll direction, so it doesn't fight the browser's own scroll gesture.
+                const dragDelta = Render.isMobileLandscape() ? dx : dy;
+                const scrollDelta = Render.isMobileLandscape() ? dy : dx;
+
+                if (Math.abs(dragDelta) > 20 && Math.abs(dragDelta) > Math.abs(scrollDelta) * 1.5) {
                     isPlacingDrag = true;
                     this.state.selectedPiece = dragInfo.key;
                     this.state.rotation = dragInfo.rotation;
                     this.updatePaletteHighlight();
                 } else {
-                    return; // Predominantly horizontal — let the browser scroll the list natively
+                    return; // Predominantly along the scroll axis — let the browser scroll the list natively
                 }
             }
 

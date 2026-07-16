@@ -327,6 +327,39 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placedCount).toBeGreaterThan(0);
   });
 
+  test('dragging a carousel piece onto the board works in landscape too, where the carousel scrolls vertically instead of horizontally', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(dispatchAtHelpers);
+
+    await page.locator('#drawer-handle').click({ force: true });
+    await expect(page.locator('#top-drawer')).toHaveClass(/expanded/);
+
+    const firstPiece = page.locator('.piece-item').first();
+    const pieceBox = await firstPiece.boundingBox();
+    const startX = pieceBox.x + pieceBox.width / 2;
+    const startY = pieceBox.y + pieceBox.height / 2;
+
+    const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+    const cellBox = await cell.boundingBox();
+    const endX = cellBox.x + cellBox.width / 2;
+    const endY = cellBox.y + cellBox.height / 2;
+
+    // In landscape the carousel is a vertical column (scrolls natively along Y), so "drag
+    // out to place" must be the HORIZONTAL escape here — the opposite of portrait, where the
+    // carousel is a horizontal row and dragging out is a vertical escape.
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchstart', x, y), { x: startX, y: startY });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: startX + 40, y: startY });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: endX, y: endY });
+    await page.waitForTimeout(50);
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchend', x, y), { x: endX, y: endY });
+
+    const selectedPiece = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selectedPiece).not.toBeNull();
+    const hoverCell = await page.evaluate(() => SandboxMode.state.hoverCell);
+    expect(hoverCell).toEqual({ p: 0, q: 0 });
+  });
+
   test('dragging a chord-guide result onto the board shows a candidate at that result\'s specific rotation', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
