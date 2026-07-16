@@ -832,6 +832,25 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(page.locator('#snake-keyboard-instructions')).toBeHidden();
   });
 
+  test('Gravity and Snake pause buttons are visible and positioned below the header on mobile', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    for (const { mode, btnId } of [
+      { mode: 'gravity', btnId: '#gravity-start-pause' },
+      { mode: 'snake', btnId: '#snake-start-pause' },
+    ]) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      // Header height varies by mode (e.g. shrinks once sandbox/midi-specific mobile tools are
+      // hidden), so measure it fresh per mode rather than once up front.
+      const headerBottom = await page.evaluate(() => document.getElementById('top-header').getBoundingClientRect().bottom);
+      const box = await page.locator(btnId).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeGreaterThan(0);
+      expect(box.y).toBeGreaterThanOrEqual(headerBottom - 5);
+    }
+  });
+
   test('mobile controls pad only visible in Gravity mode on phones', async ({ page }) => {
     const controls = page.locator('#mobile-controls');
     const width = page.viewportSize().width;
