@@ -17,6 +17,14 @@ const App = {
             }
         });
 
+        // Migrate the Puzzle Mode -> Blast Mode rename's localStorage key too
+        const oldBlastKey = 'tonncade_puzzle_best';
+        const blastVal = localStorage.getItem(oldBlastKey);
+        if (blastVal !== null) {
+            localStorage.setItem('tonncade_blast_best', blastVal);
+            localStorage.removeItem(oldBlastKey);
+        }
+
         const options = document.querySelectorAll('.mode-option');
         options.forEach((opt, idx) => {
             opt.onclick = () => this.setMode(opt.getAttribute('data-mode'), idx);
@@ -26,15 +34,19 @@ const App = {
         this.setupTouchGestures();
         this.updateVersionTag();
 
+        window.addEventListener('resize', () => {
+            this.setupMobileControls();
+        });
+
         // Start in Sandbox Mode
-        this.setMode('chop', 0);
+        this.setMode('sandbox', 0);
     },
 
     setMode: function(mode, idx) {
         if (this.currentMode === mode) return;
 
-        const stats = document.getElementById('puzzle-stats');
-        const chopCtrls = document.getElementById('chop-controls');
+        const stats = document.getElementById('blast-stats');
+        const sandboxCtrls = document.getElementById('sandbox-controls');
         const clickAction = document.getElementById('click-action');
         const activePill = document.querySelector('.mode-slider-active');
         const options = document.querySelectorAll('.mode-option');
@@ -45,7 +57,12 @@ const App = {
 
         // Slide the active background indicator
         if (activePill) {
-            activePill.style.transform = `translateX(${idx * 100}%)`;
+            const isLandscape = window.innerWidth <= 950 && window.innerWidth > window.innerHeight;
+            if (isLandscape) {
+                activePill.style.transform = `translateY(${idx * 100}%)`;
+            } else {
+                activePill.style.transform = `translateX(${idx * 100}%)`;
+            }
         }
 
         // Clean up global listeners
@@ -67,8 +84,8 @@ const App = {
             SnakeMode.cleanup();
         }
 
-        if (typeof ChopMode !== 'undefined' && ChopMode.cleanup) {
-            ChopMode.cleanup();
+        if (typeof SandboxMode !== 'undefined' && SandboxMode.cleanup) {
+            SandboxMode.cleanup();
         }
 
         this.currentMode = mode;
@@ -80,7 +97,7 @@ const App = {
                 actionBtn.style.display = 'none'; // The down arrow is sufficient for Gravity
             } else {
                 actionBtn.style.display = 'block';
-                actionBtn.textContent = mode === 'chop' ? 'Place / Pick up' : 'Place Piece';
+                actionBtn.textContent = mode === 'sandbox' ? 'Place / Pick up' : 'Place Piece';
             }
         }
 
@@ -110,14 +127,25 @@ const App = {
             palette.style.display = (mode === 'midi' || mode === 'snake') ? 'none' : 'block';
         }
 
+        // Hide/show mobile dock based on mode and screen width
+        const mobileDock = document.getElementById('mobile-dock');
+        if (mobileDock) {
+            const isMobileWidth = window.matchMedia('(max-width: 767px)').matches;
+            if (isMobileWidth && mode === 'sandbox') {
+                mobileDock.style.display = 'block';
+            } else {
+                mobileDock.style.display = 'none';
+            }
+        }
+
         // Hide/show mobile controls
         const mobileContainer = document.getElementById('mobile-controls');
         if (mobileContainer) {
-            if (mode === 'midi' || mode === 'snake') {
-                mobileContainer.style.display = 'none';
+            const isMobileWidth = window.matchMedia('(max-width: 767px)').matches;
+            if (isMobileWidth && mode === 'gravity') {
+                mobileContainer.style.display = 'flex';
             } else {
-                const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-                if (isTouch) mobileContainer.style.display = 'flex';
+                mobileContainer.style.display = 'none';
             }
         }
 
@@ -131,23 +159,23 @@ const App = {
             document.getElementById('snake-controls').style.display = 'none';
         }
         document.getElementById('placement-controls').style.display = 'none';
-        chopCtrls.style.display = 'none';
+        sandboxCtrls.style.display = 'none';
         const guide = document.getElementById('sandbox-guide');
         if (guide) {
             guide.style.display = 'none';
         }
 
-        if (mode === 'chop') {
+        if (mode === 'sandbox') {
             document.getElementById('placement-controls').style.display = 'block';
-            chopCtrls.style.display = 'block';
+            sandboxCtrls.style.display = 'block';
             if (guide) guide.style.display = 'block';
             if (clickAction) clickAction.textContent = 'Place/Pick up';
-            ChopMode.init();
-        } else if (mode === 'puzzle') {
+            SandboxMode.init();
+        } else if (mode === 'blast') {
             stats.style.display = 'block';
             document.getElementById('placement-controls').style.display = 'block';
             if (clickAction) clickAction.textContent = 'Place Piece';
-            PuzzleMode.init();
+            BlastMode.init();
         } else if (mode === 'gravity') {
             document.getElementById('gravity-controls').style.display = 'block';
             GravityMode.init();
@@ -158,20 +186,30 @@ const App = {
             document.getElementById('snake-controls').style.display = 'block';
             SnakeMode.init();
         }
+        
+        this.setupMobileControls();
     },
 
     setupMobileControls: function() {
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         const mobileContainer = document.getElementById('mobile-controls');
         
-        if (isTouch && mobileContainer) {
-            mobileContainer.style.display = 'flex';
-            
+        const isMobileWidth = window.matchMedia('(max-width: 767px)').matches;
+
+        if (mobileContainer) {
+            if (isMobileWidth && this.currentMode === 'gravity') {
+                mobileContainer.style.display = 'flex';
+            } else {
+                mobileContainer.style.display = 'none';
+            }
+        }
+
+        if (isTouch && mobileContainer && !this.mobileControlsBound) {
+            this.mobileControlsBound = true;
             const bindBtn = (id, key, code = '', shiftKey = false) => {
                 const btn = document.getElementById(id);
                 if (!btn) return;
                 
-                // Use touchstart for instantaneous mobile response, fallback to click
                 const trigger = (e) => {
                     e.preventDefault();
                     const event = new KeyboardEvent('keydown', {
@@ -197,6 +235,135 @@ const App = {
             bindBtn('m-btn-dr', 'b');                             // Down-Right (b)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
         }
+
+        const topDrawer = document.getElementById('top-drawer');
+        const menuToggle = document.getElementById('menu-toggle');
+        
+        if (topDrawer && menuToggle) {
+            if (isMobileWidth) {
+                // Initialize drawer interactions once
+                if (!this.topDrawerInitialized) {
+                    this.topDrawerInitialized = true;
+                    
+                    menuToggle.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        topDrawer.classList.toggle('expanded');
+                        topDrawer.classList.toggle('collapsed');
+                    });
+                    
+                    const drawerHandle = document.getElementById('drawer-handle');
+                    if (drawerHandle) {
+                        drawerHandle.onclick = () => {
+                            topDrawer.classList.toggle('expanded');
+                            topDrawer.classList.toggle('collapsed');
+                        };
+                        let dragStartX = 0;
+                        let dragStartY = 0;
+                        drawerHandle.addEventListener('touchstart', (e) => {
+                            dragStartX = e.touches[0].clientX;
+                            dragStartY = e.touches[0].clientY;
+                        }, { passive: true });
+                        drawerHandle.addEventListener('touchmove', (e) => {
+                            const dx = e.touches[0].clientX - dragStartX;
+                            const dy = e.touches[0].clientY - dragStartY;
+                            const isLandscape = window.innerWidth > window.innerHeight;
+                            
+                            const delta = isLandscape ? dx : dy;
+                            
+                            if (delta > 20 && !topDrawer.classList.contains('expanded')) {
+                                topDrawer.classList.add('expanded');
+                                topDrawer.classList.remove('collapsed');
+                            } else if (delta < -20 && topDrawer.classList.contains('expanded')) {
+                                topDrawer.classList.remove('expanded');
+                                topDrawer.classList.add('collapsed');
+                            }
+                        }, { passive: true });
+                    }
+                    
+                    // Prevent clicks inside drawer from passing to grid
+                    ['touchstart', 'touchmove', 'touchend', 'click', 'mousedown', 'mousemove', 'mouseup'].forEach(evtType => {
+                        topDrawer.addEventListener(evtType, (e) => {
+                            e.stopPropagation();
+                        }, { passive: false });
+                    });
+                }
+                
+                // Set up contents of the drawer depending on mode
+                const sandboxTools = document.getElementById('sandbox-mobile-tools');
+                const midiTools = document.getElementById('midi-mobile-tools');
+                const drawerInjected = document.getElementById('drawer-injected-tools');
+                const palette = document.getElementById('palette');
+                const guide = document.getElementById('sandbox-guide');
+                
+                const midiUpload = document.getElementById('midi-upload-group');
+                const midiStats = document.getElementById('midi-stats-group');
+                const midiActions = document.getElementById('midi-actions-group');
+                
+                if (drawerInjected) drawerInjected.style.display = 'none';
+
+                if (this.currentMode === 'sandbox') {
+                    if (sandboxTools) {
+                        sandboxTools.style.display = 'flex';
+                        if (palette) {
+                            palette.style.display = 'block';
+                            sandboxTools.appendChild(palette);
+                        }
+                        // Move just the chord dropdown (not the label/instructions) into the always-visible area
+                        const chordSelect = document.getElementById('chord-guide-select');
+                        const chordResults = document.getElementById('chord-guide-results');
+                        if (chordSelect && !sandboxTools.contains(chordSelect)) {
+                            sandboxTools.appendChild(chordSelect);
+                        }
+                        if (chordResults && !sandboxTools.contains(chordResults)) {
+                            sandboxTools.appendChild(chordResults);
+                        }
+                    }
+                    // Hide the full guide in the drawer (label + instruction text stay hidden)
+                    if (guide) guide.style.display = 'none';
+                    if (drawerInjected) drawerInjected.style.display = 'none';
+                    if (midiTools) midiTools.style.display = 'none';
+                } else if (this.currentMode === 'midi') {
+                    if (sandboxTools) sandboxTools.style.display = 'none';
+                    if (midiTools) {
+                        midiTools.style.display = 'flex';
+                        if (midiStats) midiTools.appendChild(midiStats);
+                        if (midiActions) midiTools.appendChild(midiActions);
+                    }
+                    if (midiUpload && drawerInjected) {
+                        drawerInjected.style.display = 'block';
+                        drawerInjected.appendChild(midiUpload);
+                    }
+                } else {
+                    if (sandboxTools) sandboxTools.style.display = 'none';
+                    if (midiTools) midiTools.style.display = 'none';
+                }
+            } else {
+                // On desktop, ensure the drawer doesn't act like a drawer
+                topDrawer.classList.remove('expanded');
+                topDrawer.classList.remove('collapsed');
+                // Ensure midi controls are back in midi-controls container
+                const midiControls = document.getElementById('midi-controls');
+                const midiUpload = document.getElementById('midi-upload-group');
+                const midiActions = document.getElementById('midi-actions-group');
+                const midiStats = document.getElementById('midi-stats-group');
+                
+                if (midiControls) {
+                    if (midiUpload && midiUpload.parentElement !== midiControls) midiControls.appendChild(midiUpload);
+                    if (midiActions && midiActions.parentElement !== midiControls) midiControls.appendChild(midiActions);
+                    if (midiStats && midiStats.parentElement !== midiControls) midiControls.appendChild(midiStats);
+                }
+                
+                // Ensure palette and guide are back in sidebar
+                const palette = document.getElementById('palette');
+                const guide = document.getElementById('sandbox-guide');
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) {
+                    if (palette && palette.parentElement !== sidebar) sidebar.appendChild(palette);
+                    if (guide && guide.parentElement !== sidebar) sidebar.appendChild(guide);
+                }
+            }
+        }
     },
 
     setupTouchGestures: function() {
@@ -208,6 +375,15 @@ const App = {
         let isGesture = false;
         let lastTapCell = null;
         let lastTouchCell = null;
+        let preTouchHoverCell = null;
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let touchStartCell = null;
+        let isDragging = false;
+        let twoFingerStartCenter = null;
+        let twoFingerStartView = null;
 
         const getAngle = (t1, t2) => {
             return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
@@ -226,6 +402,36 @@ const App = {
         svg.addEventListener('touchstart', (e) => {
             if (this.currentMode === 'snake') {
                 e.preventDefault();
+                if (typeof SnakeMode !== 'undefined' && SnakeMode.state && SnakeMode.state.snake && SnakeMode.state.snake.length > 0) {
+                    const head = SnakeMode.state.snake[0];
+                    const headPos = Render.getScreenPos(head.p, head.q);
+                    const rect = svg.getBoundingClientRect();
+                    const touch = e.touches[0];
+                    const touchX = touch.clientX - rect.left;
+                    const touchY = touch.clientY - rect.top;
+                    const dx = touchX - headPos.x;
+                    const dy = touchY - headPos.y;
+                    
+                    let deg = Math.atan2(dy, dx) * 180 / Math.PI;
+                    if (deg < 0) deg += 360;
+                    
+                    const sector = Math.round(deg / 60) % 6;
+                    const dirs = [
+                        { p: 1, q: 0 },   // 0 deg: Right
+                        { p: 0, q: 1 },   // 60 deg: Down-Right
+                        { p: -1, q: 1 },  // 120 deg: Down-Left
+                        { p: -1, q: 0 },  // 180 deg: Left
+                        { p: 0, q: -1 },  // 240 deg: Up-Left
+                        { p: 1, q: -1 }   // 300 deg: Up-Right
+                    ];
+                    const newDir = dirs[sector];
+                    if (newDir && !SnakeMode.state.isGameOver && !SnakeMode.state.isPaused && !SnakeMode.state.isFlourishing) {
+                        const currentDir = SnakeMode.state.direction;
+                        if (newDir.p !== -currentDir.p || newDir.q !== -currentDir.q) {
+                            SnakeMode.state.nextDirection = newDir;
+                        }
+                    }
+                }
                 return;
             }
 
@@ -234,65 +440,84 @@ const App = {
                     const cell = getCellFromTouch(e.touches[0]);
                     if (cell) {
                         e.preventDefault();
-                        MidiMode.handleCellInput(cell.p, cell.q);
+                        const midi = Tonnetz.getMidi(cell.p, cell.q);
+                        MidiMode.playUserNote(midi, cell.p, cell.q);
                     }
                 }
                 return;
             }
 
-            if (this.currentMode === 'gravity') return; // Gravity mode handles falling loops, skip touch drag/twist
+            if (this.currentMode === 'gravity') return;
+
+            const isPhone = window.matchMedia('(max-width: 767px)').matches;
 
             if (e.touches.length === 1) {
                 isGesture = false;
-                const cell = getCellFromTouch(e.touches[0]);
-                if (cell) {
-                    lastTouchCell = cell;
-                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
-                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
+                const touch = e.touches[0];
+                touchStartX = touch.clientX;
+                touchStartY = touch.clientY;
+                touchStartTime = Date.now();
+                touchStartCell = getCellFromTouch(touch);
+                isDragging = false;
 
-                    // If a piece is active, prevent default simulated mouse events to block unwanted panning
+                const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
+                const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece;
+
+                if (modeObj && modeObj.state && modeObj.state.hoverCell) {
+                    preTouchHoverCell = { p: modeObj.state.hoverCell.p, q: modeObj.state.hoverCell.q };
+                } else {
+                    preTouchHoverCell = null;
+                }
+
+                if (isPhone) {
                     if (pieceType) {
                         e.preventDefault();
                     }
-
-                    // Check for instant pick up in Chop Mode
-                    let isPickup = false;
-                    if (this.currentMode === 'chop') {
-                        isPickup = ChopMode.state.placedPieces.some(piece => {
-                            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
-                            return cells.some(c => c.p === cell.p && c.q === cell.q);
-                        });
-                    }
-
-                    if (isPickup || !pieceType) {
-                        // Instant action for notes and picking up pieces
-                        modeObj.state.hoverCell = cell;
-                        if (this.currentMode === 'chop') {
-                            ChopMode.handleAction(cell.p, cell.q);
-                        } else {
-                            const midi = Tonnetz.getMidi(cell.p, cell.q);
-                            Synth.playNote(midi);
+                } else {
+                    // Standard Tablet/Desktop touch tap-tap-place behavior
+                    const cell = touchStartCell;
+                    if (cell) {
+                        lastTouchCell = cell;
+                        if (pieceType) {
+                            e.preventDefault();
                         }
-                        lastTapCell = null;
-                    } else {
-                        // Regular placement flow (preview on first tap, place on second)
-                        const isSameCell = lastTapCell && lastTapCell.p === cell.p && lastTapCell.q === cell.q;
-                        modeObj.state.hoverCell = cell;
-                        modeObj.updateGhost();
+                        
+                        let isPickup = false;
+                        if (this.currentMode === 'sandbox') {
+                            isPickup = SandboxMode.state.placedPieces.some(piece => {
+                                const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+                                return cells.some(c => c.p === cell.p && c.q === cell.q);
+                            });
+                        }
 
-                        if (isSameCell) {
-                            if (this.currentMode === 'chop') {
-                                if (ChopMode.canPlace(ChopMode.state.selectedPiece, cell.p, cell.q, ChopMode.state.rotation)) {
-                                    ChopMode.placePiece(cell.p, cell.q);
-                                }
+                        if (isPickup || !pieceType) {
+                            modeObj.state.hoverCell = cell;
+                            if (this.currentMode === 'sandbox') {
+                                SandboxMode.handleAction(cell.p, cell.q);
                             } else {
-                                if (Board.checkPlacement(PuzzleMode.state.activePiece, cell.p, cell.q, PuzzleMode.state.rotation)) {
-                                    PuzzleMode.placePiece(cell.p, cell.q);
-                                }
+                                const midi = Tonnetz.getMidi(cell.p, cell.q);
+                                Synth.playNote(midi);
                             }
-                            lastTapCell = null; // Clear tap
+                            lastTapCell = null;
                         } else {
-                            lastTapCell = cell;
+                            const isSameCell = lastTapCell && lastTapCell.p === cell.p && lastTapCell.q === cell.q;
+                            modeObj.state.hoverCell = cell;
+                            modeObj.updateGhost();
+
+                            if (isSameCell) {
+                                if (this.currentMode === 'sandbox') {
+                                    if (SandboxMode.canPlace(SandboxMode.state.selectedPiece, cell.p, cell.q, SandboxMode.state.rotation)) {
+                                        SandboxMode.placePiece(cell.p, cell.q);
+                                    }
+                                } else {
+                                    if (Board.checkPlacement(BlastMode.state.activePiece, cell.p, cell.q, BlastMode.state.rotation)) {
+                                        BlastMode.placePiece(cell.p, cell.q);
+                                    }
+                                }
+                                lastTapCell = null;
+                            } else {
+                                lastTapCell = cell;
+                            }
                         }
                     }
                 }
@@ -300,6 +525,14 @@ const App = {
                 isGesture = true;
                 startAngle = getAngle(e.touches[0], e.touches[1]);
                 lastAngle = startAngle;
+                twoFingerStartCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+                twoFingerStartView = {
+                    x: Render.viewX,
+                    y: Render.viewY
+                };
                 e.preventDefault(); // Stop viewport scaling/panning while twisting
             }
         }, { passive: false });
@@ -312,19 +545,48 @@ const App = {
 
             if (this.currentMode === 'gravity') return;
 
-            if (e.touches.length === 1 && !isGesture) {
-                const cell = getCellFromTouch(e.touches[0]);
-                if (cell) {
-                    lastTouchCell = cell;
-                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
-                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
+            const isPhone = window.matchMedia('(max-width: 767px)').matches;
 
-                    // Disable standard page panning/scrolling while dragging an active piece
-                    if (this.currentMode === 'puzzle' || (this.currentMode === 'chop' && ChopMode.state.selectedPiece)) {
+            if (e.touches.length === 1 && !isGesture) {
+                const touch = e.touches[0];
+                const dx = touch.clientX - touchStartX;
+                const dy = touch.clientY - touchStartY;
+                const dt = Date.now() - touchStartTime;
+
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    isDragging = true;
+                }
+
+                if (isPhone) {
+                    // Prevent visual jump if they are just swiping vertically
+                    if (dt < 300 && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+                        return; // It's likely a swipe, don't move the piece
+                    }
+                    const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
+                    const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece;
+
+                    if (pieceType && isDragging) {
                         e.preventDefault();
-                        modeObj.state.hoverCell = cell;
-                        modeObj.updateGhost();
-                        lastTapCell = cell; // Align double-tap coordinates to latest dragged cell
+                        const cell = getCellFromTouch(touch);
+                        if (cell) {
+                            modeObj.state.hoverCell = cell;
+                            modeObj.updateGhost();
+                        }
+                    }
+                } else {
+                    const cell = getCellFromTouch(touch);
+                    if (cell) {
+                        lastTouchCell = cell;
+                        const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
+                        const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece;
+
+                        // Disable standard page panning/scrolling while dragging an active piece
+                        if (this.currentMode === 'blast' || (this.currentMode === 'sandbox' && SandboxMode.state.selectedPiece)) {
+                            e.preventDefault();
+                            modeObj.state.hoverCell = cell;
+                            modeObj.updateGhost();
+                            lastTapCell = cell; // Align double-tap coordinates to latest dragged cell
+                        }
                     }
                 }
             } else if (e.touches.length === 2) {
@@ -338,9 +600,9 @@ const App = {
 
                 // Twist angle threshold: 30 degrees
                 if (Math.abs(diff) > 30) {
-                    const modeObj = this.currentMode === 'chop' ? ChopMode : PuzzleMode;
-                    const rotateDir = diff > 0 ? 1 : -1;
-                    const pieceType = this.currentMode === 'chop' ? ChopMode.state.selectedPiece : PuzzleMode.state.activePiece;
+                    const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
+                    const rotateDir = diff > 0 ? -1 : 1; // Physical CW twist → CW piece rotation
+                    const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece;
 
                     if (pieceType) {
                         if (rotateDir > 0) {
@@ -358,14 +620,109 @@ const App = {
 
                     lastAngle = currentAngle;
                 }
+                
+                // 2. Panning drag logic
+                if (twoFingerStartCenter && twoFingerStartView) {
+                    const currentCenter = {
+                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                    };
+                    const dx = currentCenter.x - twoFingerStartCenter.x;
+                    const dy = currentCenter.y - twoFingerStartCenter.y;
+                    
+                    // Multiply delta by zoom since zoom scales coordinates
+                    Render.viewX = twoFingerStartView.x - dx * Render.zoom;
+                    Render.viewY = twoFingerStartView.y - dy * Render.zoom;
+                    
+                    // Keep SandboxMode.state in sync
+                    if (this.currentMode === 'sandbox') {
+                        SandboxMode.state.viewX = Render.viewX;
+                        SandboxMode.state.viewY = Render.viewY;
+                    }
+                    
+                    Render.updateView(Render.viewX, Render.viewY, Render.zoom);
+                }
             }
         }, { passive: false });
 
         svg.addEventListener('touchend', (e) => {
+            const isPhone = window.matchMedia('(max-width: 767px)').matches;
+
             if (e.touches.length === 0) {
                 isGesture = false;
             }
+
+            if (e.changedTouches.length === 1 && (this.currentMode === 'sandbox' || this.currentMode === 'blast')) {
+                e.preventDefault();
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - touchStartX;
+                const dy = touch.clientY - touchStartY;
+                const duration = Date.now() - touchStartTime;
+
+                // Swipe = fast vertical flick (< 400ms, > 50px vertical, mostly vertical)
+                const isVerticalSwipe = duration < 400 && Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.5;
+                const isTap = !isDragging && duration < 250 && Math.abs(dx) < 15 && Math.abs(dy) < 15;
+
+                const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
+                const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece;
+
+                if (isVerticalSwipe) {
+                    // Revert the piece position to where it was before the swipe started
+                    if (preTouchHoverCell) {
+                        modeObj.state.hoverCell = preTouchHoverCell;
+                        modeObj.updateGhost();
+                    }
+                    
+                    if (dy > 50) {
+                        // Swipe Down -> Place piece at current ghost position
+                        const cell = modeObj.state.hoverCell;
+                        if (cell && pieceType) {
+                            if (this.currentMode === 'sandbox') {
+                                if (SandboxMode.canPlace(SandboxMode.state.selectedPiece, cell.p, cell.q, SandboxMode.state.rotation)) {
+                                    SandboxMode.placePiece(cell.p, cell.q);
+                                }
+                            } else {
+                                if (Board.checkPlacement(BlastMode.state.activePiece, cell.p, cell.q, BlastMode.state.rotation)) {
+                                    BlastMode.placePiece(cell.p, cell.q);
+                                }
+                            }
+                        }
+                    } else if (dy < -50) {
+                        // Swipe Up -> Pick up ONLY (never place)
+                        if (this.currentMode === 'sandbox' && preTouchHoverCell) {
+                            SandboxMode.pickupPieceAt(preTouchHoverCell.p, preTouchHoverCell.q);
+                        }
+                    }
+                } else if (isTap) {
+                    if (pieceType) {
+                        // Tap to rotate clockwise
+                        modeObj.state.rotation = (modeObj.state.rotation + 1) % 6;
+                        modeObj.updateGhost();
+                        
+                        // Sound confirmation of rotation
+                        const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
+                        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+                        Synth.playChord(midis, true, 0.08, 0.4);
+                    } else {
+                        // Tap note keyboard behavior when no active piece is selected
+                        if (touchStartCell) {
+                            const midi = Tonnetz.getMidi(touchStartCell.p, touchStartCell.q);
+                            Synth.playNote(midi);
+                        }
+                    }
+                }
+                // If it was a drag (not a swipe, not a tap), do nothing on touchend.
+                // The ghost stays where the user dragged it.
+            }
         });
+    },
+
+    collapseMobileDrawer: function() {
+        const drawer = document.getElementById('top-drawer');
+        if (drawer) {
+            drawer.classList.remove('expanded');
+            drawer.classList.add('collapsed');
+        }
     },
 
     updateVersionTag: async function() {
@@ -422,11 +779,19 @@ window.onload = () => {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js')
             .then(reg => {
-                console.log('Service Worker registered:', reg.scope);
-                // Force-check for updates on server to bypass cache
-                reg.update().catch(err => console.warn('Service worker update check failed:', err));
+                if (reg) {
+                    console.log('Service Worker registered:', reg.scope);
+                    // Force-check for updates on server to bypass cache
+                    reg.update().catch(err => console.warn('Service worker update check failed:', err));
+                }
             })
-            .catch(err => console.error('Service Worker registration failed:', err));
+            .catch(err => {
+                if (err && err.message && err.message.includes('blocked')) {
+                    console.log('Service Worker registration was blocked as expected.');
+                } else {
+                    console.error('Service Worker registration failed:', err);
+                }
+            });
 
         // Auto-reload the app immediately when a new service worker finishes activation
         let refreshing = false;

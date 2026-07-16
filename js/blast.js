@@ -1,8 +1,8 @@
 /**
- * puzzle.js - Controller for Blast Mode.
+ * blast.js - Controller for Blast Mode.
  */
 
-const PuzzleMode = {
+const BlastMode = {
     state: {
         nextQueue: [],
         linesCleared: 0,
@@ -40,11 +40,11 @@ const PuzzleMode = {
         const linesEl = document.getElementById('lines-count');
         if (linesEl) linesEl.textContent = this.state.linesCleared;
 
-        const best = parseInt(localStorage.getItem('tonncade_puzzle_best') || '0');
+        const best = parseInt(localStorage.getItem('tonncade_blast_best') || '0');
         if (this.state.linesCleared > best) {
-            localStorage.setItem('tonncade_puzzle_best', this.state.linesCleared.toString());
+            localStorage.setItem('tonncade_blast_best', this.state.linesCleared.toString());
         }
-        const bestEl = document.getElementById('puzzle-best-count');
+        const bestEl = document.getElementById('blast-best-count');
         if (bestEl) {
             bestEl.textContent = Math.max(best, this.state.linesCleared);
         }
@@ -91,7 +91,7 @@ const PuzzleMode = {
 
     refreshBoard: function() {
         const viewport = { minP: -6, maxP: 6, minQ: -6, maxQ: 6 };
-        Render.drawLattice(viewport, { isPuzzle: true });
+        Render.drawLattice(viewport, { isBlast: true });
         
         // Render placed cells from Board state
         Board.cells.forEach((val, key) => {

@@ -95,7 +95,7 @@ const Render = {
                 // For Blast Mode, dim cells outside the radius
                 let fill = '#1c1f28';
                 let opacity = 1;
-                if (options.isPuzzle && !Board.isInBounds(p, q)) {
+                if (options.isBlast && !Board.isInBounds(p, q)) {
                     opacity = 0.2;
                 }
                 if (options.isGravity) {
@@ -136,7 +136,14 @@ const Render = {
         this.svg.appendChild(group);
     },
 
+    viewX: -400,
+    viewY: -300,
+    zoom: 1,
+
     updateView: function(viewX, viewY, zoom = 1) {
+        this.viewX = viewX;
+        this.viewY = viewY;
+        this.zoom = zoom;
         const vb = `${viewX} ${viewY} ${800 * zoom} ${600 * zoom}`;
         this.svg.setAttribute('viewBox', vb);
     }

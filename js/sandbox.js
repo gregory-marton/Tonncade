@@ -1,8 +1,8 @@
 /**
- * chop.js - Main controller for Chop Mode (Infinite Sandbox).
+ * sandbox.js - Main controller for Sandbox Mode.
  */
 
-const ChopMode = {
+const SandboxMode = {
     state: {
         viewX: -400,
         viewY: -300,
@@ -80,6 +80,9 @@ const ChopMode = {
             this.state.selectedPiece = null;
         } else {
             this.selectPiece(key);
+            if (typeof App !== 'undefined' && App.collapseMobileDrawer) {
+                App.collapseMobileDrawer();
+            }
         }
         this.updatePaletteHighlight();
     },
@@ -265,6 +268,28 @@ const ChopMode = {
             const midi = Tonnetz.getMidi(p, q);
             Synth.playNote(midi);
         }
+    },
+
+    // Pick up ONLY — never places. Returns true if a piece was picked up.
+    pickupPieceAt: function(p, q) {
+        const pieceIndex = this.state.placedPieces.findIndex(piece => {
+            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+            return cells.some(c => c.p === p && c.q === q);
+        });
+
+        if (pieceIndex !== -1) {
+            const piece = this.state.placedPieces.splice(pieceIndex, 1)[0];
+            this.selectPiece(piece.type);
+            this.state.rotation = piece.rotation;
+            this.refreshLattice();
+            this.updateGhost();
+
+            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+            Synth.playChord(midis);
+            return true;
+        }
+        return false;
     },
 
     updateGhost: function(e) {
@@ -508,6 +533,10 @@ const ChopMode = {
                 this.selectPiece(type);
                 this.state.rotation = rotation;
                 this.updateGhost();
+
+                if (typeof App !== 'undefined' && App.collapseMobileDrawer) {
+                    App.collapseMobileDrawer();
+                }
 
                 item.style.borderColor = 'var(--accent)';
                 setTimeout(() => {

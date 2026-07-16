@@ -34,12 +34,24 @@ body {
     z-index: 15;
 }
 
+#top-drawer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 #main-content {
     display: flex;
     flex-direction: row;
     flex-grow: 1;
     height: calc(100vh - 60px);
     width: 100%;
+}
+
+.mobile-only {
+    display: none !important;
 }
 
 #sidebar {
@@ -281,7 +293,7 @@ button:hover {
     opacity: 0.9;
 }
 
-#puzzle-stats {
+#blast-stats {
     background: var(--panel);
     padding: 10px;
     border: 1px solid var(--border);
@@ -289,7 +301,7 @@ button:hover {
     margin-bottom: 20px;
 }
 
-#puzzle-stats p {
+#blast-stats p {
     margin: 0;
     font-size: 14px;
 }
@@ -388,66 +400,409 @@ button:hover {
     color: var(--bg);
 }
 
-/* Responsive UI: Stacks side-by-side components on mobile portrait */
-@media (orientation: portrait) {
+/* Responsive UI: Stacks side-by-side components on mobile phones */
+@media (max-width: 767px) {
+    #top-header {
+        height: auto;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+        gap: 0;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        z-index: 120;
+    }
+
+    #top-drawer {
+        display: flex;
+        flex-direction: column;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+        text-align: center;
+    }
+
+    .header-left a {
+        display: none; /* Hide the wikipedia link on mobile */
+    }
+
+    #mode-controls {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        justify-content: flex-start;
+        padding: 4px 10px;
+        scrollbar-width: none;
+    }
+
+    #mode-controls::-webkit-scrollbar {
+        display: none;
+    }
+
+    .mode-slider {
+        width: 480px;
+        flex: 0 0 480px;
+    }
+
+    #top-drawer.expanded {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    #drawer-handle {
+        width: 100%;
+        height: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: transparent;
+        cursor: ns-resize;
+        touch-action: none; /* Prevent scrolling when dragging */
+    }
+
+    #drawer-handle::after {
+        content: '';
+        width: 40px;
+        height: 4px;
+        background: var(--dim);
+        border-radius: 2px;
+        opacity: 0.6;
+    }
+
+    #sandbox-mobile-tools #palette {
+        overflow-y: hidden;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        flex-grow: 0;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x; /* Allow native horizontal scrolling */
+    }
+
+    #sandbox-mobile-tools #piece-list {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        width: max-content;
+    }
+
+    #sandbox-mobile-tools .piece-item {
+        width: 60px;
+        padding: 5px;
+        flex-shrink: 0;
+    }
+    
+    #sandbox-mobile-tools .piece-preview {
+        height: 40px;
+    }
+    
+    #sandbox-mobile-tools .piece-name {
+        font-size: 10px;
+    }
+
+    #mode-controls {
+        height: auto;
+        padding: 10px;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    #sandbox-mobile-tools, #midi-mobile-tools {
+        padding: 0 10px 10px 10px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Chord guide dropdown always-visible on mobile */
+    #sandbox-mobile-tools #chord-guide-select {
+        width: 100%;
+        padding: 6px;
+        background: #1c202a;
+        border: 1px solid var(--border);
+        color: #fff;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        touch-action: manipulation;
+    }
+
+    #sandbox-mobile-tools #chord-guide-results {
+        font-size: 12px;
+        color: var(--dim);
+        line-height: 1.4;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+
+    #sandbox-mobile-tools h3 {
+        display: none !important;
+    }
+
     #main-content {
         flex-direction: column;
+        height: calc(100dvh - 40px);
     }
 
     #sidebar {
-        width: 100%;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        padding: 12px 15px;
+        display: contents;
     }
 
     #game-container {
+        position: relative;
         height: 0;
         flex-grow: 1;
-    }
-
-    #top-header {
-        padding: 0 15px;
-        height: 50px;
-    }
-
-    #main-content {
-        height: calc(100vh - 50px);
+        width: 100%;
+        overflow: hidden;
     }
 
     h1 {
         font-size: 18px;
     }
 
-    /* Horizontal scroll palette to save vertical space on portrait layout */
-    #piece-list {
+    /* Floating Stats Bar for Mobile */
+    #blast-stats, #gravity-controls, #snake-controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-family: monospace;
+        color: #fff;
+        margin-top: 0 !important;
+        pointer-events: none; /* Let clicks pass to SVG by default */
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* MIDI Controls all the way across top */
+    #midi-controls {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--border);
+        padding: 10px;
+        box-sizing: border-box;
+        font-family: monospace;
+        color: #fff;
+        margin-top: 0 !important;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+    }
+
+    #midi-controls .stats-panel {
+        margin-top: 0 !important;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    #midi-controls .control-buttons {
+        margin-top: 0 !important;
+        flex-direction: row !important;
+        gap: 8px;
+    }
+
+    #midi-controls .control-buttons button {
+        flex: 1;
+    }
+
+    /* Keep stats text elements layout clean */
+    #blast-stats p, #gravity-controls p, #midi-controls p, #snake-controls p {
+        margin: 2px 0;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    /* Allow buttons/inputs inside stats overlay to be clickable */
+    #blast-stats *, #gravity-controls *, #midi-controls *, #snake-controls * {
+        pointer-events: auto;
+    }
+
+    /* Custom buttons wrapper in stats overlays */
+    #gravity-controls .control-buttons, #snake-controls .control-buttons {
+        display: flex;
+        flex-direction: row !important;
+        gap: 6px;
+        margin-top: 4px;
+    }
+
+    #gravity-controls button, #snake-controls button {
+        padding: 4px 8px;
+        font-size: 11px;
+        height: 24px;
+    }
+
+    /* Floating Next Pieces Queue for Blast Mode */
+    .blast-active #piece-list {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 100;
+        background: rgba(20, 22, 28, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        display: flex;
+        flex-direction: row;
+        gap: 6px;
+        align-items: center;
+        pointer-events: none;
+        margin: 0;
+        overflow-x: visible;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    #piece-list h3 {
+        display: none; /* Hide 'Next Pieces' text */
+    }
+
+    .piece-item.next-item {
+        flex: 0 0 48px;
+        height: 48px;
+        padding: 2px;
+        background: #232836;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .piece-preview {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+    }
+
+    .piece-name {
+        display: none;
+    }
+
+    /* Scoped pieces tray style inside the mobile dock drawer */
+    #mobile-dock #piece-list {
+        position: static;
         display: flex;
         overflow-x: auto;
         gap: 10px;
         padding-bottom: 5px;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        width: 100%;
+        pointer-events: auto;
     }
 
-    .piece-item {
+    #mobile-dock .piece-item {
         flex: 0 0 75px;
+        height: auto;
         padding: 6px;
+        background: #2a2e3a;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: auto;
     }
 
-    .piece-preview {
-        height: 40px;
-        margin-bottom: 2px;
+    #mobile-dock .piece-preview {
+        width: 100% !important;
+        height: 40px !important;
+        margin-bottom: 2px !important;
     }
 
-    .piece-name {
+    #mobile-dock .piece-name {
+        display: block;
         font-size: 10px;
+        color: var(--text);
     }
 
-    #controls {
-        display: none; /* Hide keyboard shortcut text on mobile portrait */
+    /* Hide Sandbox specific instructions & palettes on mobile sidebar */
+    #controls, #midi-keyboard-instructions, #snake-keyboard-instructions, #placement-controls, #sandbox-controls {
+        display: none !important;
     }
-}
 
-/* Tooltip styles for Chop Mode */
+    /* Single-line mobile virtual D-Pad at the bottom */
+    #mobile-controls {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        z-index: 100;
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        background: rgba(20, 22, 28, 0.9);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        margin: 0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    }
+
+    polygon.active-note {
+        fill: rgba(255, 255, 255, 0.4) !important;
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+    }
+
+    polygon.glow-past {
+        fill: rgba(100, 255, 100, 0.25) !important;
+        filter: drop-shadow(0 0 6px rgba(100, 255, 100, 0.4));
+    }
+
+    polygon.glow-future {
+        fill: rgba(255, 200, 100, 0.25) !important;
+        filter: drop-shadow(0 0 6px rgba(255, 200, 100, 0.4));
+    }
+
+    #mobile-controls .m-btn {
+        flex: 1;
+        height: 48px;
+        font-size: 18px;
+        border-radius: 6px;
+        background: #2a2e3a;
+        color: var(--text);
+        border: 1px solid var(--border);
+    }
+
+
+
+/* Tooltip styles for Sandbox Mode */
 .game-tooltip {
     position: absolute;
     pointer-events: none;
@@ -512,4 +867,129 @@ button:hover {
 
 .chord-match-item:active {
     transform: translateY(0px);
+}
+
+/* Touch-primary device styles: hide keyboard controls and desktop-only instructions */
+@media (hover: none) and (pointer: coarse) {
+    .desktop-only {
+        display: none !important;
+    }
+    #controls {
+        display: none !important;
+    }
+}
+
+/* Fallback for general narrow viewports (e.g. mobile emulation without touch pointer rules) */
+@media (max-width: 767px) {
+    .desktop-only {
+        display: none !important;
+    }
+}
+
+/* Mobile Landscape Layout */
+@media (max-width: 950px) and (orientation: landscape) {
+    #app {
+        flex-direction: row;
+    }
+    #top-header {
+        height: 100dvh;
+        width: auto;
+        flex-direction: row;
+        border-bottom: none;
+        border-right: 1px solid var(--border);
+    }
+    #top-drawer {
+        flex-direction: column;
+        justify-content: flex-start;
+        max-height: none !important;
+        max-width: 0;
+        overflow-x: hidden;
+        overflow-y: hidden;
+        transition: max-width 0.3s ease;
+        border-bottom: none;
+        border-right: 1px solid var(--border);
+    }
+    #top-drawer.expanded {
+        max-width: 320px;
+        overflow-y: auto;
+    }
+    .header-left {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+    #mobile-always-visible {
+        width: auto !important;
+        height: 100dvh;
+        flex-direction: column;
+        justify-content: flex-start;
+        overflow-y: auto;
+    }
+    #sandbox-mobile-tools, #midi-mobile-tools {
+        flex-direction: column;
+        height: 100%;
+    }
+    #sandbox-mobile-tools #piece-list {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        height: 100%;
+    }
+    #sandbox-mobile-tools .piece-item {
+        margin-bottom: 8px;
+    }
+    #drawer-handle {
+        width: 24px;
+        height: 100dvh;
+        cursor: ew-resize;
+        flex-direction: column;
+        border-top: none;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    #drawer-handle::after {
+        width: 4px;
+        height: 40px;
+    }
+    #mode-controls {
+        flex-direction: column;
+        width: 100%;
+        padding: 10px 4px;
+    }
+    .mode-slider {
+        flex-direction: column;
+        width: 100%;
+        height: 200px; /* 5 items * 40px */
+        flex: 0 0 auto;
+    }
+    .mode-option {
+        width: 100%;
+        height: 40px;
+        text-align: left;
+        padding: 0 12px;
+        display: flex;
+        align-items: center;
+    }
+    .mode-slider-active {
+        width: calc(100% - 4px);
+        height: calc(20% - 4px); /* 1/5 */
+        left: 2px;
+        top: 2px;
+        bottom: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .mobile-only {
+        display: flex !important;
+    }
+    #mobile-always-visible.mobile-only {
+        display: flex !important;
+    }
+}
+@media (max-width: 950px) and (orientation: landscape) {
+    .mobile-only {
+        display: flex !important;
+    }
+    #mobile-always-visible.mobile-only {
+        display: flex !important;
+    }
 }

@@ -12,32 +12,42 @@
 <body>
     <div id="app">
         <header id="top-header">
-            <div style="display: flex; flex-direction: column; justify-content: center; gap: 2px;">
-                <h1 id="game-title" style="margin: 0; line-height: 1.1; font-size: 24px;">Tonncade <span class="version-tag">local</span></h1>
-                <a href="https://en.wikipedia.org/wiki/Tonnetz" target="_blank" rel="noopener noreferrer" 
-                   style="color: var(--dim); font-size: 11px; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.2); transition: color 0.15s ease; width: fit-content;"
-                   onmouseover="this.style.color='var(--accent)'" 
-                   onmouseout="this.style.color='var(--dim)'">
-                    Based on Leonhard Euler's (1739) Tonnetz ↗
-                </a>
-            </div>
-            <div id="mode-controls">
-                <div class="mode-slider">
-                    <div class="mode-slider-active"></div>
-                    <div class="mode-option active" data-mode="chop">Sandbox</div>
-                    <div class="mode-option" data-mode="midi">Melody</div>
-                    <div class="mode-option" data-mode="snake">Snake</div>
-                    <div class="mode-option" data-mode="puzzle">Blast</div>
-                    <div class="mode-option" data-mode="gravity">Gravity</div>
+            <div id="top-drawer">
+                <div class="header-left" id="menu-toggle" style="display: flex; flex-direction: column; justify-content: center; gap: 2px;">
+                    <h1 id="game-title" style="margin: 0; line-height: 1.1; font-size: 24px;">Tonncade <span class="version-tag">local</span></h1>
+                    <a href="https://en.wikipedia.org/wiki/Tonnetz" target="_blank" rel="noopener noreferrer" 
+                       style="color: var(--dim); font-size: 11px; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.2); transition: color 0.15s ease; width: fit-content;"
+                       onmouseover="this.style.color='var(--accent)'" 
+                       onmouseout="this.style.color='var(--dim)'">
+                        Based on Leonhard Euler's (1739) Tonnetz ↗
+                    </a>
                 </div>
+                <div id="mode-controls">
+                    <div class="mode-slider">
+                        <div class="mode-slider-active"></div>
+                        <div class="mode-option active" data-mode="sandbox">Sandbox</div>
+                        <div class="mode-option" data-mode="midi">Melody</div>
+                        <div class="mode-option" data-mode="snake">Snake</div>
+                        <div class="mode-option" data-mode="blast">Blast</div>
+                        <div class="mode-option" data-mode="gravity">Gravity</div>
+                    </div>
+                </div>
+                <div id="drawer-injected-tools" style="display: none; padding: 10px; border-top: 1px solid var(--border);"></div>
             </div>
+            
+            <div id="mobile-always-visible" class="mobile-only" style="width: 100%;">
+                <div id="sandbox-mobile-tools" style="display: none;"></div>
+                <div id="midi-mobile-tools" style="display: none;"></div>
+            </div>
+            
+            <div id="drawer-handle" class="mobile-only"></div>
         </header>
 
         <div id="main-content">
             <aside id="sidebar">
-                <div id="puzzle-stats" style="display: none;">
+                <div id="blast-stats" style="display: none;">
                     <p>Lines: <span id="lines-count">0</span></p>
-                    <p>Best: <span id="puzzle-best-count">0</span></p>
+                    <p>Best: <span id="blast-best-count">0</span></p>
                 </div>
 
                 <!-- Gravity Mode Controls & Stats -->
@@ -55,21 +65,34 @@
 
                 <!-- MIDI Mode Controls & Stats -->
                 <div id="midi-controls" style="display: none;">
-                    <div class="control-group">
+                    <div id="midi-upload-group" class="control-group">
                         <label for="midi-file-input" class="custom-file-upload">
                             Upload MIDI File
                         </label>
                         <input id="midi-file-input" type="file" accept=".mid,.midi" style="display: none;" />
                         <span id="midi-filename">Default: Hot Cross Buns</span>
                     </div>
-                    <div class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-                        <button id="midi-play-preview">Play Melody</button>
-                        <button id="midi-game-restart">Restart Game</button>
+                    <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <label for="midi-difficulty" style="font-size: 13px;">Difficulty:</label>
+                            <select id="midi-difficulty" style="flex: 1; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;">
+                                <option value="easy" selected>Easy</option>
+                                <option value="medium">Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
+                            <button id="midi-play-preview" style="flex: 1;">Play Melody</button>
+                            <button id="midi-game-restart" style="flex: 1;">Restart Game</button>
+                        </div>
                     </div>
-                    <div class="stats-panel" style="margin-top: 15px;">
-                        <p>Current Streak: <span id="midi-current-streak">0</span></p>
-                        <p>Longest Streak: <span id="midi-best-streak">0</span></p>
+                    <div id="midi-stats-group" class="stats-panel" style="margin-top: 15px;">
+                        <div id="midi-counts-row" style="display: flex; gap: 10px;">
+                            <p>Current Streak: <span id="midi-current-streak">0</span></p>
+                            <p>Longest Streak: <span id="midi-best-streak">0</span></p>
+                        </div>
                         <p id="midi-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
+                        <p id="midi-note-list" style="font-size: 13px; color: var(--dim); margin-top: 4px; min-height: 18px; font-weight: bold;"></p>
                     </div>
                     <div id="midi-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
                         <p style="margin: 0 0 5px 0;"><strong>Keyboard Play Controls:</strong></p>
@@ -148,35 +171,23 @@
                     <p class="desktop-only"><strong>F T Y H B V</strong>: Move</p>
                     <p class="desktop-only"><strong>Space / G / Arrows</strong>: Rotate (Shift-Space: CCW)</p>
                     <p id="placement-controls" class="desktop-only"><strong>Shift-G / Click</strong>: <span id="click-action">Place/Pick up</span></p>
-                    <p id="chop-controls" class="desktop-only"><strong>Letters</strong>: Select Piece</p>
+                    <p id="sandbox-controls" class="desktop-only"><strong>Letters</strong>: Select Piece</p>
                 </div>
 
                 <!-- Mobile virtual controls pad -->
                 <div id="mobile-controls" style="display: none;">
-                    <div class="mobile-control-row">
-                        <button id="m-btn-ccw" class="m-btn">↺</button>
-                        <button id="m-btn-cw" class="m-btn">↻</button>
-                    </div>
-                    <div class="mobile-control-row">
-                        <button id="m-btn-ul" class="m-btn">↖</button>
-                        <button id="m-btn-ur" class="m-btn">↗</button>
-                    </div>
-                    <div class="mobile-control-row">
-                        <button id="m-btn-left" class="m-btn">◀</button>
-                        <button id="m-btn-right" class="m-btn">▶</button>
-                    </div>
-                    <div class="mobile-control-row">
-                        <button id="m-btn-dl" class="m-btn">↙</button>
-                        <button id="m-btn-dr" class="m-btn">↘</button>
-                    </div>
-                    <div class="mobile-control-row">
-                        <button id="m-btn-action" class="m-btn long">Place / Drop</button>
-                    </div>
+                    <button id="m-btn-left" class="m-btn">◀</button>
+                    <button id="m-btn-ccw" class="m-btn">↺</button>
+                    <button id="m-btn-action" class="m-btn">▼</button>
+                    <button id="m-btn-cw" class="m-btn">↻</button>
+                    <button id="m-btn-right" class="m-btn">▶</button>
                 </div>
             </aside>
 
             <main id="game-container">
                 <svg id="tonnetz-svg"></svg>
+
+
             </main>
         </div>
     </div>
@@ -188,8 +199,8 @@
     <script src="js/pieces.js"></script>
     <script src="js/board.js"></script>
     <script src="js/render.js"></script>
-    <script src="js/chop.js"></script>
-    <script src="js/puzzle.js"></script>
+    <script src="js/sandbox.js"></script>
+    <script src="js/blast.js"></script>
     <script src="js/gravity.js"></script>
     <script src="js/midi.js"></script>
     <script src="js/snake.js"></script>

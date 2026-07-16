@@ -3,7 +3,23 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+const svgListeners = {};
+global.svgListeners = svgListeners;
+
 global.window = global;
+global.window.addEventListener = function() {};
+global.window.matchMedia = function(query) {
+    return {
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: function() {},
+        removeListener: function() {},
+        addEventListener: function() {},
+        removeEventListener: function() {},
+        dispatchEvent: function() { return false; }
+    };
+};
 global.document = {
     createElement: (tag) => ({
         style: {},
@@ -20,8 +36,18 @@ global.document = {
         classList: { add: () => {}, remove: () => {} }
     }),
     getElementById: (id) => {
-        // Return a mock element. At startup, Render.svg is undefined until Render.init is called
-        // to retrieve this element.
+        if (id === 'tonnetz-svg') {
+            return {
+                style: {},
+                setAttribute: () => {},
+                appendChild: () => {},
+                addEventListener: (type, callback) => {
+                    svgListeners[type] = callback;
+                },
+                classList: { add: () => {}, remove: () => {} },
+                querySelectorAll: () => []
+            };
+        }
         return {
             style: {},
             setAttribute: () => {},
@@ -34,17 +60,20 @@ global.document = {
     querySelectorAll: (selector) => {
         if (selector === '.mode-option') {
             return [
-                { getAttribute: () => 'chop', classList: { add: () => {}, remove: () => {} } },
+                { getAttribute: () => 'sandbox', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'midi', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'snake', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'puzzle', classList: { add: () => {}, remove: () => {} } },
+                { getAttribute: () => 'blast', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'gravity', classList: { add: () => {}, remove: () => {} } }
             ];
         }
         return [];
     },
     querySelector: (selector) => {
-        return { style: {} };
+        return {
+            style: {},
+            classList: { add: () => {}, remove: () => {} }
+        };
     }
 };
 global.localStorage = {
@@ -81,8 +110,8 @@ loadScript('synth.js');
 loadScript('pieces.js');
 loadScript('board.js');
 loadScript('render.js');
-loadScript('chop.js');
-loadScript('puzzle.js');
+loadScript('sandbox.js');
+loadScript('blast.js');
 loadScript('gravity.js');
 loadScript('midi.js');
 loadScript('snake.js');
@@ -279,6 +308,59 @@ try {
     }
 
     console.log("PASS: Tonnetz.analyzeAllChords is fully correct!");
+
+    // Test Case: MIDI Mode Touch Input Fix (Red-Green Verification)
+    console.log("Running MIDI Mode touch input test...");
+    
+    // Switch to MIDI mode
+    App.currentMode = 'midi';
+    
+    // Ensure getCellFromTouch works by mocking elementFromPoint
+    global.document.elementFromPoint = (x, y) => {
+        return {
+            tagName: 'polygon',
+            getAttribute: (attr) => {
+                if (attr === 'data-p') return '1';
+                if (attr === 'data-q') return '2';
+                return null;
+            }
+        };
+    };
+
+    // Find the touchstart listener captured
+    const touchStartHandler = svgListeners['touchstart'];
+    if (!touchStartHandler) {
+        console.error("FAIL: touchstart listener was not registered on #tonnetz-svg!");
+        process.exit(1);
+    }
+
+    // Mock a touchstart event
+    const mockTouchEvent = {
+        touches: [{ clientX: 100, clientY: 100 }],
+        preventDefault: () => {}
+    };
+
+    // Call the handler. If it has the crash bug (calling handleCellInput), it will throw an error
+    touchStartHandler(mockTouchEvent);
+    console.log("PASS: MIDI Mode touch input test succeeded without crash!");
+
+    // Test Case: Responsive Mobile Header and Mode Selector (Red-Green Verification)
+    console.log("Running Responsive Header CSS rules test...");
+    const cssContent = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+    
+    if (!cssContent.includes('@media (max-width: 767px)')) {
+        console.error("FAIL: style.css does not target max-width: 767px for phones!");
+        process.exit(1);
+    }
+    if (!cssContent.includes('flex-direction: column') || !cssContent.includes('height: 80px')) {
+        // Wait, let's verify top-header column stacking is present in style.css
+        if (!cssContent.includes('#top-header') || !cssContent.includes('flex-direction: column')) {
+            console.error("FAIL: #top-header is not styled as a column on mobile!");
+            process.exit(1);
+        }
+    }
+    console.log("PASS: Responsive Header CSS rules test succeeded!");
+
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

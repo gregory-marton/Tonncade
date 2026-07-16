@@ -13,6 +13,7 @@ const MidiMode = {
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
         bestStreak: 0,         // Longest streak achieved
+        difficulty: 'easy',    // 'easy', 'medium', 'hard'
         hoverCell: { p: 0, q: 0 }, // Keyboard navigation hover cell
         reverseQwertyMap: {},      // Reverse mapping built in init()
 
@@ -152,6 +153,15 @@ const MidiMode = {
         if (restartBtn) {
             restartBtn.onclick = () => {
                 this.resetGame();
+            };
+        }
+
+        const diffSelect = document.getElementById('midi-difficulty');
+        if (diffSelect) {
+            diffSelect.value = this.state.difficulty;
+            diffSelect.onchange = (e) => {
+                this.state.difficulty = e.target.value;
+                this.updateDifficultyUI();
             };
         }
     },
@@ -314,12 +324,66 @@ const MidiMode = {
         }
     },
 
+    updateDifficultyUI: function() {
+        const listEl = document.getElementById('midi-note-list');
+        const diff = this.state.difficulty;
+        
+        // Clear old glows
+        document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
+        document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
+
+        if (!listEl) return;
+
+        if (diff === 'hard' || this.state.melody.length === 0) {
+            listEl.innerHTML = '';
+            return;
+        }
+
+        const melody = this.state.melody;
+        const current = this.state.userIndex;
+        
+        let displayNotes = [];
+        const pastWindow = 3;
+        const futureWindow = diff === 'easy' ? 4 : 0; // Current + 3 ahead
+        
+        // Add past notes
+        for (let i = Math.max(0, current - pastWindow); i < current; i++) {
+            const midi = melody[i].midi;
+            const name = Tonnetz.getNoteName(midi);
+            displayNotes.push(`<span style="opacity: 0.6;">${name}</span>`);
+            
+            // Add past glow
+            const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
+            polygons.forEach(p => p.classList.add('glow-past'));
+        }
+        
+        // Add current/future notes
+        if (diff === 'easy') {
+            for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
+                const midi = melody[i].midi;
+                const name = Tonnetz.getNoteName(midi);
+                if (i === current) {
+                    displayNotes.push(`<span style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span>`);
+                } else {
+                    displayNotes.push(`<span style="opacity: 0.8;">${name}</span>`);
+                }
+                
+                // Add future glow
+                const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
+                polygons.forEach(p => p.classList.add('glow-future'));
+            }
+        }
+        
+        listEl.innerHTML = displayNotes.join(' - ');
+    },
+
     resetGame: function() {
         this.cleanup();
         this.state.targetLength = 1;
         this.state.userIndex = 0;
         this.updateStreak(0);
         this.updateGhost();
+        this.updateDifficultyUI();
 
         this.setStatus("Starting game...", "info");
         setTimeout(() => {
@@ -363,6 +427,7 @@ const MidiMode = {
             this.state.isPlayingSequence = false;
             this.setStatus("Your turn! Repeat the notes.", "success");
             this.state.userIndex = 0;
+            this.updateDifficultyUI();
         }, totalDuration);
 
         this.state.playbackTimeoutIds.push(tId2);
@@ -424,6 +489,7 @@ const MidiMode = {
             // Correct note!
             this.state.userIndex++;
             this.updateStreak(this.state.userIndex);
+            this.updateDifficultyUI();
 
             // Clear any existing "going ahead" timeout
             if (this.state.userRepeatTimeoutId) {
@@ -434,6 +500,9 @@ const MidiMode = {
             if (this.state.userIndex >= this.state.melody.length) {
                 // Completed the entire song!
                 this.setStatus("Congratulations! You completed the song! 🎉", "success");
+                document.getElementById('midi-note-list').innerHTML = '';
+                document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
+                document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
                 this.celebrate();
                 return;
             }
@@ -463,6 +532,7 @@ const MidiMode = {
                 this.state.targetLength = this.state.userIndex + 1;
             }
             this.state.userIndex = 0;
+            this.updateDifficultyUI();
             
             if (this.state.userRepeatTimeoutId) {
                 clearTimeout(this.state.userRepeatTimeoutId);
@@ -527,10 +597,14 @@ const MidiMode = {
 
         // Remove any visual cell highlights
         document.querySelectorAll('.active-note').forEach(el => el.classList.remove('active-note'));
+        document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
+        document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
+        const listEl = document.getElementById('midi-note-list');
+        if (listEl) listEl.innerHTML = '';
     },
 
     refreshBoard: function() {
-        // Render the full Chop Tonnetz layout
+        // Render the full Sandbox Tonnetz layout
         const viewport = {
             minP: -15, maxP: 15,
             minQ: -15, maxQ: 15
