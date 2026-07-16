@@ -21,6 +21,7 @@ const SandboxMode = {
         this.refreshLattice();
         this.setupEvents();
         this.setupGuide();
+        this.setupCarouselTouchGestures();
 
         // Ensure single game-tooltip exists in DOM
         if (!document.querySelector('.game-tooltip')) {
@@ -142,6 +143,7 @@ const SandboxMode = {
 
     setupEvents: function() {
         const svg = Render.svg;
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
@@ -215,12 +217,14 @@ const SandboxMode = {
                 }
             }
             
-            this.state.isPanning = true;
-            this.state.lastMouse = { x: e.clientX, y: e.clientY };
+            if (!isTouch) {
+                this.state.isPanning = true;
+                this.state.lastMouse = { x: e.clientX, y: e.clientY };
+            }
         };
 
         window.onmousemove = (e) => {
-            if (this.state.isPanning) {
+            if (!isTouch && this.state.isPanning) {
                 const dx = e.clientX - this.state.lastMouse.x;
                 const dy = e.clientY - this.state.lastMouse.y;
                 this.state.viewX -= dx;
@@ -432,6 +436,61 @@ const SandboxMode = {
         select.onchange = () => {
             this.updateGuideResults(select.value);
         };
+    },
+
+    setupCarouselTouchGestures: function() {
+        const list = document.getElementById('piece-list');
+        if (!list) return;
+
+        let dragKey = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let isPlacingDrag = false;
+
+        list.addEventListener('touchstart', (e) => {
+            const item = e.target.closest('.piece-item');
+            if (!item) return;
+            dragKey = item.getAttribute('data-key');
+            dragStartX = e.touches[0].clientX;
+            dragStartY = e.touches[0].clientY;
+            isPlacingDrag = false;
+        }, { passive: true });
+
+        list.addEventListener('touchmove', (e) => {
+            if (!dragKey) return;
+            const dx = e.touches[0].clientX - dragStartX;
+            const dy = e.touches[0].clientY - dragStartY;
+
+            if (!isPlacingDrag) {
+                if (Math.abs(dy) > 20 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+                    isPlacingDrag = true;
+                    this.selectPiece(dragKey);
+                } else {
+                    return; // Predominantly horizontal — let the browser scroll the carousel natively
+                }
+            }
+
+            e.preventDefault();
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (el && el.tagName.toLowerCase() === 'polygon') {
+                const p = parseInt(el.getAttribute('data-p'));
+                const q = parseInt(el.getAttribute('data-q'));
+                this.state.hoverCell = { p, q };
+                this.updateGhost();
+            }
+        }, { passive: false });
+
+        list.addEventListener('touchend', () => {
+            if (isPlacingDrag && this.state.selectedPiece) {
+                const { p, q } = this.state.hoverCell;
+                if (this.canPlace(this.state.selectedPiece, p, q, this.state.rotation)) {
+                    this.placePiece(p, q);
+                }
+            }
+            dragKey = null;
+            isPlacingDrag = false;
+        });
     },
 
     updateGuideResults: function(val) {

@@ -206,6 +206,89 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     };
   `;
 
+  // Helper: dispatch touch events, capturing the touchstart's target and reusing it for the
+  // rest of the gesture (matching real touch-event "implicit capture" semantics) instead of
+  // re-resolving elementFromPoint on every move, which would break once the finger moves off
+  // its starting element (e.g. from the carousel onto the board).
+  const dispatchAtHelpers = `
+    window.__dispatchTouchAt = function(type, x, y) {
+      if (type === 'touchstart') {
+        window.__touchAtTarget = document.elementFromPoint(x, y) || document.body;
+      }
+      const el = window.__touchAtTarget || document.body;
+      const touch = new Touch({ identifier: 2, target: el, clientX: x, clientY: y, pageX: x, pageY: y });
+      const config = { bubbles: true, cancelable: true };
+      if (type === 'touchend') {
+        config.touches = [];
+        config.targetTouches = [];
+      } else {
+        config.touches = [touch];
+        config.targetTouches = [touch];
+      }
+      config.changedTouches = [touch];
+      el.dispatchEvent(new TouchEvent(type, config));
+    };
+  `;
+
+  test('dragging a carousel piece downward onto the board places it', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(dispatchAtHelpers);
+
+    let placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBe(0);
+
+    const firstPiece = page.locator('.piece-item').first();
+    const pieceBox = await firstPiece.boundingBox();
+    const startX = pieceBox.x + pieceBox.width / 2;
+    const startY = pieceBox.y + pieceBox.height / 2;
+
+    const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+    const cellBox = await cell.boundingBox();
+    const endX = cellBox.x + cellBox.width / 2;
+    const endY = cellBox.y + cellBox.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchstart', x, y), { x: startX, y: startY });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: startX, y: startY + 40 });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: endX, y: endY });
+    await page.waitForTimeout(50);
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchend', x, y), { x: endX, y: endY });
+
+    placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBeGreaterThan(0);
+  });
+
+  test('dragging a carousel piece horizontally does not pan the board or place a piece', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(dispatchAtHelpers);
+
+    const viewXBefore = await page.evaluate(() => Render.viewX);
+    const viewYBefore = await page.evaluate(() => Render.viewY);
+
+    const firstPiece = page.locator('.piece-item').first();
+    const pieceBox = await firstPiece.boundingBox();
+    const startX = pieceBox.x + pieceBox.width / 2;
+    const startY = pieceBox.y + pieceBox.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchstart', x, y), { x: startX, y: startY });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: startX - 60, y: startY + 5 });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: startX - 120, y: startY + 5 });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchend', x, y), { x: startX - 120, y: startY + 5 });
+
+    const viewXAfter = await page.evaluate(() => Render.viewX);
+    const viewYAfter = await page.evaluate(() => Render.viewY);
+    expect(viewXAfter).toBe(viewXBefore);
+    expect(viewYAfter).toBe(viewYBefore);
+
+    const placedCount = await page.locator('.placed-piece').count();
+    expect(placedCount).toBe(0);
+  });
+
   test('drag repositions ghost WITHOUT placing or picking up', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
