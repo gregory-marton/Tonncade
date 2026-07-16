@@ -239,6 +239,7 @@ const App = {
             bindBtn('m-btn-left', 'f');                           // Left (f)
             bindBtn('m-btn-right', 'h');                          // Right (h)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick
+            bindBtn('m-btn-action-2', 'v');                       // Gravity-only duplicate soft-drop button (landscape clusters only, never shown outside Gravity)
 
             // Snake's 6-direction pad — matches the T/Y/F/H/V/B keyboard scheme SnakeMode's
             // own keydown handler already listens for.

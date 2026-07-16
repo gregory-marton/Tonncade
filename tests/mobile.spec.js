@@ -968,6 +968,71 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(actionBtn).toHaveText('Place / Pick up');
   });
 
+  test('gravity mobile pad stays a single 5-button row in portrait (duplicate down button hidden)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    await expect(page.locator('#m-btn-action')).toBeVisible();
+    await expect(page.locator('#m-btn-action-2')).toBeHidden();
+
+    const visibleButtons = await page.locator('#mobile-controls .m-btn:visible').count();
+    expect(visibleButtons).toBe(5);
+  });
+
+  test('gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const leftBtn = page.locator('#m-btn-action');
+    const rightBtn = page.locator('#m-btn-action-2');
+    await expect(leftBtn).toBeVisible();
+    await expect(rightBtn).toBeVisible();
+
+    // Left cluster hugs the left edge of the game area, right cluster hugs the right edge —
+    // relative to #main-content (not the raw viewport), same reasoning as Snake's pad test:
+    // the landscape header is a real side column, not a 0-width unwrapped element.
+    const mainContentBox = await page.locator('#main-content').boundingBox();
+    const leftBox = await leftBtn.boundingBox();
+    const rightBox = await rightBtn.boundingBox();
+    expect(leftBox.x - mainContentBox.x).toBeLessThan(100);
+    expect(rightBox.x + rightBox.width).toBeGreaterThan(mainContentBox.x + mainContentBox.width - 100);
+
+    // Both duplicate down buttons should trigger a soft-drop, avoiding handedness bias
+    let qBefore = await page.evaluate(() => GravityMode.state.q);
+    await leftBtn.click();
+    let qAfter = await page.evaluate(() => GravityMode.state.q);
+    expect(qAfter).toBeLessThan(qBefore);
+
+    qBefore = qAfter;
+    await rightBtn.click();
+    qAfter = await page.evaluate(() => GravityMode.state.q);
+    expect(qAfter).toBeLessThan(qBefore);
+  });
+
+  test('Snake and Gravity mobile pads clear iOS-style bottom browser chrome in portrait', async ({ page }) => {
+    const width = page.viewportSize().width;
+    const height = page.viewportSize().height;
+    if (width >= 768) return;
+
+    for (const { mode, selector } of [
+      { mode: 'snake', selector: '#snake-mobile-controls .m-btn' },
+      { mode: 'gravity', selector: '#mobile-controls .m-btn' },
+    ]) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      const boxes = await page.locator(selector).evaluateAll(els =>
+        els.filter(el => getComputedStyle(el).display !== 'none').map(el => el.getBoundingClientRect().toJSON())
+      );
+      expect(boxes.length).toBeGreaterThan(0);
+      const lowestBottom = Math.max(...boxes.map(b => b.bottom));
+      // The old bottom:10px offset left buttons within ~60px of the viewport edge, which real
+      // iOS Safari chrome (address bar / tab controls) can fully obscure. Require real clearance
+      // even with env(safe-area-inset-bottom) unavailable in this headless test environment.
+      expect(height - lowestBottom).toBeGreaterThan(60);
+    }
+  });
+
   test('Gravity and Snake pause buttons are visible and positioned below the header on mobile', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

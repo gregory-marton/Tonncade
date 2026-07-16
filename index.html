@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Tonncade</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="manifest" href="manifest.json">
@@ -173,13 +173,19 @@
                     <p id="sandbox-controls" class="desktop-only"><strong>Letters</strong>: Select Piece</p>
                 </div>
 
-                <!-- Mobile virtual controls pad -->
+                <!-- Mobile virtual controls pad: single row in portrait, split into two
+                     clusters (with the down button duplicated on both sides) in landscape -->
                 <div id="mobile-controls" style="display: none;">
-                    <button id="m-btn-left" class="m-btn">◀</button>
-                    <button id="m-btn-ccw" class="m-btn">↺</button>
-                    <button id="m-btn-action" class="m-btn">▼</button>
-                    <button id="m-btn-cw" class="m-btn">↻</button>
-                    <button id="m-btn-right" class="m-btn">▶</button>
+                    <div class="gravity-pad-cluster gravity-pad-left">
+                        <button id="m-btn-left" class="m-btn">◀</button>
+                        <button id="m-btn-ccw" class="m-btn">↺</button>
+                        <button id="m-btn-action" class="m-btn">▼</button>
+                    </div>
+                    <div class="gravity-pad-cluster gravity-pad-right">
+                        <button id="m-btn-action-2" class="m-btn">▼</button>
+                        <button id="m-btn-cw" class="m-btn">↻</button>
+                        <button id="m-btn-right" class="m-btn">▶</button>
+                    </div>
                 </div>
 
                 <!-- Snake mobile virtual controls pad: two thumb clusters, split left/right -->
