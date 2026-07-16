@@ -440,10 +440,21 @@ const SandboxMode = {
 
     setupGuide: function() {
         const select = document.getElementById('chord-guide-select');
+        const resetBtn = document.getElementById('chord-guide-reset');
         if (!select) return;
+
         select.onchange = () => {
             this.updateGuideResults(select.value);
+            if (resetBtn) resetBtn.style.display = select.value ? 'inline-block' : 'none';
         };
+
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                select.value = '';
+                this.updateGuideResults('');
+                resetBtn.style.display = 'none';
+            };
+        }
     },
 
     setupDragToCandidate: function(containerId, itemSelector, getPieceInfo) {

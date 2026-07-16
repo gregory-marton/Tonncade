@@ -534,7 +534,8 @@ button:hover {
 
     /* Chord guide dropdown always-visible on mobile */
     #sandbox-mobile-tools #chord-guide-select {
-        width: 100%;
+        flex: 1;
+        min-width: 0;
         padding: 6px;
         background: #1c202a;
         border: 1px solid var(--border);

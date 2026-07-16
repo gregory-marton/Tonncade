@@ -135,8 +135,8 @@
                     <h3 style="margin: 0 0 10px 0; font-size: 14px; color: var(--accent); display: flex; align-items: center; gap: 6px;">
                         <span>🎵</span> Chord Guide
                     </h3>
-                    <div class="control-group">
-                        <select id="chord-guide-select" style="width: 100%; padding: 6px; background: #1c202a; border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: monospace; font-size: 13px;">
+                    <div class="control-group" style="display: flex; gap: 6px; align-items: center;">
+                        <select id="chord-guide-select" style="flex: 1; min-width: 0; padding: 6px; background: #1c202a; border: 1px solid var(--border); color: #fff; border-radius: 4px; font-family: monospace; font-size: 13px;">
                             <option value="">-- Choose a Chord --</option>
                             <optgroup label="Basic Chords" style="background: #1c202a; color: var(--accent);">
                                 <option value="major">Major Triad</option>
@@ -161,6 +161,7 @@
                                 <option value="quartal">Quartal Stack</option>
                             </optgroup>
                         </select>
+                        <button id="chord-guide-reset" type="button" title="Clear chord guide" aria-label="Clear chord guide" style="display: none; flex-shrink: 0; width: 28px; height: 28px; padding: 0; border-radius: 4px; border: 1px solid var(--border); background: #1c202a; color: var(--dim); cursor: pointer; font-size: 14px; line-height: 1;">✕</button>
                     </div>
                     <div id="chord-guide-results" style="margin-top: 10px; font-size: 12px; color: var(--dim); line-height: 1.4;"></div>
                 </div>

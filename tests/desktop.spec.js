@@ -41,6 +41,32 @@ test('chord guide results show a piece preview matching the correct rotation', a
   expect(badgeText.join('')).not.toContain('Use');
 });
 
+test('chord guide X button resets the dropdown without touching a selected candidate', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  const resetBtn = page.locator('#chord-guide-reset');
+  await expect(resetBtn).toBeHidden();
+
+  const chordSelect = page.locator('#chord-guide-select');
+  await chordSelect.selectOption('major');
+  await expect(resetBtn).toBeVisible();
+
+  await page.locator('.chord-match-item').first().click();
+  const selectedBefore = await page.evaluate(() => SandboxMode.state.selectedPiece);
+  expect(selectedBefore).not.toBeNull();
+
+  await resetBtn.click();
+
+  await expect(resetBtn).toBeHidden();
+  expect(await chordSelect.inputValue()).toBe('');
+  const resultsText = await page.locator('#chord-guide-results').innerText();
+  expect(resultsText.trim()).toBe('');
+
+  const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
+  expect(selectedAfter).toBe(selectedBefore);
+});
+
 test('panning cannot scroll far past the edge of the audible tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
