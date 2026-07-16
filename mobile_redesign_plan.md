@@ -30,12 +30,33 @@ The real implementation evolved past the original spec text below in a few ways 
 
 Raw notes from real-device feedback, captured for the next brainstorming pass — none of this has been designed or planned yet:
 
-- **Gravity mode**: the board should resize to fill the available space (it doesn't currently). Needs a "down" button in the center of the other four direction buttons on the mobile control pad.
-- **Blast mode**: the puzzle area should fill the available space instead of sitting off to one side. If the player pans it to a better fit, don't reset their pan (i.e. `refreshBoard()`'s hardcoded `Render.updateView(-400, -300, ...)` shouldn't clobber a manual pan).
-- **Gravity and Blast modes** both need to show upcoming pieces (Blast already has a next-piece queue on desktop via `renderNextQueue`/`#piece-list` — needs a mobile-visible equivalent; Gravity has none at all).
+- **Gravity mode**: the board should resize to fill the available space (it doesn't currently). Needs a "down" button in the center of the other four direction buttons on the mobile control pad. Also needs an upcoming-pieces view (has none at all, unlike Blast).
 - **Snake mode**: no visible on-screen controls on mobile — needs a bottom control set similar to Gravity's pad. The existing tap/drag/turn touch-steering gesture (in `main.js`'s `touchstart` snake-mode branch) doesn't work predictably and needs investigation.
 - **Pause button** should be visible on mobile (currently not surfaced there).
 - **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
+
+---
+
+## Next Round: Blast mode mobile layout (spec, 2026-07-16)
+
+Investigated three compounding bugs behind "the puzzle area should fill the available space, not be off to one side" and "no upcoming-pieces view on mobile" (screenshot-confirmed: the board renders shifted toward the bottom-right with a large empty region top-left):
+
+1. **Off-center board.** `BlastMode.refreshBoard()` calls `Render.updateView(-400, -300, Render.getResponsiveZoom())` — a *fixed* offset regardless of `zoom`. Centering the origin actually requires `-400*zoom, -300*zoom`: at `zoom=1` (desktop) that's coincidentally centered, but at the mobile responsive `zoom≈0.667` it isn't, since the viewBox (`800*zoom × 600*zoom`) shrinks while the offset doesn't shrink with it.
+2. **Board doesn't fill available space.** Even once centered, Blast's compact radius-5 hex board (`Board.radius = 5`, `Board.isInBounds`) is drawn with the same generic responsive zoom used everywhere else, unrelated to the board's actual size — wasting most of the reference viewBox on empty margin.
+3. **Next-piece queue invisible on mobile, despite rendering correctly.** Diagnosed via a temporary Playwright assertion: `#palette` (which `BlastMode.renderNextQueue()` populates into `#piece-list`, confirmed non-empty) gets moved into `#sandbox-mobile-tools` whenever the app is in Sandbox mode (the default starting mode) on mobile, and nothing ever moves it back out when switching to Blast — so it sits inside a `display:none` ancestor left over from Sandbox. A related, previously-undiscovered bug: neither `#blast-stats` nor a new floating queue panel would anchor correctly even once visible, because `#blast-stats`'s actual DOM ancestor chain (`#sidebar` → `#main-content` → `#app` → `body`) has no `position` other than `static` set anywhere — confirmed via `getComputedStyle` walking the ancestor chain in a Playwright test — so `position: absolute; top: 10px; left: 10px` falls back to the viewport as its containing block instead of the game area, landing near/behind the header instead of over the board.
+
+(Per discussion: manual pan support for Blast is explicitly **out of scope** — once the board is correctly sized and centered on every render, there's nothing to pan away from, so "don't reset pan" was solving the wrong problem.)
+
+### Fix
+
+1. **`Render.getFitView(cells, padding)`** (new, in `js/render.js`, alongside `getPanBounds`): computes the screen-space bounding box of the given `{p,q}` cells via `getScreenPos`, adds padding, and returns `{viewX, viewY, zoom}` that centers and snugly fits those cells into the `800×600` reference box (`zoom = max(width/800, height/600)`, `viewX/viewY` centered on the bounding box's midpoint).
+2. **`BlastMode.refreshBoard()`** builds the list of all `{p,q}` with `Board.isInBounds(p,q)` (the actual radius-5 playable region) and calls `Render.updateView(...)` with `Render.getFitView(cells, HEX_R*2)` instead of the hardcoded `-400, -300`.
+3. **`main.js`'s `setupMobileControls()`** mobile-width dispatch: every mode branch (not just Sandbox) now explicitly manages `#palette` — Sandbox moves it into the carousel as today; Blast moves it back to `#sidebar`, shows it, and adds a `floating-queue` class; every other mode (MIDI, Gravity, Snake) moves it back to `#sidebar` and hides it, so stale content never leaks between modes.
+4. **CSS**: add `position: relative;` to `#main-content` inside the `@media (max-width: 767px)` block, giving both `#blast-stats` and the new `.floating-queue` panel a sane containing block (the game area, below the header) instead of falling back to the viewport. Add a `#palette.floating-queue` rule (mirrors `#blast-stats`'s floating panel styling, positioned `top: 10px; right: 10px` to avoid the stats badge) with a compact horizontal `#piece-list` layout inside it (small preview icons, no grid).
+
+### Testing
+
+- Unit/Playwright coverage for: `Render.getFitView` centers and sizes a known small cell set correctly; Blast's board renders centered (bounding box of rendered cells is symmetric around the SVG's visible center) at both desktop and mobile viewport widths; switching Sandbox → Blast → Sandbox on mobile leaves `#palette` visible and correctly parented in both cases (regression test for the reparenting bug); `#blast-stats` and the next-piece queue both report a bounding box within the viewport and below the header (regression test for the positioned-ancestor bug).
 
 ---
 
