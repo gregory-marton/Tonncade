@@ -361,12 +361,12 @@ const App = {
                         palette.style.display = 'none';
                         palette.classList.remove('floating-queue');
                     }
-                } else if (this.currentMode === 'blast') {
+                } else if (this.currentMode === 'blast' || this.currentMode === 'gravity') {
                     if (sandboxTools) sandboxTools.style.display = 'none';
                     if (midiTools) midiTools.style.display = 'none';
-                    // #palette doubles as Blast's next-piece queue (BlastMode.renderNextQueue
-                    // writes into #piece-list) — return it from wherever a previous mode left it
-                    // and show it as a floating overlay over the board.
+                    // #palette doubles as Blast/Gravity's next-piece queue (their own
+                    // renderNextQueue writes into #piece-list) — return it from wherever a
+                    // previous mode left it and show it as a floating overlay over the board.
                     if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
                     if (palette) {
                         palette.style.display = 'block';

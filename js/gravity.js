@@ -288,25 +288,7 @@ const GravityMode = {
             list.appendChild(div);
 
             const svg = div.querySelector('.piece-preview');
-            const positions = piece.cells.map(c => Render.getScreenPos(c.p, c.q));
-            const minX = Math.min(...positions.map(pos => pos.x));
-            const maxX = Math.max(...positions.map(pos => pos.x));
-            const minY = Math.min(...positions.map(pos => pos.y));
-            const maxY = Math.max(...positions.map(pos => pos.y));
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-            const padding = 40;
-            const size = Math.max(maxX - minX, maxY - minY) + padding * 2;
-            svg.setAttribute('viewBox', `${centerX - size/2} ${centerY - size/2} ${size} ${size}`);
-
-            piece.cells.forEach(c => {
-                const hex = Render.createHex(c.p, c.q, {
-                    fill: piece.color,
-                    stroke: 'white',
-                    strokeWidth: 2
-                });
-                svg.appendChild(hex);
-            });
+            SandboxMode.renderPiecePreview(svg, piece.cells, piece.color);
         });
     },
 

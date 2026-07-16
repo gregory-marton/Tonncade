@@ -818,6 +818,27 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(result.actualZoom).toBeCloseTo(result.fitZoom, 1);
   });
 
+  test('switching Sandbox -> Gravity -> Sandbox on mobile leaves the piece palette visible in both', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await expect(page.locator('.piece-item').first()).toBeVisible();
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    // Gravity's next-piece queue reuses #piece-list too — it should now be visible, not stuck
+    // inside the (now-hidden) Sandbox carousel container.
+    const paletteBox = await page.locator('#palette').boundingBox();
+    expect(paletteBox).not.toBeNull();
+    expect(paletteBox.width).toBeGreaterThan(0);
+    expect(paletteBox.height).toBeGreaterThan(0);
+    const pieceListChildCount = await page.evaluate(() => document.getElementById('piece-list').children.length);
+    expect(pieceListChildCount).toBeGreaterThan(0);
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await expect(page.locator('.piece-item').first()).toBeVisible();
+  });
+
   test('switching Sandbox -> Blast -> Sandbox on mobile leaves the piece palette visible in both', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
