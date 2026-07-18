@@ -92,7 +92,7 @@ const SandboxMode = {
                 <div class="place-wedge" title="Place">▼</div>
             `;
 
-            div.onclick = () => this.togglePiece(key);
+            div.onclick = () => this.selectFromCarousel(key);
             list.appendChild(div);
 
             const previewSvg = div.querySelector('.piece-preview');
@@ -105,6 +105,35 @@ const SandboxMode = {
                 e.stopPropagation();
                 this.placeActiveGhost();
             };
+
+            // On touch devices, the wedge's own onclick above relies on the browser
+            // synthesizing a click after touchend — a step that isn't always reliable, and
+            // stopPropagation on a later click doesn't stop the container's OWN touchstart/
+            // touchmove listeners (setupDragToCandidate, on #piece-list) from independently
+            // reacting to the same physical touch first. That race is what let a wedge tap
+            // sometimes read as a drag or fall through to the card underneath instead of
+            // placing. Handling touchend explicitly here — and stopping the touch from
+            // reaching the container at touchstart — makes the wedge self-contained and
+            // reliable regardless of what's listening on its ancestors.
+            let wedgeTouchStartX = 0, wedgeTouchStartY = 0, wedgeTouchStartTime = 0;
+            wedge.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                const touch = e.touches[0];
+                wedgeTouchStartX = touch.clientX;
+                wedgeTouchStartY = touch.clientY;
+                wedgeTouchStartTime = Date.now();
+            }, { passive: true });
+            wedge.addEventListener('touchend', (e) => {
+                e.stopPropagation();
+                e.preventDefault(); // suppress the synthetic click this touch would otherwise also fire
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - wedgeTouchStartX;
+                const dy = touch.clientY - wedgeTouchStartY;
+                const dt = Date.now() - wedgeTouchStartTime;
+                if (dt < 500 && Math.abs(dx) < 20 && Math.abs(dy) < 20) {
+                    this.placeActiveGhost();
+                }
+            });
         }
     },
 
@@ -132,14 +161,16 @@ const SandboxMode = {
         });
     },
 
-    togglePiece: function(key) {
-        if (this.state.selectedPiece === key) {
-            this.state.selectedPiece = null;
-        } else {
-            this.selectPiece(key);
-            if (typeof App !== 'undefined' && App.collapseMobileDrawer) {
-                App.collapseMobileDrawer();
-            }
+    // A tap on any carousel item never deselects — that's the note-play tool's job now.
+    // Instead it commits whatever candidate is currently held (a no-op if nothing is, or if
+    // the ghost isn't over a valid cell), then picks up the tapped piece as the new candidate.
+    // Same behavior on mobile and desktop; placing-then-selecting reads naturally either way.
+    selectFromCarousel: function(key) {
+        this.placeActiveGhost();
+        this.selectPiece(key);
+        this.updateGhost();
+        if (typeof App !== 'undefined' && App.collapseMobileDrawer) {
+            App.collapseMobileDrawer();
         }
         this.updatePaletteHighlight();
     },
@@ -333,11 +364,12 @@ const SandboxMode = {
             this.selectPiece(piece.type);
             this.state.rotation = piece.rotation;
             this.refreshLattice();
+            // Anchor the ghost (and the sound updateGhost triggers) to the piece's own true
+            // anchor cell, not whichever of its cells happened to be tapped — a multi-cell
+            // piece tapped off-anchor would otherwise leave the ghost (and now the sound)
+            // offset from where the piece actually was.
+            this.state.hoverCell = { p: piece.p, q: piece.q };
             this.updateGhost();
-            
-            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
-            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-            Synth.playChord(midis);
             return;
         }
 
@@ -365,11 +397,10 @@ const SandboxMode = {
             this.selectPiece(piece.type);
             this.state.rotation = piece.rotation;
             this.refreshLattice();
+            // Anchor the ghost (and the sound updateGhost triggers) to the piece's own true
+            // anchor cell — see the identical comment in handleAction's pickup branch.
+            this.state.hoverCell = { p: piece.p, q: piece.q };
             this.updateGhost();
-
-            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
-            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-            Synth.playChord(midis);
             return true;
         }
         return false;
@@ -379,7 +410,10 @@ const SandboxMode = {
         const oldGhosts = document.querySelectorAll('.ghost');
         oldGhosts.forEach(g => g.remove());
 
-        if (!this.state.selectedPiece) return;
+        if (!this.state.selectedPiece) {
+            this._lastGhostSoundKey = null; // next selection should always sound, never dedupe stale
+            return;
+        }
 
         let p, q;
         if (e && e.target && e.target.getAttribute('data-p')) {
@@ -391,11 +425,11 @@ const SandboxMode = {
             q = this.state.hoverCell.q;
         }
 
-        if (p !== undefined) {
+        if (p !== undefined && !isNaN(p) && !isNaN(q)) {
             const cells = Pieces.getAbsoluteCells(this.state.selectedPiece, p, q, this.state.rotation);
             const canPlace = this.canPlace(this.state.selectedPiece, p, q, this.state.rotation);
             const color = canPlace ? Pieces.TYPES[this.state.selectedPiece].color : '#555555';
-            
+
             cells.forEach(c => {
                 const hex = Render.createHex(c.p, c.q, {
                     fill: color,
@@ -409,6 +443,19 @@ const SandboxMode = {
             // Re-append note and keyboard labels so they stay on top of the ghost piece
             const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
             labels.forEach(lbl => Render.svg.appendChild(lbl));
+
+            // Every distinct ghost position/orientation sounds its own cells — the single
+            // authoritative place this happens, so callers (drag, keyboard nav, rotation,
+            // initial selection) all get sound for free instead of each needing its own
+            // explicit playChord call, which is exactly the gap that let ghost movement go
+            // silent. Deduped by (piece, p, q, rotation) so a flood of identical redraws
+            // (e.g. repeated mousemove within the same cell) doesn't replay the chord.
+            const soundKey = `${this.state.selectedPiece}|${p}|${q}|${this.state.rotation}`;
+            if (this._lastGhostSoundKey !== soundKey) {
+                this._lastGhostSoundKey = soundKey;
+                const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+                Synth.playChord(midis, true, 0.08, 0.4);
+            }
         }
     },
 
@@ -573,7 +620,13 @@ const SandboxMode = {
             e.preventDefault();
             const touch = e.touches[0];
             const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (el && el.tagName.toLowerCase() === 'polygon') {
+            // Must be an actual board cell, not just any <polygon> — carousel piece-preview
+            // icons (js/sandbox.js renderPiecePreview) are also <polygon class="cell"> elements
+            // and can be hit-tested here while the finger is still over the carousel, before it
+            // reaches the board. Those lack data-p/data-q entirely, which used to silently
+            // produce a NaN hoverCell and a broken, invisible ghost.
+            if (el && el.tagName.toLowerCase() === 'polygon' && el.closest('#tonnetz-svg') &&
+                el.hasAttribute('data-p') && el.hasAttribute('data-q')) {
                 const p = parseInt(el.getAttribute('data-p'));
                 const q = parseInt(el.getAttribute('data-q'));
                 this.state.hoverCell = { p, q };

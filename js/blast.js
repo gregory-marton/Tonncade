@@ -243,7 +243,10 @@ const BlastMode = {
         const oldGhosts = document.querySelectorAll('.ghost');
         oldGhosts.forEach(g => g.remove());
 
-        if (this.state.isGameOver || !this.state.activePiece) return;
+        if (this.state.isGameOver || !this.state.activePiece) {
+            this._lastGhostSoundKey = null;
+            return;
+        }
 
         let p, q;
         if (e && e.target && e.target.getAttribute('data-p')) {
@@ -255,11 +258,11 @@ const BlastMode = {
             q = this.state.hoverCell.q;
         }
 
-        if (p !== undefined) {
+        if (p !== undefined && !isNaN(p) && !isNaN(q)) {
             const cells = Pieces.getAbsoluteCells(this.state.activePiece, p, q, this.state.rotation);
             const canPlace = cells.every(c => Board.isCellEmpty(c.p, c.q));
             const color = canPlace ? Pieces.TYPES[this.state.activePiece].color : '#555555';
-            
+
             cells.forEach(c => {
                 const hex = Render.createHex(c.p, c.q, {
                     fill: color,
@@ -269,6 +272,16 @@ const BlastMode = {
                 hex.style.pointerEvents = 'none';
                 Render.svg.appendChild(hex);
             });
+
+            // Every distinct ghost position/orientation sounds its own cells — see
+            // SandboxMode.updateGhost for the full rationale. Deduped by (piece, p, q,
+            // rotation) so repeated redraws within the same cell don't replay the chord.
+            const soundKey = `${this.state.activePiece}|${p}|${q}|${this.state.rotation}`;
+            if (this._lastGhostSoundKey !== soundKey) {
+                this._lastGhostSoundKey = soundKey;
+                const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
+                Synth.playChord(midis, true, 0.08, 0.4);
+            }
         }
     },
 

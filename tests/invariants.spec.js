@@ -92,7 +92,9 @@ test.describe('Invariant tests', () => {
     await firstPiece.click();
     expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).not.toBeNull();
 
-    await firstPiece.click(); // same control summons and dismisses
+    // Deselecting is the note-play tool's job now — re-clicking the same carousel item
+    // commits+reselects instead (see the carousel place-then-select tests in mobile.spec.js).
+    await page.locator('.piece-item.note-tool-item').click();
     expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBeNull();
     expect(await page.locator('.placed-piece').count()).toBe(0);
   });
@@ -442,5 +444,97 @@ test.describe('Invariant tests', () => {
         }
       }
     }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-14: Every ghost motion sounds its own cells — placing, picking up, moving, and turning
+  // a candidate must always play the Tonnetz notes it currently corresponds to, not just when
+  // it's explicitly rotated. Real-device report: the ghost stayed silent while being dragged
+  // into position and only made a sound once you rotated it. Root cause: SandboxMode/
+  // BlastMode.updateGhost() itself never played anything — sound was bolted on separately at a
+  // few call sites (board-tap rotate, two-finger twist) and simply missing everywhere else
+  // (initial selection, drag, keyboard nav, keyboard rotation). Fixed by making updateGhost()
+  // the single place this happens, deduped by (piece, p, q, rotation) so redundant redraws at
+  // the same position don't replay the chord.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-14: selecting a piece immediately sounds its ghost, before any movement', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(() => {
+      window.__played = [];
+      Synth.playChord = (midis) => window.__played.push([...midis]);
+    });
+
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+
+    const played = await page.evaluate(() => window.__played);
+    expect(played.length).toBeGreaterThan(0);
+  });
+
+  test('INV-14: moving the ghost to a new cell sounds it; staying on the same cell does not replay it', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+
+    await page.evaluate(() => {
+      window.__played = [];
+      Synth.playChord = (midis) => window.__played.push([...midis]);
+    });
+
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 4, q: 4 };
+      SandboxMode.updateGhost();
+    });
+    let played = await page.evaluate(() => window.__played);
+    expect(played.length).toBe(1);
+
+    // Redundant re-render at the SAME cell — no new sound.
+    await page.evaluate(() => SandboxMode.updateGhost());
+    played = await page.evaluate(() => window.__played);
+    expect(played.length).toBe(1);
+
+    // A genuinely new cell sounds again.
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: -4, q: -4 };
+      SandboxMode.updateGhost();
+    });
+    played = await page.evaluate(() => window.__played);
+    expect(played.length).toBe(2);
+  });
+
+  test('INV-14: rotating the ghost via the keyboard sounds it (previously silent)', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+
+    await page.evaluate(() => {
+      window.__played = [];
+      Synth.playChord = (midis) => window.__played.push([...midis]);
+    });
+
+    await page.keyboard.press('Space');
+    const played = await page.evaluate(() => window.__played);
+    expect(played.length).toBeGreaterThan(0);
+
+    const rotation = await page.evaluate(() => SandboxMode.state.rotation);
+    expect(rotation).toBe(1);
+  });
+
+  test('INV-14: Blast\'s active-piece ghost also sounds on movement and rotation, not just placement', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    await page.evaluate(() => {
+      window.__played = [];
+      Synth.playChord = (midis) => window.__played.push([...midis]);
+    });
+
+    await page.evaluate(() => {
+      BlastMode.state.hoverCell = { p: 3, q: 3 };
+      BlastMode.updateGhost();
+    });
+    let played = await page.evaluate(() => window.__played);
+    expect(played.length).toBe(1);
+
+    await page.keyboard.press('Space'); // rotate
+    played = await page.evaluate(() => window.__played);
+    expect(played.length).toBe(2);
   });
 });

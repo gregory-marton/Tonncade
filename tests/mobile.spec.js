@@ -1033,6 +1033,141 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
   });
 
+  test('clicking a carousel item places whatever candidate is held, then selects the tapped piece — it never deselects', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const firstItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+    const secondItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').nth(1);
+
+    await firstItem.click({ force: true });
+    const firstType = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 3, q: 3 };
+      SandboxMode.updateGhost();
+    });
+    expect(await page.locator('.placed-piece').count()).toBe(0);
+
+    // Click the SAME item again — should place the held candidate at its ghost position and
+    // re-select the same type (never deselect back to the note-play tool).
+    await firstItem.click({ force: true });
+    let placed = await page.evaluate(() => SandboxMode.state.placedPieces[0]);
+    expect(placed).toMatchObject({ type: firstType, p: 3, q: 3 });
+    let selected = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selected).toBe(firstType);
+
+    // Move the (still-held, re-selected) candidate, then click a DIFFERENT item — that
+    // candidate should get placed at its new ghost position, and the newly-clicked item
+    // becomes selected.
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: -2, q: -2 };
+      SandboxMode.updateGhost();
+    });
+
+    await secondItem.click({ force: true });
+    placed = await page.evaluate(() => SandboxMode.state.placedPieces[1]);
+    expect(placed).toMatchObject({ type: firstType, p: -2, q: -2 });
+    selected = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selected).not.toBeNull(); // never lands on the note-play tool's "nothing selected" state
+  });
+
+  test('tapping the place wedge with slight touch jitter places reliably, without corrupting the carousel icon or deselecting', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(dispatchAtHelpers);
+
+    const firstItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+    await firstItem.click({ force: true });
+    const pieceType = await page.evaluate(() => SandboxMode.state.selectedPiece);
+
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 2, q: 2 };
+      SandboxMode.updateGhost();
+    });
+
+    const iconBefore = await firstItem.locator('.piece-preview').innerHTML();
+
+    const wedge = firstItem.locator('.place-wedge');
+    const box = await wedge.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // A real touch with a few pixels of jitter — not a synthetic click — reproducing the exact
+    // gesture that used to sometimes deselect, or corrupt the carousel icon, instead of placing:
+    // the carousel's drag-to-candidate touch handlers and the wedge's own click handler used to
+    // race each other, and elementFromPoint could hit a carousel preview <polygon> (which has
+    // no data-p/data-q) and feed NaN into the board's ghost state.
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: cx + 4, y: cy + 3 });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchend', x, y), { x: cx + 4, y: cy + 3 });
+
+    const placed = await page.evaluate(() => SandboxMode.state.placedPieces[0]);
+    expect(placed).toBeTruthy();
+    expect(placed).toMatchObject({ type: pieceType, p: 2, q: 2 });
+
+    const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selectedAfter).not.toBeNull();
+
+    const iconAfter = await firstItem.locator('.piece-preview').innerHTML();
+    expect(iconAfter).toBe(iconBefore);
+  });
+
+  // INVARIANT (user-reported): carousel piece-preview icons are static reference art — they
+  // must never change no matter what the player does (select, rotate, drag, place, pick up,
+  // deselect). Exercises a battery of interactions and confirms every icon's markup is
+  // byte-identical to its very first render throughout.
+  test('carousel piece-preview icons never change with any input', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+    await page.evaluate(dispatchAtHelpers);
+
+    const snapshotIcons = () => page.evaluate(() => {
+      const icons = {};
+      document.querySelectorAll('.piece-item[data-key]').forEach(item => {
+        const key = item.getAttribute('data-key');
+        const preview = item.querySelector('.piece-preview, .note-tool-glyph');
+        icons[key || '(note-tool)'] = preview ? preview.innerHTML : null;
+      });
+      return icons;
+    });
+
+    const before = await snapshotIcons();
+    expect(Object.keys(before).length).toBeGreaterThan(3);
+
+    const firstItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+    const secondItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').nth(1);
+
+    // Select, rotate (tap-on-ghost), move (tap elsewhere), place via wedge.
+    await firstItem.click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 1, q: 1 };
+      SandboxMode.updateGhost();
+    });
+    let cell = page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="1"]');
+    let box = await cell.boundingBox();
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+    await firstItem.locator('.place-wedge').click({ force: true });
+
+    // Pick it back up via swipe-up, drag a second piece out of the carousel, deselect via the
+    // note-play tool.
+    await page.evaluate(() => document.querySelector('.piece-item.note-tool-item').click());
+    await secondItem.click({ force: true });
+    cell = page.locator('polygon.cell:not(.ghost)[data-p="-3"][data-q="-3"]');
+    await page.evaluate(() => { SandboxMode.state.hoverCell = { p: -3, q: -3 }; SandboxMode.updateGhost(); });
+    await page.evaluate(() => document.querySelector('.piece-item.note-tool-item').click());
+
+    const after = await snapshotIcons();
+    expect(after).toEqual(before);
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // F. Blast Mode Mobile Layout
   // ────────────────────────────────────────────────────────────────────────

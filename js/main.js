@@ -686,12 +686,8 @@ const App = {
                         } else {
                             modeObj.state.rotation = (modeObj.state.rotation + 5) % 6;
                         }
+                        // updateGhost() itself sounds the new orientation's cells.
                         modeObj.updateGhost();
-
-                        // Sound confirmation of twist rotation
-                        const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
-                        const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-                        Synth.playChord(midis, true, 0.08, 0.4);
                     }
 
                     lastAngle = currentAngle;
@@ -786,14 +782,10 @@ const App = {
                         const nearGhost = tapCell && ghostCells.some(c => isWithinOneCell(c, tapCell));
 
                         if (!tapCell || tappedGhost) {
-                            // Tap on the candidate itself (or couldn't resolve a cell) -> rotate clockwise
+                            // Tap on the candidate itself (or couldn't resolve a cell) -> rotate
+                            // clockwise. updateGhost() itself sounds the new orientation's cells.
                             modeObj.state.rotation = (modeObj.state.rotation + 1) % 6;
                             modeObj.updateGhost();
-
-                            // Sound confirmation of rotation
-                            const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
-                            const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
-                            Synth.playChord(midis, true, 0.08, 0.4);
                         } else if (isOnPlacedPiece(tapCell) && !nearGhost) {
                             // Tap on an already-placed piece, away from the candidate -> pick it up
                             modeObj.state.hoverCell = tapCell;

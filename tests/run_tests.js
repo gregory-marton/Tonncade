@@ -26,7 +26,7 @@ global.document = {
         setAttribute: () => {},
         appendChild: () => {},
         addEventListener: () => {},
-        querySelector: () => ({ setAttribute: () => {}, appendChild: () => {} })
+        querySelector: () => ({ setAttribute: () => {}, appendChild: () => {}, addEventListener: () => {} })
     }),
     createElementNS: (ns, tag) => ({
         style: {},

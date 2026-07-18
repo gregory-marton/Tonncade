@@ -137,6 +137,34 @@ checks that one specifically, in both directions, instead of just excluding it.
 **Test:** `tests/invariants.spec.js` — "INV-13: every mode's primary elements are reachable in
 both portrait and landscape"
 
+### INV-14: Every ghost motion sounds its own cells
+
+Placing, picking up, moving, and turning a candidate piece (Sandbox or Blast) must always play
+the Tonnetz notes it currently corresponds to — not just when it's explicitly rotated. This
+covers drag, keyboard navigation, keyboard rotation, two-finger twist, and the initial ghost
+that appears the moment a piece is selected. `SandboxMode.updateGhost()` and
+`BlastMode.updateGhost()` are the single place this happens (deduped by piece/p/q/rotation so
+redundant redraws at the same position don't replay the chord) — callers should never bolt on
+their own separate `Synth.playChord` call for a ghost-position change, since that's exactly the
+gap that let ghost movement go silent while only rotation (which happened to have its own
+explicit call at a couple of sites) made sound.
+
+**Tests:** `tests/invariants.spec.js` — the four "INV-14: ..." tests (initial selection, move
+dedup, keyboard rotation, Blast parity)
+
+### INV-15: Carousel piece-preview icons never change
+
+The small piece-preview icons in the carousel (and the chord-guide results list) are static
+reference art — `SandboxMode.renderPiecePreview` renders them once and nothing about
+selecting, rotating, dragging, placing, or picking up a piece should ever redraw or mutate one.
+Real-device report: the place-wedge's tap sometimes visibly changed one of a carousel icon's
+cells. Root cause was the wedge's unreliable click-synthesis-after-touch racing against the
+carousel container's own touch listeners (see INV-14's history and the fix in
+`SandboxMode.renderPalette`'s wedge touch handling) — not the icons themselves being redrawn,
+but worth guarding directly against regardless, since the icons genuinely must never move.
+
+**Test:** `tests/mobile.spec.js` — "carousel piece-preview icons never change with any input"
+
 ---
 
 ## Primary Elements

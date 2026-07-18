@@ -21,4 +21,4 @@ through which recipients can access the Corresponding Source.
 @licend  The above is the entire license notice
 for the JavaScript code in this file.
 */
-const GIT_VERSION = 'git-4a5f127';
+const GIT_VERSION = 'git-bf468f9';
