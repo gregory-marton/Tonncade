@@ -5,14 +5,16 @@ test('desktop page title is correct', async ({ page }) => {
   await expect(page).toHaveTitle(/Tonncade/);
 });
 
-test('a "see the code" link at the bottom of the drawer points to the GitHub repo', async ({ page }) => {
+test('the "</>" version tag next to the title links to the GitHub repo', async ({ page }) => {
   await page.goto('/');
   const link = page.locator('#see-the-code-link');
   await expect(link).toBeVisible();
   await expect(link).toHaveAttribute('href', 'https://github.com/gregory-marton/Tonncade');
   await expect(link).toHaveAttribute('target', '_blank');
-  // Non-linguistic icon, not text — see docs/invariants.md-adjacent i18n backlog note
-  expect((await link.innerText()).trim()).toBe('');
+  // Prefixed with the "</>" glyph, not a word — see docs/invariants.md-adjacent i18n backlog note
+  expect((await link.innerText()).trim()).toMatch(/^<\/>/);
+  // The dynamic version text (js/main.js updateVersionTag) still lives inside the link
+  await expect(link.locator('.version-tag')).toBeVisible();
 });
 
 test('chord guide has no placeholder explanation text before a chord is chosen', async ({ page }) => {
