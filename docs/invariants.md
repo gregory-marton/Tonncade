@@ -125,6 +125,18 @@ a default.
 **Test:** `tests/invariants.spec.js` — "INV-12: panning Sandbox's Tonnetz is preserved across
 an unrelated control interaction"
 
+### INV-13: Primary elements are reachable in every orientation
+
+Every primary element listed in the "Primary Elements" table above must be reachable (present,
+non-zero size, not hidden behind a collapsed drawer once opened) in both portrait and
+landscape — not just whichever orientation someone happened to test by hand. The one documented
+exception is Gravity's duplicate down-button (`#m-btn-action-2`), which only exists as a
+distinct primary element in landscape (5 D-pad buttons in portrait, 6 in landscape); the test
+checks that one specifically, in both directions, instead of just excluding it.
+
+**Test:** `tests/invariants.spec.js` — "INV-13: every mode's primary elements are reachable in
+both portrait and landscape"
+
 ---
 
 ## Primary Elements
@@ -153,6 +165,5 @@ pieces or chord-guide results, are not listed separately):
 | Melody | Tonnetz, Drawer pull, Play, Restart, Stats, Sequence message |
 | Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
 
-This inventory isn't tested directly yet — it's the reference list a future "same primary
-elements exist across every orientation, per mode" test would check against, and the
-vocabulary the rest of this doc and its tests should stay consistent with.
+This inventory is the reference list INV-13 (below) checks against, and the vocabulary the
+rest of this doc and its tests should stay consistent with.

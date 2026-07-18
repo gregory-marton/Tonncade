@@ -375,4 +375,72 @@ test.describe('Invariant tests', () => {
     const viewAfter = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
     expect(viewAfter).toEqual(viewBefore);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-13: Primary elements set-identity — the per-mode primary-element inventory in
+  // docs/invariants.md's "Primary Elements" table is reachable in BOTH portrait and landscape,
+  // not just whichever orientation someone happened to test by hand. Gravity's D-pad is the one
+  // documented exception (5 buttons in portrait, 6 in landscape) and is checked separately.
+  // ────────────────────────────────────────────────────────────────────────
+
+  const PRIMARY_ELEMENTS = {
+    gravity: [
+      '#tonnetz-svg', '#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right',
+      '#palette', '#gravity-start-pause', '#gravity-reset', '#gravity-controls .stats-panel', '#drawer-handle',
+    ],
+    blast: ['#tonnetz-svg', '#blast-stats .stats-panel', '#drawer-handle'],
+    snake: [
+      '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
+      '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
+    ],
+    midi: ['#tonnetz-svg', '#drawer-handle', '#midi-play-preview', '#midi-game-restart', '#midi-stats-group', '#midi-game-status'],
+    sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select'],
+  };
+
+  test('INV-13: every mode\'s primary elements are reachable in both portrait and landscape', async ({ page }) => {
+    for (const [mode, selectors] of Object.entries(PRIMARY_ELEMENTS)) {
+      for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
+        await page.setViewportSize(viewport);
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+        // Primary elements only need to be reachable, not permanently visible — open the
+        // collapsible drawer first, same as a real player would (mirrors INV-1's pattern).
+        const drawer = page.locator('#top-drawer');
+        if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
+          await page.locator('#drawer-handle').click({ force: true });
+          await expect(drawer).toHaveClass(/expanded/);
+        }
+
+        if (mode === 'blast') {
+          // Blast's preview/place control only renders once a piece is active.
+          await page.evaluate(() => {
+            BlastMode.state.hoverCell = { p: 0, q: 0 };
+            BlastMode.placePiece(0, 0);
+          });
+          selectors.push('.active-item');
+        }
+
+        for (const selector of selectors) {
+          const box = await page.locator(selector).first().boundingBox();
+          const label = `mode=${mode} viewport=${viewport.width}x${viewport.height} selector=${selector}`;
+          expect(box, `${label} should be present and reachable`).not.toBeNull();
+          expect(box.width, `${label} has zero width`).toBeGreaterThan(0);
+          expect(box.height, `${label} has zero height`).toBeGreaterThan(0);
+        }
+
+        if (mode === 'blast') selectors.pop(); // undo the push above before the next viewport/mode
+
+        if (mode === 'gravity') {
+          const isLandscape = viewport.width > viewport.height;
+          const box = await page.locator('#m-btn-action-2').boundingBox();
+          const label = `gravity's duplicate down-button @ ${viewport.width}x${viewport.height}`;
+          if (isLandscape) {
+            expect(box, `${label} should be visible in landscape (documented as a 6th D-pad button there)`).not.toBeNull();
+          } else {
+            expect(box, `${label} should be hidden in portrait (documented as only 5 D-pad buttons there)`).toBeNull();
+          }
+        }
+      }
+    }
+  });
 });
