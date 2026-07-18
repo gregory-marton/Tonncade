@@ -94,3 +94,65 @@ reshuffling happens on resize (drawer restructuring, board refitting); none of i
 game state.
 
 **Tests:** `tests/invariants.spec.js` — the two "INV-9: ..." tests (Snake, Blast)
+
+### INV-10: On a restricted Tonnetz, nothing overlaps it
+
+Snake, Blast, and Gravity each show a *restricted* Tonnetz — a fixed board, not freely
+pannable — and no other element (stats/controls panel, D-pad, Blast's next-piece queue) may
+ever overlap it. Enforced by giving `#tonnetz-svg` itself a CSS box inset by exactly the space
+those overlays need, per mode and orientation, rather than letting the overlays float on top
+of a full-bleed board: the browser's own default `preserveAspectRatio="xMidYMid meet"`
+guarantees the fitted board never renders outside that smaller box.
+
+**Test:** `tests/invariants.spec.js` — "INV-10: on a restricted Tonnetz (Snake/Blast/Gravity),
+no overlay overlaps the board"
+
+### INV-11: At least 20 distinct Tonnetz cells are visible and controllable
+
+In every mode, at every supported viewport/orientation, at least 20 distinct cells are both
+on-screen and reachable (not covered by an overlay) — a floor on how much of the instrument is
+actually usable at once, regardless of how tightly the rest of the layout is squeezed.
+
+**Test:** `tests/invariants.spec.js` — "INV-11: at least 20 distinct Tonnetz cells are visible
+and controllable, in every mode/orientation"
+
+### INV-12: On an unrestricted Tonnetz, pan/zoom persists
+
+Sandbox and Melody allow free pan/zoom. Once the player sets a pan/zoom, using some other
+control (selecting a carousel piece, opening the chord guide, etc.) must not reset it back to
+a default.
+
+**Test:** `tests/invariants.spec.js` — "INV-12: panning Sandbox's Tonnetz is preserved across
+an unrelated control interaction"
+
+---
+
+## Primary Elements
+
+A **primary element** is a top-level interactive affordance a player can point to and name —
+"the D-pad's up-left arrow," "the carousel," "the drawer pull" — as opposed to a sub-item
+*within* one (an individual carousel piece, a single chord-guide search result). Two design
+rules follow from the distinction:
+
+- The primary element must always be present and reachable (this is what INV-1/2/3 actually
+  protect). The *number* of sub-items inside it can vary freely with viewport/content (a
+  carousel shows more or fewer pieces at once; Gravity's D-pad gains a duplicate down-button
+  in landscape) — that variation is expected, not a violation of anything.
+- A primary element shouldn't degrade to a single, barely-usable sub-affordance — as a rough
+  design guideline (not a hard test), a primary element with internal sub-items should keep at
+  least ~2 of them meaningfully available.
+
+Per-mode inventory (each item below is one primary element; items *within* one, like carousel
+pieces or chord-guide results, are not listed separately):
+
+| Mode | Primary elements |
+|---|---|
+| Gravity | Tonnetz, each of the 5 (portrait) / 6 (landscape) D-pad buttons individually, the next-piece preview, Pause, Restart, Stats, Drawer pull |
+| Blast | Tonnetz, the preview/place control, Stats, Drawer pull |
+| Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
+| Melody | Tonnetz, Drawer pull, Play, Restart, Stats, Sequence message |
+| Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
+
+This inventory isn't tested directly yet — it's the reference list a future "same primary
+elements exist across every orientation, per mode" test would check against, and the
+vocabulary the rest of this doc and its tests should stay consistent with.

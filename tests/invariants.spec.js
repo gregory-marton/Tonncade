@@ -278,4 +278,91 @@ test.describe('Invariant tests', () => {
     expect(linesAfter).toBe(linesBefore);
     expect(placedAfter).toBe(placedBefore);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-10 & INV-11: a restricted Tonnetz (Snake/Blast/Gravity — a fixed board, not
+  // free-pan) is never overlapped by any other element; and at least 20 distinct cells are
+  // visible and controllable in every mode/orientation.
+  // ────────────────────────────────────────────────────────────────────────
+
+  async function measureBoardOcclusion(page) {
+    return page.evaluate(() => {
+      const overlaySelectors = [
+        '#blast-stats', '#gravity-controls', '#snake-controls',
+        // The D-pad containers are transparent, pointer-events:none boxes spanning most of
+        // the game area — only their .m-btn children actually paint anything opaque.
+        '#mobile-controls .m-btn', '#snake-mobile-controls .m-btn',
+        '#palette.floating-queue', '#midi-controls',
+      ];
+      const overlayRects = [];
+      for (const sel of overlaySelectors) {
+        document.querySelectorAll(sel).forEach(el => {
+          const style = getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden') return;
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) overlayRects.push(rect);
+        });
+      }
+
+      let inViewport = 0;
+      let overlappingCells = 0;
+      // Scoped to #tonnetz-svg specifically — Render.createHex() gives every hex it draws
+      // class="cell", including the tiny piece-preview icons inside the carousel/queue/chord
+      // guide, which are legitimately positioned inside those overlay rects and aren't board
+      // cells at all.
+      document.querySelectorAll('#tonnetz-svg polygon.cell:not(.ghost)').forEach(cell => {
+        const rect = cell.getBoundingClientRect();
+        const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
+        if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) return;
+        inViewport++;
+        const covered = overlayRects.some(r => cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom);
+        if (covered) overlappingCells++;
+      });
+      return { inViewport, overlappingCells, unobscured: inViewport - overlappingCells };
+    });
+  }
+
+  test('INV-10: on a restricted Tonnetz (Snake/Blast/Gravity), no overlay overlaps the board', async ({ page }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
+      await page.setViewportSize(viewport);
+      for (const mode of ['snake', 'blast', 'gravity']) {
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        const { overlappingCells } = await measureBoardOcclusion(page);
+        expect(overlappingCells, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBe(0);
+      }
+    }
+  });
+
+  test('INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation', async ({ page }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
+      await page.setViewportSize(viewport);
+      for (const mode of MODES) {
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        const { unobscured } = await measureBoardOcclusion(page);
+        expect(unobscured, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBeGreaterThanOrEqual(20);
+      }
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-12: On an unrestricted Tonnetz (Sandbox/Melody — free pan/zoom), the player's chosen
+  // pan/zoom persists through interacting with other controls, rather than resetting.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-12: panning Sandbox\'s Tonnetz is preserved across an unrelated control interaction', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    await page.evaluate(() => {
+      Render.updateView(-999, -888, 1);
+      SandboxMode.state.viewX = Render.viewX;
+      SandboxMode.state.viewY = Render.viewY;
+    });
+    const viewBefore = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
+
+    await page.locator('.piece-item').first().click();
+
+    const viewAfter = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
+    expect(viewAfter).toEqual(viewBefore);
+  });
 });

@@ -1303,3 +1303,51 @@ button:hover {
         width: auto;
     }
 }
+
+/* INVARIANT (see docs/invariants.md): on a restricted Tonnetz (Snake/Blast/Gravity — a fixed
+   board, not free-pan), no other element may overlap it. #tonnetz-svg previously filled
+   #game-container edge-to-edge, so the floating overlay panels (stats/controls, the D-pad,
+   Blast's queue) — all position:absolute on top of it — visually buried whatever cells sat
+   under them. Giving the SVG itself a smaller, inset CSS box reserves that space instead:
+   the browser's own default preserveAspectRatio="xMidYMid meet" letterboxes/centers the fit
+   view within whatever box the element actually occupies, so the rendered board can never
+   extend into the reserved margins — no JS/viewBox math needs to change, only this layout. */
+@media (max-width: 767px) {
+    #app[data-mode="snake"] #tonnetz-svg,
+    #app[data-mode="gravity"] #tonnetz-svg,
+    #app[data-mode="blast"] #tonnetz-svg {
+        position: absolute;
+        top: 210px;    /* clears the stats/controls panel (and Blast's queue, same corner-ish height) */
+        left: 0;
+        right: 0;
+        width: auto;
+        height: auto;
+    }
+    #app[data-mode="snake"] #tonnetz-svg,
+    #app[data-mode="gravity"] #tonnetz-svg {
+        bottom: 150px; /* clears the D-pad row + --mobile-pad-safe-bottom */
+    }
+    #app[data-mode="blast"] #tonnetz-svg {
+        bottom: 0;
+    }
+}
+
+@media (max-width: 950px) and (orientation: landscape) {
+    #app[data-mode="snake"] #tonnetz-svg,
+    #app[data-mode="gravity"] #tonnetz-svg,
+    #app[data-mode="blast"] #tonnetz-svg {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 210px;   /* clears the stats/controls panel (and, for Snake/Gravity, the left D-pad cluster) */
+        width: auto;
+        height: auto;
+    }
+    #app[data-mode="snake"] #tonnetz-svg,
+    #app[data-mode="gravity"] #tonnetz-svg {
+        right: 70px;   /* clears the right D-pad cluster */
+    }
+    #app[data-mode="blast"] #tonnetz-svg {
+        right: 0;      /* Blast's queue is left-side only in landscape (see #app[data-mode="blast"] #palette.floating-queue above) */
+    }
+}

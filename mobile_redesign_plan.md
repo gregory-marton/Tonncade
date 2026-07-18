@@ -35,8 +35,12 @@ The real implementation evolved past the original spec text below in a few ways 
 
 Raw notes from real-device feedback, captured for the next brainstorming pass — none of this has been designed or planned yet:
 
-- **Melody mode**: when adding a MIDI file, offer to search for one (not just a raw file picker).
+- **Melody mode MIDI file source**: replace the raw upload picker with a local MIDI folder the player sets once, browsed via a dropdown of its contents — no search/download feature (supersedes the earlier "offer to search for one" idea).
+- **Melody mode post-playback transform**: after playing the melody, its notes stay highlighted and become a moveable shape as a whole — draggable to translate/transpose, two-finger rotate for harmonic variation — with a new control to save the altered MIDI afterward.
 - **Sandbox mode "Choose a Chord" dropdown in landscape**: the dropdown is cut off vertically (its text isn't fully readable) and is much wider than the carousel above it. Two options to consider: (a) make it taller and constrain its width to match the carousel, or (b) widen the carousel to a 2×N grid and constrain the dropdown to match that width instead. (Surfaced only after the landscape root-cause fix in Status item 6 — previously landscape mobile styling never activated at all, so this was hidden.)
+- **Sandbox mode double-tap bug + pickup redesign**: the first tap of a double-tap is currently interpreted as a rotate (falls through to normal single-tap logic), so the piece can end up in an unintended orientation by the time the second tap lands. Fix planned: remove double-tap-to-pick-up entirely; instead, a single tap picks up a placed piece whenever it's not part of a double-tap AND not within one cell of the current candidate ghost (which more likely means "rotate"). Double-tap-to-place stays as is.
+- **Blast mode**: consider adding a Restart button (currently has none).
+- **Snake mode**: (1) remove the status message (`#snake-game-status`) entirely; (2) the D-pad arrows should continuously highlight whichever direction is currently "next" (`SnakeMode.state.nextDirection`), not just flash on press, so the active heading is always visible at a glance.
 
 ---
 

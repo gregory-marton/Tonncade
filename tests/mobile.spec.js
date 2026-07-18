@@ -42,7 +42,10 @@ async function countVisibleCells(page) {
     const vh = window.innerHeight;
     let inViewport = 0;
     let unobscured = 0;
-    document.querySelectorAll('polygon.cell:not(.ghost)').forEach(cell => {
+    // Scoped to #tonnetz-svg — Render.createHex() gives every hex it draws class="cell",
+    // including tiny piece-preview icons inside the carousel/queue/chord guide, which aren't
+    // board cells and are legitimately positioned inside those overlays' own rects.
+    document.querySelectorAll('#tonnetz-svg polygon.cell:not(.ghost)').forEach(cell => {
       const rect = cell.getBoundingClientRect();
       const cx = rect.x + rect.width / 2;
       const cy = rect.y + rect.height / 2;
