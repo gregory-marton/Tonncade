@@ -1,3 +1,26 @@
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this file.
+
+Copyright (C) 2026  Gregory Marton
+
+The JavaScript code in this file is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+@licend  The above is the entire license notice
+for the JavaScript code in this file.
+*/
 /**
  * sandbox.js - Main controller for Sandbox Mode.
  */
@@ -578,20 +601,20 @@ const SandboxMode = {
 
         const getWikipediaUrl = (genericName) => {
             const name = genericName.replace('Root ', '').trim();
-            if (name.startsWith('Major') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Major_triad';
-            if (name.startsWith('minor') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Minor_triad';
-            if (name.includes('m7b5')) return 'https://en.wikipedia.org/wiki/Half-diminished_seventh_chord';
-            if (name.includes('m7')) return 'https://en.wikipedia.org/wiki/Minor_seventh_chord';
-            if (name.includes('Maj7')) return 'https://en.wikipedia.org/wiki/Major_seventh_chord';
-            if (name.includes('m(Maj7)')) return 'https://en.wikipedia.org/wiki/Minor_major_seventh_chord';
-            if (name.includes('7')) return 'https://en.wikipedia.org/wiki/Dominant_seventh_chord';
-            if (name.includes('5 (Fifth)')) return 'https://en.wikipedia.org/wiki/Power_chord';
-            if (name.includes('Sus4') || name.includes('Sus2')) return 'https://en.wikipedia.org/wiki/Suspended_chord';
-            if (name.includes('Pentatonic Stack')) return 'https://en.wikipedia.org/wiki/Quintal_harmony';
-            if (name.includes('dim')) return 'https://en.wikipedia.org/wiki/Diminished_triad';
-            if (name.includes('aug')) return 'https://en.wikipedia.org/wiki/Augmented_triad';
-            if (name.includes('Major 3rd') || name.includes('minor 3rd') || name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Third_(music)';
-            if (name.includes('4th')) return 'https://en.wikipedia.org/wiki/Fourth';
+            if (name.startsWith('Major') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Major_triad';
+            if (name.startsWith('minor') && !name.includes('7') && !name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Minor_triad';
+            if (name.includes('m7b5')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Half-diminished_seventh_chord';
+            if (name.includes('m7')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Minor_seventh_chord';
+            if (name.includes('Maj7')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Major_seventh_chord';
+            if (name.includes('m(Maj7)')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Minor_major_seventh_chord';
+            if (name.includes('7')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Dominant_seventh_chord';
+            if (name.includes('5 (Fifth)')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Power_chord';
+            if (name.includes('Sus4') || name.includes('Sus2')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Suspended_chord';
+            if (name.includes('Pentatonic Stack')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Quintal_harmony';
+            if (name.includes('dim')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Diminished_triad';
+            if (name.includes('aug')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Augmented_triad';
+            if (name.includes('Major 3rd') || name.includes('minor 3rd') || name.includes('3rd')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Third_(music)';
+            if (name.includes('4th')) return 'https://en.wikipedia.org/wiki/Special:MyLanguage/Fourth';
             return `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(name)}`;
         };
 

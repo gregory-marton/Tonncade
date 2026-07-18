@@ -409,6 +409,37 @@ try {
     }
     console.log("PASS: Every piece is connected, non-overlapping, and closed under rotation at all 6 orientations!");
 
+    // INVARIANT: every wikipedia.org link in the source uses Special:MyLanguage, so a
+    // non-English reader lands on their own language's edition (falling back to English if
+    // no translation exists) instead of always being forced into English regardless of their
+    // browser/OS language. Scans the actual source files rather than checking a couple of
+    // rendered links, so any future wikipedia.org link added without the prefix gets caught.
+    console.log("Running Wikipedia links use Special:MyLanguage test...");
+    const filesToScan = ['index.html', 'js/main.js', 'js/sandbox.js', 'js/blast.js', 'js/gravity.js', 'js/snake.js', 'js/midi.js'];
+    const wikiUrlRe = /https?:\/\/[a-z-]+\.wikipedia\.org\/[^\s"'`)]+/g;
+    let wikiLinksChecked = 0;
+    for (const relPath of filesToScan) {
+        const filePath = path.join(__dirname, '..', relPath);
+        if (!fs.existsSync(filePath)) continue;
+        const content = fs.readFileSync(filePath, 'utf8');
+        const matches = content.match(wikiUrlRe) || [];
+        for (const url of matches) {
+            // The one legitimate exception: a full-text search fallback isn't a specific
+            // article, so Special:MyLanguage (which redirects a known PAGENAME) doesn't apply.
+            if (url.includes('/w/index.php?search=')) continue;
+            wikiLinksChecked++;
+            if (!url.includes('/wiki/Special:MyLanguage/')) {
+                console.error(`FAIL: ${relPath} has a Wikipedia link that doesn't use Special:MyLanguage: ${url}`);
+                process.exit(1);
+            }
+        }
+    }
+    if (wikiLinksChecked === 0) {
+        console.error('FAIL: expected to find at least one Special:MyLanguage-eligible Wikipedia link to check, found none — the scan itself may be broken');
+        process.exit(1);
+    }
+    console.log(`PASS: All ${wikiLinksChecked} Wikipedia links use Special:MyLanguage!`);
+
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

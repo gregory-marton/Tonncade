@@ -1,3 +1,13 @@
+#!/bin/sh
+# Tracked copy of the pre-commit hook, so it survives fresh clones (.git/hooks/ itself is
+# never version-controlled by git). To use it: `git config core.hooksPath githooks`, or copy
+# this file to .git/hooks/pre-commit and `chmod +x` it.
+#
+# Regenerates js/version.js with the current commit's short SHA, preserving the LibreJS
+# @licstart/@licend license notice (js/version.js is otherwise fully auto-generated, so the
+# notice has to be re-added here rather than just living in a file nothing ever overwrites).
+SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "init")
+cat > js/version.js << HEADER
 /*
 @licstart  The following is the entire license notice for the
 JavaScript code in this file.
@@ -21,4 +31,6 @@ through which recipients can access the Corresponding Source.
 @licend  The above is the entire license notice
 for the JavaScript code in this file.
 */
-const GIT_VERSION = 'git-439facd';
+const GIT_VERSION = 'git-$SHA';
+HEADER
+git add js/version.js
