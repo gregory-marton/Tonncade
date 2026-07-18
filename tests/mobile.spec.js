@@ -816,7 +816,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placedCount).toBe(0);
   });
 
-  test('double-tap on a placed piece picks it up, even with nothing currently selected', async ({ page }) => {
+  test('a single tap on a placed piece picks it up, even with nothing currently selected', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
@@ -838,18 +838,89 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy + 70 });
     expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
 
-    // Deselect entirely — a plain single tap can't pick this piece back up (main.js only
-    // does that when a piece is already selected); double-tap should work regardless.
-    await page.evaluate(() => { SandboxMode.state.selectedPiece = null; });
+    // Deselect entirely, then move the ghost far away — a plain single tap directly on the
+    // placed piece (away from any ghost) should now pick it up on its own, no double-tap needed.
+    await page.evaluate(() => {
+      SandboxMode.state.selectedPiece = null;
+      SandboxMode.state.hoverCell = { p: 5, q: 5 };
+    });
 
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
 
     expect(await page.locator('.placed-piece').count()).toBe(0);
     const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
     expect(selectedAfter).not.toBeNull();
+  });
+
+  test('a single tap on a placed piece that sits within one cell of the candidate ghost does NOT pick it up', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+
+    // Place a single-cell piece ('.') at (0,0)
+    await page.evaluate(() => {
+      SandboxMode.state.selectedPiece = '.';
+      SandboxMode.state.rotation = 0;
+      SandboxMode.state.hoverCell = { p: 0, q: 0 };
+      SandboxMode.placePiece(0, 0);
+    });
+    expect(await page.locator('.placed-piece').count()).toBe(1);
+
+    // Select a new candidate and hover its ghost at (1,0) — a neighbor of (0,0), so within
+    // one cell of the placed piece at (0,0).
+    await page.locator('.piece-item').first().click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 1, q: 0 };
+      SandboxMode.updateGhost();
+    });
+
+    const placedCell = page.locator('polygon.placed-piece[data-p="0"][data-q="0"]');
+    const box = await placedCell.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+
+    // The placed piece should still be there — the tap was near the ghost, so it's treated as
+    // moving/interacting with the candidate rather than picking up the nearby placed piece.
+    expect(await page.locator('.placed-piece').count()).toBe(1);
+  });
+
+  test('double-tapping exactly where the candidate ghost sits places it at its original orientation, not rotated by the first tap', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+
+    await page.locator('.piece-item').first().click({ force: true });
+    await page.evaluate(() => {
+      SandboxMode.state.rotation = 0;
+      SandboxMode.state.hoverCell = { p: 0, q: 0 };
+      SandboxMode.updateGhost();
+    });
+    const rotationBefore = await page.evaluate(() => SandboxMode.state.rotation);
+
+    const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+    const box = await cell.boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // Double-tap directly on the ghost's own current cell — the first tap of this pair would,
+    // on its own, rotate the candidate (tap-on-ghost -> rotate). The double-tap-place that
+    // follows should still place it at the ORIGINAL orientation, not the rotated one.
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+
+    const placed = await page.evaluate(() => SandboxMode.state.placedPieces[0]);
+    expect(placed).toBeTruthy();
+    expect(placed.rotation).toBe(rotationBefore);
   });
 
   test('double-tap on an empty cell places the selected candidate there', async ({ page }) => {

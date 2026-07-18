@@ -456,6 +456,7 @@ const App = {
 
         let doubleTapLastCell = null;
         let doubleTapLastTime = 0;
+        let doubleTapSnapshotRotation = null;
 
         let touchStartX = 0;
         let touchStartY = 0;
@@ -751,28 +752,34 @@ const App = {
                         doubleTapLastCell && doubleTapLastCell.p === touchStartCell.p && doubleTapLastCell.q === touchStartCell.q &&
                         (now - doubleTapLastTime) < 350;
 
+                    const isOnPlacedPiece = (cell) => this.currentMode === 'sandbox' && cell && SandboxMode.state.placedPieces.some(piece => {
+                        const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
+                        return cells.some(c => c.p === cell.p && c.q === cell.q);
+                    });
+                    const isWithinOneCell = (a, b) => (a.p === b.p && a.q === b.q) ||
+                        Tonnetz.getNeighbors(a.p, a.q).some(n => n.p === b.p && n.q === b.q);
+
                     if (isDoubleTap) {
                         // Consume it so a third tap doesn't chain into another double-tap.
                         doubleTapLastCell = null;
                         const tapCell = touchStartCell;
-                        const isOnPlacedPiece = SandboxMode.state.placedPieces.some(piece => {
-                            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
-                            return cells.some(c => c.p === tapCell.p && c.q === tapCell.q);
-                        });
-
-                        if (isOnPlacedPiece) {
-                            // Pick up, regardless of whether a piece is already selected — unlike
-                            // the single-tap pickup path below, which only fires when one is.
-                            modeObj.state.hoverCell = tapCell;
-                            SandboxMode.pickupPieceAt(tapCell.p, tapCell.q);
-                        } else if (pieceType && SandboxMode.canPlace(pieceType, tapCell.p, tapCell.q, SandboxMode.state.rotation)) {
+                        // Double-tap now only places a selected candidate — pickup moved to a
+                        // plain single tap (below), guarded against the ghost's own vicinity.
+                        // Use the rotation snapshotted BEFORE the first tap's own action ran:
+                        // if that first tap landed on the ghost, it would have rotated it,
+                        // which shouldn't silently change what a double-tap-place commits.
+                        const rotationToUse = doubleTapSnapshotRotation !== null ? doubleTapSnapshotRotation : SandboxMode.state.rotation;
+                        if (pieceType && SandboxMode.canPlace(pieceType, tapCell.p, tapCell.q, rotationToUse)) {
+                            SandboxMode.state.rotation = rotationToUse;
                             SandboxMode.placePiece(tapCell.p, tapCell.q);
                         }
+                        doubleTapSnapshotRotation = null;
                         return;
                     }
 
                     doubleTapLastCell = touchStartCell;
                     doubleTapLastTime = now;
+                    doubleTapSnapshotRotation = pieceType ? modeObj.state.rotation : null;
 
                     if (pieceType) {
                         const tapCell = touchStartCell;
@@ -780,6 +787,7 @@ const App = {
                             ? Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)
                             : [];
                         const tappedGhost = tapCell && ghostCells.some(c => c.p === tapCell.p && c.q === tapCell.q);
+                        const nearGhost = tapCell && ghostCells.some(c => isWithinOneCell(c, tapCell));
 
                         if (!tapCell || tappedGhost) {
                             // Tap on the candidate itself (or couldn't resolve a cell) -> rotate clockwise
@@ -790,20 +798,22 @@ const App = {
                             const cells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation);
                             const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
                             Synth.playChord(midis, true, 0.08, 0.4);
-                        } else if (this.currentMode === 'sandbox' && SandboxMode.state.placedPieces.some(piece => {
-                            const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
-                            return cells.some(c => c.p === tapCell.p && c.q === tapCell.q);
-                        })) {
-                            // Tap on an already-placed piece -> pick it up as the new candidate
+                        } else if (isOnPlacedPiece(tapCell) && !nearGhost) {
+                            // Tap on an already-placed piece, away from the candidate -> pick it up
                             modeObj.state.hoverCell = tapCell;
                             SandboxMode.pickupPieceAt(tapCell.p, tapCell.q);
                         } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) {
                             // Blast has no pickup — ignore taps on locked cells
                         } else {
-                            // Tap elsewhere on an empty cell -> move the candidate here instead of rotating
+                            // Tap elsewhere (including a placed piece near the candidate) ->
+                            // move the candidate here instead of rotating or picking up
                             modeObj.state.hoverCell = tapCell;
                             modeObj.updateGhost();
                         }
+                    } else if (isOnPlacedPiece(touchStartCell)) {
+                        // Nothing selected -> a plain tap on a placed piece picks it up (no
+                        // ghost exists yet, so there's nothing to be "near")
+                        SandboxMode.pickupPieceAt(touchStartCell.p, touchStartCell.q);
                     } else {
                         // Tap note keyboard behavior when no active piece is selected
                         if (touchStartCell) {
