@@ -488,14 +488,14 @@ button:hover {
         pointer-events: auto;
     }
 
-    #gravity-controls .control-buttons, #snake-controls .control-buttons {
+    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
         gap: 6px;
         margin-top: 4px;
     }
 
-    #gravity-controls button, #snake-controls button {
+    #blast-stats button, #gravity-controls button, #snake-controls button {
         padding: 4px 8px;
         font-size: 11px;
         height: 24px;
@@ -859,14 +859,14 @@ button:hover {
     }
 
     /* Custom buttons wrapper in stats overlays */
-    #gravity-controls .control-buttons, #snake-controls .control-buttons {
+    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
         gap: 6px;
         margin-top: 4px;
     }
 
-    #gravity-controls button, #snake-controls button {
+    #blast-stats button, #gravity-controls button, #snake-controls button {
         padding: 4px 8px;
         font-size: 11px;
         height: 24px;
@@ -1296,7 +1296,7 @@ button:hover {
        #app[data-mode="blast"] — #palette.floating-queue is shared with Gravity's queue, whose
        landscape control pad already occupies the left edge and would otherwise collide. */
     #app[data-mode="blast"] #palette.floating-queue {
-        top: 70px;
+        top: 135px; /* clears #blast-stats, which grew taller once its Restart button was added */
         bottom: var(--mobile-pad-safe-bottom);
         right: auto;
         left: 10px;

@@ -133,6 +133,13 @@ const BlastMode = {
     setupEvents: function() {
         const svg = Render.svg;
 
+        const resetBtn = document.getElementById('blast-reset');
+        if (resetBtn) {
+            resetBtn.onclick = () => {
+                this.reset();
+            };
+        }
+
         window.onmousemove = (e) => {
             if (this.state.isGameOver) return;
             this.updateGhost(e);

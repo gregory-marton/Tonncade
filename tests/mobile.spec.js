@@ -1151,6 +1151,25 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(queueBox.y).toBeGreaterThanOrEqual(headerBottom - 5);
   });
 
+  test('Blast has a visible Restart button that resets the board and line count', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+
+    // Place a piece and simulate a cleared line so there's real state to reset
+    await page.evaluate(() => {
+      BlastMode.state.linesCleared = 3;
+      Board.cells.set('0,0', { type: BlastMode.state.activePiece, color: '#fff' });
+      BlastMode.refreshUI();
+    });
+    expect(await page.evaluate(() => Board.cells.size)).toBeGreaterThan(0);
+
+    const resetBtn = page.locator('#blast-reset');
+    await expect(resetBtn).toBeVisible();
+    await resetBtn.click({ force: true });
+
+    expect(await page.evaluate(() => BlastMode.state.linesCleared)).toBe(0);
+    expect(await page.evaluate(() => Board.cells.size)).toBe(0);
+  });
+
   test('blast next-piece queue reorients vertically under the score, active item at bottom-left, in landscape', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
