@@ -8,7 +8,7 @@ It also tracks status: what's already shipped, how the implementation diverged f
 
 ## Status as of 2026-07-18
 
-The original plan (see "Goal Description" below) is substantially implemented and verified, and so are the fourteen rounds of follow-up work that came after it:
+The original plan (see "Goal Description" below) is substantially implemented and verified, and so are the fifteen rounds of follow-up work that came after it:
 
 1. **Renames/polish/carousel fixes** — renames, chord-guide placeholder text, mobile cell size, pan clamp, and the carousel scroll/drag-to-place fixes, including two follow-up root causes found post-launch: a `touch-action: none` rule that was unintentionally blocking the carousel's own scroll, and a flexbox `min-width: auto` trap that kept `#palette` from ever actually overflowing/clipping. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-sandbox-blast-rename-and-mobile-polish.md`.
 2. **Chord Guide draggable pieces + tap-to-move candidate** — chord-guide results now show a correctly-oriented, draggable piece preview instead of a static "Use" badge (reusing a generalized version of the carousel's drag-to-candidate gesture), an X button resets the guide dropdown without disturbing a selected candidate, and touch taps on the board now move the candidate to wherever you tapped (or pick up an existing placed piece in Sandbox) instead of always rotating it. Implementation plan and commit history: `docs/superpowers/plans/2026-07-15-chord-guide-drag-and-tap-to-move.md`.
@@ -25,9 +25,10 @@ The original plan (see "Goal Description" below) is substantially implemented an
 12. **Board-inset "no overlap" fix + Sandbox chord picker space allocation** — gave `#tonnetz-svg` itself a CSS box inset by exactly what each mode/orientation's overlays need (rather than overlays floating on top of a full-bleed board), so Snake/Blast/Gravity's Tonnetz can never be visually covered — relies entirely on the browser's default `preserveAspectRatio="xMidYMid meet"`, no render.js changes needed. Also fixed the Sandbox landscape carousel/chord-picker fighting each other for space (an uncapped `#chord-guide-results` squeezed the carousel via default flex-shrink instead of the carousel being the one that scrolls) — closes backlog item #19.
 13. **Sandbox double-tap redesign** — fixed the first-tap-rotates-the-candidate bug: the first tap of a double-tap pair always ran normal single-tap logic, so double-tapping where the candidate ghost already sits (the common "confirm placement here" gesture) rotated it once before the second tap placed it, silently changing the committed orientation. Fixed by snapshotting the candidate's rotation right before the first tap's own action runs, and using that snapshot (not whatever the first tap mutated) when the double-tap-place actually commits. Also removed double-tap-to-pick-up entirely — a plain single tap now picks up a placed piece whenever nothing's selected, or when something is selected but the tap isn't on or within one hex-cell of the candidate ghost (which more likely means "interact with the candidate" instead). Double-tap-to-place is unchanged. Closes backlog item #23.
 14. **Blast Restart button** — Blast was the only realtime mode without one. Wired to the existing `BlastMode.reset()`, matching Snake/Gravity's button-wiring pattern, and restructured `#blast-stats` to the same `.control-buttons` + `.stats-panel` markup Snake/Gravity already use (extending their compact-button CSS to cover it too). Adding the button made `#blast-stats` taller, which in turn meant the Blast landscape queue's fixed `top` offset (set in Status item 8) no longer cleared it — bumped from 70px to 135px. Closes backlog item #25.
+15. **Snake status message removal + continuous direction highlighting** — removed `#snake-game-status` and `setStatus()` entirely (pause state was already shown via the Pause/Resume button label; game-over/victory already have their own audio cue, so the text was redundant). Added `SnakeMode.updateDirectionHighlight()`, called whenever `nextDirection` changes (keyboard or D-pad, both go through the same keydown handler) and on reset, toggling a new `.active-direction` class onto whichever D-pad button matches the current heading so it's always visible, not just flashing on press. Closes backlog item #26 — **this closes out every item in this round's mobile-blocking backlog.**
 
 - **8/8 unit tests pass** (`node tests/run_tests.js`)
-- **159/159 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`).
+- **163/163 Playwright tests pass** across Desktop Chrome, Mobile Chrome (Pixel 5), and Tablet Chrome (`npx playwright test`).
 
 The real implementation evolved past the original spec text below in a few ways — this is expected drift from iterative work, not a bug:
 
@@ -40,11 +41,9 @@ The real implementation evolved past the original spec text below in a few ways 
 
 ## Next Round: what's still blocking a good mobile experience (backlog, not yet speced)
 
-Scoped down to items that affect mobile playability/consistency specifically — see
-`next_steps.md` for new-feature ideas that aren't blocking the mobile experience itself.
-Numbered to match the task tracker; none of this has been designed or planned yet.
-
-- **#26 Snake mode**: (1) remove the status message (`#snake-game-status`) entirely; (2) the D-pad arrows should continuously highlight whichever direction is currently "next" (`SnakeMode.state.nextDirection`), not just flash on press, so the active heading is always visible at a glance.
+Empty as of Status item 15 — every item that was blocking a good, consistent mobile
+experience has been closed. New feature ideas (not blocking the mobile experience itself) go
+in `next_steps.md` instead.
 
 ---
 
