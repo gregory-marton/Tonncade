@@ -121,6 +121,45 @@ h1 { font-size: 20px; margin: 0; }
     border-color: var(--accent);
     box-shadow: 0 0 10px rgba(127, 224, 208, 0.3);
     background: #232731;
+    position: relative;
+}
+
+/* A distinct, always-visible tap target for "place the candidate here" — only shown on the
+   currently-selected carousel item. Deliberately a real button, not a gesture, so it needs no
+   timing precision or stillness (unlike the double-tap/hold gestures this replaced) and can't
+   be confused with dragging the item. */
+.piece-item .place-wedge {
+    display: none;
+}
+
+.piece-item.selected .place-wedge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 22px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 13px;
+    line-height: 1;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+    cursor: pointer;
+}
+
+/* The always-present note-play tool entry — same card treatment as a real piece, minus the
+   preview/name/wedge, so it never scrolls out of a predictable, fixed first position. */
+.note-tool-glyph {
+    font-size: 22px;
+    color: var(--dim);
+    line-height: 60px; /* matches .piece-preview's height so the card keeps a consistent size */
+}
+
+.piece-item.note-tool-item.selected .note-tool-glyph {
+    color: var(--accent);
 }
 
 .piece-preview {
@@ -680,7 +719,11 @@ button:hover {
     #sandbox-mobile-tools .piece-preview {
         height: 40px;
     }
-    
+
+    #sandbox-mobile-tools .note-tool-glyph {
+        line-height: 40px;
+    }
+
     #sandbox-mobile-tools .piece-name {
         font-size: 10px;
     }

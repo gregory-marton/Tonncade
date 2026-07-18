@@ -139,7 +139,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     // Piece items should be visible
-    const pieceItems = page.locator('.piece-item');
+    const pieceItems = page.locator('.piece-item[data-key]:not(.note-tool-item)');
     const count = await pieceItems.count();
     expect(count).toBeGreaterThan(3); // Multiple pieces available
 
@@ -390,7 +390,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     let placedCount = await page.locator('.placed-piece').count();
     expect(placedCount).toBe(0);
 
-    const firstPiece = page.locator('.piece-item').first();
+    const firstPiece = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     const pieceBox = await firstPiece.boundingBox();
     const startX = pieceBox.x + pieceBox.width / 2;
     const startY = pieceBox.y + pieceBox.height / 2;
@@ -438,7 +438,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.locator('#drawer-handle').click({ force: true });
     await expect(page.locator('#top-drawer')).toHaveClass(/expanded/);
 
-    const firstPiece = page.locator('.piece-item').first();
+    const firstPiece = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     const pieceBox = await firstPiece.boundingBox();
     const startX = pieceBox.x + pieceBox.width / 2;
     const startY = pieceBox.y + pieceBox.height / 2;
@@ -523,7 +523,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     const viewXBefore = await page.evaluate(() => Render.viewX);
     const viewYBefore = await page.evaluate(() => Render.viewY);
 
-    const firstPiece = page.locator('.piece-item').first();
+    const firstPiece = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     const pieceBox = await firstPiece.boundingBox();
     const startX = pieceBox.x + pieceBox.width / 2;
     const startY = pieceBox.y + pieceBox.height / 2;
@@ -550,7 +550,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(touchHelpers);
 
     // Select a piece
-    const pieceItem = page.locator('.piece-item').first();
+    const pieceItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     await pieceItem.click({ force: true });
 
     // Verify no pieces placed initially
@@ -584,7 +584,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(touchHelpers);
 
     // Select a piece
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
 
     // Get initial rotation
     const rotBefore = await page.evaluate(() => SandboxMode.state.rotation);
@@ -615,7 +615,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await page.evaluate(touchHelpers);
 
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.hoverCell = { p: 0, q: 0 };
       SandboxMode.updateGhost();
@@ -672,7 +672,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await page.evaluate(touchHelpers);
 
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.hoverCell = { p: 0, q: 0 };
       SandboxMode.placePiece(0, 0);
@@ -681,7 +681,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placedCount).toBeGreaterThan(0);
 
     // Select a second candidate, positioned well away from the placed piece
-    await page.locator('.piece-item').nth(1).click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').nth(1).click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.hoverCell = { p: 5, q: 5 };
       SandboxMode.updateGhost();
@@ -750,7 +750,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(touchHelpers);
 
     // Select a piece
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
 
     // Position the ghost by setting hoverCell directly
     await page.evaluate(() => {
@@ -791,7 +791,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(touchHelpers);
 
     // Select a piece
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
 
     // Position ghost at an empty location
     await page.evaluate(() => {
@@ -816,7 +816,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placedCount).toBe(0);
   });
 
-  test('a single tap on a placed piece picks it up, even with nothing currently selected', async ({ page }) => {
+  test('a single tap on a placed piece with nothing selected plays its note instead of picking it up', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
@@ -824,7 +824,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(touchHelpers);
 
     // Select a piece and place it via swipe down
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.hoverCell = { p: 0, q: 0 };
       SandboxMode.updateGhost();
@@ -838,8 +838,8 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy + 70 });
     expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
 
-    // Deselect entirely, then move the ghost far away — a plain single tap directly on the
-    // placed piece (away from any ghost) should now pick it up on its own, no double-tap needed.
+    // Deselect entirely (the note-play tool) — a plain single tap on the placed piece should
+    // now just play its note, leaving it in place, no pickup.
     await page.evaluate(() => {
       SandboxMode.state.selectedPiece = null;
       SandboxMode.state.hoverCell = { p: 5, q: 5 };
@@ -848,9 +848,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
 
-    expect(await page.locator('.placed-piece').count()).toBe(0);
+    expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
     const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
-    expect(selectedAfter).not.toBeNull();
+    expect(selectedAfter).toBeNull();
   });
 
   test('a single tap on a placed piece that sits within one cell of the candidate ghost does NOT pick it up', async ({ page }) => {
@@ -871,7 +871,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
 
     // Select a new candidate and hover its ghost at (1,0) — a neighbor of (0,0), so within
     // one cell of the placed piece at (0,0).
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.hoverCell = { p: 1, q: 0 };
       SandboxMode.updateGhost();
@@ -890,66 +890,147 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(await page.locator('.placed-piece').count()).toBe(1);
   });
 
-  test('double-tapping exactly where the candidate ghost sits places it at its original orientation, not rotated by the first tap', async ({ page }) => {
+  test('rapid successive taps on the ghost only rotate — they never misfire into a placement', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await page.evaluate(touchHelpers);
 
-    await page.locator('.piece-item').first().click({ force: true });
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
     await page.evaluate(() => {
       SandboxMode.state.rotation = 0;
       SandboxMode.state.hoverCell = { p: 0, q: 0 };
       SandboxMode.updateGhost();
     });
-    const rotationBefore = await page.evaluate(() => SandboxMode.state.rotation);
 
     const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
     const box = await cell.boundingBox();
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
 
-    // Double-tap directly on the ghost's own current cell — the first tap of this pair would,
-    // on its own, rotate the candidate (tap-on-ghost -> rotate). The double-tap-place that
-    // follows should still place it at the ORIGINAL orientation, not the rotated one.
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+    // Four rapid taps in a row, all on the ghost's own cell, well within what used to be the
+    // double-tap window. This used to misfire: a rapid second tap in the same spot would
+    // register as a "double-tap place" and commit the piece instead of continuing to rotate.
+    for (let i = 0; i < 4; i++) {
+      await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+      await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+    }
+
+    expect(await page.locator('.placed-piece').count()).toBe(0);
+    const rotationAfter = await page.evaluate(() => SandboxMode.state.rotation);
+    expect(rotationAfter).toBe(4 % 6);
+  });
+
+  test('the place wedge is only visible on the selected carousel item, and tapping it places the ghost', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const firstItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+    const secondItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').nth(1);
+
+    // No wedge visible anywhere before selecting anything
+    await expect(firstItem.locator('.place-wedge')).toBeHidden();
+    await expect(secondItem.locator('.place-wedge')).toBeHidden();
+
+    await firstItem.click({ force: true });
+    await expect(firstItem.locator('.place-wedge')).toBeVisible();
+    await expect(secondItem.locator('.place-wedge')).toBeHidden();
+
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 2, q: 2 };
+      SandboxMode.updateGhost();
+    });
+    expect(await page.locator('.placed-piece').count()).toBe(0);
+
+    await firstItem.locator('.place-wedge').click({ force: true });
 
     const placed = await page.evaluate(() => SandboxMode.state.placedPieces[0]);
     expect(placed).toBeTruthy();
-    expect(placed.rotation).toBe(rotationBefore);
+    expect(placed).toMatchObject({ p: 2, q: 2 });
   });
 
-  test('double-tap on an empty cell places the selected candidate there', async ({ page }) => {
+  test('dragging a new piece out of the carousel places the previously-active candidate first', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(dispatchAtHelpers);
+
+    const firstItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+    const secondItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').nth(1);
+
+    await firstItem.click({ force: true });
+    const firstType = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 4, q: 4 };
+      SandboxMode.updateGhost();
+    });
+    expect(await page.locator('.placed-piece').count()).toBe(0);
+
+    // Drag the second carousel item far enough (perpendicular to native scroll) to register as
+    // "pulling a piece out," which should commit the first candidate before swapping to the second.
+    // Portrait's carousel scrolls horizontally, so the escape axis is vertical; landscape's
+    // carousel scrolls vertically, so the escape axis is horizontal (mirrors the existing
+    // "dragging a carousel piece onto the board works in landscape too" test above).
+    const box = await secondItem.boundingBox();
+    const startX = box.x + box.width / 2;
+    const startY = box.y + box.height / 2;
+    const isLandscape = await page.evaluate(() => Render.isMobileLandscape());
+    const dx = isLandscape ? 40 : 0;
+    const dy = isLandscape ? 0 : 40;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchstart', x, y), { x: startX, y: startY });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchmove', x, y), { x: startX + dx, y: startY + dy });
+    await page.evaluate(({ x, y }) => window.__dispatchTouchAt('touchend', x, y), { x: startX + dx, y: startY + dy });
+
+    const placed = await page.evaluate(() => SandboxMode.state.placedPieces[0]);
+    expect(placed).toBeTruthy();
+    expect(placed).toMatchObject({ type: firstType, p: 4, q: 4 });
+
+    const selectedAfter = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selectedAfter).not.toBeNull();
+    expect(selectedAfter).not.toBe(firstType);
+  });
+
+  test('the note-play tool carousel item is always first, and selecting it plays notes on tap regardless of placed pieces', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await page.evaluate(touchHelpers);
 
-    await page.locator('.piece-item').first().click({ force: true });
-    // Put the candidate somewhere other than the target cell, so the first tap's
-    // existing "move candidate here" behavior doesn't coincidentally already satisfy this.
-    await page.evaluate(() => {
-      SandboxMode.state.hoverCell = { p: 3, q: 3 };
-      SandboxMode.updateGhost();
-    });
+    const noteTool = page.locator('.piece-item.note-tool-item');
+    await expect(noteTool).toBeVisible();
+    expect(await page.locator('#piece-list > .piece-item').first().getAttribute('class')).toContain('note-tool-item');
 
-    const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
-    const box = await cell.boundingBox();
+    // It's selected by default (nothing else picked yet)
+    await expect(noteTool).toHaveClass(/selected/);
+
+    // Select a real piece, then place it, then switch back to the note tool
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+    await expect(noteTool).not.toHaveClass(/selected/);
+    await page.evaluate(() => {
+      SandboxMode.state.hoverCell = { p: 0, q: 0 };
+      SandboxMode.placePiece(0, 0);
+    });
+    expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
+
+    await noteTool.click({ force: true });
+    await expect(noteTool).toHaveClass(/selected/);
+    const selected = await page.evaluate(() => SandboxMode.state.selectedPiece);
+    expect(selected).toBeNull();
+
+    // Tapping the placed piece now just plays its note — piece stays put
+    const placedCell = page.locator('polygon.placed-piece[data-p="0"][data-q="0"]').first();
+    const box = await placedCell.boundingBox();
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
-
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
     await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
-    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
-
-    const placed = await page.locator('.placed-piece').count();
-    expect(placed).toBeGreaterThan(0);
+    expect(await page.locator('.placed-piece').count()).toBeGreaterThan(0);
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -1407,7 +1488,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
 
     // Tap a piece (pieces are in #sandbox-mobile-tools, outside drawer,
     // but the piece selection calls collapseMobileDrawer)
-    const pieceItem = page.locator('.piece-item').first();
+    const pieceItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     await pieceItem.tap();
 
     // Drawer should collapse
@@ -1564,42 +1645,6 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     const mainContentBottom = mainContentBox.y + mainContentBox.height;
     expect(mainContentBottom - (leftBox.y + leftBox.height)).toBeLessThan(40);
     expect(mainContentBottom - (rightBox.y + rightBox.height)).toBeLessThan(40);
-  });
-
-  test('Snake stats/controls panel stays narrow in landscape even with the long game-over message', async ({ page }) => {
-    await page.setViewportSize({ width: 852, height: 393 });
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
-
-    // "Game Over! Click Restart to play again." is long enough that, with nothing constraining
-    // #snake-controls's width, the panel (and the flex:1 Pause/Restart buttons riding along
-    // with it) balloons to fit it on one line instead of the message wrapping.
-    await page.evaluate(() => SnakeMode.gameOver());
-
-    const panelBox = await page.locator('#snake-controls').boundingBox();
-    expect(panelBox.width).toBeLessThan(220);
-
-    const pauseBox = await page.locator('#snake-start-pause').boundingBox();
-    expect(pauseBox.width).toBeLessThan(100);
-  });
-
-  test('Snake and Gravity stats/controls panel stays a small fraction of the board in landscape', async ({ page }) => {
-    await page.setViewportSize({ width: 852, height: 393 });
-
-    for (const { mode, panel } of [
-      { mode: 'snake', panel: '#snake-controls' },
-      { mode: 'gravity', panel: '#gravity-controls' },
-    ]) {
-      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-      const mainContentBox = await page.locator('#main-content').boundingBox();
-      const panelBox = await page.locator(panel).boundingBox();
-      const panelArea = panelBox.width * panelBox.height;
-      const boardArea = mainContentBox.width * mainContentBox.height;
-      // Landscape previously fell back to full desktop button/text sizing (no compact override
-      // existed outside the portrait-only block), ballooning this panel over a third of the
-      // board. The real invariant is "stays a small corner of the board," not any particular
-      // pixel value for the buttons/text that happen to achieve that today.
-      expect(panelArea / boardArea).toBeLessThan(0.15);
-    }
   });
 
   // ────────────────────────────────────────────────────────────────────────

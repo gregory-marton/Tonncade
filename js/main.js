@@ -770,39 +770,12 @@ const App = {
                         }
                     }
                 } else if (isTap) {
-                    const now = Date.now();
-                    const isDoubleTap = this.currentMode === 'sandbox' && touchStartCell &&
-                        doubleTapLastCell && doubleTapLastCell.p === touchStartCell.p && doubleTapLastCell.q === touchStartCell.q &&
-                        (now - doubleTapLastTime) < 350;
-
                     const isOnPlacedPiece = (cell) => this.currentMode === 'sandbox' && cell && SandboxMode.state.placedPieces.some(piece => {
                         const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
                         return cells.some(c => c.p === cell.p && c.q === cell.q);
                     });
                     const isWithinOneCell = (a, b) => (a.p === b.p && a.q === b.q) ||
                         Tonnetz.getNeighbors(a.p, a.q).some(n => n.p === b.p && n.q === b.q);
-
-                    if (isDoubleTap) {
-                        // Consume it so a third tap doesn't chain into another double-tap.
-                        doubleTapLastCell = null;
-                        const tapCell = touchStartCell;
-                        // Double-tap now only places a selected candidate — pickup moved to a
-                        // plain single tap (below), guarded against the ghost's own vicinity.
-                        // Use the rotation snapshotted BEFORE the first tap's own action ran:
-                        // if that first tap landed on the ghost, it would have rotated it,
-                        // which shouldn't silently change what a double-tap-place commits.
-                        const rotationToUse = doubleTapSnapshotRotation !== null ? doubleTapSnapshotRotation : SandboxMode.state.rotation;
-                        if (pieceType && SandboxMode.canPlace(pieceType, tapCell.p, tapCell.q, rotationToUse)) {
-                            SandboxMode.state.rotation = rotationToUse;
-                            SandboxMode.placePiece(tapCell.p, tapCell.q);
-                        }
-                        doubleTapSnapshotRotation = null;
-                        return;
-                    }
-
-                    doubleTapLastCell = touchStartCell;
-                    doubleTapLastTime = now;
-                    doubleTapSnapshotRotation = pieceType ? modeObj.state.rotation : null;
 
                     if (pieceType) {
                         const tapCell = touchStartCell;
@@ -833,12 +806,13 @@ const App = {
                             modeObj.state.hoverCell = tapCell;
                             modeObj.updateGhost();
                         }
-                    } else if (isOnPlacedPiece(touchStartCell)) {
-                        // Nothing selected -> a plain tap on a placed piece picks it up (no
-                        // ghost exists yet, so there's nothing to be "near")
-                        SandboxMode.pickupPieceAt(touchStartCell.p, touchStartCell.q);
                     } else {
-                        // Tap note keyboard behavior when no active piece is selected
+                        // Nothing selected -> this is the note-play tool: a tap ALWAYS plays
+                        // the note under the finger, regardless of any placed piece there.
+                        // Picking up a placed piece is swipe-up (or tapping it while a
+                        // different piece is already selected, above) — never a plain tap with
+                        // nothing selected, so idly tapping around to hear notes can never
+                        // accidentally disturb something already placed.
                         if (touchStartCell) {
                             const midi = Tonnetz.getMidi(touchStartCell.p, touchStartCell.q);
                             Synth.playNote(midi);

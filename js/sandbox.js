@@ -41,6 +41,7 @@ const SandboxMode = {
     init: function() {
         Render.init('tonnetz-svg');
         this.renderPalette();
+        this.updatePaletteHighlight();
         this.refreshLattice();
         this.setupEvents();
         this.setupGuide();
@@ -65,6 +66,21 @@ const SandboxMode = {
         const list = document.getElementById('piece-list');
         list.innerHTML = '';
 
+        // Always-present carousel entry for the note-play tool — the default mode where
+        // touching any cell plays its note, regardless of any placed piece there. With the
+        // place-wedge occupying most of a selected item's own card, tapping that item to
+        // toggle it back off is no longer the obvious way back to this mode, so it gets its
+        // own dedicated, fixed-position entry instead of having to relocate/scroll to
+        // whatever's currently selected. A note glyph rather than words, per the
+        // icon-over-text bias.
+        const noteToolDiv = document.createElement('div');
+        noteToolDiv.className = 'piece-item note-tool-item';
+        noteToolDiv.setAttribute('data-key', '');
+        noteToolDiv.title = 'Play notes';
+        noteToolDiv.innerHTML = `<div class="note-tool-glyph">♪</div>`;
+        noteToolDiv.onclick = () => this.selectNoteTool();
+        list.appendChild(noteToolDiv);
+
         for (const key in Pieces.TYPES) {
             const piece = Pieces.TYPES[key];
             const div = document.createElement('div');
@@ -73,6 +89,7 @@ const SandboxMode = {
             div.innerHTML = `
                 <svg class="piece-preview"></svg>
                 <div class="piece-name">${piece.name}</div>
+                <div class="place-wedge" title="Place">▼</div>
             `;
 
             div.onclick = () => this.togglePiece(key);
@@ -80,6 +97,14 @@ const SandboxMode = {
 
             const previewSvg = div.querySelector('.piece-preview');
             this.renderPiecePreview(previewSvg, piece.cells, piece.color);
+
+            // Only visible (via CSS) when this item is the selected candidate — a distinct,
+            // always-discoverable tap target for "place it here," alongside swipe-down.
+            const wedge = div.querySelector('.place-wedge');
+            wedge.onclick = (e) => {
+                e.stopPropagation();
+                this.placeActiveGhost();
+            };
         }
     },
 
@@ -119,16 +144,35 @@ const SandboxMode = {
         this.updatePaletteHighlight();
     },
 
+    selectNoteTool: function() {
+        this.state.selectedPiece = null;
+        this.updatePaletteHighlight();
+    },
+
     selectPiece: function(key) {
         this.state.selectedPiece = key;
         this.state.rotation = 0;
         this.updatePaletteHighlight();
     },
 
+    // Places the current candidate at its current ghost position, same as swipe-down — no-op
+    // if the ghost's position isn't actually a valid placement.
+    placeActiveGhost: function() {
+        if (!this.state.selectedPiece) return;
+        const { p, q } = this.state.hoverCell;
+        if (this.canPlace(this.state.selectedPiece, p, q, this.state.rotation)) {
+            this.placePiece(p, q);
+        }
+    },
+
     updatePaletteHighlight: function() {
         document.querySelectorAll('.piece-item').forEach((item) => {
             const k = item.getAttribute('data-key');
-            item.classList.toggle('selected', k === this.state.selectedPiece);
+            if (item.classList.contains('note-tool-item')) {
+                item.classList.toggle('selected', !this.state.selectedPiece);
+            } else {
+                item.classList.toggle('selected', k === this.state.selectedPiece);
+            }
         });
     },
 
@@ -493,6 +537,7 @@ const SandboxMode = {
             const item = e.target.closest(itemSelector);
             if (!item) return;
             dragInfo = getPieceInfo(item);
+            if (!dragInfo.key) { dragInfo = null; return; } // e.g. the note-play tool item
             dragStartX = e.touches[0].clientX;
             dragStartY = e.touches[0].clientY;
             isPlacingDrag = false;
@@ -511,6 +556,11 @@ const SandboxMode = {
                 const scrollDelta = Render.isMobileLandscape() ? dy : dx;
 
                 if (Math.abs(dragDelta) > 20 && Math.abs(dragDelta) > Math.abs(scrollDelta) * 1.5) {
+                    // Starting a new candidate this way commits whatever's currently active
+                    // first — a piece mid-placement is cheap to pick back up if it lands
+                    // wrong, and dragging a new piece out is an unambiguous "I'm done with
+                    // this one" signal.
+                    this.placeActiveGhost();
                     isPlacingDrag = true;
                     this.state.selectedPiece = dragInfo.key;
                     this.state.rotation = dragInfo.rotation;

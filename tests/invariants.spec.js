@@ -88,7 +88,7 @@ test.describe('Invariant tests', () => {
   test('INV-2: a candidate piece selected from the carousel can always be deselected without placing it', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
-    const firstPiece = page.locator('.piece-item').first();
+    const firstPiece = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     await firstPiece.click();
     expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).not.toBeNull();
 
@@ -332,6 +332,16 @@ test.describe('Invariant tests', () => {
         expect(overlappingCells, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBe(0);
       }
     }
+
+    // Dynamic content can grow a panel past its allotted margin without any single fixed
+    // pixel value ever being "wrong" in isolation — Snake's long game-over message did
+    // exactly this once. Exercise it explicitly, since nothing else in this loop varies panel
+    // content length.
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+    await page.evaluate(() => SnakeMode.gameOver());
+    const { overlappingCells } = await measureBoardOcclusion(page);
+    expect(overlappingCells, 'snake mode, after game over (long message)').toBe(0);
   });
 
   test('INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation', async ({ page }) => {
