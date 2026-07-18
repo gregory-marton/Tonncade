@@ -258,8 +258,13 @@ const App = {
                 btn.onclick = trigger;
             };
 
-            bindBtn('m-btn-ccw', ' ', 'Space', true);  // CCW Rotate (Shift + Space)
-            bindBtn('m-btn-cw', ' ', 'Space', false);   // CW Rotate (Space)
+            // GravityMode's Space handler treats `rotation + 1` (no shift) as its default
+            // step and `rotation + 5` (shift) as the reverse — but per real screen coordinates
+            // (see tests/run_tests.js's "rotation direction" test), +1 is actually
+            // counter-clockwise on screen and +5 is actually clockwise. These two bindings were
+            // previously swapped, making the ↻/↺ icons rotate backwards from what they show.
+            bindBtn('m-btn-ccw', ' ', 'Space', false); // CCW Rotate (Space -> rotation+1, actually CCW)
+            bindBtn('m-btn-cw', ' ', 'Space', true);   // CW Rotate (Shift+Space -> rotation+5, actually CW)
             bindBtn('m-btn-left', 'f');                           // Left (f)
             bindBtn('m-btn-right', 'h');                          // Right (h)
             bindBtn('m-btn-action', 'g', '', true);               // Shift-G to place/pick

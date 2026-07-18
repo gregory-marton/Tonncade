@@ -123,7 +123,8 @@ const Pieces = {
     // with mirror-image pairs (>/<, L/J, P/Q, S/Z) kept adjacent.
     CAROUSEL_ORDER: ['.', '-', 'V', '|', '>', '<', 'O', 'X', 'I', 'L', 'J', 'P', 'Q', 'C', 'S', 'Z'],
 
-    // Rotate 60 degrees clockwise
+    // Rotate 60 degrees counter-clockwise on screen (verified against Render.getScreenPos —
+    // despite the name, this is NOT the visual "clockwise" direction; see docs/invariants.md).
     rotate: function(cells) {
         return cells.map(c => ({
             p: -c.q,
@@ -131,7 +132,7 @@ const Pieces = {
         }));
     },
 
-    // Rotate 60 degrees counter-clockwise
+    // Rotate 60 degrees clockwise on screen — the true inverse of rotate() above.
     rotateCCW: function(cells) {
         return cells.map(c => ({
             p: c.p + c.q,

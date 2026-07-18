@@ -1325,12 +1325,18 @@ button:hover {
         padding: 0;
         justify-content: space-between;
         align-items: center;
+        /* Same fix as #snake-mobile-controls: without this, the container's own box (spanning
+           nearly the full width/height) swallows taps in the empty middle instead of letting
+           them reach the board underneath — invisible since the background is transparent, but
+           real, and it also covered the board's own center point for hit-testing purposes. */
+        pointer-events: none;
     }
 
     .gravity-pad-cluster {
         display: flex;
         flex-direction: column;
         gap: 8px;
+        pointer-events: auto;
     }
 
     #mobile-controls .m-btn {
@@ -1345,6 +1351,48 @@ button:hover {
 
     #m-btn-action-2 {
         display: flex;
+    }
+
+    /* Gravity's next-piece queue, in the one landscape width range (768-950px) where it was
+       never given an explicit position at all — it fell back to its static in-flow position,
+       which happened to sit directly under the left D-pad cluster. The only space that clears
+       BOTH the board (which renders right up to its own 70px-reserved margin) and the right
+       D-pad cluster (vertically centered within that same margin) is a narrow strip above the
+       cluster, inside the margin itself — so this has to fit inside ~70px wide, not spill past
+       it. Scoped to Gravity specifically (unlike the shared default a few rules up) so it
+       doesn't also shrink Blast's own differently-positioned, wider landscape queue below. */
+    #app[data-mode="gravity"] #palette.floating-queue {
+        top: 10px;
+        right: 14px;
+        left: auto;
+        bottom: auto;
+        width: 50px;
+        max-width: 50px;
+        max-height: 90px;
+        padding: 4px;
+        overflow-y: auto;
+    }
+
+    #app[data-mode="gravity"] #palette.floating-queue h3 {
+        display: none; /* no room for a heading in a 50px-wide strip */
+    }
+
+    #app[data-mode="gravity"] #palette.floating-queue #piece-list {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    #app[data-mode="gravity"] #palette.floating-queue .piece-item {
+        width: 100%;
+        padding: 2px;
+    }
+
+    #app[data-mode="gravity"] #palette.floating-queue .piece-name {
+        display: none; /* icon-only at this width */
+    }
+
+    #app[data-mode="gravity"] #palette.floating-queue .piece-preview {
+        height: 20px;
     }
 
     /* Blast's next-piece queue reorients vertically under the score in landscape. The

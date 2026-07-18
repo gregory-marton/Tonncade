@@ -319,36 +319,32 @@ test.describe('Invariant tests', () => {
 
   async function measureBoardOcclusion(page) {
     return page.evaluate(() => {
-      const overlaySelectors = [
-        '#blast-stats', '#gravity-controls', '#snake-controls',
-        // The D-pad containers are transparent, pointer-events:none boxes spanning most of
-        // the game area — only their .m-btn children actually paint anything opaque.
-        '#mobile-controls .m-btn', '#snake-mobile-controls .m-btn',
-        '#palette.floating-queue', '#midi-controls',
-      ];
-      const overlayRects = [];
-      for (const sel of overlaySelectors) {
-        document.querySelectorAll(sel).forEach(el => {
-          const style = getComputedStyle(el);
-          if (style.display === 'none' || style.visibility === 'hidden') return;
-          const rect = el.getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) overlayRects.push(rect);
-        });
-      }
-
       let inViewport = 0;
       let overlappingCells = 0;
       // Scoped to #tonnetz-svg specifically — Render.createHex() gives every hex it draws
       // class="cell", including the tiny piece-preview icons inside the carousel/queue/chord
-      // guide, which are legitimately positioned inside those overlay rects and aren't board
-      // cells at all.
+      // guide, which aren't board cells at all.
+      //
+      // Hit-tests each cell's own center via elementFromPoint rather than checking against a
+      // manually curated list of overlay selectors — a curated list only catches overlays
+      // someone remembered to add to it, which is exactly how the D-pad/next-piece-queue
+      // overlap this test was meant to catch slipped through for a real release. Any future
+      // overlay is covered automatically, with no list to keep in sync.
+      // Bound against the SVG's own rendered box, not the window — preserveAspectRatio
+      // letterboxes/insets the fitted board within #tonnetz-svg's CSS box (INV-10's own
+      // architecture), so a cell whose computed center falls outside that box but still
+      // within the window is off the actually-drawn board, not "visible but covered."
+      const svgRect = document.getElementById('tonnetz-svg').getBoundingClientRect();
       document.querySelectorAll('#tonnetz-svg polygon.cell:not(.ghost)').forEach(cell => {
         const rect = cell.getBoundingClientRect();
         const cx = rect.x + rect.width / 2;
         const cy = rect.y + rect.height / 2;
-        if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight) return;
+        if (cx < svgRect.left || cy < svgRect.top || cx > svgRect.right || cy > svgRect.bottom) return;
         inViewport++;
-        const covered = overlayRects.some(r => cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom);
+        const hit = document.elementFromPoint(cx, cy);
+        // Anything that resolves back into #tonnetz-svg itself (the cell, a note/qwerty label,
+        // a ghost stacked on top) is the board legitimately covering itself, not a bug.
+        const covered = hit && !hit.closest('#tonnetz-svg');
         if (covered) overlappingCells++;
       });
       return { inViewport, overlappingCells, unobscured: inViewport - overlappingCells };
@@ -453,11 +449,29 @@ test.describe('Invariant tests', () => {
         }
 
         for (const selector of selectors) {
-          const box = await page.locator(selector).first().boundingBox();
           const label = `mode=${mode} viewport=${viewport.width}x${viewport.height} selector=${selector}`;
-          expect(box, `${label} should be present and reachable`).not.toBeNull();
-          expect(box.width, `${label} has zero width`).toBeGreaterThan(0);
-          expect(box.height, `${label} has zero height`).toBeGreaterThan(0);
+          const result = await page.evaluate((sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return { present: false };
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) return { present: true, width: r.width, height: r.height };
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const hit = document.elementFromPoint(cx, cy);
+            const occludedBy = hit && !el.contains(hit)
+              ? (hit.id ? `#${hit.id}` : (typeof hit.className === 'string' && hit.className ? `.${hit.className.split(' ')[0]}` : hit.tagName))
+              : null;
+            return { present: true, width: r.width, height: r.height, occludedBy };
+          }, selector);
+          // A real bounding box isn't enough — a Playwright boundingBox() check alone missed a
+          // real bug (Gravity's landscape next-piece queue sitting on top of its own D-pad's
+          // left cluster) because it never checks whether something else is drawn on top.
+          // elementFromPoint at the element's own center is what actually answers "can a tap
+          // here reach this control."
+          expect(result.present, `${label} should be present`).toBe(true);
+          expect(result.width, `${label} has zero width`).toBeGreaterThan(0);
+          expect(result.height, `${label} has zero height`).toBeGreaterThan(0);
+          expect(result.occludedBy, `${label} is covered by something else at its own center point`).toBeNull();
         }
 
         if (mode === 'blast') selectors.pop(); // undo the push above before the next viewport/mode
@@ -566,5 +580,31 @@ test.describe('Invariant tests', () => {
     await page.keyboard.press('Space'); // rotate
     played = await page.evaluate(() => window.__played);
     expect(played.length).toBe(2);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-16: Rotation direction matches its icon. Real-device report: "Gravity rotation is
+  // backwards." tests/run_tests.js's "rotation direction" test independently verifies, against
+  // real screen coordinates, that Pieces.rotate() is counter-clockwise (i.e. `rotation + 1`)
+  // and its inverse rotateCCW() is clockwise (i.e. `rotation + 5`, equivalently -1). Given that,
+  // Gravity's D-pad buttons — the one place in the app with an explicit ↻/↺ icon promising a
+  // specific direction — must dispatch the matching step: ↻ (m-btn-cw) should apply the
+  // clockwise step (+5), ↺ (m-btn-ccw) the counter-clockwise step (+1). They were swapped.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-16: Gravity\'s clockwise/counter-clockwise D-pad buttons rotate in their labeled direction', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const rotBefore = await page.evaluate(() => GravityMode.state.rotation);
+    await page.locator('#m-btn-cw').click({ force: true });
+    const rotAfterCW = await page.evaluate(() => GravityMode.state.rotation);
+    // The clockwise step is `rotation + 5` (mod 6) — see tests/run_tests.js's "rotation
+    // direction" test for why +5, not +1, is the one that's actually clockwise on screen.
+    expect(rotAfterCW).toBe((rotBefore + 5) % 6);
+
+    await page.locator('#m-btn-ccw').click({ force: true });
+    const rotAfterCCW = await page.evaluate(() => GravityMode.state.rotation);
+    expect(rotAfterCCW).toBe((rotAfterCW + 1) % 6);
   });
 });

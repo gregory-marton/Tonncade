@@ -483,6 +483,40 @@ try {
     Board.cells.clear();
     console.log("PASS: Gravity pieces can overhang the side walls down to a single toe-hold hex, and the floor stays solid!");
 
+    // INVARIANT (see docs/invariants.md): rotation direction is a shared foundation used by
+    // every mode (tap-to-rotate, keyboard Space/G, two-finger twist, Gravity's D-pad) — get it
+    // wrong once and it's wrong everywhere. Verify against real screen coordinates (not just
+    // "whatever the code currently does") that Pieces.rotate() is counter-clockwise and its
+    // inverse, rotateCCW(), is clockwise — this is the exact opposite of what their names claim,
+    // a real mislabeling caught live via Gravity's D-pad (whose ↻/↺ icons make the wrong
+    // direction immediately obvious, unlike Sandbox/Blast's un-iconed rotation).
+    console.log("Running rotation direction (invariants.md) test...");
+    const RenderObj = vm.runInContext("Render", context);
+    // Degrees clockwise from 12 o'clock (screen-up), matching a clock face.
+    const clockAngle = (p, q) => {
+        const pos = RenderObj.getScreenPos(p, q);
+        let a = Math.atan2(pos.x, -pos.y) * 180 / Math.PI;
+        if (a < 0) a += 360;
+        return a;
+    };
+    const angleBefore = clockAngle(1, 0); // due east, 90 degrees clockwise from 12
+    const afterRotate = PiecesObj.rotate([{ p: 1, q: 0 }])[0];
+    const afterRotateCCW = PiecesObj.rotateCCW([{ p: 1, q: 0 }])[0];
+    const angleAfterRotate = clockAngle(afterRotate.p, afterRotate.q);
+    const angleAfterRotateCCW = clockAngle(afterRotateCCW.p, afterRotateCCW.q);
+    // A 60-degree step; mod 360 so e.g. 90 -> 30 (CCW) doesn't get confused with 90 -> 390.
+    const stepCCW = ((angleBefore - angleAfterRotate) % 360 + 360) % 360;
+    const stepCW = ((angleAfterRotateCCW - angleBefore) % 360 + 360) % 360;
+    if (stepCCW !== 60) {
+        console.error(`FAIL: Pieces.rotate() should move a cell 60 degrees counter-clockwise on screen! Measured step: ${stepCCW}`);
+        process.exit(1);
+    }
+    if (stepCW !== 60) {
+        console.error(`FAIL: Pieces.rotateCCW() should move a cell 60 degrees clockwise on screen! Measured step: ${stepCW}`);
+        process.exit(1);
+    }
+    console.log("PASS: Pieces.rotate() is counter-clockwise and Pieces.rotateCCW() is clockwise, matching real screen coordinates!");
+
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);
