@@ -67,10 +67,18 @@ test.describe('Invariant tests', () => {
     const drawer = page.locator('#top-drawer');
     const handle = page.locator('#drawer-handle');
 
+    // BUG (found live): 'expanded'/'collapsed' are two sides of one state, not independent
+    // flags -- setting them via two separate classList.toggle() calls can desync, since the
+    // drawer starts with NEITHER class present (see index.html), so the very first toggle adds
+    // BOTH at once instead of just one. Checking exact class equality (not just "contains
+    // expanded") catches that desync; the old assertion here would have passed even with both
+    // classes present simultaneously.
     await handle.click({ force: true });
-    await expect(drawer).toHaveClass(/expanded/);
+    await expect(drawer).toHaveClass('expanded');
     await handle.click({ force: true });
-    await expect(drawer).not.toHaveClass(/expanded/);
+    await expect(drawer).toHaveClass('collapsed');
+    await handle.click({ force: true });
+    await expect(drawer).toHaveClass('expanded');
   });
 
   test('INV-2: the chord guide, once populated with results, can always be cleared', async ({ page }) => {

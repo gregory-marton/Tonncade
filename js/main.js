@@ -302,20 +302,30 @@ const App = {
 
         const topDrawer = document.getElementById('top-drawer');
         const menuToggle = document.getElementById('menu-toggle');
-        
+
+        // 'expanded'/'collapsed' are two sides of one state, not independent flags -- setting
+        // them via two separate classList.toggle() calls can desync (e.g. the drawer starts
+        // with NEITHER class present, so the very first toggle adds both at once instead of
+        // just one), landing on "expanded collapsed" simultaneously. Always derive the target
+        // from one boolean and set both classes to match it.
+        const toggleDrawer = () => {
+            const nowExpanded = !topDrawer.classList.contains('expanded');
+            topDrawer.classList.toggle('expanded', nowExpanded);
+            topDrawer.classList.toggle('collapsed', !nowExpanded);
+        };
+
         if (topDrawer && menuToggle) {
             if (isMobileWidth) {
                 // Initialize drawer interactions once
                 if (!this.topDrawerInitialized) {
                     this.topDrawerInitialized = true;
-                    
+
                     menuToggle.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        topDrawer.classList.toggle('expanded');
-                        topDrawer.classList.toggle('collapsed');
+                        toggleDrawer();
                     });
-                    
+
                     const drawerHandle = document.getElementById('drawer-handle');
                     if (drawerHandle) {
                         let dragStartX = 0;
@@ -332,8 +342,7 @@ const App = {
                                 toggledByDrag = false;
                                 return;
                             }
-                            topDrawer.classList.toggle('expanded');
-                            topDrawer.classList.toggle('collapsed');
+                            toggleDrawer();
                         };
                         drawerHandle.addEventListener('touchstart', (e) => {
                             dragStartX = e.touches[0].clientX;
