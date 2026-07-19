@@ -708,6 +708,35 @@ try {
     ReplayObj.log = [];
     console.log("PASS: window.replay() returns { seed, meta, events } -- enough to fully recreate a session!");
 
+    console.log("Running scripts/replay-to-gif.js option parsing test...");
+    const { parseArgs, isVirtualButtonTarget } = require('../scripts/replay-to-gif.js');
+    const defaultOpts = parseArgs(['session.json']);
+    if (defaultOpts.out !== 'session.gif') {
+        console.error(`FAIL: parseArgs() should default --out to <basename>.gif next to the input! Got: ${defaultOpts.out}`);
+        process.exit(1);
+    }
+    if (defaultOpts.baseUrl !== 'http://localhost:8001' || defaultOpts.speed !== 1 || defaultOpts.maxWait !== 300000 || defaultOpts.frameDelay !== 700 || defaultOpts.keepFrames !== false) {
+        console.error(`FAIL: parseArgs() defaults are wrong! Got: ${JSON.stringify(defaultOpts)}`);
+        process.exit(1);
+    }
+    const customOpts = parseArgs(['a/session.json', '--out=b/out.gif', '--speed=2', '--keep-frames']);
+    if (customOpts.out !== 'b/out.gif' || customOpts.speed !== 2 || customOpts.keepFrames !== true) {
+        console.error(`FAIL: parseArgs() should honor explicit flags! Got: ${JSON.stringify(customOpts)}`);
+        process.exit(1);
+    }
+    console.log("PASS: scripts/replay-to-gif.js's parseArgs() applies sane defaults and honors overrides!");
+
+    console.log("Running scripts/replay-to-gif.js virtual-button detection test...");
+    if (!isVirtualButtonTarget('#m-btn-left') || !isVirtualButtonTarget('#snake-btn-ul')) {
+        console.error("FAIL: isVirtualButtonTarget() should recognize #m-btn-* and #snake-btn-* ids!");
+        process.exit(1);
+    }
+    if (isVirtualButtonTarget('#drawer-handle') || isVirtualButtonTarget('div.mode-option') || isVirtualButtonTarget('polygon')) {
+        console.error("FAIL: isVirtualButtonTarget() should NOT match non-virtual-button targets!");
+        process.exit(1);
+    }
+    console.log("PASS: scripts/replay-to-gif.js's isVirtualButtonTarget() only matches #m-btn-*/#snake-btn-* ids!");
+
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

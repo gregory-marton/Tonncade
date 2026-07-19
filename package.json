@@ -12,7 +12,8 @@
   },
   "scripts": {
     "test": "node tests/run_tests.js && npx playwright test",
-    "test:librejs": "node scripts/check-librejs.js"
+    "test:librejs": "node scripts/check-librejs.js",
+    "replay:gif": "node scripts/replay-to-gif.js"
   },
   "repository": {
     "type": "git",
