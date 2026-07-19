@@ -3,3 +3,10 @@
 *.swp
 node_modules/
 test-results/
+
+# Downloaded bug-report replays and scripts/replay-to-gif.js's generated GIF/viewer output --
+# investigation artifacts for a specific report (the GitHub issue is the source of truth), not
+# source code. Kept out of git so the repo doesn't accumulate binary blobs per investigation, but
+# living in-tree (not a job-scoped tmp dir) so they're a durable, easy-to-find local location
+# instead of disappearing when a session/job is cleaned up.
+replays/

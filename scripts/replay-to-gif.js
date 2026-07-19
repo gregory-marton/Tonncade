@@ -33,7 +33,9 @@
  * Produces two local outputs, no network/publish step involved: a flat GIF (for pasting into an
  * issue) and a self-contained HTML viewer (embedded frames, scrubber, play/pause, prev/next --
  * open it directly with `file://`, no server needed) for actually stepping through frame by
- * frame to pinpoint a specific broken moment.
+ * frame to pinpoint a specific broken moment. Both are written next to the input JSON by default,
+ * so save a downloaded/pasted replay into replays/ (gitignored, but a durable in-repo location --
+ * not a job-scoped tmp dir that disappears when a session ends) and the GIF/viewer land there too.
  *
  * Usage:
  *   node scripts/replay-to-gif.js path/to/replay.json [options]
@@ -166,6 +168,23 @@ render();
 </script>
 </body></html>
 `;
+}
+
+// Runs inside the page. What counts as "a placed cell" differs by mode: Gravity/Blast share the
+// Board.cells map, but Sandbox keeps its own state.placedPieces array and never touches
+// Board.cells at all -- reading Board.cells.size in Sandbox mode always reads 0, regardless of
+// how many pieces have actually been placed, which looks exactly like "nothing ever placed"
+// (found live investigating a Sandbox placement bug report -- the replay looked like every
+// attempt silently failed, when the very first one had actually succeeded).
+function getCellCountSnapshot() {
+    const mode = typeof App !== 'undefined' ? App.currentMode : null;
+    let cellCount = null;
+    if (mode === 'sandbox' && typeof SandboxMode !== 'undefined') {
+        cellCount = SandboxMode.state.placedPieces.length;
+    } else if (typeof Board !== 'undefined') {
+        cellCount = Board.cells.size;
+    }
+    return { mode, cellCount };
 }
 
 function checkTool(name) {
@@ -315,10 +334,7 @@ async function run(opts) {
     const captureFrame = async (label) => {
         frameNum++;
         const filePath = path.join(framesDir, `frame_${String(frameNum).padStart(4, '0')}.png`);
-        const snapshot = await page.evaluate(() => ({
-            mode: typeof App !== 'undefined' ? App.currentMode : null,
-            cellCount: typeof Board !== 'undefined' ? Board.cells.size : null,
-        }));
+        const snapshot = await page.evaluate(getCellCountSnapshot);
         const text = `#${frameNum}  ${label}${snapshot.cellCount !== null ? `  cells=${snapshot.cellCount}` : ''}`;
         // Stamp the label as a DOM overlay using the page's own already-loaded fonts, then
         // remove it -- avoids depending on ImageMagick/ffmpeg having a system font available,
@@ -409,7 +425,7 @@ async function run(opts) {
 
         // Capture whenever the board's cell count changes (a placement/lock/clear happened),
         // or every 3 real seconds regardless, so idle stretches don't leave a huge frame gap.
-        const cellCount = await page.evaluate(() => (typeof Board !== 'undefined' ? Board.cells.size : null));
+        const { cellCount } = await page.evaluate(getCellCountSnapshot);
         const dueForPeriodicCapture = lastCaptureT === null || ev.t - lastCaptureT >= 3000;
         if (cellCount !== lastCellCount || dueForPeriodicCapture) {
             frameLog.push(await captureFrame(cellCount !== lastCellCount ? 'board-changed' : 'periodic'));
