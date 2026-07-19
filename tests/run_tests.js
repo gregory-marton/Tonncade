@@ -8,6 +8,8 @@ global.svgListeners = svgListeners;
 
 global.window = global;
 global.window.addEventListener = function() {};
+global.location = { origin: 'http://localhost', pathname: '/', search: '' };
+global.window.location = global.location;
 global.window.matchMedia = function(query) {
     return {
         matches: false,
@@ -633,6 +635,18 @@ try {
     }
     console.log("PASS: Replay.seedRandom()'s recorded seed exactly reproduces its Math.random() sequence!");
 
+    // Recording a seed is only half of "full recreation" -- the other half is being able to
+    // feed a previously-recorded seed back in via ?seed= and actually get it to take effect.
+    console.log("Running Replay.seedRandom() ?seed= forcing test...");
+    global.location.search = '?seed=123456789';
+    ReplayObj.seedRandom();
+    if (ReplayObj.seed !== 123456789) {
+        console.error(`FAIL: seedRandom() should use the ?seed= URL param when present, got seed ${ReplayObj.seed} instead of 123456789`);
+        process.exit(1);
+    }
+    global.location.search = '';
+    console.log("PASS: Replay.seedRandom() honors a forced ?seed= URL param!");
+
     console.log("Running Replay.buildIssueUrl() test...");
     ReplayObj.recordMeta();
     ReplayObj.log = [{ type: 'keydown', t: 1, key: 'f' }, { type: 'keydown', t: 2, key: 'h' }];
@@ -649,6 +663,10 @@ try {
     }
     if (!decodedBody.includes(`**Seed:** ${ReplayObj.seed}`)) {
         console.error(`FAIL: buildIssueUrl() body should include the recorded seed! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes(`?seed=${ReplayObj.seed}`)) {
+        console.error(`FAIL: buildIssueUrl() body should include a ready-to-use ?seed= replay URL! Body: ${decodedBody}`);
         process.exit(1);
     }
     if (!decodedBody.includes(`**Version:** ${ReplayObj.meta.version}`)) {

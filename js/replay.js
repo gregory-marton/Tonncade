@@ -64,12 +64,22 @@ const Replay = {
     },
 
     // mulberry32 -- small, fast, good-enough-for-gameplay deterministic PRNG. Used to REPLACE
-    // Math.random() globally (not just to drive test scripts, as elsewhere in this repo), so it
-    // must be seeded from real entropy each load rather than a fixed constant.
+    // Math.random() globally (not just to drive test scripts, as elsewhere in this repo).
+    //
+    // Recording a seed is only half of "full recreation" -- the other half is being able to
+    // feed a previously-recorded seed back in and actually get the same random sequence again.
+    // A `?seed=` URL param does that: a developer investigating a bug report pastes the seed
+    // from the report into the URL and reloads. With no param, seed from real entropy as usual,
+    // so ordinary gameplay stays exactly as unpredictable as before.
     seedRandom: function() {
-        this.seed = (typeof crypto !== 'undefined' && crypto.getRandomValues)
-            ? crypto.getRandomValues(new Uint32Array(1))[0]
-            : (Date.now() ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
+        const forced = (typeof window !== 'undefined' && window.location)
+            ? parseInt(new URLSearchParams(window.location.search).get('seed'), 10)
+            : NaN;
+
+        this.seed = !isNaN(forced) ? (forced >>> 0)
+            : (typeof crypto !== 'undefined' && crypto.getRandomValues)
+                ? crypto.getRandomValues(new Uint32Array(1))[0]
+                : (Date.now() ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
 
         let state = this.seed;
         Math.random = function() {
@@ -152,11 +162,15 @@ const Replay = {
         const viewport = `${window.innerWidth || '?'}x${window.innerHeight || '?'}`;
         const meta = this.meta || {};
         const recentEvents = this.log.slice(-30);
+        // Appending ?seed=<seed> to the app's own URL re-forces the same random sequence on
+        // reload -- see seedRandom(). This turns the recorded seed from a fact into something
+        // directly actionable for whoever investigates the report.
+        const replayUrl = `${location.origin}${location.pathname}?seed=${this.seed}`;
 
         const body = [
             `**Version:** ${meta.version || 'unknown'}`,
             `**Mode:** ${mode}`,
-            `**Seed:** ${this.seed}`,
+            `**Seed:** ${this.seed} (reload with \`${replayUrl}\` to reproduce the same random sequence)`,
             `**Viewport:** ${viewport}`,
             `**User agent:** ${meta.userAgent || 'unknown'}`,
             `**Max touch points:** ${meta.maxTouchPoints}`,

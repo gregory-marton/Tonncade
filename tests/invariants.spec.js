@@ -695,4 +695,59 @@ test.describe('Invariant tests', () => {
     expect(body).toMatch(/\*\*Seed:\*\* \d+/);
     expect(body).toContain('"key": "ArrowLeft"');
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-19: A recorded seed can actually be fed back in and reproduce the same session -- not
+  // just be present in the data. Recording a seed is only half of "full recreation"; the other
+  // half is a real mechanism to force that seed on reload (the ?seed= URL param), and that
+  // mechanism has to demonstrably work: two independent page loads forced to the identical seed
+  // must draw the identical sequence of random Gravity pieces, since that's the entire point of
+  // recording the seed in the first place.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-19: forcing a page to a recorded seed reproduces the identical Gravity piece sequence', async ({ page, context }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const original = await page.evaluate(() => {
+      const pieces = [GravityMode.state.activePiece, ...GravityMode.state.nextQueue];
+      for (let i = 0; i < 5; i++) {
+        GravityMode.spawnPiece();
+        pieces.push(GravityMode.state.activePiece);
+      }
+      return { seed: Replay.seed, pieces };
+    });
+
+    const page2 = await context.newPage();
+    await page2.goto(`/?seed=${original.seed}`);
+    await page2.waitForLoadState('networkidle');
+    await page2.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const replayedSeed = await page2.evaluate(() => Replay.seed);
+    expect(replayedSeed).toBe(original.seed);
+
+    const replayedPieces = await page2.evaluate(() => {
+      const pieces = [GravityMode.state.activePiece, ...GravityMode.state.nextQueue];
+      for (let i = 0; i < 5; i++) {
+        GravityMode.spawnPiece();
+        pieces.push(GravityMode.state.activePiece);
+      }
+      return pieces;
+    });
+
+    expect(replayedPieces).toEqual(original.pieces);
+    await page2.close();
+  });
+
+  test('INV-19: without a ?seed= param, two page loads draw genuinely different random sequences', async ({ page, context }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    const seedA = await page.evaluate(() => Replay.seed);
+
+    const page2 = await context.newPage();
+    await page2.goto('/');
+    await page2.waitForLoadState('networkidle');
+    const seedB = await page2.evaluate(() => Replay.seed);
+    await page2.close();
+
+    expect(seedA).not.toBe(seedB);
+  });
 });
