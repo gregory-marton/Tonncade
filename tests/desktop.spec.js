@@ -306,3 +306,48 @@ test('panning is left unclamped in restricted modes (Snake/Gravity have no free-
     expect(bounds, `${mode} should NOT have free-pan bounds`).toBeNull();
   }
 });
+
+// Double-tap-to-place was an earlier design, in both Sandbox and Blast, that was found not to
+// work well and was meant to be fully replaced -- Sandbox by the place-wedge/carousel-drag,
+// Blast by swipe/queue-tap -- but js/main.js's setupTouchGestures kept a second, separate
+// same-cell-double-tap-places implementation alive for real touch devices at tablet/desktop
+// widths (the "Standard Tablet/Desktop touch tap-tap-place behavior" branch), found live via a
+// real bug report's replay.
+for (const mode of ['sandbox', 'blast']) {
+  test(`tapping the same empty board cell twice never places a piece on a tablet/desktop touch device (${mode})`, async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/');
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    if (mode === 'sandbox') {
+      await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+    }
+    // Blast's active piece is already selected automatically on mode entry.
+
+    const cellBox = await page.evaluate(() => {
+      const el = document.querySelector('polygon.cell[data-p="0"][data-q="0"]');
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    expect(cellBox).toBeTruthy();
+
+    await page.evaluate(({ x, y }) => {
+      const el = document.getElementById('tonnetz-svg');
+      const dispatch = (type) => {
+        const touch = new Touch({ identifier: 1, target: el, clientX: x, clientY: y, pageX: x, pageY: y });
+        const config = { bubbles: true, cancelable: true, changedTouches: [touch] };
+        config.touches = type === 'touchend' ? [] : [touch];
+        config.targetTouches = config.touches;
+        el.dispatchEvent(new TouchEvent(type, config));
+      };
+      dispatch('touchstart'); dispatch('touchend');
+      dispatch('touchstart'); dispatch('touchend');
+    }, cellBox);
+
+    const placedCount = await page.evaluate(
+      (m) => (m === 'sandbox' ? SandboxMode.state.placedPieces.length : Board.cells.size),
+      mode
+    );
+    expect(placedCount).toBe(0);
+  });
+}

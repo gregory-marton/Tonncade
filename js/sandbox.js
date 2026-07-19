@@ -305,20 +305,23 @@ const SandboxMode = {
             const q = isHex ? parseInt(e.target.getAttribute('data-q')) : null;
 
             if (isHex) {
-                const isSameCell = this.state.hoverCell.p === p && this.state.hoverCell.q === q;
-                
                 this.state.hoverCell = { p, q };
                 if (this.state.selectedPiece) {
                     this.updateGhost();
                 }
 
-                // Instantly pick up existing pieces on tap, but require double tap to place a new one
+                // Instantly pick up existing pieces on tap. Placing a NEW piece is deliberately
+                // never triggered by a plain board tap (double-tap-to-place was tried and didn't
+                // work well -- it collided with pickup, since placing then immediately re-tapping
+                // the same now-occupied cell would instantly pick the piece back up, silently
+                // undoing a placement the player never intended to reverse) -- only the place
+                // wedge, a carousel drag, or swipe-down place a piece.
                 const isExistingPiece = this.state.placedPieces.some(piece => {
                     const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
                     return cells.some(c => c.p === p && c.q === q);
                 });
 
-                if (isSameCell || isExistingPiece || !this.state.selectedPiece) {
+                if (isExistingPiece || !this.state.selectedPiece) {
                     this.handleAction(p, q);
                 }
             }

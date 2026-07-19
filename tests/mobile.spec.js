@@ -952,6 +952,30 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(placed).toMatchObject({ p: 2, q: 2 });
   });
 
+  // Double-tap-to-place was an earlier design that didn't work well (found live: it collided
+  // with tap-to-pick-up, since placing and immediately re-tapping the same now-occupied cell
+  // would instantly pick the piece back up, silently undoing the placement a player never
+  // intended to reverse) and was meant to be fully replaced by the place-wedge/carousel-drag/
+  // swipe-down mechanisms -- but a real bug report's replay showed it still firing via
+  // js/sandbox.js's onmousedown handler (which real touch devices also reach through the
+  // browser's own touch-to-mouse compatibility event synthesis, not just an actual mouse).
+  test('tapping the same empty board cell twice never places a piece (double-tap-to-place was removed)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+
+    // Query by selector fresh each time rather than holding one locator -- once this bug is
+    // fixed the cell never gains a second (.placed-piece) polygon, but while red, asserting via
+    // a stale locator across multiple placements makes for a confusing failure.
+    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
+    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
+    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
+
+    expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+  });
+
   test('dragging a new piece out of the carousel places the previously-active candidate first', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

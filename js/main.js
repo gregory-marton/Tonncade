@@ -494,13 +494,8 @@ const App = {
         let startAngle = 0;
         let lastAngle = 0;
         let isGesture = false;
-        let lastTapCell = null;
         let lastTouchCell = null;
         let preTouchHoverCell = null;
-
-        let doubleTapLastCell = null;
-        let doubleTapLastTime = 0;
-        let doubleTapSnapshotRotation = null;
 
         let touchStartX = 0;
         let touchStartY = 0;
@@ -595,26 +590,13 @@ const App = {
                                 const midi = Tonnetz.getMidi(cell.p, cell.q);
                                 Synth.playNote(midi);
                             }
-                            lastTapCell = null;
                         } else {
-                            const isSameCell = lastTapCell && lastTapCell.p === cell.p && lastTapCell.q === cell.q;
+                            // A plain board tap never places a piece here -- double-tap-to-place
+                            // was tried and removed (see js/sandbox.js). Placement only happens
+                            // via the place-wedge, carousel tap/drag, or swipe-down (Sandbox), or
+                            // swipe/piece-queue tap (Blast).
                             modeObj.state.hoverCell = cell;
                             modeObj.updateGhost();
-
-                            if (isSameCell) {
-                                if (this.currentMode === 'sandbox') {
-                                    if (SandboxMode.canPlace(SandboxMode.state.selectedPiece, cell.p, cell.q, SandboxMode.state.rotation)) {
-                                        SandboxMode.placePiece(cell.p, cell.q);
-                                    }
-                                } else {
-                                    if (Board.checkPlacement(BlastMode.state.activePiece, cell.p, cell.q, BlastMode.state.rotation)) {
-                                        BlastMode.placePiece(cell.p, cell.q);
-                                    }
-                                }
-                                lastTapCell = null;
-                            } else {
-                                lastTapCell = cell;
-                            }
                         }
                     }
                 }
@@ -682,7 +664,6 @@ const App = {
                             e.preventDefault();
                             modeObj.state.hoverCell = cell;
                             modeObj.updateGhost();
-                            lastTapCell = cell; // Align double-tap coordinates to latest dragged cell
                         }
                     }
                 }
