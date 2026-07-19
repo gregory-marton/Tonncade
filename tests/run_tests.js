@@ -681,40 +681,26 @@ try {
         console.error(`FAIL: buildIssueUrl() body should include recent recorded events! Body: ${decodedBody}`);
         process.exit(1);
     }
-    // Confirms the two size-aware paths directly, since a real live session (a ~2.5 hour Blast
-    // game) hit exactly this: the OLD wording said "if it's not already pasted below" -- but the
-    // 30-event preview is ALWAYS below, so that phrasing read as satisfied even when the reporter
-    // still needed to separately paste the full log. Worse, the full log for that real session
-    // was too long for GitHub's 65536-char body limit, so pasting it wouldn't have worked at all.
-    if (!decodedBody.includes('copied to your clipboard')) {
-        console.error(`FAIL: a short log should tell the reporter to paste from their clipboard! Body: ${decodedBody}`);
+    // Found live (a real reporter's actual workflow, and a real ~2.5 hour Blast session whose
+    // full log blew past GitHub's 65536-char body limit): the full log must always be treated as
+    // a file to attach, never text to paste into the body -- regardless of how short the session
+    // was. No conditional "if it's not already pasted below" framing either, since the 30-event
+    // preview is ALWAYS below, which made that old wording read as satisfied even when the
+    // reporter still needed to separately handle the full log.
+    if (!decodedBody.includes(`downloaded as \`tonncade-replay-${ReplayObj.seed}.json\``)) {
+        console.error(`FAIL: buildIssueUrl() body should say the full log was downloaded, with the exact filename! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes("don't paste it into the body")) {
+        console.error(`FAIL: buildIssueUrl() body should explicitly say not to paste the full log into the body! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (decodedBody.includes('copied to your clipboard') || decodedBody.includes('Paste it below this line')) {
+        console.error(`FAIL: buildIssueUrl() should never suggest pasting the full log into the body! Body: ${decodedBody}`);
         process.exit(1);
     }
     ReplayObj.log = [];
-    console.log("PASS: Replay.buildIssueUrl() produces a prefilled GitHub issue URL with mode, seed, and recent input!");
-
-    console.log("Running Replay.buildIssueUrl() long-session download-fallback test...");
-    // Simulate a log long enough that its JSON exceeds MAX_SAFE_PASTE_LENGTH -- as happened for
-    // real with a long Blast game's full session history.
-    for (let i = 0; i < 2000; i++) {
-        ReplayObj.log.push({ type: 'keydown', t: i, key: 'ArrowDown', code: 'ArrowDown', shiftKey: false });
-    }
-    const longIssueUrl = ReplayObj.buildIssueUrl();
-    const longDecodedBody = new URLSearchParams(longIssueUrl.split('?')[1]).get('body');
-    if (longDecodedBody.includes('copied to your clipboard')) {
-        console.error(`FAIL: a long log should NOT claim it was copied to the clipboard -- it can't fit in a GitHub issue body! Body: ${longDecodedBody}`);
-        process.exit(1);
-    }
-    if (!longDecodedBody.includes('downloaded instead') || !longDecodedBody.includes(`tonncade-replay-${ReplayObj.seed}.json`)) {
-        console.error(`FAIL: a long log should say it was downloaded, with the exact filename! Body: ${longDecodedBody}`);
-        process.exit(1);
-    }
-    if (!longDecodedBody.includes('65536')) {
-        console.error(`FAIL: a long log's instructions should mention GitHub's actual body-length limit! Body: ${longDecodedBody}`);
-        process.exit(1);
-    }
-    ReplayObj.log = [];
-    console.log("PASS: Replay.buildIssueUrl() switches to a file-download instruction once the full log would exceed GitHub's body limit!");
+    console.log("PASS: Replay.buildIssueUrl() always treats the full log as a file to attach, never text to paste into the body!");
 
     console.log("Running window.replay() schema test...");
     ReplayObj.log = [{ type: 'keydown', t: 1, key: 'x' }];

@@ -671,9 +671,15 @@ test.describe('Invariant tests', () => {
   // for players who can't reach a browser console — mostly mobile players, who'd otherwise need
   // a second computer to debug their phone. It must open a real, prefilled GitHub issue carrying
   // the current mode and recent real input, with nothing pre-armed by the player beforehand.
+  //
+  // The full log is always a real file download, never clipboard-paste-into-body -- found live
+  // that even a session short enough to technically fit under GitHub's 65536-char body limit
+  // still shouldn't be pasted inline (a real reporter's actual workflow was "paste into a text
+  // document, attach that as a separate file"), and a real ~2.5 hour session's full log blew
+  // well past that limit anyway. A downloaded file sidesteps the question for any length.
   // ────────────────────────────────────────────────────────────────────────
 
-  test('INV-18: the bug-report link opens a prefilled GitHub issue with mode and recent input', async ({ page }) => {
+  test('INV-18: the bug-report link downloads the full log and opens a prefilled GitHub issue', async ({ page }) => {
     // Replace window.open with a recorder instead of letting it actually navigate to github.com.
     await page.evaluate(() => {
       window.__openedUrl = null;
@@ -694,7 +700,10 @@ test.describe('Invariant tests', () => {
       }
     }
 
+    const downloadPromise = page.waitForEvent('download');
     await page.locator('#report-bug-link').click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^tonncade-replay-\d+\.json$/);
 
     const openedUrl = await page.evaluate(() => window.__openedUrl);
     expect(openedUrl).toContain('https://github.com/gregory-marton/Tonncade/issues/new?');
@@ -702,34 +711,7 @@ test.describe('Invariant tests', () => {
     expect(body).toContain('**Mode:** blast');
     expect(body).toMatch(/\*\*Seed:\*\* \d+/);
     expect(body).toContain('"key": "ArrowLeft"');
-  });
-
-  // ────────────────────────────────────────────────────────────────────────
-  // INV-18b: found live -- a real ~2.5 hour Blast session's full log exceeded GitHub's 65536-char
-  // issue-body limit, so the old "copy to clipboard, paste it in" flow couldn't actually deliver
-  // the data for any real-length session. Past MAX_SAFE_PASTE_LENGTH, a real file download must
-  // fire instead (attaching a file sidesteps the body-text limit entirely).
-  // ────────────────────────────────────────────────────────────────────────
-
-  test('INV-18b: a long session triggers a real file download instead of an unpasteable clipboard copy', async ({ page }) => {
-    await page.evaluate(() => {
-      window.__openedUrl = null;
-      window.open = (url) => { window.__openedUrl = url; return null; };
-      // Simulate a long real session directly, rather than actually playing one out.
-      for (let i = 0; i < 2000; i++) {
-        Replay.record({ type: 'keydown', t: i, key: 'ArrowDown', code: 'ArrowDown', shiftKey: false });
-      }
-    });
-
-    const downloadPromise = page.waitForEvent('download');
-    await page.evaluate(() => Replay.reportBug());
-    const download = await downloadPromise;
-
-    expect(download.suggestedFilename()).toMatch(/^tonncade-replay-\d+\.json$/);
-
-    const openedUrl = await page.evaluate(() => window.__openedUrl);
-    const body = new URL(openedUrl).searchParams.get('body');
-    expect(body).toContain('downloaded instead');
+    expect(body).toContain("don't paste it into the body");
     expect(body).not.toContain('copied to your clipboard');
   });
 
