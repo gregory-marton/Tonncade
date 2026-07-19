@@ -28,7 +28,7 @@ module.exports = {
         ...devices['Pixel 5'],
         hasTouch: true,
       },
-      testMatch: /.*(mobile|invariants)\.spec\.js/,
+      testMatch: /.*(mobile|invariants|exploratory)\.spec\.js/,
     },
     {
       name: 'Tablet Chrome',
@@ -36,7 +36,7 @@ module.exports = {
         ...devices['Galaxy Tab S4'],
         hasTouch: true,
       },
-      testMatch: /.*(mobile|invariants)\.spec\.js/,
+      testMatch: /.*(mobile|invariants|exploratory)\.spec\.js/,
     }
   ],
   webServer: {
