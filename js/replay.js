@@ -149,13 +149,22 @@ const Replay = {
         if (link) link.addEventListener('click', (e) => this.reportBug(e));
     },
 
+    // GitHub rejects an issue body over 65536 characters (confirmed live -- a real ~2.5 hour
+    // session's full log alone blew well past it). That's a hard ceiling on the WHOLE body, not
+    // just the pasted log, so this leaves real headroom for the template itself plus whatever
+    // the reporter types in "What happened". Below this, clipboard-paste-into-body works; at or
+    // above it, pasting would either get silently truncated or rejected outright, so a file
+    // download (attached via drag-and-drop, which isn't subject to the body-text limit) is used
+    // instead.
+    MAX_SAFE_PASTE_LENGTH: 50000,
+
     /**
      * Players who can't reach a browser console (most mobile users -- see docs/ for why) still
      * need a way to report a bug with their real input history attached. This bypasses the
-     * console entirely: it fires a clipboard write with the full log (best-effort; clipboard
-     * access needs a secure context, so it silently no-ops over file:// or older browsers) and
-     * opens a prefilled GitHub issue. Only the last 30 events go directly in the URL, since a
-     * GitHub issue URL carrying the full 5000-event log would be far too long to work reliably.
+     * console entirely: it opens a prefilled GitHub issue, and gets the full log to the reporter
+     * via whichever of two paths actually fits (see MAX_SAFE_PASTE_LENGTH). Only the last 30
+     * events go directly in the URL either way, since a GitHub issue URL carrying the full
+     * 5000-event log would be far too long to work reliably.
      */
     buildIssueUrl: function() {
         const mode = (typeof App !== 'undefined') ? App.currentMode : 'unknown';
@@ -166,6 +175,15 @@ const Replay = {
         // reload -- see seedRandom(). This turns the recorded seed from a fact into something
         // directly actionable for whoever investigates the report.
         const replayUrl = `${location.origin}${location.pathname}?seed=${this.seed}`;
+
+        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log });
+        const filename = `tonncade-replay-${this.seed}.json`;
+        // Unconditional either way -- no "if it's not already pasted" framing, since something
+        // (the 30-event preview) is ALWAYS already below, which made the old wording read as
+        // satisfied even when the full log still needed to be added separately.
+        const fullLogInstruction = fullLogJson.length <= this.MAX_SAFE_PASTE_LENGTH
+            ? 'Your full session history has been copied to your clipboard. Paste it below this line (if your browser blocked the automatic copy, run `copy(replay())` in the console instead).'
+            : `Your full session history (${fullLogJson.length.toLocaleString()} characters) is too long to paste into a GitHub issue body (limit: 65536). It's been downloaded instead, as \`${filename}\` -- drag that file into this issue to attach it.`;
 
         const body = [
             `**Version:** ${meta.version || 'unknown'}`,
@@ -179,9 +197,9 @@ const Replay = {
             '**What happened:**',
             '(describe the bug here)',
             '',
-            'If your recent input history isn\'t already pasted below (some browsers block automatic clipboard copying), open the browser console, run `copy(replay())`, and paste the result here.',
+            fullLogInstruction,
             '',
-            `**Last ${recentEvents.length} recorded inputs:**`,
+            `**Last ${recentEvents.length} recorded inputs (preview only -- see above for the full session):**`,
             '```json',
             JSON.stringify(recentEvents, null, 2),
             '```',
@@ -191,11 +209,31 @@ const Replay = {
         return `https://github.com/gregory-marton/Tonncade/issues/new?${params.toString()}`;
     },
 
+    // Sidesteps GitHub's body-length limit entirely: a dragged-in file attachment isn't body
+    // text. No server involved -- a Blob + object URL + synthetic click, all client-side.
+    downloadFullLog: function() {
+        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log });
+        const blob = new Blob([fullLogJson], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tonncade-replay-${this.seed}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
+
     reportBug: function(e) {
         if (e) e.preventDefault();
 
-        if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(window.replay()).catch(() => {});
+        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log });
+        if (fullLogJson.length <= this.MAX_SAFE_PASTE_LENGTH) {
+            if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(fullLogJson).catch(() => {});
+            }
+        } else {
+            this.downloadFullLog();
         }
 
         window.open(this.buildIssueUrl(), '_blank');

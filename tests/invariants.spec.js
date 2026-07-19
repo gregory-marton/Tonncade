@@ -705,6 +705,35 @@ test.describe('Invariant tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
+  // INV-18b: found live -- a real ~2.5 hour Blast session's full log exceeded GitHub's 65536-char
+  // issue-body limit, so the old "copy to clipboard, paste it in" flow couldn't actually deliver
+  // the data for any real-length session. Past MAX_SAFE_PASTE_LENGTH, a real file download must
+  // fire instead (attaching a file sidesteps the body-text limit entirely).
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-18b: a long session triggers a real file download instead of an unpasteable clipboard copy', async ({ page }) => {
+    await page.evaluate(() => {
+      window.__openedUrl = null;
+      window.open = (url) => { window.__openedUrl = url; return null; };
+      // Simulate a long real session directly, rather than actually playing one out.
+      for (let i = 0; i < 2000; i++) {
+        Replay.record({ type: 'keydown', t: i, key: 'ArrowDown', code: 'ArrowDown', shiftKey: false });
+      }
+    });
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.evaluate(() => Replay.reportBug());
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/^tonncade-replay-\d+\.json$/);
+
+    const openedUrl = await page.evaluate(() => window.__openedUrl);
+    const body = new URL(openedUrl).searchParams.get('body');
+    expect(body).toContain('downloaded instead');
+    expect(body).not.toContain('copied to your clipboard');
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
   // INV-19: A recorded seed can actually be fed back in and reproduce the same session -- not
   // just be present in the data. Recording a seed is only half of "full recreation"; the other
   // half is a real mechanism to force that seed on reload (the ?seed= URL param), and that
