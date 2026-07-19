@@ -202,19 +202,60 @@ function isVirtualButtonTarget(target) {
     return typeof target === 'string' && /^#(m-btn-|snake-btn-)/.test(target);
 }
 
+// Every real recorded session so far has come from a touch device (meta.maxTouchPoints > 0), and
+// a real touchscreen tap has no preceding hover/move phase at all. Playwright's mouse API
+// (page.mouse.click / locator.click) always sends a mousemove immediately before mousedown --
+// and app code can reasonably hook window.onmousemove to update hover-preview state for
+// desktop's mouse-driven UX (js/sandbox.js's updateGhost() does exactly this, moving
+// state.hoverCell to match whatever the mouse last passed over). That preceding mousemove can
+// satisfy a gate the app never expected a plain tap to satisfy on its own -- found live: this
+// made a board tap appear to trigger Sandbox's placement logic, which made a replay-tool
+// artifact look exactly like a real "tap places a piece" bug.
+//
+// page.touchscreen.tap() dispatches a real touchstart/touchend with no preceding move, which
+// solves that -- but Chromium's CDP-driven touch injection doesn't reliably synthesize the
+// compatibility mousedown/click a real device's touch stack produces afterward, and
+// js/sandbox.js's board interaction is wired to onmousedown only (no separate touch listener).
+// So the actual fix is a directly-dispatched mousedown/mouseup/click at the target coordinate,
+// completely bypassing Playwright's own mouse-movement machinery -- a "cold" click with no
+// hover phase, matching what a real device's touch-to-mouse-compatibility synthesis produces.
+async function tap(page, x, y) {
+    await page.evaluate(({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        if (!el) return;
+        const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, view: window };
+        el.dispatchEvent(new MouseEvent('mousedown', opts));
+        el.dispatchEvent(new MouseEvent('mouseup', opts));
+        el.dispatchEvent(new MouseEvent('click', opts));
+    }, { x, y });
+}
+
+async function tapElement(page, locator, fallbackX, fallbackY) {
+    try {
+        const box = await locator.boundingBox();
+        if (box) {
+            await tap(page, box.x + box.width / 2, box.y + box.height / 2);
+            return;
+        }
+    } catch {
+        // fall through to raw-coordinate tap below
+    }
+    await tap(page, fallbackX, fallbackY);
+}
+
 async function resolveAndClick(page, ev, recordedViewport) {
     const target = ev.target;
     if (!target) {
-        await page.mouse.click(ev.x, ev.y);
+        await tap(page, ev.x, ev.y);
         return;
     }
     if (target.startsWith('#')) {
         const loc = page.locator(target).first();
         if (await loc.count() > 0) {
-            await loc.click({ force: true }).catch(() => page.mouse.click(ev.x, ev.y));
+            await tapElement(page, loc, ev.x, ev.y);
             return;
         }
-        await page.mouse.click(ev.x, ev.y);
+        await tap(page, ev.x, ev.y);
         return;
     }
     if (target === 'polygon') {
@@ -224,11 +265,11 @@ async function resolveAndClick(page, ev, recordedViewport) {
             return { p: el.getAttribute('data-p'), q: el.getAttribute('data-q') };
         }, { x: ev.x, y: ev.y });
         if (cell && cell.p !== null && cell.q !== null) {
-            await page.locator(`polygon[data-p="${cell.p}"][data-q="${cell.q}"]`).first()
-                .click({ force: true }).catch(() => page.mouse.click(ev.x, ev.y));
+            const loc = page.locator(`polygon[data-p="${cell.p}"][data-q="${cell.q}"]`).first();
+            await tapElement(page, loc, ev.x, ev.y);
             return;
         }
-        await page.mouse.click(ev.x, ev.y);
+        await tap(page, ev.x, ev.y);
         return;
     }
     // The mode-option row is a small, fixed, always-present set (sandbox/midi/snake/blast/
@@ -259,7 +300,7 @@ async function resolveAndClick(page, ev, recordedViewport) {
             return true;
         }, { coord, span });
         if (clicked) return;
-        await page.mouse.click(ev.x, ev.y);
+        await tap(page, ev.x, ev.y);
         return;
     }
     // "tag.class" selectors are ambiguous (many elements share them: piece-item carousel,
@@ -283,10 +324,10 @@ async function resolveAndClick(page, ev, recordedViewport) {
             return false;
         }, { selector: target, x: ev.x, y: ev.y, vw: recordedViewport.width, vh: recordedViewport.height });
         if (clicked) return;
-        await page.mouse.click(ev.x, ev.y);
+        await tap(page, ev.x, ev.y);
         return;
     }
-    await page.mouse.click(ev.x, ev.y);
+    await tap(page, ev.x, ev.y);
 }
 
 async function run(opts) {
@@ -486,4 +527,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { parseArgs, isVirtualButtonTarget };
+module.exports = { parseArgs, isVirtualButtonTarget, resolveAndClick, getCellCountSnapshot };
