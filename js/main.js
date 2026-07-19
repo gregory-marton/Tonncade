@@ -29,6 +29,8 @@ const App = {
     currentMode: '',
 
     init: function() {
+        if (typeof Replay !== 'undefined') Replay.init();
+
         // Migrate localStorage keys from Tonntris to Tonncade to preserve player scores
         const oldKeys = ['tonntris_gravity_best', 'tonntris_midi_best', 'tonntris_puzzle_best', 'tonntris_snake_best'];
         oldKeys.forEach(oldKey => {

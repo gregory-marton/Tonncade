@@ -607,4 +607,92 @@ test.describe('Invariant tests', () => {
     const rotAfterCCW = await page.evaluate(() => GravityMode.state.rotation);
     expect(rotAfterCCW).toBe((rotAfterCW + 1) % 6);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-17: window.replay() keeps recording across a mode switch, and carries enough to fully
+  // recreate a session -- not just keystrokes/taps, but the RNG seed (every mode that draws
+  // random pieces depends on Math.random(); without knowing what it produced, replaying the
+  // same inputs against a fresh, differently-random session reproduces nothing) and viewport
+  // size (pointer coordinates are meaningless without knowing the screen they were captured on).
+  // window.onkeydown gets reassigned by every mode (App.setMode nulls it, each mode's
+  // setupEvents() reassigns its own handler) — js/replay.js listens via addEventListener
+  // instead, specifically so a player's real input history since page load survives regardless
+  // of which mode they were in when a bug happened, letting them report it post-hoc via
+  // copy(replay()) with nothing pre-armed.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-17: window.replay() records real keydowns, seed, and viewport, and survives a mode switch', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.keyboard.press('ArrowLeft');
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.keyboard.press('ArrowRight');
+
+    const replayData = await page.evaluate(() => JSON.parse(window.replay()));
+    expect(typeof replayData.seed).toBe('number');
+    expect(typeof replayData.meta.version).toBe('string');
+    expect(typeof replayData.meta.userAgent).toBe('string');
+    expect(typeof replayData.meta.maxTouchPoints).toBe('number');
+    expect(typeof replayData.meta.devicePixelRatio).toBe('number');
+
+    const keys = replayData.events.filter(e => e.type === 'keydown').map(e => e.key);
+    expect(keys).toContain('ArrowLeft');
+    expect(keys).toContain('ArrowRight');
+
+    const resizes = replayData.events.filter(e => e.type === 'resize');
+    expect(resizes.length).toBeGreaterThan(0);
+    expect(resizes[0]).toHaveProperty('width');
+    expect(resizes[0]).toHaveProperty('height');
+    expect(resizes[0]).toHaveProperty('orientation');
+  });
+
+  test('INV-17: window.replay() records a visibility change (tab focus/blur)', async ({ page }) => {
+    // A real tab switch can't be triggered from inside the page, but dispatching the same event
+    // the browser would fire is enough to verify the listener is wired and records something --
+    // this is what lets a replay explain an otherwise-mysterious gap ("were they even here?").
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+    const replayData = await page.evaluate(() => JSON.parse(window.replay()));
+    const visibilityEvents = replayData.events.filter(e => e.type === 'visibility');
+    expect(visibilityEvents.length).toBeGreaterThan(0);
+    expect(typeof visibilityEvents[0].state).toBe('string');
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-18: The mosquito bug-report link (next to the "</> local" code link) exists specifically
+  // for players who can't reach a browser console — mostly mobile players, who'd otherwise need
+  // a second computer to debug their phone. It must open a real, prefilled GitHub issue carrying
+  // the current mode and recent real input, with nothing pre-armed by the player beforehand.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-18: the bug-report link opens a prefilled GitHub issue with mode and recent input', async ({ page }) => {
+    // Replace window.open with a recorder instead of letting it actually navigate to github.com.
+    await page.evaluate(() => {
+      window.__openedUrl = null;
+      window.open = (url) => { window.__openedUrl = url; return null; };
+    });
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+    await page.keyboard.press('ArrowLeft');
+
+    // The link lives inside the collapsible #top-drawer on mobile/tablet widths (see INV-1) —
+    // open it first, same as any real player would.
+    const isMobile = await page.evaluate(() => Render.isMobileViewport());
+    if (isMobile) {
+      const drawer = page.locator('#top-drawer');
+      if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
+        await page.locator('#drawer-handle').click({ force: true });
+        await expect(drawer).toHaveClass(/expanded/);
+      }
+    }
+
+    await page.locator('#report-bug-link').click();
+
+    const openedUrl = await page.evaluate(() => window.__openedUrl);
+    expect(openedUrl).toContain('https://github.com/gregory-marton/Tonncade/issues/new?');
+    const body = new URL(openedUrl).searchParams.get('body');
+    expect(body).toContain('**Mode:** blast');
+    expect(body).toMatch(/\*\*Seed:\*\* \d+/);
+    expect(body).toContain('"key": "ArrowLeft"');
+  });
 });

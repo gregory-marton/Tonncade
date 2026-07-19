@@ -74,7 +74,9 @@ global.document = {
             style: {},
             classList: { add: () => {}, remove: () => {} }
         };
-    }
+    },
+    addEventListener: () => {},
+    visibilityState: 'visible'
 };
 global.localStorage = {
     getItem: () => null,
@@ -105,6 +107,7 @@ function loadScript(file) {
 }
 
 loadScript('version.js');
+loadScript('replay.js');
 loadScript('tonnetz.js');
 loadScript('synth.js');
 loadScript('pieces.js');
@@ -581,6 +584,97 @@ try {
 
     Board.cells.clear();
     console.log("PASS: checkGameOver's anchor-column scan reaches far enough to find legal far-overhang placements!");
+
+    // Replay: an always-on ring buffer of recent input, so a player can report a bug post-hoc
+    // (via the console, or the report-bug link) without having had anything pre-armed.
+    console.log("Running Replay ring buffer capacity test...");
+    const ReplayObj = vm.runInContext("Replay", context);
+    ReplayObj.log = [];
+    for (let i = 0; i < ReplayObj.MAX_EVENTS + 50; i++) {
+        ReplayObj.record({ type: 'keydown', t: i, key: 'x' });
+    }
+    if (ReplayObj.log.length !== ReplayObj.MAX_EVENTS) {
+        console.error(`FAIL: Replay.log should cap at MAX_EVENTS (${ReplayObj.MAX_EVENTS}), but was ${ReplayObj.log.length}`);
+        process.exit(1);
+    }
+    // The oldest 50 events should have been evicted -- the first surviving one is t=50.
+    if (ReplayObj.log[0].t !== 50) {
+        console.error(`FAIL: Replay.log should evict the OLDEST events first, oldest surviving t should be 50, was ${ReplayObj.log[0].t}`);
+        process.exit(1);
+    }
+    console.log("PASS: Replay.log is a ring buffer that evicts the oldest events first, capped at MAX_EVENTS!");
+
+    // Keystrokes/taps alone can't recreate a session: Gravity/Blast draw random pieces via
+    // Math.random(), so replaying the same inputs against a fresh (differently-random) session
+    // reproduces nothing without also knowing what Math.random() itself produced. seedRandom()
+    // patches Math.random() with a seeded PRNG (seeded from real entropy, so gameplay is exactly
+    // as unpredictable to the player as before) and records the seed used -- reproducing that
+    // seed must reproduce the exact same sequence.
+    console.log("Running Replay.seedRandom() determinism test...");
+    ReplayObj.seedRandom();
+    if (typeof ReplayObj.seed !== 'number') {
+        console.error(`FAIL: Replay.seedRandom() should set Replay.seed to a number, got: ${ReplayObj.seed}`);
+        process.exit(1);
+    }
+    const sequenceA = [Math.random(), Math.random(), Math.random()];
+    // Reconstruct the exact same PRNG externally, seeded with the recorded value, and confirm
+    // it reproduces the identical sequence -- the core promise of recording the seed at all.
+    let state = ReplayObj.seed;
+    const reconstructed = function() {
+        state |= 0; state = (state + 0x6D2B79F5) | 0;
+        let t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const sequenceB = [reconstructed(), reconstructed(), reconstructed()];
+    if (JSON.stringify(sequenceA) !== JSON.stringify(sequenceB)) {
+        console.error(`FAIL: reseeding with Replay.seed should reproduce the identical Math.random() sequence! Got ${JSON.stringify(sequenceA)} vs ${JSON.stringify(sequenceB)}`);
+        process.exit(1);
+    }
+    console.log("PASS: Replay.seedRandom()'s recorded seed exactly reproduces its Math.random() sequence!");
+
+    console.log("Running Replay.buildIssueUrl() test...");
+    ReplayObj.recordMeta();
+    ReplayObj.log = [{ type: 'keydown', t: 1, key: 'f' }, { type: 'keydown', t: 2, key: 'h' }];
+    App.currentMode = 'gravity';
+    const issueUrl = ReplayObj.buildIssueUrl();
+    if (!issueUrl.startsWith('https://github.com/gregory-marton/Tonncade/issues/new?')) {
+        console.error(`FAIL: buildIssueUrl() should target the real repo's new-issue page, got: ${issueUrl}`);
+        process.exit(1);
+    }
+    const decodedBody = new URLSearchParams(issueUrl.split('?')[1]).get('body');
+    if (!decodedBody.includes('**Mode:** gravity')) {
+        console.error(`FAIL: buildIssueUrl() body should include the current mode! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes(`**Seed:** ${ReplayObj.seed}`)) {
+        console.error(`FAIL: buildIssueUrl() body should include the recorded seed! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes(`**Version:** ${ReplayObj.meta.version}`)) {
+        console.error(`FAIL: buildIssueUrl() body should include the recorded git version! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes('**Max touch points:**') || !decodedBody.includes('**Device pixel ratio:**')) {
+        console.error(`FAIL: buildIssueUrl() body should include touch/pixel-ratio metadata! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    if (!decodedBody.includes('"key": "f"') || !decodedBody.includes('"key": "h"')) {
+        console.error(`FAIL: buildIssueUrl() body should include recent recorded events! Body: ${decodedBody}`);
+        process.exit(1);
+    }
+    ReplayObj.log = [];
+    console.log("PASS: Replay.buildIssueUrl() produces a prefilled GitHub issue URL with mode, seed, and recent input!");
+
+    console.log("Running window.replay() schema test...");
+    ReplayObj.log = [{ type: 'keydown', t: 1, key: 'x' }];
+    const replayed = JSON.parse(vm.runInContext("window.replay()", context));
+    if (typeof replayed.seed !== 'number' || !replayed.meta || !Array.isArray(replayed.events)) {
+        console.error(`FAIL: window.replay() should return { seed: number, meta: object, events: array }! Got: ${JSON.stringify(replayed)}`);
+        process.exit(1);
+    }
+    ReplayObj.log = [];
+    console.log("PASS: window.replay() returns { seed, meta, events } -- enough to fully recreate a session!");
 
     process.exit(0);
 } catch (err) {

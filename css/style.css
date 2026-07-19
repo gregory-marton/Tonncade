@@ -650,6 +650,11 @@ button:hover {
         display: none; /* Hide the wikipedia link on mobile */
     }
 
+    #report-bug-link {
+        display: inline; /* Exception: mobile is exactly where this link matters most, since
+                             there's no console access without a second, tethered computer. */
+    }
+
     #mode-controls {
         width: 100%;
         overflow-x: auto;
