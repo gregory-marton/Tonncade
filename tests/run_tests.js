@@ -517,6 +517,35 @@ try {
     }
     console.log("PASS: Pieces.rotate() is counter-clockwise and Pieces.rotateCCW() is clockwise, matching real screen coordinates!");
 
+    // BUG (reported live, twice, via real play -- a horizontal I piece, then an L piece, each
+    // visibly overlapping an existing piece): a piece is allowed to lock while overhanging past
+    // the true playable columns (-5..4) -- that's the intentional toe-hold rule tested above.
+    // But once locked, those overhanging cells get written into Board.cells exactly like any
+    // other cell (fillCells doesn't bounds-check), and findFullLines only ever scans cols
+    // -5..4, so that off-grid debris is never part of a clearable line and never gets removed
+    // -- it persists forever. checkActivePlacement's toe-hold loop skips collision checking
+    // entirely for any cell outside -5..4 ("nothing out there to collide with" -- true only
+    // before anything had ever locked out there). A later piece can then lock directly on top
+    // of that leftover debris.
+    console.log("Running Gravity overhang-debris collision test...");
+    App.currentMode = 'gravity';
+    Board.cells.clear();
+
+    // Simulate leftover debris from an earlier overhanging lock: one off-grid cell at col 5,
+    // one column past the right wall (col 4).
+    Board.cells.set('0,10', { type: 'X', color: '#ffffff' });
+
+    // A fresh I piece laying flat, anchor p=-1,q=10: cells land at cols 3,4,5,6 -- two genuine
+    // on-grid toe-hold cells (3 and 4, both empty) plus a cell at col 5 landing exactly on the
+    // debris placed above.
+    if (Board.checkActivePlacement('I', -1, 10, 0)) {
+        console.error("FAIL: a piece overlapping leftover off-grid overhang debris should be illegal, even though the debris itself sits off-grid!");
+        process.exit(1);
+    }
+
+    Board.cells.clear();
+    console.log("PASS: Gravity pieces can no longer lock on top of leftover off-grid overhang debris!");
+
     process.exit(0);
 } catch (err) {
     console.error("FAIL: App test failed with error:", err.stack || err.message);

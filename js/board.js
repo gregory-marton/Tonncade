@@ -190,15 +190,18 @@ const Board = {
         const cells = Pieces.getAbsoluteCells(type, p, q, rotation);
         // The floor is always solid, but the side walls aren't: a piece may overhang the left
         // or right edge as far as it likes while steering, as long as it keeps at least one
-        // hex ("a toe-hold") on the actual playable columns — cells beyond the wall simply
-        // can't collide with anything, since there's nothing out there to collide with.
+        // hex ("a toe-hold") on the actual playable columns. That only exempts overhanging
+        // cells from the WALL — it doesn't mean nothing can ever occupy that space: a piece
+        // locked while overhanging leaves its off-grid cells in Board.cells permanently
+        // (fillCells doesn't bounds-check, and findFullLines never scans past col 4 to clear
+        // them), so a later piece must still check collision there too, or it can lock right
+        // on top of that leftover debris.
         let hasToeHold = false;
         for (const c of cells) {
             if (c.q < 0) return false;
-            const col = c.p + Math.floor(c.q / 2);
-            if (col < -5 || col > 4) continue;
-            hasToeHold = true;
             if (this.cells.has(`${c.p},${c.q}`)) return false;
+            const col = c.p + Math.floor(c.q / 2);
+            if (col >= -5 && col <= 4) hasToeHold = true;
         }
         return hasToeHold;
     }
