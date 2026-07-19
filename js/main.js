@@ -70,6 +70,11 @@ const App = {
     setMode: function(mode, idx) {
         if (this.currentMode === mode) return;
 
+        // Picking a mode is "done with the menu" -- same as selecting a piece from the Sandbox
+        // chord-guide (js/sandbox.js), the drawer should get out of the way afterward instead of
+        // permanently occupying screen space on mobile.
+        this.collapseMobileDrawer();
+
         const stats = document.getElementById('blast-stats');
         const sandboxCtrls = document.getElementById('sandbox-controls');
         const clickAction = document.getElementById('click-action');

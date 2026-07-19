@@ -20,6 +20,10 @@ Gravity), regardless of current viewport size or orientation. On mobile/tablet w
 list lives inside the collapsible `#top-drawer` (open it first); on desktop it's always
 visible. Either way, the path to switching modes must never be blocked.
 
+Selecting a mode collapses the drawer afterward (same as picking a piece from the Sandbox
+chord guide) — it doesn't stay open across multiple selections, so switching modes twice in a
+row on mobile means reopening the drawer each time.
+
 **Test:** `tests/invariants.spec.js` — "INV-1: every mode is reachable from every other mode,
 in portrait and landscape"
 

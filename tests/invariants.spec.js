@@ -34,19 +34,21 @@ test.describe('Invariant tests', () => {
       await page.setViewportSize(viewport);
 
       // The mode list lives inside the collapsible #top-drawer by design (a hamburger-menu
-      // pattern) on mobile/tablet widths — it must be opened before mode buttons are reachable.
-      // Desktop shows it uncollapsed. This mirrors the real interaction sequence a user follows,
-      // not a workaround for a bug.
+      // pattern) on mobile/tablet widths — it must be opened before mode buttons are reachable,
+      // and selecting a mode collapses it again (see INV-20), so it has to be reopened before
+      // each subsequent switch. Desktop shows it uncollapsed throughout. This mirrors the real
+      // interaction sequence a user follows, not a workaround for a bug.
       const isMobile = await page.evaluate(() => Render.isMobileViewport());
-      if (isMobile) {
-        const drawer = page.locator('#top-drawer');
-        if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-          await page.locator('#drawer-handle').click();
-          await expect(drawer).toHaveClass(/expanded/);
-        }
-      }
 
       for (const mode of MODES) {
+        if (isMobile) {
+          const drawer = page.locator('#top-drawer');
+          if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
+            await page.locator('#drawer-handle').click();
+            await expect(drawer).toHaveClass(/expanded/);
+          }
+        }
+
         // No {force:true} — Playwright's actionability checks require the element to be
         // visible, stable, and unobscured, so this fails if a mode button is ever unreachable.
         await page.locator(`.mode-option[data-mode="${mode}"]`).click();
@@ -804,5 +806,27 @@ test.describe('Invariant tests', () => {
     await page2.close();
 
     expect(seedA).not.toBe(seedB);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-20: On mobile, picking a mode from the drawer must collapse it afterward. Found via a
+  // real bug report's replayed session: App.collapseMobileDrawer() exists and is already wired
+  // up for the Sandbox chord-guide picker (js/sandbox.js), but was never called from the
+  // mode-option click handler itself (js/main.js's setMode) -- so opening the drawer to switch
+  // modes left it expanded, permanently occupying screen space, for the rest of the session.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-20: selecting a mode from the mobile drawer collapses the drawer afterward', async ({ page }) => {
+    const isMobile = await page.evaluate(() => Render.isMobileViewport());
+    test.skip(!isMobile, 'the drawer only exists at mobile/tablet widths');
+
+    const drawer = page.locator('#top-drawer');
+    await page.locator('#drawer-handle').click();
+    await expect(drawer).toHaveClass(/expanded/);
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    await expect(drawer).not.toHaveClass(/expanded/);
+    await expect(drawer).toHaveClass(/collapsed/);
   });
 });
