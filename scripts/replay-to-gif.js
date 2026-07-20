@@ -478,6 +478,41 @@ async function run(opts) {
     await page.clock.runFor(1000);
     frameLog.push(await captureFrame('end'));
 
+    // Sound verification: the replayed page runs the real app, so it records its OWN sound
+    // trace via the same Replay.wrapSynth() instrumentation that produced the original
+    // recording (see js/replay.js) -- every real note/chord played corresponds exactly to a
+    // specific game action (INV-4, docs/invariants.md), so comparing the two traces note-by-
+    // note finds the EXACT point reconstruction first disagrees with the original session,
+    // rather than only ever being able to compare the final board state. Sounds live in their
+    // own ring buffer (Replay.soundLog), separate from the raw input-event log, since they're
+    // produced at a much higher volume (~8x more sound events than input events in one real
+    // session) and would otherwise crowd real input events out of existence on a long session.
+    // Replays recorded before this feature existed simply have no `sounds` array to compare, so
+    // this silently does nothing for them.
+    const originalSounds = data.sounds || [];
+    let soundVerification = null;
+    if (originalSounds.length > 0) {
+        const reconstructedSounds = await page.evaluate(() =>
+            typeof Replay !== 'undefined' ? Replay.soundLog : []
+        );
+        const minLen = Math.min(originalSounds.length, reconstructedSounds.length);
+        let firstDivergence = -1;
+        for (let i = 0; i < minLen; i++) {
+            if (originalSounds[i].midi !== reconstructedSounds[i].midi) { firstDivergence = i; break; }
+        }
+        if (firstDivergence === -1 && originalSounds.length !== reconstructedSounds.length) {
+            firstDivergence = minLen;
+        }
+        soundVerification = {
+            originalCount: originalSounds.length,
+            reconstructedCount: reconstructedSounds.length,
+            matches: firstDivergence === -1,
+            firstDivergenceIndex: firstDivergence,
+            original: firstDivergence >= 0 ? (originalSounds[firstDivergence] || null) : null,
+            reconstructed: firstDivergence >= 0 ? (reconstructedSounds[firstDivergence] || null) : null,
+        };
+    }
+
     await browser.close();
 
     const written = [];
@@ -517,6 +552,18 @@ async function run(opts) {
         console.log('\nWarnings:');
         warnings.forEach(w => console.log(' -', w));
     }
+    if (soundVerification) {
+        console.log('\nSound verification (see js/replay.js\'s Replay.wrapSynth):');
+        if (soundVerification.matches) {
+            console.log(`  MATCH -- all ${soundVerification.originalCount} recorded notes/chords reproduced exactly.`);
+        } else {
+            console.log(`  DIVERGED at sound event #${soundVerification.firstDivergenceIndex} (of ${soundVerification.originalCount} original / ${soundVerification.reconstructedCount} reconstructed):`);
+            console.log('    original:      ', JSON.stringify(soundVerification.original));
+            console.log('    reconstructed: ', JSON.stringify(soundVerification.reconstructed));
+            console.log('  Everything before this tick reconstructed faithfully; look at what happens at/after it.');
+        }
+    }
+    return { soundVerification };
 }
 
 if (require.main === module) {

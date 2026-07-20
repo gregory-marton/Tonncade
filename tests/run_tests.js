@@ -587,24 +587,35 @@ try {
     Board.cells.clear();
     console.log("PASS: checkGameOver's anchor-column scan reaches far enough to find legal far-overhang placements!");
 
-    // Replay: an always-on ring buffer of recent input, so a player can report a bug post-hoc
-    // (via the console, or the report-bug link) without having had anything pre-armed.
-    console.log("Running Replay ring buffer capacity test...");
+    // Replay: an always-on capped log of recent input, so a player can report a bug post-hoc
+    // (via the console, or the report-bug link) without having had anything pre-armed. Eviction
+    // is amortized (see Replay.trimToCapacity): the log is allowed to grow up to 2x MAX_EVENTS
+    // before a single bulk trim brings it back down to exactly MAX_EVENTS, rather than paying an
+    // O(n) shift() on every single push once at capacity.
+    console.log("Running Replay capped-log eviction test...");
     const ReplayObj = vm.runInContext("Replay", context);
     ReplayObj.log = [];
-    for (let i = 0; i < ReplayObj.MAX_EVENTS + 50; i++) {
+    // Push exactly one past the 2x threshold, landing precisely at the post-trim state: this
+    // triggers exactly one trim, converging the log to exactly MAX_EVENTS.
+    for (let i = 0; i <= ReplayObj.MAX_EVENTS * 2; i++) {
         ReplayObj.record({ type: 'keydown', t: i, key: 'x' });
+        if (ReplayObj.log.length > ReplayObj.MAX_EVENTS * 2) {
+            console.error(`FAIL: Replay.log should never exceed 2x MAX_EVENTS (${ReplayObj.MAX_EVENTS * 2}), but was ${ReplayObj.log.length} after push #${i}`);
+            process.exit(1);
+        }
     }
     if (ReplayObj.log.length !== ReplayObj.MAX_EVENTS) {
-        console.error(`FAIL: Replay.log should cap at MAX_EVENTS (${ReplayObj.MAX_EVENTS}), but was ${ReplayObj.log.length}`);
+        console.error(`FAIL: Replay.log should converge to exactly MAX_EVENTS (${ReplayObj.MAX_EVENTS}) right after crossing the 2x trim threshold, but was ${ReplayObj.log.length}`);
         process.exit(1);
     }
-    // The oldest 50 events should have been evicted -- the first surviving one is t=50.
-    if (ReplayObj.log[0].t !== 50) {
-        console.error(`FAIL: Replay.log should evict the OLDEST events first, oldest surviving t should be 50, was ${ReplayObj.log[0].t}`);
+    // The oldest surviving event should be t = MAX_EVENTS + 1 (everything from 0..MAX_EVENTS,
+    // inclusive, was evicted by the single trim).
+    if (ReplayObj.log[0].t !== ReplayObj.MAX_EVENTS + 1) {
+        console.error(`FAIL: Replay.log should evict the OLDEST events first, oldest surviving t should be ${ReplayObj.MAX_EVENTS + 1}, was ${ReplayObj.log[0].t}`);
         process.exit(1);
     }
-    console.log("PASS: Replay.log is a ring buffer that evicts the oldest events first, capped at MAX_EVENTS!");
+    ReplayObj.log = [];
+    console.log("PASS: Replay.log stays bounded (never exceeds 2x MAX_EVENTS) and evicts the oldest events first, converging to exactly MAX_EVENTS after each amortized trim!");
 
     // Deterministic replay reconstruction: wall-clock timing turned out to be fragile for long
     // real sessions (small timing differences during replay compounded into a completely
@@ -729,6 +740,65 @@ try {
     }
     ReplayObj.log = [];
     console.log("PASS: window.replay() returns { seed, meta, events } -- enough to fully recreate a session!");
+
+    // Sound is the one signal that corresponds exactly to game state (INV-4: every sound the
+    // app plays corresponds exactly to the Tonnetz note(s) actually responsible for it), so
+    // recording it gives replay verification a checkpoint that raw input events alone can't:
+    // a fresh reconstruction's own sound log can be diffed against the original to find the
+    // exact tick where they first disagree, instead of only comparing final board state.
+    console.log("Running Replay.wrapSynth() sound-event recording test...");
+    ReplayObj.soundLog = [];
+    const Synth = vm.runInContext("Synth", context);
+    Synth.playNote(60);
+    Synth.playChord([60, 64, 67]);
+    if (ReplayObj.soundLog.length !== 4) {
+        console.error(`FAIL: Replay.wrapSynth() should record one sound event per real playNote() call (1 direct + 3 from playChord's 3 notes) in its OWN soundLog (not the input-event log), got ${ReplayObj.soundLog.length}: ${JSON.stringify(ReplayObj.soundLog)}`);
+        process.exit(1);
+    }
+    if (ReplayObj.soundLog[0].midi !== 60) {
+        console.error(`FAIL: sound event should record the exact midi note played! Got: ${JSON.stringify(ReplayObj.soundLog[0])}`);
+        process.exit(1);
+    }
+    const chordMidis = ReplayObj.soundLog.slice(1).map(e => e.midi);
+    if (JSON.stringify(chordMidis) !== JSON.stringify([60, 64, 67])) {
+        console.error(`FAIL: playChord()'s individual notes should each be recorded! Got: ${JSON.stringify(chordMidis)}`);
+        process.exit(1);
+    }
+    // Sound events must NOT compete with the raw-input ring buffer -- a single Gravity session
+    // was found to produce ~2100 sound events (89% of a 2349-event combined log) against a
+    // MAX_EVENTS of 5000, which would evict real early-session input events out of existence on
+    // any longer session. They get their own, separate, much larger ring buffer instead.
+    if (ReplayObj.log.some(e => e.type === 'sound')) {
+        console.error(`FAIL: sound events must go into Replay.soundLog, NOT Replay.log (the raw-input ring buffer) -- they'd crowd out real input events on long sessions.`);
+        process.exit(1);
+    }
+    // Bass-boost harmonics (playNote's own recursive call for low notes, isHarmonic=true) are
+    // an audio-engineering implementation detail, not a distinct game event -- recording them
+    // would pollute the comparison signal with near-duplicate entries for every low note.
+    ReplayObj.soundLog = [];
+    Synth.playNote(30); // low enough to trigger the internal harmonic recursive call
+    if (ReplayObj.soundLog.length !== 1 || ReplayObj.soundLog[0].midi !== 30) {
+        console.error(`FAIL: a low note's internal bass-boost harmonic call should NOT be separately recorded! Got: ${JSON.stringify(ReplayObj.soundLog)}`);
+        process.exit(1);
+    }
+    ReplayObj.soundLog = [];
+    console.log("PASS: Replay.wrapSynth() records every real note played (not internal bass-boost harmonics) into its own soundLog!");
+
+    console.log("Running Replay soundLog capped-eviction test...");
+    ReplayObj.soundLog = [];
+    for (let i = 0; i <= ReplayObj.MAX_SOUND_EVENTS * 2; i++) {
+        ReplayObj.recordSound(i);
+    }
+    if (ReplayObj.soundLog.length !== ReplayObj.MAX_SOUND_EVENTS) {
+        console.error(`FAIL: Replay.soundLog should converge to exactly MAX_SOUND_EVENTS (${ReplayObj.MAX_SOUND_EVENTS}) right after crossing the 2x trim threshold, but was ${ReplayObj.soundLog.length}`);
+        process.exit(1);
+    }
+    if (ReplayObj.soundLog[0].midi !== ReplayObj.MAX_SOUND_EVENTS + 1) {
+        console.error(`FAIL: Replay.soundLog should evict the OLDEST sound events first, oldest surviving midi should be ${ReplayObj.MAX_SOUND_EVENTS + 1}, was ${ReplayObj.soundLog[0].midi}`);
+        process.exit(1);
+    }
+    ReplayObj.soundLog = [];
+    console.log("PASS: Replay.soundLog is its own capped, amortized-eviction log, independent of the input-event log!");
 
     console.log("Running scripts/replay-to-gif.js option parsing test...");
     const { parseArgs, isVirtualButtonTarget } = require('../scripts/replay-to-gif.js');

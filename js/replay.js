@@ -24,8 +24,9 @@ for the JavaScript code in this file.
 /**
  * replay.js - Always-on input recording for post-hoc bug reports and full session recreation.
  *
- * Keeps a rolling log of the last MAX_EVENTS raw events (keydown, pointer down/up, and viewport
- * resize/orientation changes) from page load, independent of the current mode. Modes routinely
+ * Keeps a rolling log of the last MAX_EVENTS raw events (keydown, pointer down/up, viewport
+ * resize/orientation changes, and every real note played -- see wrapSynth) from page load,
+ * independent of the current mode. Modes routinely
  * reassign window.onkeydown per mode switch (App.setMode nulls it, each mode's setupEvents()
  * reassigns it) -- this listens via addEventListener instead, so it keeps recording across every
  * mode change without needing any mode to cooperate.
@@ -57,6 +58,36 @@ const Replay = {
     seed: null,
     tickSeq: 0,
 
+    // Sound events get their own, much larger ring buffer, entirely separate from `log` (raw
+    // input events). They're a fundamentally different kind of data -- a dense, high-frequency
+    // verification trace rather than sparse reconstruction instructions -- and their volume
+    // reflects that: one real ~2-game Gravity session produced ~2100 sound events against just
+    // ~250 real input events (89% of a combined log), which would have evicted precious,
+    // irreplaceable early-session input events out of a shared MAX_EVENTS buffer on any longer
+    // session. Each entry is tiny ({t, tick, midi}), so a generous cap costs little.
+    MAX_SOUND_EVENTS: 50000,
+    soundLog: [],
+
+    // Both logs are capped by amortized trimming, not a shift() on every single push: shift()
+    // is O(n) (it re-indexes every remaining element), so paying it on every insert once a log
+    // is at capacity would mean every single recorded event/sound costs O(n) work. Letting a log
+    // grow to 2x its nominal cap before bulk-trimming back down to exactly the cap in one splice
+    // pays the same total trimming work, amortized across `cap` pushes instead of paid on every
+    // one -- O(1) amortized per push, at the cost of the log occasionally holding up to 2x its
+    // nominal cap in memory (a few extra MB at most here, trivial). Both logs stay plain,
+    // chronologically-ordered arrays throughout -- callers (tests, replay-to-gif.js, the JSON
+    // export below) read them directly, no wrap-around indexing to account for.
+    trimToCapacity: function(arr, cap) {
+        if (arr.length > cap * 2) {
+            arr.splice(0, arr.length - cap);
+        }
+    },
+
+    recordSound: function(midi) {
+        this.soundLog.push({ t: Date.now(), tick: this.tickSeq, midi });
+        this.trimToCapacity(this.soundLog, this.MAX_SOUND_EVENTS);
+    },
+
     record: function(entry) {
         // Stamp every recorded event with the current automatic-tick count (see recordTick) --
         // the delta between two consecutive events' `tick` values is exactly how many automatic
@@ -68,9 +99,7 @@ const Replay = {
         // tool can just call tick() this many times directly, with no timing involved at all.
         entry.tick = this.tickSeq;
         this.log.push(entry);
-        if (this.log.length > this.MAX_EVENTS) {
-            this.log.shift();
-        }
+        this.trimToCapacity(this.log, this.MAX_EVENTS);
     },
 
     // Called as the first line of any mode's automatic tick() (GravityMode, SnakeMode) --
@@ -146,10 +175,37 @@ const Replay = {
         this.record({ type: 'visibility', t: Date.now(), state: document.visibilityState });
     },
 
+    // Raw input events alone leave a replay tool with nothing to check its own reconstruction
+    // against except the very final state -- if it drifts from reality anywhere along the way,
+    // there's no way to tell where. But every mode's every meaningful action already plays a
+    // specific, exact set of Tonnetz notes (INV-4, docs/invariants.md) -- a placement's chord, a
+    // move's single note, a cleared line's chord of every note it contained. Recording that
+    // sequence turns it into a compact, structured checkpoint: a replay tool's own reconstruction
+    // (which runs the real app, so it plays its OWN sounds through this same recording) can be
+    // diffed note-by-note against the original recording to find the exact tick two runs first
+    // disagree, rather than only ever comparing the end.
+    //
+    // Wraps Synth.playNote specifically (not playChord) since playChord's own implementation
+    // calls playNote once per note internally -- wrapping both would double-record every chord.
+    // playNote's own recursive bass-boost call for low notes (isHarmonic=true) is skipped: it's
+    // an audio-engineering detail, not a distinct game event, and would otherwise add a
+    // near-duplicate entry for every low note played.
+    wrapSynth: function() {
+        if (typeof Synth === 'undefined' || typeof Synth.playNote !== 'function') return;
+        const originalPlayNote = Synth.playNote.bind(Synth);
+        Synth.playNote = (midi, t0, dur, peak, isHarmonic) => {
+            if (!isHarmonic) {
+                this.recordSound(midi);
+            }
+            return originalPlayNote(midi, t0, dur, peak, isHarmonic);
+        };
+    },
+
     init: function() {
         this.seedRandom();
         this.recordMeta();
         this.recordViewport();
+        this.wrapSynth();
 
         window.addEventListener('keydown', (e) => {
             this.record({ type: 'keydown', t: Date.now(), key: e.key, code: e.code, shiftKey: e.shiftKey });
@@ -200,7 +256,7 @@ const Replay = {
 
     // No server involved -- a Blob + object URL + synthetic click, all client-side.
     downloadFullLog: function() {
-        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log });
+        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log, sounds: this.soundLog });
         const blob = new Blob([fullLogJson], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -215,7 +271,7 @@ const Replay = {
     // Falls back to a hidden-textarea copy for browsers/contexts where navigator.clipboard is
     // unavailable (e.g. insecure file:// origins).
     copyFullLogToClipboard: function() {
-        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log });
+        const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log, sounds: this.soundLog });
         if (navigator.clipboard && navigator.clipboard.writeText) {
             return navigator.clipboard.writeText(fullLogJson).catch(() => this.legacyCopy(fullLogJson));
         }
@@ -253,9 +309,11 @@ const Replay = {
 // { seed, meta, events } together are enough to fully recreate a session: the seed reproduces
 // the exact random piece sequence, meta carries the session-level browser facts that affect how
 // input dispatches and how the game behaves, and events carries every keystroke/tap plus the
-// viewport size at each point in time. See the file header comment for why each part matters.
+// viewport size at each point in time. `sounds` isn't needed for reconstruction itself -- it's a
+// separate verification trace (see Replay.wrapSynth) a replay tool can diff its own
+// reconstruction's sounds against to find exactly where the two first disagree.
 window.replay = function() {
-    return JSON.stringify({ seed: Replay.seed, meta: Replay.meta, events: Replay.log });
+    return JSON.stringify({ seed: Replay.seed, meta: Replay.meta, events: Replay.log, sounds: Replay.soundLog });
 };
 
 if (typeof module !== 'undefined') {
