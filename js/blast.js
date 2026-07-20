@@ -156,7 +156,7 @@ const BlastMode = {
                 className: 'placed-piece',
                 data: { p, q }
             });
-            Render.svg.appendChild(hex);
+            Render.appendToLattice(hex);
         });
 
         const boardCells = [];
@@ -290,7 +290,7 @@ const BlastMode = {
                     data: { p: c.p, q: c.q }
                 });
                 hex.style.pointerEvents = 'none';
-                Render.svg.appendChild(hex);
+                Render.appendToLattice(hex);
             });
 
             // Every distinct ghost position/orientation sounds its own cells — see

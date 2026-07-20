@@ -35,6 +35,54 @@ const Render = {
 
     init: function(svgId) {
         this.svg = document.getElementById(svgId);
+        const stored = parseInt(localStorage.getItem('tonncade_rotation_deg') || '0', 10);
+        this.rotationDeg = isNaN(stored) ? 0 : ((stored % 360) + 360) % 360;
+    },
+
+    rotationDeg: 0,
+
+    // Sets the view rotation (any degrees, normalized into [0, 360)) and persists it. Does not
+    // redraw -- callers own their own redraw entrypoint (refreshBoard/refreshLattice/refreshUI
+    // differ by mode; see js/main.js's rotate-view button handler).
+    setRotation: function(deg) {
+        this.rotationDeg = ((deg % 360) + 360) % 360;
+        localStorage.setItem('tonncade_rotation_deg', this.rotationDeg);
+    },
+
+    // Gravity's falling mechanic is defined entirely in axial (p, q) space ("down" is a fixed
+    // direction in that space -- see js/gravity.js), independent of how the lattice happens to
+    // be drawn on screen. Rotating gravity's RENDERING without also rotating its game logic would
+    // make pieces visibly fall sideways or upward while the code still calls that direction
+    // "down" -- so Gravity always renders at 0 regardless of the player's stored preference,
+    // rather than trying to keep logic and rendering in sync under an arbitrary render rotation.
+    getEffectiveRotation: function() {
+        if (typeof App !== 'undefined' && App.currentMode === 'gravity') return 0;
+        return this.rotationDeg;
+    },
+
+    // getScreenPos(p, q), rotated by the current effective rotation around the origin -- the
+    // actual on-screen position once the lattice-group's rotate() transform (see drawLattice) is
+    // applied. Bounding-box math (getFitView, getPanBounds) needs THIS, not the raw unrotated
+    // position, to correctly fit/clamp against what's actually visible on screen.
+    getRotatedScreenPos: function(p, q) {
+        const pos = this.getScreenPos(p, q);
+        const deg = this.getEffectiveRotation();
+        if (deg === 0) return pos;
+        const rad = deg * Math.PI / 180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        return {
+            x: pos.x * cos - pos.y * sin,
+            y: pos.x * sin + pos.y * cos
+        };
+    },
+
+    // Appends into the lattice's own group (see drawLattice) rather than directly onto the <svg>,
+    // so placed pieces/ghosts/gems/labels inherit that group's rotate() transform and turn
+    // together with the base lattice, instead of staying fixed in place while the grid rotates
+    // under them. Falls back to a direct svg append if drawLattice hasn't run yet.
+    appendToLattice: function(el) {
+        const group = this.svg.querySelector('#lattice-group');
+        (group || this.svg).appendChild(el);
     },
 
     // Convert axial (p, q) to screen (x, y)
@@ -105,6 +153,15 @@ const Render = {
         });
     },
 
+    // Counter-rotates a label around its own anchor point so it stays upright regardless of the
+    // lattice-group's overall rotation -- a child's own rotate(-D) composes with the parent
+    // group's rotate(D) to net zero rotation for the glyph itself, while the anchor point (and
+    // so the label's position) still moves correctly with the group.
+    applyLabelCounterRotation: function(el, x, y) {
+        const deg = this.getEffectiveRotation();
+        if (deg !== 0) el.setAttribute('transform', `rotate(${-deg} ${x} ${y})`);
+    },
+
     createLabel: function(p, q, text) {
         const pos = this.getScreenPos(p, q);
         const t = document.createElementNS(this.NS, 'text');
@@ -113,6 +170,7 @@ const Render = {
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('class', 'note-label');
         t.textContent = text;
+        this.applyLabelCounterRotation(t, pos.x, pos.y + 5);
         return t;
     },
 
@@ -124,6 +182,7 @@ const Render = {
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('class', 'qwerty-label');
         t.textContent = text;
+        this.applyLabelCounterRotation(t, pos.x, pos.y - 7);
         return t;
     },
 
@@ -131,7 +190,9 @@ const Render = {
         this.svg.innerHTML = '';
         const group = document.createElementNS(this.NS, 'g');
         group.setAttribute('id', 'lattice-group');
-        
+        const rotationDeg = this.getEffectiveRotation();
+        if (rotationDeg !== 0) group.setAttribute('transform', `rotate(${rotationDeg})`);
+
         // Render range
         for (let p = viewport.minP; p <= viewport.maxP; p++) {
             for (let q = viewport.minQ; q <= viewport.maxQ; q++) {
@@ -219,7 +280,7 @@ const Render = {
             for (let q = -15; q <= 15; q++) {
                 const midi = Tonnetz.getMidi(p, q);
                 if (midi < 0 || midi > 127) continue;
-                const pos = this.getScreenPos(p, q);
+                const pos = this.getRotatedScreenPos(p, q);
                 minX = Math.min(minX, pos.x - this.HEX_R);
                 maxX = Math.max(maxX, pos.x + this.HEX_R);
                 minY = Math.min(minY, pos.y - this.HEX_R);
@@ -255,7 +316,7 @@ const Render = {
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         cells.forEach(c => {
-            const pos = this.getScreenPos(c.p, c.q);
+            const pos = this.getRotatedScreenPos(c.p, c.q);
             minX = Math.min(minX, pos.x - this.HEX_R);
             maxX = Math.max(maxX, pos.x + this.HEX_R);
             minY = Math.min(minY, pos.y - this.HEX_R);

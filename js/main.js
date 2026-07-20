@@ -59,6 +59,7 @@ const App = {
         this.setupTouchGestures();
         this.updateVersionTag();
         this.setupMidiInput();
+        this.setupRotateView();
 
         window.addEventListener('resize', () => {
             this.setupMobileControls();
@@ -121,6 +122,12 @@ const App = {
 
         this.currentMode = mode;
         document.getElementById('app').setAttribute('data-mode', mode);
+
+        // Gravity's "down" is fixed in its own falling-piece logic (see Render.getEffectiveRotation),
+        // so rotating its view would desync what the player sees from what the game means by
+        // "down" -- hide the control there rather than let it silently do nothing.
+        const rotateBtn = document.getElementById('rotate-view-btn');
+        if (rotateBtn) rotateBtn.style.display = mode === 'gravity' ? 'none' : 'inline';
 
         // Configure mobile action button text based on active mode
         const actionBtn = document.getElementById('m-btn-action');
@@ -918,6 +925,32 @@ const App = {
         }
         btn.onclick = () => {
             MidiInput.connect().catch(err => console.warn('MIDI connection failed:', err));
+        };
+    },
+
+    // Which function actually redraws each mode's board -- differs by mode (see js/blast.js's
+    // own comment on why it needs refreshUI specifically, not refreshBoard alone). Gravity is
+    // deliberately absent: its rotate button stays hidden (see setMode below), since
+    // Render.getEffectiveRotation() always renders Gravity at 0 regardless of this setting.
+    modeRefreshFns: {
+        sandbox: () => SandboxMode.refreshLattice(),
+        blast: () => BlastMode.refreshUI(),
+        midi: () => MidiMode.refreshBoard(),
+        snake: () => SnakeMode.refreshBoard(),
+    },
+
+    // A hexagon has 60-degree self-symmetry, so a hex lattice looks like a clean, uniformly-
+    // rotated field of tiles at ANY rotation angle -- there's no "wrong" step size the way there
+    // would be for e.g. a square grid. 30-degree steps cover both the pointy-top (0/60/120/...)
+    // and flat-top (30/90/150/...) families, plus exact quarter-turns to match screen
+    // portrait/landscape or a MIDI controller's own physical orientation.
+    setupRotateView: function() {
+        const btn = document.getElementById('rotate-view-btn');
+        if (!btn) return;
+        btn.onclick = () => {
+            Render.setRotation(Render.rotationDeg + 30);
+            const refresh = this.modeRefreshFns[this.currentMode];
+            if (refresh) refresh();
         };
     },
 

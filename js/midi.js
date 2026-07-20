@@ -252,7 +252,7 @@ const MidiMode = {
                 data: { p, q }
             });
             hex.style.pointerEvents = 'none';
-            Render.svg.appendChild(hex);
+            Render.appendToLattice(hex);
         }
     },
 

@@ -377,13 +377,13 @@ const SnakeMode = {
                 strokeWidth: 2,
                 className: 'snake-gem'
             });
-            Render.svg.appendChild(hex);
+            Render.appendToLattice(hex);
 
             // Gem Label
             const gemMidi = Tonnetz.getMidi(gem.p, gem.q);
             const label = Render.createLabel(gem.p, gem.q, Tonnetz.getNoteName(gemMidi));
             label.setAttribute('class', 'note-label gem-label');
-            Render.svg.appendChild(label);
+            Render.appendToLattice(label);
         }
 
         // Draw Snake body (backwards from tail to head, so head lays on top)
@@ -397,12 +397,12 @@ const SnakeMode = {
                 strokeWidth: 1.5,
                 className: isHead ? 'snake-head' : 'snake-body'
             });
-            Render.svg.appendChild(hex);
+            Render.appendToLattice(hex);
 
             // Label segment
             const midi = Tonnetz.getMidi(segment.p, segment.q);
             const label = Render.createLabel(segment.p, segment.q, Tonnetz.getNoteName(midi));
-            Render.svg.appendChild(label);
+            Render.appendToLattice(label);
         }
 
         Render.updateView(-440, -330, 1.1);

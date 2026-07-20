@@ -218,7 +218,7 @@ const SandboxMode = {
         
         // Re-append note and keyboard labels to the end of the SVG so they render on top of placed pieces
         const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
-        labels.forEach(lbl => Render.svg.appendChild(lbl));
+        labels.forEach(lbl => Render.appendToLattice(lbl));
 
         this.state.zoom = Render.getResponsiveZoom();
         Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
@@ -242,7 +242,7 @@ const SandboxMode = {
                 hex.onmouseleave = () => this.hidePlacedTooltip();
                 hex.onmousemove = (e) => this.movePlacedTooltip(e);
 
-                Render.svg.appendChild(hex);
+                Render.appendToLattice(hex);
             });
         });
     },
@@ -451,12 +451,12 @@ const SandboxMode = {
                     data: { p: c.p, q: c.q }
                 });
                 hex.style.pointerEvents = 'none';
-                Render.svg.appendChild(hex);
+                Render.appendToLattice(hex);
             });
 
             // Re-append note and keyboard labels so they stay on top of the ghost piece
             const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
-            labels.forEach(lbl => Render.svg.appendChild(lbl));
+            labels.forEach(lbl => Render.appendToLattice(lbl));
 
             // Every distinct ghost position/orientation sounds its own cells — the single
             // authoritative place this happens, so callers (drag, keyboard nav, rotation,

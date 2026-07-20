@@ -383,7 +383,7 @@ const GravityMode = {
                     className: 'placed-piece',
                     data: { p, q }
                 });
-                Render.svg.appendChild(hex);
+                Render.appendToLattice(hex);
             }
         });
 
@@ -398,14 +398,14 @@ const GravityMode = {
                     strokeWidth: 2,
                     className: 'active-piece'
                 });
-                Render.svg.appendChild(hex);
+                Render.appendToLattice(hex);
             });
 
             // Draw active piece labels
             cells.forEach(c => {
                 const midi = Tonnetz.getMidi(c.p, c.q);
                 const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
-                Render.svg.appendChild(label);
+                Render.appendToLattice(label);
             });
 
             // Render ghost projection
@@ -469,7 +469,7 @@ const GravityMode = {
                 className: 'ghost'
             });
             hex.style.pointerEvents = 'none';
-            Render.svg.appendChild(hex);
+            Render.appendToLattice(hex);
         });
     },
 

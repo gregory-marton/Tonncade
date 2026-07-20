@@ -233,6 +233,15 @@ its own mirror image, verified directly for both the 60° bend (`V`) and the 120
 there is no second, genuinely distinct 120°-bend shape to give `<` — the correct fix was
 removing the duplicate outright (`<` no longer exists).
 
+The test enumerates the *entire* shape space per size (starting from the single-cell shape and
+growing by every way to attach one more cell, deduplicating by canonical rotation at each step)
+rather than just checking the one known duplicate pairwise — so it catches gaps as well as
+duplicates, and needs no changes if a future size (5-cell pentahexes, say) is ever added: it
+reads which sizes exist directly from `Pieces.TYPES`. Current counts: 1-cell → 1 shape, 2-cell →
+1, 3-cell → 3, 4-cell → 10 — all fully covered.
+
+**Test:** `tests/run_tests.js` — "complete-polyhex-coverage test"
+
 ### INV-23: Live MIDI hardware input plays and highlights exactly like the equivalent tap
 
 In any mode with a "play a free note" concept (Sandbox, Melody), a note-on message from a
@@ -257,14 +266,42 @@ the same note as a Sandbox tap" and "INV-23: live MIDI hardware note-on advances
 practice sequence like a tap" (both drive a mocked `navigator.requestMIDIAccess`, since no real
 MIDI hardware is available in CI).
 
-The test enumerates the *entire* shape space per size (starting from the single-cell shape and
-growing by every way to attach one more cell, deduplicating by canonical rotation at each step)
-rather than just checking the one known duplicate pairwise — so it catches gaps as well as
-duplicates, and needs no changes if a future size (5-cell pentahexes, say) is ever added: it
-reads which sizes exist directly from `Pieces.TYPES`. Current counts: 1-cell → 1 shape, 2-cell →
-1, 3-cell → 3, 4-cell → 10 — all fully covered.
+### INV-24: Rotating the Tonnetz view keeps everything else about the board correct
 
-**Test:** `tests/run_tests.js` — "complete-polyhex-coverage test"
+The player can rotate the whole rendered lattice (`#rotate-view-btn`, `js/render.js`'s
+`Render.rotationDeg`/`setRotation`) in 30°-steps — motivated live by a real AXiS-49 MIDI
+keyboard being physically oriented differently than the on-screen Tonnetz expected, and by
+Snake/Blast's narrower aspect ratios sometimes fitting better with the lattice's flats aligned
+to the screen edges instead of its points. 30° (not 60°) is deliberate: a hexagon's own 60°
+self-symmetry means EVERY rotation angle renders a perfectly normal, uniformly-rotated field of
+hexagons — there's no "wrong" angle the way there would be for a shape without 6-fold symmetry
+— so 30° steps cleanly reach both the pointy-top family (0/60/120°...) and the flat-top family
+(30/90/150°...), including exact quarter turns to match portrait/landscape or a physical
+device's own orientation.
+
+This is a purely visual transform on `#lattice-group`, entirely decoupled from the underlying
+axial (p, q) coordinate system every mode's game logic runs on — nothing about placement,
+collision, or note mapping changes. Everything rendered must rotate together, not just the base
+lattice: placed pieces, ghosts, the Snake body/gem, and Melody's QWERTY labels are all routed
+through `Render.appendToLattice()` (appending into `#lattice-group` itself) rather than
+appending directly onto `<svg>`, specifically so they inherit the group's rotation instead of
+staying visually fixed while the grid turns under them. Note-name/QWERTY labels counter-rotate
+individually (`Render.applyLabelCounterRotation`) so they stay upright and legible at any angle,
+matching the original vision in task #28. `Render.getFitView`/`getPanBounds` compute their
+bounding boxes from `Render.getRotatedScreenPos`, not the raw unrotated position, so fitting and
+pan-clamping stay correct (nothing clipped) at any rotation.
+
+Gravity is the one exception: its falling mechanic is defined entirely in axial space ("down"
+is a fixed direction there, independent of rendering), so rotating gravity's on-screen render
+without also rotating its game logic would make pieces visibly fall sideways while the code
+still calls that direction "down." `Render.getEffectiveRotation()` always returns 0 in Gravity
+regardless of the player's stored preference, and the rotate button hides itself there rather
+than silently doing nothing.
+
+**Test:** `tests/invariants.spec.js` — the six "INV-24: ..." tests (transform value per click,
+30° wraparound + localStorage persistence across reload, no cell becomes clipped/unobscured
+after rotating, a placed piece visibly moves with the lattice rather than staying fixed, a
+label's on-screen aspect ratio stays constant across rotation, and Gravity's immunity).
 
 ---
 

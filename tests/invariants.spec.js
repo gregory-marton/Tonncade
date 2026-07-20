@@ -935,4 +935,134 @@ test.describe('Invariant tests', () => {
       ).toBeGreaterThan(minHeightFraction);
     }
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-24: rotating the Tonnetz view (js/main.js's #rotate-view-btn, js/render.js's
+  // Render.rotationDeg/getEffectiveRotation) keeps everything else about the board correct --
+  // nothing clipped, labels stay upright, and Gravity is immune (see docs/invariants.md).
+  // ────────────────────────────────────────────────────────────────────────
+
+  const clickRotateButton = (page, times = 1) => page.evaluate((n) => {
+    for (let i = 0; i < n; i++) document.getElementById('rotate-view-btn').click();
+  }, times);
+
+  test('INV-24: the rotate button steps the lattice-group transform by exactly 30 degrees per click', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const readTransform = () => page.evaluate(() =>
+      document.getElementById('lattice-group').getAttribute('transform')
+    );
+
+    expect(await readTransform()).toBeNull(); // 0 degrees omits the attribute entirely
+    await clickRotateButton(page);
+    expect(await readTransform()).toBe('rotate(30)');
+    await clickRotateButton(page, 2);
+    expect(await readTransform()).toBe('rotate(90)');
+  });
+
+  test('INV-24: the rotate button wraps from 330 back to 0, and the chosen angle persists across a reload', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    await clickRotateButton(page, 11); // 11 * 30 = 330
+    expect(await page.evaluate(() => Render.rotationDeg)).toBe(330);
+    await clickRotateButton(page, 1); // 330 + 30 = 360 -> wraps to 0
+    expect(await page.evaluate(() => Render.rotationDeg)).toBe(0);
+
+    await clickRotateButton(page, 3); // 90 degrees, a value worth surviving a reload
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(await page.evaluate(() => Render.rotationDeg)).toBe(90);
+
+    // Leave global state clean for any test that runs after this one in the same worker.
+    await page.evaluate(() => Render.setRotation(0));
+  });
+
+  test('INV-24: rotating the view keeps every playable cell visible and unobscured', async ({ page }) => {
+    for (const mode of ['sandbox', 'midi', 'snake', 'blast']) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      await clickRotateButton(page, 3); // 90 degrees
+      const { unobscured } = await measureBoardOcclusion(page);
+      expect(unobscured, `mode=${mode} at 90 degrees`).toBeGreaterThanOrEqual(20);
+      await page.evaluate(() => Render.setRotation(0));
+    }
+  });
+
+  test('INV-24: a placed Sandbox piece rotates together with the base lattice, not independently of it', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(() => {
+      SandboxMode.state.selectedPiece = '-';
+      SandboxMode.state.rotation = 0;
+      SandboxMode.state.hoverCell = { p: 2, q: 2 };
+      SandboxMode.placePiece(2, 2);
+    });
+
+    const beforeCenter = await page.evaluate(() => {
+      const el = document.querySelector('polygon.placed-piece[data-p="2"][data-q="2"]');
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+
+    await clickRotateButton(page, 3); // 90 degrees
+    await page.evaluate(() => SandboxMode.refreshLattice());
+
+    const afterCenter = await page.evaluate(() => {
+      const el = document.querySelector('polygon.placed-piece[data-p="2"][data-q="2"]');
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+
+    // If the placed piece had stayed fixed while only the base lattice rotated under it (the
+    // exact bug appendToLattice fixes), its screen position wouldn't move at all here.
+    const moved = Math.hypot(afterCenter.x - beforeCenter.x, afterCenter.y - beforeCenter.y);
+    expect(moved).toBeGreaterThan(5);
+
+    await page.evaluate(() => Render.setRotation(0));
+  });
+
+  test('INV-24: note labels stay upright (same on-screen aspect ratio) regardless of lattice rotation', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    // Labels don't carry data-p/data-q themselves (only their own x/y position, set from
+    // getScreenPos(p, q) BEFORE any rotation is applied -- see createLabel) -- match by that
+    // instead of adding attributes solely for this test to read.
+    const rectAt = async (deg) => {
+      await page.evaluate((d) => { Render.setRotation(d); SandboxMode.refreshLattice(); }, deg);
+      return page.evaluate(() => {
+        const expectedX = Render.getScreenPos(2, 2).x;
+        const target = Array.from(document.querySelectorAll('text.note-label')).find(t =>
+          Math.abs(parseFloat(t.getAttribute('x')) - expectedX) < 0.5
+        );
+        const r = target.getBoundingClientRect();
+        return { width: r.width, height: r.height };
+      });
+    };
+
+    const rect0 = await rectAt(0);
+    const rect90 = await rectAt(90);
+
+    // A genuinely-rotated (not counter-rotated) label would swap width and height at 90 degrees.
+    // Generous tolerance since sub-pixel font rendering isn't perfectly deterministic.
+    expect(rect90.width).toBeGreaterThan(rect0.width * 0.5);
+    expect(rect90.height).toBeLessThan(rect0.height * 2);
+
+    await page.evaluate(() => Render.setRotation(0));
+  });
+
+  test('INV-24: Gravity always renders at 0 degrees and hides the rotate control, regardless of the stored preference', async ({ page }) => {
+    await page.evaluate(() => Render.setRotation(90));
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    expect(await page.evaluate(() => Render.getEffectiveRotation())).toBe(0);
+    expect(await page.evaluate(() =>
+      document.getElementById('lattice-group').getAttribute('transform')
+    )).toBeNull();
+    await expect(page.locator('#rotate-view-btn')).toBeHidden();
+
+    // Switching back to a rotatable mode should honor the still-stored preference.
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    expect(await page.evaluate(() => Render.getEffectiveRotation())).toBe(90);
+    await expect(page.locator('#rotate-view-btn')).toBeVisible();
+
+    await page.evaluate(() => Render.setRotation(0));
+  });
 });
