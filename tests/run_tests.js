@@ -414,6 +414,95 @@ try {
     }
     console.log("PASS: Every piece is connected, non-overlapping, and closed under rotation at all 6 orientations!");
 
+    // INVARIANT (GitHub issue #3): every piece SIZE the game defines has COMPLETE coverage of
+    // all distinct "one-sided" polyhexes of that size -- every connected hex shape achievable
+    // with N cells, distinct under rotation only (not reflection, since pieces here never flip)
+    // -- with no duplicates and no gaps. This is what actually went wrong with the 3-cell
+    // "bendy" pieces '<'/'>': coded as byte-identical shapes, a straight-up duplicate rather
+    // than the two real trihex bend shapes (only one 120-degree bend exists, since it's
+    // self-mirroring under this rotation-only system -- verified directly: no geometrically
+    // distinct mirror image is reachable). Enumerating the full shape space and comparing
+    // against it, rather than just checking pairwise for THIS ONE known duplicate, catches
+    // every future case at once -- including a missing shape, not just a repeated one -- and
+    // needs no updates if a future size (e.g. 5-cell pentahexes) gets added: it reads which
+    // sizes actually exist from Pieces.TYPES itself.
+    console.log("Running complete-polyhex-coverage test...");
+    const canonicalShapeKey = (cells) => {
+        const sorted = [...cells].sort((a, b) => a.p - b.p || a.q - b.q);
+        const { p: dp, q: dq } = sorted[0];
+        return cells.map(c => cellKey({ p: c.p - dp, q: c.q - dq })).sort().join('|');
+    };
+    const canonicalRotationInvariantKey = (cells) => {
+        let cur = cells;
+        const candidates = [];
+        for (let i = 0; i < 6; i++) {
+            candidates.push(canonicalShapeKey(cur));
+            cur = PiecesObj.rotate(cur);
+        }
+        return candidates.sort()[0];
+    };
+
+    const piecesBySize = {};
+    for (const [typeKey, def] of Object.entries(PiecesObj.TYPES)) {
+        const size = def.cells.length;
+        (piecesBySize[size] = piecesBySize[size] || []).push(typeKey);
+    }
+    const maxSize = Math.max(...Object.keys(piecesBySize).map(Number));
+
+    // Enumerate every distinct one-sided polyhex shape from size 1 up to maxSize, growing each
+    // size's shapes from the previous size's by trying every way to attach one more cell.
+    let currentShapes = [[{ p: 0, q: 0 }]];
+    const enumeratedBySize = { 1: [canonicalRotationInvariantKey(currentShapes[0])] };
+    for (let size = 2; size <= maxSize; size++) {
+        const seen = new Set();
+        const nextShapes = [];
+        for (const shape of currentShapes) {
+            const inShape = new Set(shape.map(cellKey));
+            for (const c of shape) {
+                for (const n of TonnetzObj.getNeighbors(c.p, c.q)) {
+                    const nk = cellKey(n);
+                    if (inShape.has(nk)) continue;
+                    const candidate = [...shape, n];
+                    const ck = canonicalRotationInvariantKey(candidate);
+                    if (!seen.has(ck)) {
+                        seen.add(ck);
+                        nextShapes.push(candidate);
+                    }
+                }
+            }
+        }
+        enumeratedBySize[size] = [...seen];
+        currentShapes = nextShapes;
+    }
+
+    for (const size of Object.keys(piecesBySize).map(Number).sort((a, b) => a - b)) {
+        const actualKeys = piecesBySize[size].map(typeKey => canonicalRotationInvariantKey(PiecesObj.TYPES[typeKey].cells));
+        const actualSet = new Set(actualKeys);
+        if (actualSet.size !== actualKeys.length) {
+            const seenAlready = new Set();
+            let dupeTypeKey = null;
+            for (let i = 0; i < piecesBySize[size].length; i++) {
+                if (seenAlready.has(actualKeys[i])) { dupeTypeKey = piecesBySize[size][i]; break; }
+                seenAlready.add(actualKeys[i]);
+            }
+            console.error(`FAIL: size-${size} pieces have a duplicate shape -- '${dupeTypeKey}' is the same reachable shape as an earlier piece of the same size`);
+            process.exit(1);
+        }
+        const enumeratedSet = new Set(enumeratedBySize[size]);
+        const missing = [...enumeratedSet].filter(k => !actualSet.has(k));
+        if (missing.length > 0) {
+            console.error(`FAIL: size-${size} pieces are missing ${missing.length} of the ${enumeratedSet.size} possible distinct one-sided shapes -- coverage is incomplete!`);
+            process.exit(1);
+        }
+        const extra = [...actualSet].filter(k => !enumeratedSet.has(k));
+        if (extra.length > 0) {
+            console.error(`FAIL: size-${size} pieces include a shape the enumeration didn't produce -- either an invalid/disconnected piece, or an enumeration bug`);
+            process.exit(1);
+        }
+        console.log(`  size ${size}: ${actualSet.size}/${enumeratedSet.size} distinct shapes -- complete, no duplicates, no gaps`);
+    }
+    console.log("PASS: every piece size has complete coverage of all distinct one-sided polyhex shapes!");
+
     // INVARIANT: every wikipedia.org link in the source uses Special:MyLanguage, so a
     // non-English reader lands on their own language's edition (falling back to English if
     // no translation exists) instead of always being forced into English regardless of their

@@ -89,15 +89,16 @@ const Pieces = {
             color: '#f15bb5',
             cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:0}]
         },
+        // '<' used to exist alongside '>' here as a would-be chiral pair (GitHub issue #3), but
+        // both were coded as the exact same three-cell shape -- and no genuine mirror image is
+        // achievable for a plain 2-arm hex bend under this game's rotation-only piece system (any
+        // such bend is self-mirroring via some rotation, verified for both this 120-degree bend
+        // and the 60-degree 'V' bend below), so '<' was removed as a pure duplicate rather than
+        // kept as a fake distinct choice.
         '>': {
             name: '>',
             color: '#00bbf9',
             cells: [{p:1, q:-1}, {p:0, q:0}, {p:-1, q:0}]
-        },
-        '<': {
-            name: '<',
-            color: '#00f5d4',
-            cells: [{p:-1, q:0}, {p:0, q:0}, {p:1, q:-1}]
         },
         'V': {
             name: 'V',
@@ -120,8 +121,9 @@ const Pieces = {
 
     // Sandbox carousel order: simplest to most complex. Single hex, then the domino, then the
     // trihexes and tetrahexes each ordered roundest/most-compact -> straightest -> bendiest,
-    // with mirror-image pairs (>/<, L/J, P/Q, S/Z) kept adjacent.
-    CAROUSEL_ORDER: ['.', '-', 'V', '|', '>', '<', 'O', 'X', 'I', 'L', 'J', 'P', 'Q', 'C', 'S', 'Z'],
+    // with mirror-image pairs (L/J, P/Q, S/Z) kept adjacent. '>' has no such pair -- see its own
+    // comment above for why (GitHub issue #3).
+    CAROUSEL_ORDER: ['.', '-', 'V', '|', '>', 'O', 'X', 'I', 'L', 'J', 'P', 'Q', 'C', 'S', 'Z'],
 
     // Rotate 60 degrees counter-clockwise on screen (verified against Render.getScreenPos —
     // despite the name, this is NOT the visual "clockwise" direction; see docs/invariants.md).

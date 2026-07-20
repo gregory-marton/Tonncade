@@ -217,6 +217,32 @@ element's real size settles, rather than sticking around until the next unrelate
 **Test:** `tests/invariants.spec.js` — "INV-21: Gravity's board fills a real share of its
 available height, in portrait and landscape"
 
+### INV-22: Every piece size has complete polyhex coverage
+
+For every cell-count the game defines a piece size for (1-cell, 2-cell, 3-cell, 4-cell, and any
+future size), the registered pieces of that size must be exactly the full set of distinct
+"one-sided" polyhexes of that size — every connected hex shape achievable with that many cells,
+counted as distinct under rotation only (never reflection, since no piece here ever flips). No
+duplicates (two pieces that are secretly the same reachable shape) and no gaps (a valid shape
+with no piece for it).
+
+Real bug (GitHub issue #3): the two 3-cell "bendy" pieces `<` and `>` were coded as
+byte-identical cell arrays — a plain duplicate, not two genuinely different shapes. The
+tempting fix ("make them a real chiral pair") doesn't work: a plain 2-arm hex bend is always
+self-mirroring under a rotation-only piece system — rotating it by some multiple of 60° reaches
+its own mirror image, verified directly for both the 60° bend (`V`) and the 120° bend (`>`). So
+there is no second, genuinely distinct 120°-bend shape to give `<` — the correct fix was
+removing the duplicate outright (`<` no longer exists).
+
+The test enumerates the *entire* shape space per size (starting from the single-cell shape and
+growing by every way to attach one more cell, deduplicating by canonical rotation at each step)
+rather than just checking the one known duplicate pairwise — so it catches gaps as well as
+duplicates, and needs no changes if a future size (5-cell pentahexes, say) is ever added: it
+reads which sizes exist directly from `Pieces.TYPES`. Current counts: 1-cell → 1 shape, 2-cell →
+1, 3-cell → 3, 4-cell → 10 — all fully covered.
+
+**Test:** `tests/run_tests.js` — "complete-polyhex-coverage test"
+
 ---
 
 ## Primary Elements
