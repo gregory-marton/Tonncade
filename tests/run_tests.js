@@ -577,6 +577,97 @@ try {
     Board.cells.clear();
     console.log("PASS: Gravity pieces can overhang the side walls down to a single toe-hold hex, and the floor stays solid!");
 
+    // Real bug (GitHub issue #6, "floating piece"): dropRowsAbove(qClear) shifted every cell
+    // above the cleared line by calling getDown(p, q) on EACH CELL INDEPENDENTLY, using that
+    // cell's own row parity. getDown's parity-dependent zigzag is only valid for moving a
+    // SINGLE reference point (a falling piece's anchor) down by one row -- applying it
+    // per-cell to an already-locked multi-cell structure tears it apart whenever the structure
+    // spans both an even and an odd row and has cells connected via a diagonal (non
+    // "same-column") hex direction: two originally-adjacent cells can land on a NON-adjacent
+    // relative offset after the "shift," splitting a solid mass into a disconnected, visibly
+    // floating fragment the instant a line below it clears -- confirmed live via a real
+    // captured session's byte-for-byte-verified sound trace (see js/replay.js's
+    // Replay.wrapSynth and scripts/replay-to-gif.js's sound verification).
+    console.log("Running Gravity dropRowsAbove shape-preservation test...");
+    const GravityMode = vm.runInContext("GravityMode", context);
+    Board.cells.clear();
+
+    // Two cells connected via the "+Min3" hex direction (offset (-1,+1) -- see
+    // Tonnetz.getNeighbors), straddling an even/odd row boundary (q=4 even, q=5 odd), well
+    // above the row about to be cleared (q=0).
+    Board.cells.set('0,4', { type: 'X', color: '#ffffff' });
+    Board.cells.set('-1,5', { type: 'X', color: '#ffffff' });
+    const originalKeys = new Set(Board.cells.keys());
+
+    GravityMode.dropRowsAbove(0);
+
+    if (Board.cells.size !== 2) {
+        console.error(`FAIL: dropRowsAbove should move both cells, not lose or duplicate any -- got ${Board.cells.size} cells: ${JSON.stringify([...Board.cells.keys()])}`);
+        process.exit(1);
+    }
+    const movedKeys = [...Board.cells.keys()].map(k => k.split(',').map(Number));
+    // Both cells should have moved DOWN by exactly one row (q decreased by 1) each.
+    const originalQs = [...originalKeys].map(k => Number(k.split(',')[1])).sort();
+    const movedQs = movedKeys.map(([p, q]) => q).sort();
+    if (JSON.stringify(movedQs) !== JSON.stringify(originalQs.map(q => q - 1))) {
+        console.error(`FAIL: dropRowsAbove should move every cell down by exactly one row! Original q's: ${JSON.stringify(originalQs)}, after: ${JSON.stringify(movedQs)}`);
+        process.exit(1);
+    }
+    // The two cells' RELATIVE offset (their shape) must be preserved -- still a valid hex
+    // neighbor pair, exactly as before the shift, not sheared apart into a disconnected pair.
+    const [a, b] = movedKeys;
+    const relOffset = [b[0] - a[0], b[1] - a[1]];
+    const relOffsetAlt = [a[0] - b[0], a[1] - b[1]];
+    const validNeighborOffsets = [[1, 0], [-1, 0], [0, 1], [0, -1], [-1, 1], [1, -1]];
+    const isValidNeighborOffset = (off) => validNeighborOffsets.some(v => v[0] === off[0] && v[1] === off[1]);
+    if (!isValidNeighborOffset(relOffset) && !isValidNeighborOffset(relOffsetAlt)) {
+        console.error(`FAIL: dropRowsAbove sheared a connected structure apart! Cells that were adjacent (offset (-1,1)) ended up at a non-adjacent relative offset ${JSON.stringify(relOffset)} after the shift -- moved positions: ${JSON.stringify(movedKeys)}`);
+        process.exit(1);
+    }
+
+    Board.cells.clear();
+    console.log("PASS: Gravity's dropRowsAbove shifts connected structures as a single rigid body, never tearing them apart!");
+
+    // Conservation of hexes: clearing a line and cascading everything above it down must never
+    // create or destroy cells -- the total board population after should be exactly what it was
+    // before, minus the width of the cleared row (always 10 for Gravity's constant-width cup).
+    // The shape-preservation test above already checks one connected structure keeps its own
+    // shape; this checks the WHOLE-BOARD count across MULTIPLE disconnected structures at once,
+    // which is where a silent collision could hide -- two different components, each shifted by
+    // its own consistent-but-different delta, landing on the same target cell and overwriting
+    // (silently losing) one of them, something a single-component test can't exercise at all.
+    console.log("Running Gravity clear+cascade conservation-of-hexes test...");
+    Board.cells.clear();
+    // A full row at q=0 (Gravity's cup is a constant 10 columns wide, col -5..4).
+    const fullRow = [];
+    for (let col = -5; col <= 4; col++) {
+        const p = col; // floor(0/2) = 0
+        Board.cells.set(`${p},0`, { type: 'X', color: '#ffffff' });
+        fullRow.push({ p, q: 0 });
+    }
+    // Four separate disconnected structures above the clear line, spanning a mix of even/odd
+    // rows and both "same-column" and diagonal connections -- deliberately busy, the way a real
+    // mid-game board looks, not a single tidy piece.
+    const aboveCells = ['-4,3', '-4,4', '-1,4', '-2,5', '2,3', '2,4', '3,3', '0,8'];
+    aboveCells.forEach(key => Board.cells.set(key, { type: 'X', color: '#ffffff' }));
+
+    const sizeBefore = Board.cells.size; // 10 (row) + 8 (above) = 18
+    Board.clearCells(fullRow); // exactly what GravityMode.processClears itself calls
+    GravityMode.dropRowsAbove(0);
+    const sizeAfter = Board.cells.size;
+
+    if (sizeAfter !== sizeBefore - fullRow.length) {
+        console.error(`FAIL: conservation of hexes violated! ${sizeBefore} cells before, cleared a ${fullRow.length}-wide row, expected ${sizeBefore - fullRow.length} after, got ${sizeAfter} -- some cell was silently lost (or duplicated) during the cascade.`);
+        process.exit(1);
+    }
+    if (sizeAfter !== aboveCells.length) {
+        console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...Board.cells.keys()])}`);
+        process.exit(1);
+    }
+
+    Board.cells.clear();
+    console.log("PASS: clearing a line and cascading the board above it conserves exactly (before - row width) cells, even across multiple disconnected structures!");
+
     // INVARIANT (see docs/invariants.md): rotation direction is a shared foundation used by
     // every mode (tap-to-rotate, keyboard Space/G, two-finger twist, Gravity's D-pad) — get it
     // wrong once and it's wrong everywhere. Verify against real screen coordinates (not just

@@ -226,26 +226,65 @@ const GravityMode = {
         }
     },
 
+    // Shifts every locked cell above the cleared row down by one row -- but as a set of RIGID
+    // connected components, not cell-by-cell. getDown(p, q)'s zigzag (p unchanged for odd q,
+    // p+1 for even q) is only valid for moving a SINGLE reference point down by one row -- it's
+    // how a falling piece's own anchor moves, with the piece's actual shape always recomputed
+    // fresh from that one anchor (Pieces.getAbsoluteCells), never touching individual cells.
+    // Calling it on every ALREADY-LOCKED cell independently, using each cell's own row parity,
+    // tears a structure apart the moment it spans both an even and an odd row: two cells that
+    // were hex-neighbors before the shift can land on a non-neighbor relative offset after it
+    // (found live, GitHub issue #6 -- a connected mass split into a solid base and a visibly
+    // floating fragment the instant a line below it cleared). The fix: group cells into
+    // connected components first (matching real physical structure -- pieces locked at
+    // different times can end up touching, merging into one mass), then shift each component
+    // by a single, uniform (dp, dq) offset -- a uniform translation preserves every relative
+    // offset within the component by construction, so its shape can never be sheared.
     dropRowsAbove: function(qClear) {
-        const cellsToMove = [];
+        const cellsAbove = [];
         Board.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
-            if (q > qClear) {
-                cellsToMove.push({ p, q, val });
+            if (q > qClear) cellsAbove.push({ p, q, val, key });
+        });
+        if (cellsAbove.length === 0) return;
+
+        const byKey = new Map(cellsAbove.map(c => [c.key, c]));
+        const visited = new Set();
+        const components = [];
+        for (const start of cellsAbove) {
+            if (visited.has(start.key)) continue;
+            const component = [];
+            const stack = [start];
+            visited.add(start.key);
+            while (stack.length) {
+                const cur = stack.pop();
+                component.push(cur);
+                for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
+                    const nk = `${n.p},${n.q}`;
+                    const neighborCell = byKey.get(nk);
+                    if (neighborCell && !visited.has(nk)) {
+                        visited.add(nk);
+                        stack.push(neighborCell);
+                    }
+                }
             }
-        });
-        
-        // Sort bottom-to-top to prevent overwriting
-        cellsToMove.sort((a, b) => a.q - b.q);
-        
-        // Delete old positions
-        cellsToMove.forEach(c => Board.cells.delete(`${c.p},${c.q}`));
-        
-        // Insert at new vertically dropped positions
-        cellsToMove.forEach(c => {
-            const down = this.getDown(c.p, c.q);
-            Board.cells.set(`${down.p},${down.q}`, c.val);
-        });
+            components.push(component);
+        }
+
+        // Delete every old position first, across all components, before inserting any new
+        // one -- otherwise one component's insert could land on and overwrite another
+        // component's not-yet-relocated old cell.
+        cellsAbove.forEach(c => Board.cells.delete(c.key));
+
+        for (const component of components) {
+            const ref = component[0];
+            const down = this.getDown(ref.p, ref.q);
+            const dp = down.p - ref.p;
+            const dq = down.q - ref.q;
+            component.forEach(c => {
+                Board.cells.set(`${c.p + dp},${c.q + dq}`, c.val);
+            });
+        }
     },
 
     hardDrop: function() {
