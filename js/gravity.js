@@ -46,6 +46,18 @@ const GravityMode = {
         if (pauseBtn) pauseBtn.onclick = () => this.togglePause();
         if (resetBtn) resetBtn.onclick = () => this.reset();
 
+        // #tonnetz-svg's on-screen box can still be settling the first time refreshBoard() runs
+        // here (mobile layout uses `100dvh`, which Chromium can take an extra tick to resolve to
+        // its final value) -- refreshBoard()'s aspect-matched fit (see
+        // Render.getAspectMatchedRefBox) would otherwise permanently fit against that transient,
+        // too-small size, since nothing else re-triggers it once the game is running. A
+        // ResizeObserver re-fits whenever the element's actual box changes, for any reason,
+        // self-correcting regardless of the specific cause.
+        if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
+            this._resizeObserver = new ResizeObserver(() => this.refreshBoard());
+            this._resizeObserver.observe(Render.svg);
+        }
+
         this.reset();
         this.setupEvents();
     },
@@ -369,8 +381,13 @@ const GravityMode = {
                 cupCells.push({ p, q });
             }
         }
-        const fit = Render.getFitView(cupCells, Render.HEX_R * 2);
-        Render.updateView(fit.viewX, fit.viewY, fit.zoom);
+        // The cup is much taller than wide -- fit it against #tonnetz-svg's own actual on-screen
+        // aspect ratio (see Render.getAspectMatchedRefBox) rather than the historical fixed 4:3
+        // reference box, so it fills the element's real box instead of being letterboxed inside
+        // a mismatched shape.
+        const { refW, refH } = Render.getAspectMatchedRefBox();
+        const fit = Render.getFitView(cupCells, Render.HEX_R * 2, 1, refW, refH);
+        Render.updateView(fit.viewX, fit.viewY, fit.zoom, refW, refH);
     },
 
     updateGhost: function() {

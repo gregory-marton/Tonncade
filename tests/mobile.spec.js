@@ -1286,8 +1286,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
       const boardCenterX = (Math.min(...positions.map(pos => pos.x)) + Math.max(...positions.map(pos => pos.x))) / 2;
       const boardCenterY = (Math.min(...positions.map(pos => pos.y)) + Math.max(...positions.map(pos => pos.y))) / 2;
 
-      const viewBoxCenterX = Render.viewX + (800 * Render.zoom) / 2;
-      const viewBoxCenterY = Render.viewY + (600 * Render.zoom) / 2;
+      // Gravity fits against #tonnetz-svg's own actual aspect ratio (see
+      // Render.getAspectMatchedRefBox, INV-21 in docs/invariants.md), not a fixed 800x600 box.
+      const { refW, refH } = Render.getAspectMatchedRefBox();
+      const viewBoxCenterX = Render.viewX + (refW * Render.zoom) / 2;
+      const viewBoxCenterY = Render.viewY + (refH * Render.zoom) / 2;
 
       return { boardCenterX, boardCenterY, viewBoxCenterX, viewBoxCenterY };
     }, gravityCupCells());
@@ -1362,7 +1365,8 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
 
     const result = await page.evaluate((cells) => {
-      const fit = Render.getFitView(cells, Render.HEX_R * 2);
+      const { refW, refH } = Render.getAspectMatchedRefBox();
+      const fit = Render.getFitView(cells, Render.HEX_R * 2, 1, refW, refH);
       return { actualZoom: Render.zoom, fitZoom: fit.zoom };
     }, gravityCupCells());
 

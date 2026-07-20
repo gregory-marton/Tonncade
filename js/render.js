@@ -210,12 +210,24 @@ const Render = {
     },
 
     // Computes {viewX, viewY, zoom} that centers and snugly fits the given {p, q} cells into
-    // the 800x600 reference viewBox, padded by `padding` screen-space units around the
-    // content's bounding box. `scale` makes the result that much bigger on screen (e.g. 1.25
-    // renders 1.25x bigger) while staying centered on the same content midpoint.
-    getFitView: function(cells, padding = 0, scale = 1) {
+    // an 800x600 (or refW x refH, see below) reference viewBox, padded by `padding` screen-
+    // space units around the content's bounding box. `scale` makes the result that much bigger
+    // on screen (e.g. 1.25 renders 1.25x bigger) while staying centered on the same content
+    // midpoint.
+    //
+    // refW/refH default to the historical fixed 800x600 (4:3) reference frame every mode has
+    // always used -- callers that don't pass them get byte-identical behavior to before. A
+    // caller whose SVG element is NOT rendered at a 4:3 aspect ratio (e.g. a tall, narrow phone
+    // viewport) can instead pass a refW/refH matching its own actual on-screen aspect ratio, so
+    // the fitted content fills that box edge-to-edge instead of being centered with wasted
+    // letterbox margin inside it (found live: fixing just the CSS box that reserves this
+    // element's on-screen space, without ALSO matching the reference box's aspect ratio to it,
+    // had zero visible effect -- preserveAspectRatio="xMidYMid meet" just moved the wasted space
+    // from outside the SVG's DOM box to inside it). See updateView, which must be called with
+    // the SAME refW/refH so the actual viewBox attribute agrees with this math.
+    getFitView: function(cells, padding = 0, scale = 1, refW = 800, refH = 600) {
         if (!cells || cells.length === 0) {
-            return { viewX: -400, viewY: -300, zoom: 1 };
+            return { viewX: -refW / 2, viewY: -refH / 2, zoom: 1 };
         }
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -232,22 +244,25 @@ const Render = {
         minY -= padding;
         maxY += padding;
 
-        const zoom = Math.max((maxX - minX) / 800, (maxY - minY) / 600) / scale;
+        const zoom = Math.max((maxX - minX) / refW, (maxY - minY) / refH) / scale;
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
 
         return {
-            viewX: centerX - (800 * zoom) / 2,
-            viewY: centerY - (600 * zoom) / 2,
+            viewX: centerX - (refW * zoom) / 2,
+            viewY: centerY - (refH * zoom) / 2,
             zoom
         };
     },
 
-    updateView: function(viewX, viewY, zoom = 1) {
+    // refW/refH must match whatever getFitView (if any) computed viewX/viewY/zoom against --
+    // see getFitView's comment. Every existing caller omits them and keeps the historical
+    // 800x600 reference frame exactly as before.
+    updateView: function(viewX, viewY, zoom = 1, refW = 800, refH = 600) {
         const bounds = this.getPanBounds();
         if (bounds) {
-            const vbWidth = 800 * zoom;
-            const vbHeight = 600 * zoom;
+            const vbWidth = refW * zoom;
+            const vbHeight = refH * zoom;
             const maxViewX = bounds.maxX - vbWidth;
             const maxViewY = bounds.maxY - vbHeight;
             if (bounds.minX <= maxViewX) {
@@ -260,7 +275,19 @@ const Render = {
         this.viewX = viewX;
         this.viewY = viewY;
         this.zoom = zoom;
-        const vb = `${viewX} ${viewY} ${800 * zoom} ${600 * zoom}`;
+        const vb = `${viewX} ${viewY} ${refW * zoom} ${refH * zoom}`;
         this.svg.setAttribute('viewBox', vb);
+    },
+
+    // The reference box getFitView/updateView should use so fitted content fills #tonnetz-svg's
+    // actual on-screen box edge-to-edge instead of being letterboxed inside a mismatched fixed
+    // 4:3 shape. Keeps width fixed at 800 (preserving the existing zoom-magnitude scale) and
+    // derives height from the SVG element's real current aspect ratio. Falls back to the
+    // historical 800x600 if the element isn't laid out yet (e.g. zero size before first paint).
+    getAspectMatchedRefBox: function() {
+        if (!this.svg) return { refW: 800, refH: 600 };
+        const rect = this.svg.getBoundingClientRect();
+        if (!rect.width || !rect.height) return { refW: 800, refH: 600 };
+        return { refW: 800, refH: 800 * (rect.height / rect.width) };
     }
 };

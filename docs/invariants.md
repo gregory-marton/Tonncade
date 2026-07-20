@@ -179,6 +179,44 @@ but worth guarding directly against regardless, since the icons genuinely must n
 
 **Test:** `tests/mobile.spec.js` — "carousel piece-preview icons never change with any input"
 
+### INV-21: A restricted-Tonnetz board fills a real share of its available height
+
+On a fixed, non-pannable board (Snake/Blast/Gravity), the rendered board content must fill a
+meaningful fraction of the vertical space actually reserved for it — not just be *visible*
+(that's INV-11) but be rendered at a *size* worth looking at. Real-device report (GitHub issue
+#6): Gravity's board rendered at ~29% of the mobile viewport's height, with large dead margins
+above and below, despite every cell technically being on screen and unobscured.
+
+Two distinct, compounding bugs caused this, both in how `#tonnetz-svg` gets sized/fitted on
+mobile — worth understanding together since fixing only one has no visible effect on its own:
+
+1. **The CSS box itself was undersized.** `<svg>` is a "replaced element" with an intrinsic
+   aspect ratio (from its `viewBox`). When `top`/`right`/`bottom`/`left` are all given a
+   definite CSS value and `width`/`height` are both `auto`, browsers resolve ONE dimension from
+   the insets and derive the OTHER from the intrinsic ratio instead of stretching to fill its
+   own insets — silently ignoring whichever inset that leaves out. Fixed by giving both `width`
+   and `height` an explicit `calc()` (never `auto`) in the mobile media queries (`css/style.css`).
+2. **The reference viewBox didn't match the container's shape.** `Render.getFitView`/
+   `updateView` always fit content into a fixed 800x600 (4:3) reference frame, regardless of the
+   actual on-screen aspect ratio of `#tonnetz-svg`. Once (1) is fixed and the SVG's DOM box
+   correctly becomes tall and narrow on a phone, a fixed 4:3-shaped *reference viewBox* still
+   gets letterboxed inside that box by the browser's default `preserveAspectRatio`, moving the
+   wasted space from outside the SVG to inside it — invisible from outside, but just as wasteful.
+   Fixed by `Render.getAspectMatchedRefBox()`, which Gravity's `refreshBoard()` uses to fit
+   against the SVG's actual current aspect ratio instead of the fixed default. Every other
+   caller of `getFitView`/`updateView` omits this and keeps the historical 800x600 behavior
+   unchanged — Blast shares the same underlying issue but is deliberately not yet migrated,
+   since it also supports free two-finger panning through a separate shared gesture handler
+   that would need its own careful handling of a persisted reference-box aspect ratio.
+
+Mobile CSS layout can also report a transient, too-small size for a `100dvh`-based container
+before Chromium finishes resolving it — `GravityMode.init()` sets up a `ResizeObserver` on
+`#tonnetz-svg` so a fit computed against that transient size gets self-corrected once the
+element's real size settles, rather than sticking around until the next unrelated game event.
+
+**Test:** `tests/invariants.spec.js` — "INV-21: Gravity's board fills a real share of its
+available height, in portrait and landscape"
+
 ---
 
 ## Primary Elements

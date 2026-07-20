@@ -829,4 +829,51 @@ test.describe('Invariant tests', () => {
     await expect(drawer).not.toHaveClass(/expanded/);
     await expect(drawer).toHaveClass(/collapsed/);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-21: see docs/invariants.md for the two compounding CSS/rendering bugs this guards
+  // against (both needed fixing together -- fixing only one had no visible effect).
+  // ────────────────────────────────────────────────────────────────────────
+
+  test("INV-21: Gravity's board fills a real share of its available height, in portrait and landscape", async ({ page }) => {
+    const cases = [
+      { viewport: { width: 390, height: 844 }, label: 'portrait', minHeightFraction: 0.35 },
+      { viewport: { width: 852, height: 393 }, label: 'landscape', minHeightFraction: 0.65 },
+    ];
+
+    for (const { viewport, label, minHeightFraction } of cases) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+      // ResizeObserver (see docs/invariants.md) may need a beat to self-correct a transient
+      // too-small measurement from mobile `100dvh` layout still settling.
+      await page.waitForTimeout(300);
+
+      const boardHeightFraction = await page.evaluate(() => {
+        const svg = document.getElementById('tonnetz-svg');
+        const cupCells = [];
+        for (let q = 0; q < 20; q++) {
+          for (let p = -20; p <= 10; p++) {
+            const col = p + Math.floor(q / 2);
+            if (col < -5 || col > 4) continue;
+            cupCells.push({ p, q });
+          }
+        }
+        let minY = Infinity, maxY = -Infinity;
+        cupCells.forEach(c => {
+          const pos = Render.getScreenPos(c.p, c.q);
+          const pt = svg.createSVGPoint();
+          pt.x = pos.x; pt.y = pos.y;
+          const screenPt = pt.matrixTransform(svg.getScreenCTM());
+          minY = Math.min(minY, screenPt.y);
+          maxY = Math.max(maxY, screenPt.y);
+        });
+        return (maxY - minY) / window.innerHeight;
+      });
+
+      expect(
+        boardHeightFraction,
+        `[${label}, ${viewport.width}x${viewport.height}] Gravity board should fill a real share of the viewport height (got ${(boardHeightFraction * 100).toFixed(1)}%, floor ${minHeightFraction * 100}%)`
+      ).toBeGreaterThan(minHeightFraction);
+    }
+  });
 });

@@ -1438,6 +1438,15 @@ button:hover {
    the browser's own default preserveAspectRatio="xMidYMid meet" letterboxes/centers the fit
    view within whatever box the element actually occupies, so the rendered board can never
    extend into the reserved margins — no JS/viewBox math needs to change, only this layout. */
+/* <svg> is a "replaced element" with an intrinsic aspect ratio (derived from its viewBox). When
+   top/right/bottom/left are ALL given a definite value on a replaced element and width/height
+   are both 'auto', browsers pick ONE dimension to resolve from the insets and derive the OTHER
+   from the intrinsic ratio instead of stretching to fill its own insets -- silently ignoring
+   whichever inset that leaves out (found live: the board rendered at ~35% of the true available
+   height on a phone, not the ~55% its insets actually reserve for it). Giving BOTH width and
+   height an explicit calc() -- never 'auto' -- sidesteps the replaced-element special case
+   entirely for both dimensions at once (fixing only one, still 'auto', flips the bug onto the
+   other). See docs/invariants.md's INV-21 for the fill-ratio test this fixed. */
 @media (max-width: 767px) {
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg,
@@ -1446,15 +1455,16 @@ button:hover {
         top: 210px;    /* clears the stats/controls panel (and Blast's queue, same corner-ish height) */
         left: 0;
         right: 0;
-        width: auto;
-        height: auto;
+        width: calc(100% - 0px - 0px);
     }
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg {
         bottom: 150px; /* clears the D-pad row + --mobile-pad-safe-bottom */
+        height: calc(100% - 210px - 150px);
     }
     #app[data-mode="blast"] #tonnetz-svg {
         bottom: 0;
+        height: calc(100% - 210px - 0px);
     }
 }
 
@@ -1466,14 +1476,15 @@ button:hover {
         top: 0;
         bottom: 0;
         left: 210px;   /* clears the stats/controls panel (and, for Snake/Gravity, the left D-pad cluster) */
-        width: auto;
-        height: auto;
+        height: calc(100% - 0px - 0px);
     }
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg {
         right: 70px;   /* clears the right D-pad cluster */
+        width: calc(100% - 210px - 70px);
     }
     #app[data-mode="blast"] #tonnetz-svg {
         right: 0;      /* Blast's queue is left-side only in landscape (see #app[data-mode="blast"] #palette.floating-queue above) */
+        width: calc(100% - 210px - 0px);
     }
 }
