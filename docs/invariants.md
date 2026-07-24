@@ -349,6 +349,42 @@ getFrequency tests" (pure MIDI-to-Hz correctness, independent of any UI).
 
 ---
 
+### INV-26: Melody's drilled segment can be replayed from any note already reached, not just note 0
+
+The "Simon says" drill (`MidiMode.playTargetSequence`) always used to replay the whole growing
+segment starting at note 0, and a wrong note always reset practice back to note 0 too — fine for
+a short song, but a real scaling problem for a long one (task #46): every extension re-listens to
+an ever-longer prefix before the player gets to attempt the new note, and a single mistake near
+the end throws away the whole segment's progress.
+
+`MidiMode.state.startIndex` now tracks where the drilled segment begins, clamped to
+`[0, targetLength - 1]` — never past the notes already reached. A scrub control
+(`#midi-start-slider`, shown next to the note list whenever there's more than one note to
+replay-from) lets a player drag it to any of those notes and immediately hear the segment replay
+from there: `MidiMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets
+`startIndex`, and calls `playTargetSequence()`, which now schedules relative to
+`melody[startIndex].time` instead of always `melody[0].time`. A wrong note resets
+`userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an earlier stretch
+also becomes the new starting point for mistake-recovery within that practice pass. Dragging the
+slider forward (within the already-reached range) lets a player skip replaying notes they've
+already mastered; dragging it back replays an earlier stretch they want to relisten to. The
+slider stays hidden in Hard mode along with the rest of the note-list readout it's paired with,
+and `seekTo` is a no-op while a full-melody preview (`isPlayingPreview`) is playing, since that's
+a different, position-independent playback path.
+
+Per INV-3, `updateStartSliderRange` toggles `display` on the slider (and its icon) directly
+rather than on a wrapping container: `js/main.js` relocates `#midi-stats-group` wholesale into
+the always-visible mobile drawer area, and a hidden wrapper there would read as an orphaned
+control (a hidden ancestor around a real `<input>`) even though it's legitimately just empty for
+now.
+
+**Test:** `tests/desktop.spec.js` — six "Melody mode: ... scrub control ..." / "a wrong note
+resets progress back to the scrub position" tests, covering visibility, range growth, clamping,
+backward replay (skipped notes actually re-sound), forward skip (mastered notes are skipped, not
+re-played), and the mistake-branch reset landing on `startIndex` rather than always 0.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

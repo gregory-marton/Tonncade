@@ -30,6 +30,9 @@ const MidiMode = {
         melody: [],            // List of { midi, time, duration }
         targetLength: 1,       // Current number of notes to play/repeat
         userIndex: 0,          // Current progress of user in repeating the sequence
+        startIndex: 0,         // Where the drilled segment begins (see #46 scrub control) --
+                                // always <= targetLength - 1, letting a player replay from any
+                                // note already reached instead of always from note 0.
         isPlayingPreview: false,
         isPlayingSequence: false,
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
@@ -163,6 +166,15 @@ const MidiMode = {
         if (restartBtn) {
             restartBtn.onclick = () => {
                 this.resetGame();
+            };
+        }
+
+        const startSlider = document.getElementById('midi-start-slider');
+        if (startSlider) {
+            // 'change' (not 'input') fires once on release/arrow-key commit, so dragging through
+            // intermediate notes doesn't spam a replay on every pixel of motion.
+            startSlider.onchange = (e) => {
+                this.seekTo(parseInt(e.target.value));
             };
         }
 
@@ -388,6 +400,8 @@ const MidiMode = {
         const listEl = document.getElementById('midi-note-list');
         const diff = this.state.difficulty;
 
+        this.updateStartSliderRange();
+
         // Clear old glows
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
@@ -453,6 +467,7 @@ const MidiMode = {
         this.cleanup();
         this.state.targetLength = 1;
         this.state.userIndex = 0;
+        this.state.startIndex = 0;
         this.updateStreak(0);
         this.updateGhost();
         this.updateDifficultyUI();
@@ -468,17 +483,19 @@ const MidiMode = {
         this.state.isPlayingSequence = true;
         this.setStatus("Listen to the notes...", "info");
 
-        // Disable input
-        this.state.userIndex = 0;
+        // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
+        // control), so a player can drill any already-reached stretch of the melody.
+        const start = this.state.startIndex;
+        this.state.userIndex = start;
 
         let delayOffset = 0.5; // Initial delay before sequence starts playing
 
-        for (let i = 0; i < this.state.targetLength; i++) {
+        for (let i = start; i < this.state.targetLength; i++) {
             const note = this.state.melody[i];
             if (!note) break;
 
-            // Calculate timing relative to first note in sequence
-            const relativeTime = note.time - this.state.melody[0].time;
+            // Calculate timing relative to the first note IN THIS SEGMENT
+            const relativeTime = note.time - this.state.melody[start].time;
             const scheduledTime = (relativeTime * 1000) + (delayOffset * 1000);
 
             // Schedule note sound and visual highlight
@@ -493,17 +510,56 @@ const MidiMode = {
 
         // Calculate when the sequence finishes playing
         const lastNote = this.state.melody[this.state.targetLength - 1];
-        const lastRelativeTime = lastNote ? (lastNote.time - this.state.melody[0].time + lastNote.duration) : 1;
+        const lastRelativeTime = lastNote ? (lastNote.time - this.state.melody[start].time + lastNote.duration) : 1;
         const totalDuration = (lastRelativeTime * 1000) + (delayOffset * 1000);
 
         const tId2 = setTimeout(() => {
             this.state.isPlayingSequence = false;
             this.setStatus("Your turn! Repeat the notes.", "success");
-            this.state.userIndex = 0;
+            this.state.userIndex = start;
             this.updateDifficultyUI();
         }, totalDuration);
 
         this.state.playbackTimeoutIds.push(tId2);
+    },
+
+    // #46 scrub control: replay the drilled segment starting from any note already reached.
+    // Clamped to [0, targetLength - 1] -- "anywhere you've already played," never ahead into
+    // notes not yet drilled.
+    getMaxStartIndex: function() {
+        return Math.max(0, this.state.targetLength - 1);
+    },
+
+    seekTo: function(index) {
+        if (this.state.isPlayingPreview) return;
+        const clamped = Math.max(0, Math.min(index, this.getMaxStartIndex()));
+
+        if (this.state.userRepeatTimeoutId) {
+            clearTimeout(this.state.userRepeatTimeoutId);
+            this.state.userRepeatTimeoutId = null;
+        }
+        if (this.state.mistakeTimeoutId) {
+            clearTimeout(this.state.mistakeTimeoutId);
+            this.state.mistakeTimeoutId = null;
+        }
+
+        this.state.startIndex = clamped;
+        this.playTargetSequence();
+    },
+
+    updateStartSliderRange: function() {
+        const slider = document.getElementById('midi-start-slider');
+        const icon = document.getElementById('midi-start-icon');
+        if (!slider) return;
+
+        // Toggles the slider (and icon) THEMSELVES, not a wrapping div -- see INV-3 and the
+        // comment on #midi-start-scrub-group in index.html for why that distinction matters.
+        const maxIdx = this.getMaxStartIndex();
+        const show = this.state.difficulty !== 'hard' && this.state.melody.length > 0 && maxIdx > 0;
+        slider.style.display = show ? '' : 'none';
+        if (icon) icon.style.display = show ? '' : 'none';
+        slider.max = maxIdx;
+        slider.value = this.state.startIndex;
     },
 
     playPreview: function() {
@@ -606,7 +662,7 @@ const MidiMode = {
             if (this.state.userIndex >= this.state.targetLength) {
                 this.state.targetLength = this.state.userIndex + 1;
             }
-            this.state.userIndex = 0;
+            this.state.userIndex = this.state.startIndex;
             this.updateDifficultyUI();
             
             if (this.state.userRepeatTimeoutId) {

@@ -409,6 +409,128 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
   expect(view).toEqual({ x: -450, y: -320 });
 });
 
+// ────────────────────────────────────────────────────────────────────────
+// Melody mode replay-from scrub control (#46 low-hanging fruit): lets a player replay the
+// drilled segment starting from any note already reached, instead of always restarting from
+// note 0 -- useful both to relisten to an earlier stretch and to skip past notes already
+// mastered. Clamped to [0, targetLength - 1].
+// ────────────────────────────────────────────────────────────────────────
+
+test('Melody mode: the replay-from scrub control stays hidden until more than one note has been reached', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.clock.fastForward(2000); // let the auto-kickoff intro finish; targetLength stays 1
+
+  await expect(page.locator('#midi-start-slider')).toBeHidden();
+});
+
+test('Melody mode: the scrub control appears and its range grows as the drilled segment grows', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  await page.evaluate(() => {
+    MidiMode.state.targetLength = 4;
+    MidiMode.updateDifficultyUI();
+  });
+
+  await expect(page.locator('#midi-start-slider')).toBeVisible();
+  expect(await page.locator('#midi-start-slider').getAttribute('max')).toBe('3'); // targetLength - 1
+});
+
+test('Melody mode: the scrub control clamps to notes already reached, never past targetLength', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  await page.evaluate(() => {
+    MidiMode.state.targetLength = 4;
+    MidiMode.updateDifficultyUI();
+  });
+
+  const clamped = await page.evaluate(() => {
+    MidiMode.seekTo(99); // far beyond targetLength - 1
+    return MidiMode.state.startIndex;
+  });
+  expect(clamped).toBe(3);
+});
+
+test('Melody mode: dragging the scrub control back replays the skipped-over earlier notes', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.clock.fastForward(2000); // clear the auto-kickoff intro
+
+  await page.evaluate(() => {
+    window.__played = [];
+    Synth.playNote = (midi) => window.__played.push(midi);
+    MidiMode.state.targetLength = 4;
+    MidiMode.state.startIndex = 2; // simulate having already drilled through note 2
+    MidiMode.updateDifficultyUI();
+  });
+
+  await page.evaluate(() => {
+    const slider = document.getElementById('midi-start-slider');
+    slider.value = '0';
+    slider.dispatchEvent(new Event('change'));
+  });
+  expect(await page.evaluate(() => MidiMode.state.startIndex)).toBe(0);
+
+  await page.clock.fastForward(5000); // let the whole replayed segment (notes 0..3) finish
+
+  const playedFromZero = await page.evaluate(() => {
+    const expected = MidiMode.state.melody.slice(0, 4).map(n => n.midi);
+    return JSON.stringify(window.__played) === JSON.stringify(expected);
+  });
+  expect(playedFromZero).toBe(true);
+  expect(await page.evaluate(() => MidiMode.state.userIndex)).toBe(0);
+});
+
+test('Melody mode: dragging the scrub control forward skips already-mastered notes on replay', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.clock.fastForward(2000);
+
+  await page.evaluate(() => {
+    window.__played = [];
+    Synth.playNote = (midi) => window.__played.push(midi);
+    MidiMode.state.targetLength = 4;
+    MidiMode.updateDifficultyUI();
+  });
+
+  await page.evaluate(() => {
+    const slider = document.getElementById('midi-start-slider');
+    slider.value = '2';
+    slider.dispatchEvent(new Event('change'));
+  });
+
+  await page.clock.fastForward(5000);
+
+  const playedFromTwo = await page.evaluate(() => {
+    const expected = MidiMode.state.melody.slice(2, 4).map(n => n.midi);
+    return JSON.stringify(window.__played) === JSON.stringify(expected);
+  });
+  expect(playedFromTwo).toBe(true);
+  expect(await page.evaluate(() => MidiMode.state.userIndex)).toBe(2);
+});
+
+test('Melody mode: a wrong note resets progress back to the scrub position, not always to note 0', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.clock.fastForward(2000);
+
+  const resetIndex = await page.evaluate(() => {
+    MidiMode.state.isPlayingSequence = false;
+    MidiMode.state.targetLength = 4;
+    MidiMode.state.startIndex = 2; // player scrubbed to replay from note 2
+    MidiMode.state.userIndex = 3;  // got note 2 right, currently on note 3
+    MidiMode.handleUserInputNote(-1); // guaranteed wrong pitch
+    return MidiMode.state.userIndex;
+  });
+  expect(resetIndex).toBe(2);
+});
+
 test('Render.getFitView centers a set of cells within the reference viewBox', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => Render.getFitView([{ p: 0, q: 0 }], 20));
