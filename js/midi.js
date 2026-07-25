@@ -900,6 +900,60 @@ const MidiMode = {
         return { notes: timedNotes };
     },
 
+    // Standard MIDI File writer -- the inverse of parseMIDI/tickToSec above, for Compose mode's
+    // Save. Single track, format 0. Deliberately emits NO tempo meta event: parseMIDI's tickToSec
+    // already defaults to 500000 usec/beat (120bpm) whenever no tempo change is present, so
+    // omitting one here (rather than writing a redundant, always-identical tempo event) keeps
+    // parseMIDI(writeMIDI(x)) an exact round trip at the fixed WRITE_TICKS_PER_BEAT resolution,
+    // not just an equivalent-sounding one.
+    WRITE_TICKS_PER_BEAT: 480,
+    WRITE_TEMPO_USEC_PER_BEAT: 500000, // 120bpm -- must match parseMIDI's tickToSec default
+
+    writeMIDI: function(melodySeq) {
+        const ticksPerSec = this.WRITE_TICKS_PER_BEAT * (1000000 / this.WRITE_TEMPO_USEC_PER_BEAT);
+
+        const events = [];
+        melodySeq.forEach(note => {
+            events.push({ tick: Math.round(note.time * ticksPerSec), type: 'on', midi: note.midi });
+            events.push({ tick: Math.round((note.time + note.duration) * ticksPerSec), type: 'off', midi: note.midi });
+        });
+        // Note-offs before note-ons at the same tick, so a note ending exactly when the next
+        // begins never reads as a (however briefly) overlapping pair of the same pitch.
+        events.sort((a, b) => a.tick - b.tick || (a.type === 'off' ? -1 : 1));
+
+        function writeVarInt(value) {
+            const out = [value & 0x7f];
+            value = Math.floor(value / 128);
+            while (value > 0) {
+                out.unshift((value & 0x7f) | 0x80);
+                value = Math.floor(value / 128);
+            }
+            return out;
+        }
+
+        const trackBytes = [];
+        let lastTick = 0;
+        events.forEach(ev => {
+            trackBytes.push(...writeVarInt(ev.tick - lastTick));
+            lastTick = ev.tick;
+            trackBytes.push(ev.type === 'on' ? 0x90 : 0x80, ev.midi, ev.type === 'on' ? 100 : 0);
+        });
+        trackBytes.push(...writeVarInt(0), 0xff, 0x2f, 0x00); // End of track meta event
+
+        const trackLength = trackBytes.length;
+        const bytes = [
+            0x4d, 0x54, 0x68, 0x64, // "MThd"
+            0x00, 0x00, 0x00, 0x06, // header chunk length = 6
+            0x00, 0x00,             // format 0
+            0x00, 0x01,             // 1 track
+            (this.WRITE_TICKS_PER_BEAT >> 8) & 0xff, this.WRITE_TICKS_PER_BEAT & 0xff,
+            0x4d, 0x54, 0x72, 0x6b, // "MTrk"
+            (trackLength >>> 24) & 0xff, (trackLength >>> 16) & 0xff, (trackLength >>> 8) & 0xff, trackLength & 0xff,
+            ...trackBytes
+        ];
+        return new Uint8Array(bytes).buffer;
+    },
+
     // Convert polyphonic notes to a single melody sequence (monophonic)
     extractMonophonicMelody: function(parsed) {
         const melody = [];

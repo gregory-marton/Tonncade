@@ -120,6 +120,10 @@ const App = {
             SandboxMode.cleanup();
         }
 
+        if (typeof ComposeMode !== 'undefined' && ComposeMode.cleanup) {
+            ComposeMode.cleanup();
+        }
+
         this.currentMode = mode;
         document.getElementById('app').setAttribute('data-mode', mode);
 
@@ -129,14 +133,21 @@ const App = {
         const rotateBtn = document.getElementById('rotate-view-btn');
         if (rotateBtn) rotateBtn.style.display = mode === 'gravity' ? 'none' : 'inline';
 
-        // Configure mobile action button text based on active mode
+        // Configure mobile action button text based on active mode. Compose has no
+        // selected-piece/"place" concept this button models -- its own Record/Play/Undo/Clear/
+        // Save buttons in #compose-controls are the real controls, so this one just stays out
+        // of the way (same reasoning as hiding the palette for Compose above).
         const actionBtn = document.getElementById('m-btn-action');
         if (actionBtn) {
-            actionBtn.style.display = 'block';
-            if (mode === 'gravity') {
-                actionBtn.textContent = '▼'; // Reused as the soft-drop button in Gravity
+            if (mode === 'compose') {
+                actionBtn.style.display = 'none';
             } else {
-                actionBtn.textContent = mode === 'sandbox' ? 'Place / Pick up' : 'Place Piece';
+                actionBtn.style.display = 'block';
+                if (mode === 'gravity') {
+                    actionBtn.textContent = '▼'; // Reused as the soft-drop button in Gravity
+                } else {
+                    actionBtn.textContent = mode === 'sandbox' ? 'Place / Pick up' : 'Place Piece';
+                }
             }
         }
 
@@ -163,7 +174,7 @@ const App = {
         // Hide/show palette
         const palette = document.getElementById('palette');
         if (palette) {
-            palette.style.display = (mode === 'midi' || mode === 'snake') ? 'none' : 'block';
+            palette.style.display = (mode === 'midi' || mode === 'snake' || mode === 'compose') ? 'none' : 'block';
         }
 
         // Hide/show mobile dock based on mode and screen width
@@ -197,6 +208,9 @@ const App = {
         if (document.getElementById('snake-controls')) {
             document.getElementById('snake-controls').style.display = 'none';
         }
+        if (document.getElementById('compose-controls')) {
+            document.getElementById('compose-controls').style.display = 'none';
+        }
         document.getElementById('placement-controls').style.display = 'none';
         sandboxCtrls.style.display = 'none';
         const guide = document.getElementById('sandbox-guide');
@@ -224,6 +238,9 @@ const App = {
         } else if (mode === 'snake') {
             document.getElementById('snake-controls').style.display = 'block';
             SnakeMode.init();
+        } else if (mode === 'compose') {
+            document.getElementById('compose-controls').style.display = 'block';
+            ComposeMode.init();
         }
         
         this.setupMobileControls();
@@ -582,19 +599,23 @@ const App = {
                 return;
             }
 
-            if (this.currentMode === 'midi') {
+            if (this.currentMode === 'midi' || this.currentMode === 'compose') {
                 if (e.touches.length === 1) {
                     const cell = getCellFromTouch(e.touches[0]);
                     if (cell) {
                         e.preventDefault();
-                        const midi = Tonnetz.getMidi(cell.p, cell.q);
-                        MidiMode.playUserNote(midi, cell.p, cell.q);
+                        if (this.currentMode === 'compose') {
+                            ComposeMode.tapCell(cell.p, cell.q);
+                        } else {
+                            const midi = Tonnetz.getMidi(cell.p, cell.q);
+                            MidiMode.playUserNote(midi, cell.p, cell.q);
+                        }
                     }
                     return;
                 }
                 // Falls through to the shared two-finger gesture setup below for a 2-touch
-                // start -- Melody has no selected-piece concept to rotate via twist, so only
-                // the pan half of that gesture ever does anything here (see touchmove).
+                // start -- neither Melody nor Compose has a selected-piece concept to rotate via
+                // twist, so only the pan half of that gesture ever does anything here (touchmove).
             }
 
             if (this.currentMode === 'gravity') return;
@@ -689,9 +710,9 @@ const App = {
                 return;
             }
 
-            // A single touch in Melody mode is tap-to-play (handled entirely in touchstart) --
-            // only a 2-touch pan gesture (below) applies here.
-            if (this.currentMode === 'midi' && e.touches.length !== 2) {
+            // A single touch in Melody/Compose is tap-to-play(-and-record) (handled entirely in
+            // touchstart) -- only a 2-touch pan gesture (below) applies here.
+            if ((this.currentMode === 'midi' || this.currentMode === 'compose') && e.touches.length !== 2) {
                 e.preventDefault();
                 return;
             }
@@ -793,6 +814,9 @@ const App = {
                     } else if (this.currentMode === 'midi') {
                         MidiMode.state.viewX = Render.viewX;
                         MidiMode.state.viewY = Render.viewY;
+                    } else if (this.currentMode === 'compose') {
+                        ComposeMode.state.viewX = Render.viewX;
+                        ComposeMode.state.viewY = Render.viewY;
                     }
                 }
             }
@@ -956,6 +980,7 @@ const App = {
         blast: () => BlastMode.refreshUI(),
         midi: () => MidiMode.refreshBoard(),
         snake: () => SnakeMode.refreshBoard(),
+        compose: () => ComposeMode.refreshBoard(),
     },
 
     // A hexagon has 60-degree self-symmetry, so a hex lattice looks like a clean, uniformly-

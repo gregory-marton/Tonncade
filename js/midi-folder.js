@@ -80,12 +80,26 @@ const MidiFolder = {
     },
 
     // Wires the folder UI and attempts to restore a previously-chosen folder. Called once from
-    // MidiMode.setupDOMEvents with the MidiMode instance itself (so this module never needs to
-    // know MidiMode's internals beyond the one shared entrypoint, loadMelodyFromArrayBuffer).
-    setup: async function(midiMode) {
-        this.midiMode = midiMode;
-        const uploadGroup = document.getElementById('midi-upload-group');
-        const folderGroup = document.getElementById('midi-folder-group');
+    // each mode's own setupDOMEvents with that mode's instance (so this module never needs to
+    // know a caller's internals beyond the one shared entrypoint, loadMelodyFromArrayBuffer) and
+    // an `ids` config naming that mode's own DOM elements -- this is what lets Melody AND Compose
+    // both browse the SAME remembered folder (this.folderHandle is shared on purpose: it's the
+    // same folder of songs either way) while each keeps its own upload/folder/select/status UI.
+    // Defaults match Melody's original ids exactly, so its existing call site is unaffected.
+    DEFAULT_IDS: {
+        uploadGroup: 'midi-upload-group',
+        folderGroup: 'midi-folder-group',
+        chooseBtn: 'midi-choose-folder-btn',
+        filesSelect: 'midi-folder-files',
+        folderStatus: 'midi-folder-status',
+    },
+
+    setup: async function(mode, ids) {
+        this.mode = mode;
+        this.ids = Object.assign({}, this.DEFAULT_IDS, ids);
+
+        const uploadGroup = document.getElementById(this.ids.uploadGroup);
+        const folderGroup = document.getElementById(this.ids.folderGroup);
         if (!folderGroup) return;
 
         if (!this.isSupported()) {
@@ -96,8 +110,8 @@ const MidiFolder = {
         if (uploadGroup) uploadGroup.style.display = 'none';
         folderGroup.style.display = '';
 
-        const chooseBtn = document.getElementById('midi-choose-folder-btn');
-        const select = document.getElementById('midi-folder-files');
+        const chooseBtn = document.getElementById(this.ids.chooseBtn);
+        const select = document.getElementById(this.ids.filesSelect);
         if (chooseBtn) chooseBtn.onclick = () => this.chooseFolder();
         if (select) select.onchange = () => this.loadSelectedFile();
 
@@ -149,8 +163,8 @@ const MidiFolder = {
     },
 
     showReconnect: function(handle) {
-        const status = document.getElementById('midi-folder-status');
-        const chooseBtn = document.getElementById('midi-choose-folder-btn');
+        const status = document.getElementById(this.ids.folderStatus);
+        const chooseBtn = document.getElementById(this.ids.chooseBtn);
         if (status) status.textContent = `Reconnect "${handle.name}"`;
         if (chooseBtn) {
             chooseBtn.textContent = 'Reconnect Folder';
@@ -174,9 +188,9 @@ const MidiFolder = {
         files.sort((a, b) => a.name.localeCompare(b.name));
         this.fileHandles = files;
 
-        const select = document.getElementById('midi-folder-files');
-        const status = document.getElementById('midi-folder-status');
-        const chooseBtn = document.getElementById('midi-choose-folder-btn');
+        const select = document.getElementById(this.ids.filesSelect);
+        const status = document.getElementById(this.ids.folderStatus);
+        const chooseBtn = document.getElementById(this.ids.chooseBtn);
         if (chooseBtn) {
             chooseBtn.textContent = 'Change Folder';
             chooseBtn.onclick = () => this.chooseFolder(); // restores normal behavior after a reconnect
@@ -200,7 +214,7 @@ const MidiFolder = {
     },
 
     loadSelectedFile: function() {
-        const select = document.getElementById('midi-folder-files');
+        const select = document.getElementById(this.ids.filesSelect);
         if (!select) return Promise.resolve();
         return this.loadFileAt(parseInt(select.value, 10));
     },
@@ -210,6 +224,36 @@ const MidiFolder = {
         if (!entry) return;
         const file = await entry.getFile();
         const buffer = await file.arrayBuffer();
-        this.midiMode.loadMelodyFromArrayBuffer(buffer, file.name);
+        this.mode.loadMelodyFromArrayBuffer(buffer, file.name);
+    },
+
+    // Writes a file into whichever folder is currently remembered (this.folderHandle, set by
+    // listFiles above) -- shared by Melody and Compose alike, since both just want "put this
+    // back wherever the player's songs already are." Falls back to a plain <a download> blob
+    // link when no folder is set (Safari/Firefox, which don't implement the File System Access
+    // API at all, or Chrome before a folder's been chosen this session) so Save always works
+    // regardless of browser/state, matching the graceful-degradation precedent the upload-picker
+    // fallback already establishes elsewhere in this file.
+    saveFileAs: async function(name, arrayBuffer) {
+        if (this.folderHandle) {
+            try {
+                const fileHandle = await this.folderHandle.getFileHandle(name, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(arrayBuffer);
+                await writable.close();
+                return true;
+            } catch (err) {
+                console.warn('Could not save into the remembered MIDI folder, falling back to a download:', err);
+            }
+        }
+
+        const blob = new Blob([arrayBuffer], { type: 'audio/midi' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = name;
+        link.click();
+        URL.revokeObjectURL(url);
+        return false;
     },
 };

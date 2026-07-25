@@ -81,6 +81,45 @@ const Tonnetz = {
         return midi >= 0 && midi <= 127;
     },
 
+    // getMidi(p,q) = 60 + 7p + 3q is not injective -- any given pitch sits at infinitely many
+    // (p,q), differing by multiples of (3,-7) (since 7*3 + 3*-7 = 0). Given a target midi pitch
+    // and a reference point, finds the specific (p,q) solution closest (by hex distance) to that
+    // reference -- used by Compose mode to lay a loaded melody (which only stores midi/time/
+    // duration, not p/q) out on the lattice as one coherent, connected path rather than an
+    // arbitrary one. Standard tuning only (the p:+7/q:+3 mapping); not meaningful in Gravity mode.
+    nearestCoordFor: function(midi, near) {
+        near = near || { p: 0, q: 0 };
+        const target = midi - 60;
+
+        // Exactly one baseP in {0,1,2} solves target - 7*baseP === 0 (mod 3), since 7 === 1 (mod 3).
+        let baseP = 0, baseQ = 0;
+        for (let p = 0; p < 3; p++) {
+            const rem = target - 7 * p;
+            if (rem % 3 === 0) {
+                baseP = p;
+                baseQ = rem / 3;
+                break;
+            }
+        }
+
+        // Every solution is (baseP + 3t, baseQ - 7t) for integer t; hex distance from `near`
+        // grows roughly linearly with |t|, so a small bracketing window is always sufficient.
+        let best = { p: baseP, q: baseQ };
+        let bestDist = Infinity;
+        for (let t = -6; t <= 6; t++) {
+            const p = baseP + 3 * t;
+            const q = baseQ - 7 * t;
+            const dp = p - near.p;
+            const dq = q - near.q;
+            const dist = (Math.abs(dp) + Math.abs(dq) + Math.abs(dp + dq)) / 2;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = { p, q };
+            }
+        }
+        return best;
+    },
+
     analyzeChord: function(midis) {
         const matches = this.analyzeAllChords(midis);
         if (matches.length === 0) return null;

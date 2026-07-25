@@ -403,6 +403,167 @@ test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the 
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Compose mode (task #27's "edit any melody, record a new song" -- built as its own mode rather
+// than bolted onto Melody's practice loop, since drag/rotate-to-transpose belongs to composition,
+// not a structured drill). v1 scope: record by tapping cells in real time, play back, Undo/Clear,
+// and Save (via MidiMode.writeMIDI + MidiFolder.saveFileAs, both new). Per-note drag-to-
+// reposition/retime, a timeline view, and polyphony are explicitly deferred.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Compose: tapping cells while recording appends notes with the tapped cell\'s own pitch and increasing time', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.locator('#compose-record').click();
+  await expect(page.locator('#compose-record')).toHaveText('Stop Recording');
+
+  const cellA = page.locator('polygon.cell:not(.ghost)[data-p="2"][data-q="1"]');
+  const cellB = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="3"]');
+  await cellA.click();
+  await page.waitForTimeout(30); // real, small elapsed time between taps -- just needs to be > 0
+  await cellB.click();
+
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes.length).toBe(2);
+  expect(notes[0]).toMatchObject({ p: 2, q: 1, midi: 60 + 7 * 2 + 3 * 1 });
+  expect(notes[1]).toMatchObject({ p: 0, q: 3, midi: 60 + 7 * 0 + 3 * 3 });
+  expect(notes[1].time).toBeGreaterThan(notes[0].time);
+});
+
+test('Compose: Play schedules every recorded note through Synth.playNote, in time order', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    window.__played = [];
+    Synth.playNote = (midi) => window.__played.push(midi);
+    ComposeMode.state.notes = [
+      { midi: 64, p: 1, q: 0, time: 0, duration: 0.4 },
+      { midi: 60, p: 0, q: 0, time: 0.5, duration: 0.4 },
+    ];
+  });
+
+  await page.locator('#compose-play').click();
+  await page.clock.fastForward(1000);
+
+  const played = await page.evaluate(() => window.__played);
+  expect(played).toEqual([64, 60]);
+});
+
+test('Compose: Undo removes only the most recently added note', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+  });
+
+  await page.locator('#compose-undo').click();
+
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes).toEqual([{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]);
+  expect(await page.locator('#compose-note-count').textContent()).toBe('1');
+});
+
+test('Compose: Clear empties the whole recorded sequence', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+  });
+
+  await page.locator('#compose-clear').click();
+
+  expect(await page.evaluate(() => ComposeMode.state.notes)).toEqual([]);
+  expect(await page.locator('#compose-note-count').textContent()).toBe('0');
+});
+
+test('Compose: Save writes a MIDI file that round-trips back to the same notes', async ({ page }) => {
+  await page.goto('/');
+
+  // A fake remembered folder whose getFileHandle/createWritable capture the written bytes,
+  // so this test can decode them back and confirm Save round-trips real content -- not just
+  // that some function was called.
+  await page.evaluate(() => {
+    window.__savedFiles = {};
+    const fakeHandle = {
+      name: 'MySongs',
+      values: async function* () {},
+      getFileHandle: async (name) => ({
+        createWritable: async () => ({
+          write: async (buf) => { window.__savedFiles[name] = buf; },
+          close: async () => {},
+        }),
+      }),
+    };
+    MidiFolder.folderHandle = fakeHandle;
+    window.prompt = () => 'my-song.mid';
+  });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 64, p: 1, q: 0, time: 0, duration: 0.4 },
+      { midi: 60, p: 0, q: 0, time: 0.5, duration: 0.4 },
+    ];
+  });
+
+  await page.locator('#compose-save').click();
+  await page.waitForFunction(() => window.__savedFiles['my-song.mid'] !== undefined);
+
+  const roundTripped = await page.evaluate(() => {
+    const buf = window.__savedFiles['my-song.mid'];
+    const parsed = MidiMode.parseMIDI(buf);
+    return MidiMode.extractMonophonicMelody(parsed).map(n => ({ midi: n.midi, time: n.time }));
+  });
+  expect(roundTripped.length).toBe(2);
+  expect(roundTripped[0].midi).toBe(64);
+  expect(roundTripped[1].midi).toBe(60);
+  expect(roundTripped[1].time).toBeGreaterThan(roundTripped[0].time);
+});
+
+test('Compose: loading an existing MIDI file lays its notes out as one connected path on the lattice', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    MidiMode.parseMIDI = () => ({
+      notes: [
+        { midi: 60, time: 0, duration: 0.4 },
+        { midi: 64, time: 0.5, duration: 0.4 },
+        { midi: 67, time: 1.0, duration: 0.4 },
+      ],
+    });
+  });
+
+  await page.evaluate(async () => {
+    await ComposeMode.loadMelodyFromArrayBuffer(new ArrayBuffer(0), 'test.mid');
+  });
+
+  const result = await page.evaluate(() => {
+    const notes = ComposeMode.state.notes;
+    const midiMatches = notes.every(note => Tonnetz.getMidi(note.p, note.q) === note.midi);
+    const distances = [];
+    for (let i = 1; i < notes.length; i++) {
+      const dp = notes[i].p - notes[i - 1].p;
+      const dq = notes[i].q - notes[i - 1].q;
+      distances.push((Math.abs(dp) + Math.abs(dq) + Math.abs(dp + dq)) / 2);
+    }
+    return { count: notes.length, midiMatches, distances };
+  });
+  expect(result.count).toBe(3);
+  expect(result.midiMatches).toBe(true);
+  // Each note should land close (by hex distance) to the previous one -- a connected path,
+  // not scattered arbitrarily across the infinite lattice.
+  result.distances.forEach(dist => expect(dist).toBeLessThanOrEqual(3));
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // Melody mode mouse-drag panning -- real report: rotating the view (INV-24) could move a
 // melody's notes off-screen with no way back, since Melody had no pan capability at all (touch
 // OR mouse), despite Render.getPanBounds() already listing 'midi' among the free-pan modes.

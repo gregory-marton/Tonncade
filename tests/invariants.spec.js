@@ -16,7 +16,7 @@ const { test, expect } = require('@playwright/test');
  * dependency, so they live in tests/run_tests.js instead — see that file for their coverage.
  */
 
-const MODES = ['sandbox', 'midi', 'snake', 'blast', 'gravity'];
+const MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
 
 test.describe('Invariant tests', () => {
   test.beforeEach(async ({ page }) => {

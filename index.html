@@ -56,6 +56,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <div class="mode-slider-active"></div>
                         <div class="mode-option active" data-mode="sandbox">Sandbox</div>
                         <div class="mode-option" data-mode="midi">Melody</div>
+                        <div class="mode-option" data-mode="compose">Compose</div>
                         <div class="mode-option" data-mode="snake">Snake</div>
                         <div class="mode-option" data-mode="blast">Blast</div>
                         <div class="mode-option" data-mode="gravity">Gravity</div>
@@ -158,6 +159,42 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <p style="margin: 2px 0;"><strong>Row a-;</strong>: Middle letter row</p>
                         <p style="margin: 2px 0;"><strong>Row z-/</strong>: Bottom letter row</p>
                         <p style="margin: 2px 0;"><strong>Shift + Letters</strong>: Higher octaves</p>
+                    </div>
+                </div>
+
+                <!-- Compose Mode Controls & Stats -->
+                <div id="compose-controls" style="display: none;">
+                    <div id="compose-upload-group" class="control-group">
+                        <label for="compose-file-input" class="custom-file-upload">
+                            Load MIDI to Edit
+                        </label>
+                        <input id="compose-file-input" type="file" accept=".mid,.midi" style="display: none;" />
+                    </div>
+                    <!-- Shares Melody's exact remembered folder (js/midi-folder.js) -- both work
+                         with .mid files, so there's no reason for a separate directory the way
+                         Life mode's YAML files will need one. -->
+                    <div id="compose-folder-group" class="control-group" style="display: none;">
+                        <button type="button" id="compose-choose-folder-btn">Choose MIDI Folder</button>
+                        <span id="compose-folder-status"></span>
+                        <select id="compose-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
+                    </div>
+                    <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
+                            <button id="compose-record" style="flex: 1;">Record</button>
+                            <button id="compose-play" style="flex: 1;">Play</button>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
+                            <button id="compose-undo" style="flex: 1;">Undo</button>
+                            <button id="compose-clear" style="flex: 1;">Clear</button>
+                        </div>
+                        <button id="compose-save" style="width: 100%;">Save</button>
+                    </div>
+                    <div id="compose-stats-group" class="stats-panel" style="margin-top: 15px;">
+                        <div style="display: flex; gap: 10px;">
+                            <p>Notes: <span id="compose-note-count">0</span></p>
+                            <p>Length: <span id="compose-elapsed">0.0s</span></p>
+                        </div>
+                        <p id="compose-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Ready to record.</p>
                     </div>
                 </div>
 
@@ -281,6 +318,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/midi.js"></script>
     <script src="js/midi-folder.js"></script>
     <script src="js/midi-input.js"></script>
+    <script src="js/compose.js"></script>
     <script src="js/snake.js"></script>
     <script src="js/main.js"></script>
 </body>

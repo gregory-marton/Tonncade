@@ -273,7 +273,7 @@ const Render = {
     getPanBounds: function() {
         if (typeof App === 'undefined') return null;
         const mode = App.currentMode;
-        if (mode !== 'sandbox' && mode !== 'blast' && mode !== 'midi') return null;
+        if (mode !== 'sandbox' && mode !== 'blast' && mode !== 'midi' && mode !== 'compose') return null;
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (let p = -15; p <= 15; p++) {

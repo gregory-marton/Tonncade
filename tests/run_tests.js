@@ -119,6 +119,7 @@ loadScript('sandbox.js');
 loadScript('blast.js');
 loadScript('gravity.js');
 loadScript('midi.js');
+loadScript('compose.js');
 loadScript('snake.js');
 loadScript('main.js');
 
@@ -330,6 +331,107 @@ try {
         process.exit(1);
     }
     console.log("PASS: Tonnetz.getFrequency is a correct, unclamped MIDI-to-Hz conversion!");
+
+    // Test Tonnetz.nearestCoordFor -- Compose mode's canonical-(p,q)-per-note assignment when
+    // loading an existing melody (which only has midi/time/duration, no stored p,q). getMidi is
+    // not injective, so this needs to actually search the (3,-7) solution family, not just invert
+    // a formula.
+    console.log("Running Tonnetz.nearestCoordFor tests...");
+    (function() {
+        // getMidi branches on App.currentMode ('gravity' uses a different interval mapping) --
+        // an earlier test in this file leaves currentMode set to 'gravity', so pin it to a
+        // Standard-tuning mode here rather than silently inheriting whatever ran before this.
+        App.currentMode = 'sandbox';
+        // Every returned coord must actually produce the requested pitch.
+        for (const midi of [60, 67, 55, 72, 48, 91]) {
+            const coord = TonnetzObj.nearestCoordFor(midi, { p: 0, q: 0 });
+            const actual = TonnetzObj.getMidi(coord.p, coord.q);
+            if (actual !== midi) {
+                console.error(`FAIL: nearestCoordFor(${midi}) returned (${coord.p},${coord.q}) which maps to midi ${actual}, not ${midi}!`);
+                process.exit(1);
+            }
+        }
+
+        // Nearest-to-origin: midi 60 (C4) is exactly (0,0) itself -- the closest possible.
+        const originCoord = TonnetzObj.nearestCoordFor(60, { p: 0, q: 0 });
+        if (originCoord.p !== 0 || originCoord.q !== 0) {
+            console.error("FAIL: nearestCoordFor(60, origin) should be (0,0) itself! Got:", originCoord);
+            process.exit(1);
+        }
+
+        // Nearest-to-a-reference-point: given a target pitch reachable from `near` by a single
+        // hex step, that single step should win over any more distant solution in the same family.
+        const near = { p: 2, q: 2 };
+        const oneStepAway = TonnetzObj.getMidi(near.p + 1, near.q); // a genuine immediate neighbor
+        const coord = TonnetzObj.nearestCoordFor(oneStepAway, near);
+        if (coord.p !== near.p + 1 || coord.q !== near.q) {
+            console.error(`FAIL: nearestCoordFor should prefer the adjacent solution (${near.p + 1},${near.q}), got (${coord.p},${coord.q})!`);
+            process.exit(1);
+        }
+
+        // A short connected melody path: each successive note should land within a small hex
+        // distance of the previous one, not scattered arbitrarily far across the lattice.
+        const melody = [60, 64, 67, 72, 67, 64, 60]; // a simple arpeggio-ish shape
+        let prev = { p: 0, q: 0 };
+        melody.forEach(midi => {
+            const c = TonnetzObj.nearestCoordFor(midi, prev);
+            const dp = c.p - prev.p, dq = c.q - prev.q;
+            const dist = (Math.abs(dp) + Math.abs(dq) + Math.abs(dp + dq)) / 2;
+            if (dist > 3) {
+                console.error(`FAIL: nearestCoordFor should keep a melody path connected -- got distance ${dist} from (${prev.p},${prev.q}) to (${c.p},${c.q}) for midi ${midi}!`);
+                process.exit(1);
+            }
+            prev = c;
+        });
+    })();
+    console.log("PASS: Tonnetz.nearestCoordFor correctly finds the nearest lattice solution!");
+
+    // Test MidiMode.writeMIDI -- the inverse of parseMIDI/tickToSec, for Compose mode's Save.
+    // Round-trips through parseMIDI+extractMonophonicMelody and should reproduce the original
+    // sequence (modulo tick-grid rounding, which is why the tolerance is a fraction of one tick
+    // at the fixed 480-ticks-per-beat/120bpm resolution writeMIDI uses).
+    console.log("Running MidiMode.writeMIDI round-trip tests...");
+    (function() {
+        const MidiModeObj = vm.runInContext("MidiMode", context);
+        const original = [
+            { midi: 64, time: 0.0, duration: 0.4 },
+            { midi: 62, time: 0.5, duration: 0.4 },
+            { midi: 60, time: 1.0, duration: 0.8 },
+        ];
+        const buffer = MidiModeObj.writeMIDI(original);
+        const parsed = MidiModeObj.parseMIDI(buffer);
+        const roundTripped = MidiModeObj.extractMonophonicMelody(parsed);
+
+        if (roundTripped.length !== original.length) {
+            console.error(`FAIL: writeMIDI round-trip note count mismatch -- expected ${original.length}, got ${roundTripped.length}!`);
+            process.exit(1);
+        }
+        const TOLERANCE = 0.01; // well under one tick (1/960 sec) at 480 ticks/beat, 120bpm
+        original.forEach((note, i) => {
+            const got = roundTripped[i];
+            if (got.midi !== note.midi) {
+                console.error(`FAIL: writeMIDI round-trip note ${i} midi mismatch -- expected ${note.midi}, got ${got.midi}!`);
+                process.exit(1);
+            }
+            if (Math.abs(got.time - note.time) > TOLERANCE) {
+                console.error(`FAIL: writeMIDI round-trip note ${i} time mismatch -- expected ${note.time}, got ${got.time}!`);
+                process.exit(1);
+            }
+            if (Math.abs(got.duration - note.duration) > TOLERANCE) {
+                console.error(`FAIL: writeMIDI round-trip note ${i} duration mismatch -- expected ${note.duration}, got ${got.duration}!`);
+                process.exit(1);
+            }
+        });
+
+        // An empty melody should still produce a structurally valid (if silent) MIDI file.
+        const emptyBuffer = MidiModeObj.writeMIDI([]);
+        const emptyParsed = MidiModeObj.parseMIDI(emptyBuffer);
+        if (emptyParsed.notes.length !== 0) {
+            console.error("FAIL: writeMIDI([]) should round-trip to zero notes!");
+            process.exit(1);
+        }
+    })();
+    console.log("PASS: MidiMode.writeMIDI round-trips correctly through parseMIDI!");
 
     // Test Case: MIDI Mode Touch Input Fix (Red-Green Verification)
     console.log("Running MIDI Mode touch input test...");

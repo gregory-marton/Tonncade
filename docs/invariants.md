@@ -420,6 +420,53 @@ Chrome (INV-26 sets the same precedent already).
 
 ---
 
+### INV-28: Compose mode's Save round-trips exactly what was recorded or loaded
+
+Compose mode (`js/compose.js`) is v1 of the rest of task #27 ("edit any melody, record a new
+song"), built as its own separate mode rather than bolted onto Melody's practice loop — drag/
+rotate-to-transpose is a composition interaction, not a natural extension of a structured drill,
+so it belongs here instead. v1 scope is deliberately narrow: record by tapping cells in real
+time, play back, Undo (removes the most recently added note) and Clear are the only editing
+primitives, and Save/Load round-trip through Standard MIDI Files. Per-note drag-to-reposition/
+retime, a timeline/piano-roll view, multi-select, inserting a note into the middle of an existing
+sequence, and polyphony are all real interaction-design work saved for later, not silently
+expanded into v1.
+
+Two new, genuinely shared pieces make Save possible, both usable by Melody too whenever it grows
+its own save flow later:
+- `MidiMode.writeMIDI(melodySeq)` — a Standard MIDI File writer (single-track format-0), the
+  inverse of the existing `parseMIDI`/`tickToSec` logic. Deliberately emits no tempo meta event,
+  since `tickToSec` already defaults to 500000 usec/beat (120bpm) with none present — this keeps
+  `parseMIDI(writeMIDI(x))` an exact round trip at the fixed 480-ticks-per-beat resolution
+  `writeMIDI` uses, rather than merely an equivalent-sounding one.
+- `MidiFolder.saveFileAs(name, arrayBuffer)` — writes into whichever folder is currently
+  remembered (`this.folderHandle`, shared with Melody's own folder browsing — Compose and Melody
+  both work with `.mid` files, so there's no reason for the separate directory Life mode's YAML
+  files will need), falling back to a plain `<a download>` blob link when no folder is set.
+
+A tapped cell's `(p,q)` needs no reverse-mapping — the player chose it directly. Loading an
+existing file is different: `Tonnetz.getMidi(p,q)` isn't injective (any pitch sits at infinitely
+many `(p,q)`, differing by multiples of `(3,-7)`, since `7*3 + 3*-7 = 0`), so a loaded melody
+(which only has `midi`/`time`/`duration`) needs a specific cell assigned to each note before it
+can be shown on the lattice. `Tonnetz.nearestCoordFor(midi, near)` finds the solution closest
+(by hex distance) to a reference point; Compose uses it to lay a melody out as one coherent,
+connected path — note 0 nearest the origin, each note after it nearest the previous note's own
+chosen cell — rather than a valid but visually arbitrary/disconnected scatter.
+
+`MidiFolder.setup` now takes an optional `ids` config (defaulting to Melody's original element
+ids, so its existing call site is unaffected) so both Melody and Compose can browse the *same*
+remembered folder while each keeps its own upload/folder/select/status DOM elements.
+
+**Test:** `tests/run_tests.js` — "Tonnetz.nearestCoordFor" (every returned coord actually
+produces the requested pitch; prefers a genuinely adjacent solution over a more distant one in
+the same family; keeps a short melody's path connected) and "MidiMode.writeMIDI round-trip"
+(reproduces midi/time/duration through `parseMIDI` within one tick's tolerance, including the
+empty-melody edge case). `tests/desktop.spec.js` — six "Compose: ..." tests covering recording,
+playback ordering, Undo, Clear, a Save round-trip through a faked folder handle, and loading an
+existing file into a connected on-lattice path.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
@@ -445,6 +492,7 @@ pieces or chord-guide results, are not listed separately):
 | Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
 | Melody | Tonnetz, Drawer pull, Play, Restart, Stats, Sequence message |
 | Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
+| Compose | Tonnetz, Drawer pull, Record, Play, Undo, Clear, Save, Stats |
 
 This inventory is the reference list INV-13 (below) checks against, and the vocabulary the
 rest of this doc and its tests should stay consistent with.
