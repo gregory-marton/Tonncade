@@ -492,10 +492,73 @@ const GravityMode = {
         });
     },
 
+    // The 5 actions below (moveLeft/moveRight/softDrop/rotateCW/rotateCCW) are the same 5
+    // actions the portrait D-pad exposes (m-btn-left/ccw/action/cw/right) -- named and shared
+    // here so both the keyboard handler and MidiInput's note-on routing (see handleMidiNote,
+    // issue #11) drive the exact same placement-check-then-mutate-then-sound-then-refresh logic
+    // instead of duplicating it.
+    moveLeft: function() {
+        if (this.state.isPaused || this.state.isGameOver) return;
+        if (Board.checkActivePlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
+            this.state.p -= 1;
+            this.playActivePieceSound(0.06, 0.3);
+            this.refreshUI();
+        }
+    },
+
+    moveRight: function() {
+        if (this.state.isPaused || this.state.isGameOver) return;
+        if (Board.checkActivePlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
+            this.state.p += 1;
+            this.playActivePieceSound(0.06, 0.3);
+            this.refreshUI();
+        }
+    },
+
+    softDrop: function() {
+        if (this.state.isPaused || this.state.isGameOver) return;
+        const down = this.getDown(this.state.p, this.state.q);
+        if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+            this.state.p = down.p;
+            this.state.q = down.q;
+            this.playActivePieceSound(0.06, 0.3);
+            this.refreshUI();
+        }
+    },
+
+    rotateCW: function() {
+        if (this.state.isPaused || this.state.isGameOver) return;
+        const nextRot = (this.state.rotation + 1) % 6;
+        if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+            this.state.rotation = nextRot;
+            this.playActivePieceSound(0.08, 0.4);
+            this.refreshUI();
+        }
+    },
+
+    rotateCCW: function() {
+        if (this.state.isPaused || this.state.isGameOver) return;
+        const nextRot = (this.state.rotation + 5) % 6;
+        if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+            this.state.rotation = nextRot;
+            this.playActivePieceSound(0.08, 0.4);
+            this.refreshUI();
+        }
+    },
+
+    // Issue #11: a MIDI keyboard's middle C/D/E/F/G (MIDI 60/62/64/65/67) drive the same 5
+    // actions as the portrait D-pad, left-to-right, matching the notes' own left-to-right
+    // ascending order on a real keyboard -- C=left, D=CCW, E=soft-drop, F=CW, G=right. Regular
+    // keyboard/touch controls stay exactly as they were; this is purely an additional input.
+    handleMidiNote: function(midi) {
+        const action = { 60: 'moveLeft', 62: 'rotateCCW', 64: 'softDrop', 65: 'rotateCW', 67: 'moveRight' }[midi];
+        if (action) this[action]();
+    },
+
     setupEvents: function() {
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
-            
+
             // Allow toggling pause with 'Escape' or 'p' key
             if (e.key === 'Escape' || e.key === 'Esc' || key === 'p') {
                 e.preventDefault();
@@ -504,7 +567,7 @@ const GravityMode = {
             }
 
             if (this.state.isPaused || this.state.isGameOver) return;
-            
+
             // Prevent default browser scrolling actions on game controls
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.key) || e.code === 'Space') {
                 e.preventDefault();
@@ -512,49 +575,20 @@ const GravityMode = {
 
             // 1. Move Left/Right (allows half-step columns [-6, 5])
             if (key === 'f' || e.key === 'ArrowLeft') {
-                if (Board.checkActivePlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
-                    this.state.p -= 1;
-                    this.playActivePieceSound(0.06, 0.3);
-                    this.refreshUI();
-                }
+                this.moveLeft();
             } else if (key === 'h' || e.key === 'ArrowRight') {
-                if (Board.checkActivePlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
-                    this.state.p += 1;
-                    this.playActivePieceSound(0.06, 0.3);
-                    this.refreshUI();
-                }
+                this.moveRight();
             } else if (key === 'v' || key === 's' || e.key === 'ArrowDown') { // Soft drop
-                const down = this.getDown(this.state.p, this.state.q);
-                if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
-                    this.state.p = down.p;
-                    this.state.q = down.q;
-                    this.playActivePieceSound(0.06, 0.3);
-                    this.refreshUI();
-                }
+                this.softDrop();
             }
-            
+
             // 2. Rotate (Space, ArrowUp, or g)
             if (e.code === 'Space') {
-                let nextRot = e.shiftKey ? (this.state.rotation + 5) % 6 : (this.state.rotation + 1) % 6;
-                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
-                    this.state.rotation = nextRot;
-                    this.playActivePieceSound(0.08, 0.4);
-                    this.refreshUI();
-                }
+                if (e.shiftKey) this.rotateCCW(); else this.rotateCW();
             } else if (key === 'g' && !e.shiftKey || e.key === 'ArrowUp') {
-                let nextRot = (this.state.rotation + 1) % 6;
-                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
-                    this.state.rotation = nextRot;
-                    this.playActivePieceSound(0.08, 0.4);
-                    this.refreshUI();
-                }
+                this.rotateCW();
             } else if (e.key === 'ArrowLeft' && e.shiftKey) { // CCW fallback
-                let nextRot = (this.state.rotation + 5) % 6;
-                if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
-                    this.state.rotation = nextRot;
-                    this.playActivePieceSound(0.08, 0.4);
-                    this.refreshUI();
-                }
+                this.rotateCCW();
             }
         };
     }

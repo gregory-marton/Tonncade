@@ -41,7 +41,16 @@ const MidiInput = {
     state: {
         access: null,
         boundInputIds: new Set(),
+        pendingChordNotes: [],
+        chordTimeoutId: null,
     },
+
+    // Issue #11: Blast wants a whole CHORD (the notes played close together), not one note at a
+    // time, to search for a matching piece placement -- a real piano chord's individual key-
+    // presses never land in the exact same JS event-loop tick, so a short buffering window is
+    // needed to group them. Other modes (Sandbox/Melody/Gravity/Snake) act on each note the
+    // instant it arrives; only Blast's handler ever sees this window at all.
+    CHORD_WINDOW_MS: 50,
 
     isSupported: function() {
         return typeof navigator !== 'undefined' && !!navigator.requestMIDIAccess;
@@ -90,9 +99,24 @@ const MidiInput = {
             SandboxMode.playNoteByMidi(midi);
         } else if (App.currentMode === 'midi' && typeof MidiMode !== 'undefined') {
             MidiMode.playUserNoteByMidi(midi);
+        } else if (App.currentMode === 'gravity' && typeof GravityMode !== 'undefined') {
+            GravityMode.handleMidiNote(midi);
+        } else if (App.currentMode === 'snake' && typeof SnakeMode !== 'undefined') {
+            SnakeMode.handleMidiNote(midi);
+        } else if (App.currentMode === 'blast' && typeof BlastMode !== 'undefined') {
+            this.bufferChordNote(midi);
         }
-        // Other modes (Blast/Gravity/Snake) have no "play a free note" concept -- taps there
-        // drive gameplay actions (move/rotate/place), which a raw incoming pitch doesn't map to.
+    },
+
+    bufferChordNote: function(midi) {
+        this.state.pendingChordNotes.push(midi);
+        clearTimeout(this.state.chordTimeoutId);
+        this.state.chordTimeoutId = setTimeout(() => {
+            const notes = this.state.pendingChordNotes;
+            this.state.pendingChordNotes = [];
+            this.state.chordTimeoutId = null;
+            BlastMode.handleMidiChord(notes);
+        }, this.CHORD_WINDOW_MS);
     },
 
     refreshStatus: function() {

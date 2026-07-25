@@ -312,6 +312,41 @@ const SnakeMode = {
         });
     },
 
+    // Shared by the keyboard/D-pad direction keys and MidiMode's note-on routing (issue #11) --
+    // the same "don't reverse directly into your own tail" guard applies regardless of input.
+    turnTo: function(newDir) {
+        const currentDir = this.state.direction;
+        if (newDir.p !== -currentDir.p || newDir.q !== -currentDir.q) {
+            this.state.nextDirection = newDir;
+            this.updateDirectionHighlight();
+        }
+    },
+
+    // Issue #11: "totally turn towards whatever note is played, as best you can interpret
+    // 'towards'" -- of the snake's 6 immediate neighbor cells (the only 6 directions it can
+    // turn), pick whichever one's own pitch is closest to the played note. Most played notes
+    // aren't exactly reachable in one step (a hex step only ever changes pitch by a fifth/
+    // third), so "closest" is the right reading of "as best you can interpret towards", not an
+    // exact-match requirement. This also means repeatedly playing a gem's own note will
+    // reliably steer straight at it -- an intentional, accepted shortcut per the report, not a
+    // bug to guard against.
+    handleMidiNote: function(midi) {
+        if (this.state.isGameOver || this.state.isPaused || this.state.isFlourishing) return;
+        const head = this.state.snake[0];
+        if (!head) return;
+
+        let best = null;
+        let bestDist = Infinity;
+        Tonnetz.getNeighbors(head.p, head.q).forEach(n => {
+            const dist = Math.abs(Tonnetz.getMidi(n.p, n.q) - midi);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = { p: n.p - head.p, q: n.q - head.q };
+            }
+        });
+        if (best) this.turnTo(best);
+    },
+
     setupKeyboardEvents: function() {
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
@@ -352,13 +387,7 @@ const SnakeMode = {
 
             if (newDir) {
                 e.preventDefault();
-
-                // Prevent moving directly into opposite direction (-p, -q)
-                const currentDir = this.state.direction;
-                if (newDir.p !== -currentDir.p || newDir.q !== -currentDir.q) {
-                    this.state.nextDirection = newDir;
-                    this.updateDirectionHighlight();
-                }
+                this.turnTo(newDir);
             }
         };
     },

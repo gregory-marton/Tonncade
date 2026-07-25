@@ -433,6 +433,111 @@ try {
     })();
     console.log("PASS: MidiMode.writeMIDI round-trips correctly through parseMIDI!");
 
+    // Test issue #11's MIDI hardware routing for Gravity/Snake/Blast -- Sandbox/Melody's own
+    // routing predates this and is covered elsewhere (INV-23).
+    console.log("Running Gravity/Snake/Blast MIDI hardware routing tests...");
+    (function() {
+        App.currentMode = 'gravity';
+        const GravityModeObj = vm.runInContext("GravityMode", context);
+        const BoardObj = vm.runInContext("Board", context);
+        const PiecesObj = vm.runInContext("Pieces", context);
+        const SnakeModeObj = vm.runInContext("SnakeMode", context);
+        const BlastModeObj = vm.runInContext("BlastMode", context);
+        const TonnetzObj2 = vm.runInContext("Tonnetz", context);
+
+        // --- Gravity: middle C/D/E/F/G drive the same 5 actions as the portrait D-pad ---
+        // Stub refreshUI (the DOM/render-dependent tail of every action) -- this test is about
+        // the STATE-MUTATION logic each note drives, which the earlier "Gravity Mode cup
+        // dimensions" test already proved runs against a real render once, elsewhere in this file.
+        GravityModeObj.refreshUI = () => {};
+        GravityModeObj.state.activePiece = 'I';
+        GravityModeObj.state.p = -8;
+        GravityModeObj.state.q = 10;
+        GravityModeObj.state.rotation = 0;
+        GravityModeObj.state.isPaused = false;
+        GravityModeObj.state.isGameOver = false;
+        const startP = GravityModeObj.state.p;
+        GravityModeObj.handleMidiNote(60); // C -> moveLeft
+        if (GravityModeObj.state.p !== startP - 1) {
+            console.error("FAIL: MIDI note 60 (C) should move Gravity's piece left!");
+            process.exit(1);
+        }
+        GravityModeObj.handleMidiNote(67); // G -> moveRight (back, plus one more right of start)
+        if (GravityModeObj.state.p !== startP) {
+            console.error("FAIL: MIDI note 67 (G) should move Gravity's piece right!");
+            process.exit(1);
+        }
+        const startRot = GravityModeObj.state.rotation;
+        GravityModeObj.handleMidiNote(65); // F -> rotateCW
+        if (GravityModeObj.state.rotation !== (startRot + 1) % 6) {
+            console.error("FAIL: MIDI note 65 (F) should rotate Gravity's piece CW!");
+            process.exit(1);
+        }
+        GravityModeObj.handleMidiNote(62); // D -> rotateCCW (back to startRot)
+        if (GravityModeObj.state.rotation !== startRot) {
+            console.error("FAIL: MIDI note 62 (D) should rotate Gravity's piece CCW!");
+            process.exit(1);
+        }
+        GravityModeObj.handleMidiNote(48); // not one of C/D/E/F/G -- no-op, shouldn't throw
+        console.log("PASS: Gravity's middle C/D/E/F/G drive left/CCW/soft-drop/CW/right!");
+
+        // --- Snake: turns toward whichever of its 6 neighbors has the closest pitch ---
+        App.currentMode = 'snake';
+        SnakeModeObj.updateDirectionHighlight = () => {}; // DOM-dependent tail, not under test here
+        SnakeModeObj.state.snake = [{ p: 0, q: 0 }];
+        SnakeModeObj.state.direction = { p: 1, q: 0 };
+        SnakeModeObj.state.isGameOver = false;
+        SnakeModeObj.state.isPaused = false;
+        SnakeModeObj.state.isFlourishing = false;
+        // Neighbor (0,1) is +Maj3 (+4 semitones) from (0,0) -- request exactly that pitch and
+        // confirm Snake turns toward the neighbor that actually has it, not just any neighbor.
+        const targetMidi = TonnetzObj2.getMidi(0, 1);
+        SnakeModeObj.handleMidiNote(targetMidi);
+        if (SnakeModeObj.state.nextDirection.p !== 0 || SnakeModeObj.state.nextDirection.q !== 1) {
+            console.error(`FAIL: Snake should turn toward the neighbor with pitch ${targetMidi}! Got direction:`, SnakeModeObj.state.nextDirection);
+            process.exit(1);
+        }
+        console.log("PASS: Snake turns toward whichever neighbor cell has the closest pitch to the played note!");
+
+        // --- Blast: find every on-board placement matching a played chord ---
+        App.currentMode = 'blast';
+        BoardObj.cells.clear();
+        BlastModeObj.state.activePiece = 'I'; // a straight 4-in-a-row piece, simplest to reason about
+        BlastModeObj.state.lastChordKey = null;
+        BlastModeObj.state.chordCandidateIndex = 0;
+
+        // Rotation 0's actual relative pitches for whatever piece 'I' is -- derive them directly
+        // rather than assuming a specific shape, so this test survives a piece redefinition.
+        const relCells = PiecesObj.getAbsoluteCells('I', 0, 0, 0);
+        const relPitches = relCells.map(c => 7 * c.p + 3 * c.q);
+        const anchorMidi = 60; // pretend the anchor cell is a real, playable pitch
+        const chord = relPitches.map(r => anchorMidi + r);
+
+        const placements = BlastModeObj.findChordPlacements(chord);
+        if (placements.length === 0) {
+            console.error("FAIL: findChordPlacements should find at least the exact rotation-0 placement for its own piece's chord!");
+            process.exit(1);
+        }
+        // Every returned placement must actually reproduce the played chord when placed for real.
+        const chordSorted = chord.slice().sort((a, b) => a - b);
+        placements.forEach(placement => {
+            const cells = PiecesObj.getAbsoluteCells('I', placement.p, placement.q, placement.rotation);
+            const producedChord = cells.map(c => TonnetzObj2.getMidi(c.p, c.q)).sort((a, b) => a - b);
+            if (JSON.stringify(producedChord) !== JSON.stringify(chordSorted)) {
+                console.error(`FAIL: a returned Blast placement doesn't actually reproduce the played chord! Expected ${chordSorted}, got ${producedChord}`);
+                process.exit(1);
+            }
+        });
+
+        // A chord with the wrong NUMBER of notes for the active piece can never match.
+        const wrongSizeChord = chord.slice(0, chord.length - 1);
+        if (BlastModeObj.findChordPlacements(wrongSizeChord).length !== 0) {
+            console.error("FAIL: a chord with the wrong note count should never match any placement!");
+            process.exit(1);
+        }
+        console.log("PASS: Blast's findChordPlacements finds only placements that truly reproduce the played chord!");
+    })();
+
     // Test Case: MIDI Mode Touch Input Fix (Red-Green Verification)
     console.log("Running MIDI Mode touch input test...");
     

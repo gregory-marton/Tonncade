@@ -87,28 +87,28 @@ const Tonnetz = {
     // reference -- used by Compose mode to lay a loaded melody (which only stores midi/time/
     // duration, not p/q) out on the lattice as one coherent, connected path rather than an
     // arbitrary one. Standard tuning only (the p:+7/q:+3 mapping); not meaningful in Gravity mode.
-    nearestCoordFor: function(midi, near) {
-        near = near || { p: 0, q: 0 };
-        const target = midi - 60;
-
-        // Exactly one baseP in {0,1,2} solves target - 7*baseP === 0 (mod 3), since 7 === 1 (mod 3).
-        let baseP = 0, baseQ = 0;
+    // Shared by nearestCoordFor and allCoordsFor below: exactly one baseP in {0,1,2} solves
+    // target - 7*baseP === 0 (mod 3), since 7 === 1 (mod 3); every other solution is
+    // (baseP + 3t, baseQ - 7t) for integer t.
+    _baseCoordFor: function(target) {
         for (let p = 0; p < 3; p++) {
             const rem = target - 7 * p;
-            if (rem % 3 === 0) {
-                baseP = p;
-                baseQ = rem / 3;
-                break;
-            }
+            if (rem % 3 === 0) return { p, q: rem / 3 };
         }
+        return { p: 0, q: 0 }; // unreachable -- some p in 0..2 always solves it
+    },
 
-        // Every solution is (baseP + 3t, baseQ - 7t) for integer t; hex distance from `near`
-        // grows roughly linearly with |t|, so a small bracketing window is always sufficient.
-        let best = { p: baseP, q: baseQ };
+    nearestCoordFor: function(midi, near) {
+        near = near || { p: 0, q: 0 };
+        const base = this._baseCoordFor(midi - 60);
+
+        // Hex distance from `near` grows roughly linearly with |t|, so a small bracketing
+        // window is always sufficient.
+        let best = base;
         let bestDist = Infinity;
         for (let t = -6; t <= 6; t++) {
-            const p = baseP + 3 * t;
-            const q = baseQ - 7 * t;
+            const p = base.p + 3 * t;
+            const q = base.q - 7 * t;
             const dp = p - near.p;
             const dq = q - near.q;
             const dist = (Math.abs(dp) + Math.abs(dq) + Math.abs(dp + dq)) / 2;
@@ -118,6 +118,21 @@ const Tonnetz = {
             }
         }
         return best;
+    },
+
+    // All (p,q) solutions to getMidi(p,q) === midi within `maxT` steps of the (3,-7) family --
+    // used by Blast's chord-placement search (js/blast.js), which needs every candidate, not
+    // just the nearest one, since a piece can slide along this exact direction and keep every
+    // cell's pitch unchanged (that's *why* more than one on-board placement can match the same
+    // played chord). maxT=6 comfortably covers Board.radius (5) from any starting point, since
+    // hex distance grows ~linearly with |t|.
+    allCoordsFor: function(midi, maxT = 6) {
+        const base = this._baseCoordFor(midi - 60);
+        const coords = [];
+        for (let t = -maxT; t <= maxT; t++) {
+            coords.push({ p: base.p + 3 * t, q: base.q - 7 * t });
+        }
+        return coords;
     },
 
     analyzeChord: function(midis) {

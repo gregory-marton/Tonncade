@@ -517,10 +517,15 @@ Fixed by giving `GravityMode` a real `cleanup()` (clears the timer *and* disconn
 `ResizeObserver`, matching the pattern `MidiMode`/`SnakeMode`/`SandboxMode`/`ComposeMode` already
 follow) and calling it from `setMode`, in place of the old inline timer-only clear.
 
+`BlastMode` had the exact same latent bug — its own `ResizeObserver` (added for the same mobile
+`100dvh`-settling reason) was never disconnected either, and `BlastMode` had no `cleanup()` at
+all. Not yet reported, found while extending Blast's own MIDI routing for issue #11; fixed the
+same way.
+
 **Test:** `tests/desktop.spec.js` — "INV-30: leaving Gravity mode stops it from repainting the
-board on a later resize" — switches to Gravity, confirms the observer exists, switches away,
-confirms it's been nulled, then spies on `Render.drawLattice` through a real viewport resize to
-confirm nothing calls it with Gravity's own options afterward.
+board on a later resize" and "...leaving Blast mode..." — switch to the mode, confirm the
+observer exists, switch away, confirm it's been nulled, then spy on `Render.drawLattice` through
+a real viewport resize to confirm nothing calls it with that mode's own options afterward.
 
 ---
 
@@ -550,6 +555,53 @@ breakpoint's hidden set, matching the other two breakpoints that already hide it
 wide overlay) at a landscape width under 950px" — asserts `#midi-controls`'s rendered width and
 that `#midi-keyboard-instructions` is hidden, at exactly the width class that reproduced the
 report.
+
+---
+
+### INV-32: Live MIDI hardware input drives Gravity/Snake/Blast too, per issue #11's own spec
+
+`js/midi-input.js`'s `MidiInput.handleNoteOn` previously only routed to Sandbox and Melody
+(INV-23) — "other modes have no 'play a free note' concept" was true at the time, but the user
+asked for real per-mode mappings instead, fully specified in the issue itself. Regular keyboard/
+touch controls are untouched everywhere below; MIDI is purely an additional input.
+
+**Gravity**: middle C/D/E/F/G (MIDI 60/62/64/65/67) drive the same 5 actions as the portrait
+D-pad, left-to-right matching the notes' own ascending order — C=left, D=CCW, E=soft-drop,
+F=CW, G=right. The keyboard handler's inline move/rotate logic was refactored into named methods
+(`moveLeft`/`moveRight`/`softDrop`/`rotateCW`/`rotateCCW`) so `handleMidiNote` and the keyboard
+handler share the exact same placement-check-then-mutate-then-sound-then-refresh logic instead
+of duplicating it.
+
+**Snake**: "totally turn towards whatever note is played, as best you can interpret towards" — of
+the snake's 6 immediate neighbor cells (the only 6 directions it can turn), `handleMidiNote`
+turns toward whichever one's own pitch is closest to the played note. Most played notes aren't
+exactly reachable in one hex step at all (a step only ever changes pitch by a fifth/third), so
+"closest" is the right reading of "as best you can interpret", not an exact-match requirement.
+This also means repeatedly playing a gem's own note reliably steers straight at it — an
+intentional, accepted shortcut per the report, not a bug to guard against.
+
+**Blast**: "use chords to place: whichever notes are played in the chord, show them and find a
+location and orientation that fit. If there is more than one, cycle through the possible ones on
+each play of the chord. If there are none, just highlight the notes without moving the
+candidate." `MidiInput` buffers near-simultaneous note-ons into one chord (a 50ms window — real
+key-presses never land in the same JS tick) before calling `BlastMode.handleMidiChord`, which
+delegates the actual search to `findChordPlacements`: for each of the active piece's 6
+rotations, checks whether the piece's relative pitches reproduce the played chord as a set (up
+to a constant shift), then — since a piece can slide along the `(Δp,Δq)=(3,-7)` lattice
+direction and keep every cell's pitch unchanged (`Tonnetz.allCoordsFor`, see INV about
+`nearestCoordFor`) — enumerates every on-board anchor position along that family via
+`Board.checkPlacement`. More than one valid placement is common, not an edge case: that's what
+repeated plays of the same chord cycle through (`state.lastChordKey`/`chordCandidateIndex`), and
+it's why the report specifically called out cycling as expected behavior. Committing the
+placement still goes through however it always has (click the queue item, swipe down, or the
+mobile action button) — the open question in the report ("how to indicate 'place' on the MIDI
+device itself") is sidestepped by not needing a new gesture there at all.
+
+**Test:** `tests/run_tests.js` — "Gravity/Snake/Blast MIDI hardware routing tests" (pure state-
+mutation logic, each mode's `refreshUI`/`updateDirectionHighlight` DOM tail stubbed out).
+`tests/invariants.spec.js` — three "issue #11: ..." tests using the same fake-MIDI-device
+pattern INV-23 established, exercising the real end-to-end path including the chord-buffering
+timing.
 
 ---
 

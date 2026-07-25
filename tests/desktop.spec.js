@@ -921,6 +921,34 @@ test('INV-30: leaving Gravity mode stops it from repainting the board on a later
   expect(await page.evaluate(() => App.currentMode)).toBe('sandbox');
 });
 
+// Found while working on Blast's own MIDI routing (issue #11): BlastMode has the exact same
+// ResizeObserver-on-the-shared-<svg> pattern as Gravity did (see INV-30), and never had a
+// cleanup() either -- a latent version of the same bug, just not yet reported.
+test('INV-30: leaving Blast mode stops it from repainting the board on a later resize', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+  expect(await page.evaluate(() => !!BlastMode._resizeObserver)).toBe(true);
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  expect(await page.evaluate(() => BlastMode._resizeObserver)).toBeNull();
+
+  await page.evaluate(() => {
+    window.__drawLatticeCalls = [];
+    const original = Render.drawLattice.bind(Render);
+    Render.drawLattice = (viewport, options) => {
+      window.__drawLatticeCalls.push({ isBlast: !!(options && options.isBlast) });
+      return original(viewport, options);
+    };
+  });
+
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.waitForTimeout(300);
+
+  const calls = await page.evaluate(() => window.__drawLatticeCalls);
+  expect(calls.some(c => c.isBlast), 'no post-switch redraw should carry Blast\'s own options').toBe(false);
+  expect(await page.evaluate(() => App.currentMode)).toBe('sandbox');
+});
+
 // ────────────────────────────────────────────────────────────────────────
 // Issue #12: real report from a ChromeOS play session -- Melody's MIDI-folder controls and
 // keyboard-instructions text overlapped the Tonnetz at a landscape width under 950px, leaving

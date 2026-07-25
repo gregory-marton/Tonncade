@@ -32,7 +32,9 @@ const BlastMode = {
         isGameOver: false,
         activePiece: null,
         rotation: 0,
-        hoverCell: { p: 0, q: 0 }
+        hoverCell: { p: 0, q: 0 },
+        lastChordKey: null,     // sorted-pitch signature of the last MIDI chord played
+        chordCandidateIndex: 0  // which of that chord's matching placements is currently shown
     },
 
     init: function() {
@@ -54,6 +56,17 @@ const BlastMode = {
 
         this.reset();
         this.setupEvents();
+    },
+
+    // Same latent bug INV-30 fixed in Gravity (js/gravity.js), found here while working on
+    // issue #11's Blast MIDI routing: this ResizeObserver was never disconnected on leaving
+    // Blast either, so a later layout reflow in a different mode could repaint Blast's stale
+    // board over it. Not yet reported for Blast specifically, but the exact same fix applies.
+    cleanup: function() {
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
     },
 
     reset: function() {
@@ -257,6 +270,83 @@ const BlastMode = {
                 }
             }
         };
+    },
+
+    // Issue #11: "use chords to place: whichever notes are played in the chord, show them and
+    // find a location and orientation that fit. If there is more than one, cycle through the
+    // possible ones on each play of the chord. If there are none, just highlight the notes
+    // without moving the candidate." Regular keyboard/touch controls are untouched -- this only
+    // moves the ghost to a matching spot; committing the placement still goes through however
+    // it always has (click the active queue item, swipe down, or the mobile action button).
+    // MidiInput buffers near-simultaneous note-ons into one chord before calling this (see
+    // js/midi-input.js) -- Sandbox/Melody still get each individual note instantly, since only
+    // Blast needs chord grouping at all.
+    handleMidiChord: function(midiNotes) {
+        if (this.state.isGameOver || !this.state.activePiece) return;
+        const chord = [...new Set(midiNotes)];
+        if (chord.length === 0) return;
+
+        // Highlight the played notes regardless of whether a placement is found.
+        chord.forEach(m => Render.highlightByMidi(m, 400));
+
+        const candidates = this.findChordPlacements(chord);
+        const key = chord.slice().sort((a, b) => a - b).join(',');
+
+        if (candidates.length === 0) {
+            this.state.lastChordKey = null; // a later repeat of this same (still-unmatched) chord starts fresh, not mid-cycle
+            return;
+        }
+
+        if (key === this.state.lastChordKey) {
+            this.state.chordCandidateIndex = (this.state.chordCandidateIndex + 1) % candidates.length;
+        } else {
+            this.state.lastChordKey = key;
+            this.state.chordCandidateIndex = 0;
+        }
+
+        const choice = candidates[this.state.chordCandidateIndex];
+        this.state.hoverCell = { p: choice.p, q: choice.q };
+        this.state.rotation = choice.rotation;
+        this.updateGhost();
+    },
+
+    // Every (p, q, rotation) placement of the current active piece whose cells' pitches exactly
+    // match `midiNotes` as a set (order-independent -- a chord has no inherent per-cell
+    // assignment). A piece can slide along the (Δp,Δq)=(3,-7) lattice direction and keep every
+    // cell's pitch unchanged (7*3 + 3*-7 = 0, see Tonnetz.allCoordsFor), so more than one
+    // on-board placement can genuinely match the same played chord -- that's what
+    // handleMidiChord above cycles through on repeated plays.
+    findChordPlacements: function(midiNotes) {
+        const type = this.state.activePiece;
+        if (!type) return [];
+        const chordSet = midiNotes.slice().sort((a, b) => a - b);
+        if (chordSet.length !== Pieces.TYPES[type].cells.length) return [];
+
+        const results = [];
+        for (let rotation = 0; rotation < 6; rotation++) {
+            const relCells = Pieces.getAbsoluteCells(type, 0, 0, rotation);
+            const relPitches = relCells.map(c => 7 * c.p + 3 * c.q); // relative to an anchor at (0,0)
+
+            for (const anchorNote of chordSet) {
+                // Try `anchorNote` as the pitch landing on relCells[0]; check whether the rest of
+                // the shape's relative pitches, shifted by that same anchor, reproduce the WHOLE
+                // chord (a valid match must account for every played note, not just one).
+                // anchorPitch is the absolute pitch the (0,0)-relative anchor cell itself would
+                // need -- i.e. exactly what Tonnetz.getMidi(P,Q) must equal for the real anchor.
+                const anchorPitch = anchorNote - relPitches[0];
+                const expected = relPitches.map(r => anchorPitch + r).sort((a, b) => a - b);
+                const matches = expected.length === chordSet.length && expected.every((v, i) => v === chordSet[i]);
+                if (!matches) continue;
+
+                Tonnetz.allCoordsFor(anchorPitch).forEach(coord => {
+                    if (Board.checkPlacement(type, coord.p, coord.q, rotation)) {
+                        results.push({ p: coord.p, q: coord.q, rotation });
+                    }
+                });
+                break; // this rotation already matched via anchorNote -- no need to try others
+            }
+        }
+        return results;
     },
 
     updateGhost: function(e) {

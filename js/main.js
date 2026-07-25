@@ -108,6 +108,10 @@ const App = {
             GravityMode.cleanup();
         }
 
+        if (typeof BlastMode !== 'undefined' && BlastMode.cleanup) {
+            BlastMode.cleanup();
+        }
+
         if (typeof MidiMode !== 'undefined') {
             MidiMode.cleanup();
         }
