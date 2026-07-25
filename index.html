@@ -260,8 +260,16 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 </div>
 
                 <div id="controls">
-                    <p class="desktop-only"><strong>F T Y H B V</strong>: Move</p>
-                    <p class="desktop-only"><strong>Space / G / Arrows</strong>: Rotate (Shift-Space: CCW)</p>
+                    <!-- F/T/Y/H/B/V hover-cell movement and Space/G/Arrows rotation are Sandbox
+                         AND Blast's own keyboard shortcuts (see js/blast.js's identical "ftyhbv
+                         cluster") -- toggled alongside #placement-controls below, which already
+                         shows for exactly those two modes. Previously always visible regardless
+                         of mode (found live via Compose mode's visual QA), which is misleading
+                         in Melody/Snake/Gravity, none of which bind these keys at all. -->
+                    <div id="hex-nav-controls" style="display: none;">
+                        <p class="desktop-only"><strong>F T Y H B V</strong>: Move</p>
+                        <p class="desktop-only"><strong>Space / G / Arrows</strong>: Rotate (Shift-Space: CCW)</p>
+                    </div>
                     <p id="placement-controls" class="desktop-only"><strong>Shift-G / Click</strong>: <span id="click-action">Place/Pick up</span></p>
                     <p id="sandbox-controls" class="desktop-only"><strong>Letters</strong>: Select Piece</p>
                 </div>

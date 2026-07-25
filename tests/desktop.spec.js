@@ -402,6 +402,24 @@ test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the 
   await expect(page.locator('#midi-upload-group')).toBeVisible();
 });
 
+test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys', async ({ page }) => {
+  await page.goto('/');
+  const hexNav = page.locator('#hex-nav-controls');
+
+  for (const mode of ['sandbox', 'blast']) {
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    await expect(hexNav, `mode=${mode}`).toBeVisible();
+  }
+
+  // Melody/Compose/Snake/Gravity each bind their own, different keys -- this hint would be
+  // actively misleading there (found live via Compose mode's visual QA: it used to show in
+  // every mode unconditionally).
+  for (const mode of ['midi', 'compose', 'snake', 'gravity']) {
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    await expect(hexNav, `mode=${mode}`).toBeHidden();
+  }
+});
+
 // ────────────────────────────────────────────────────────────────────────
 // Compose mode (task #27's "edit any melody, record a new song" -- built as its own mode rather
 // than bolted onto Melody's practice loop, since drag/rotate-to-transpose belongs to composition,

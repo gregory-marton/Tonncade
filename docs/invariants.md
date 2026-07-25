@@ -467,6 +467,34 @@ existing file into a connected on-lattice path.
 
 ---
 
+### INV-29: The mode-slider's active-pill background exactly matches the active option's position, for however many modes there are
+
+Found live via Compose mode's own visual QA screenshot, not written speculatively: `css/style.
+css`'s `.mode-slider-active` hardcoded a width (default orientation) and height (landscape
+orientation) as `20%`/`calc(20% - ...)` — "1/5", sized for exactly the 5 modes that existed
+before Compose. Adding a 6th option didn't just leave the pill the wrong size; `App.setMode`'s
+slide animation translates it by `idx * 100%` of *its own* box, so a mis-sized pill also lands in
+the wrong place — every mode from the 3rd option onward highlighted a visibly incorrect slot.
+
+Fixed by expressing both rules as `calc((100% - 4px) / 6)` — a plain count-based formula instead
+of a magic percentage — with a comment on each naming the current option count, so the next mode
+added or removed has an obvious single number to update instead of a silent trap. Also fixed
+along the way, found in the same screenshot: the desktop-only "F T Y H B V: Move" / "Space / G /
+Arrows: Rotate" keyboard hints (`#hex-nav-controls`) had never been scoped to a mode at all —
+they showed unconditionally in every mode, including Melody/Compose/Snake/Gravity, none of which
+bind those keys (only Sandbox and Blast do, the same "ftyhbv cluster" in both `js/sandbox.js` and
+`js/blast.js`) — now toggled alongside the existing `#placement-controls` element, which already
+had exactly the right sandbox-or-blast visibility logic to mirror.
+
+**Test:** `tests/invariants.spec.js` — "INV-29: the mode-slider active pill exactly covers the
+active mode option, for every mode, portrait and landscape" (checks pill-vs-option position, not
+size — a `.mode-option`'s own horizontal padding legitimately makes its bounding box wider than
+the pill's under content-box sizing, which is normal text-inset spacing, not a visual gap, since
+only the pill paints a background at all). `tests/desktop.spec.js` — "The F/T/Y/H/B/V hover-move
+and Space/G/Arrows rotate hints only show for Sandbox and Blast."
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

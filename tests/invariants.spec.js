@@ -911,6 +911,43 @@ test.describe('Invariant tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
+  // INV-29: found live via Compose mode's visual QA -- the mode-slider's active-pill background
+  // (css/style.css's .mode-slider-active) hardcoded a width/height sized for exactly 5 options,
+  // which silently desynced (wrong size AND wrong position, since App.setMode's translate is a
+  // multiple of the pill's OWN width) the moment a 6th option (Compose) was added. Generalized
+  // across every mode and both slider orientations so any FUTURE mode count change gets caught
+  // here too, not just rediscovered by eye again.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-29: the mode-slider active pill exactly covers the active mode option, for every mode, portrait and landscape', async ({ page }) => {
+    for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
+      await page.setViewportSize(viewport);
+      for (const mode of MODES) {
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        await page.waitForTimeout(300); // let the pill's 0.25s transition finish
+
+        const { pillRect, optionRect } = await page.evaluate((m) => {
+          const pill = document.querySelector('.mode-slider-active');
+          const option = document.querySelector(`.mode-option[data-mode="${m}"]`);
+          return { pillRect: pill.getBoundingClientRect(), optionRect: option.getBoundingClientRect() };
+        }, mode);
+
+        // Checking left/top position (not width/height) is deliberate: .mode-option has its own
+        // horizontal padding (content-box, not border-box) that legitimately makes its rendered
+        // box wider than the pill's -- that's just text-inset spacing, not a visual gap, since
+        // only the absolutely-positioned pill paints a background at all. Position is the real
+        // signal of "the pill is under the right label"; it's also exactly what the original bug
+        // got wrong (both position AND size were off, since idx*100% translates by multiples of
+        // the pill's own -- then-mis-sized -- width).
+        const label = `mode=${mode} viewport=${viewport.width}x${viewport.height}`;
+        const TOLERANCE = 1; // sub-pixel rounding only
+        expect(Math.abs(pillRect.left - optionRect.left), `${label} left`).toBeLessThan(TOLERANCE);
+        expect(Math.abs(pillRect.top - optionRect.top), `${label} top`).toBeLessThan(TOLERANCE);
+      }
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
   // INV-21: see docs/invariants.md for the two compounding CSS/rendering bugs this guards
   // against (both needed fixing together -- fixing only one had no visible effect).
   // ────────────────────────────────────────────────────────────────────────

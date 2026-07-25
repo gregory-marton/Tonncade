@@ -212,6 +212,8 @@ const App = {
             document.getElementById('compose-controls').style.display = 'none';
         }
         document.getElementById('placement-controls').style.display = 'none';
+        const hexNavControls = document.getElementById('hex-nav-controls');
+        if (hexNavControls) hexNavControls.style.display = 'none';
         sandboxCtrls.style.display = 'none';
         const guide = document.getElementById('sandbox-guide');
         if (guide) {
@@ -220,6 +222,7 @@ const App = {
 
         if (mode === 'sandbox') {
             document.getElementById('placement-controls').style.display = 'block';
+            if (hexNavControls) hexNavControls.style.display = 'block';
             sandboxCtrls.style.display = 'block';
             if (guide) guide.style.display = 'block';
             if (clickAction) clickAction.textContent = 'Place/Pick up';
@@ -227,6 +230,7 @@ const App = {
         } else if (mode === 'blast') {
             stats.style.display = 'block';
             document.getElementById('placement-controls').style.display = 'block';
+            if (hexNavControls) hexNavControls.style.display = 'block';
             if (clickAction) clickAction.textContent = 'Place Piece';
             BlastMode.init();
         } else if (mode === 'gravity') {
