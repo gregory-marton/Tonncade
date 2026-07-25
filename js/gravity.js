@@ -62,6 +62,25 @@ const GravityMode = {
         this.setupEvents();
     },
 
+    // Real report (issue #9): the "done" Gravity board stayed on screen after switching to
+    // another mode. Root cause was that nothing ever called this -- js/main.js's setMode only
+    // ever cleared state.timer inline, leaving the ResizeObserver above watching Render.svg (the
+    // one <svg> every mode shares) forever. Since its callback unconditionally repaints Gravity's
+    // own viewport + Board.cells, any LATER layout reflow -- e.g. switching to a mode whose
+    // sidebar content is a different size -- fired it again and overwrote the new mode's board
+    // with Gravity's stale one. Nulling both the timer and the observer here, matching every
+    // other mode's own cleanup(), is what actually stops it for good.
+    cleanup: function() {
+        if (this.state.timer) {
+            clearInterval(this.state.timer);
+            this.state.timer = null;
+        }
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
+        }
+    },
+
     reset: function() {
         Board.cells.clear();
         this.state.linesCleared = 0;

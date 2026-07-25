@@ -879,6 +879,76 @@ for (const mode of ['sandbox', 'blast', 'midi']) {
   });
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Issue #9: real report from a ChromeOS play session -- after finishing a Gravity game and
+// switching to another mode, the "done" Gravity board stayed on screen instead of clearing.
+// Root cause: GravityMode.init() (js/gravity.js) creates a ResizeObserver watching Render.svg
+// (the one <svg> element every mode shares) to re-fit after mobile 100dvh settles, but it was
+// NEVER disconnected -- js/main.js's setMode only ever cleared GravityMode.state.timer inline,
+// with no GravityMode.cleanup() at all (every other mode gets one). Since the observer calls
+// this.refreshBoard() (which unconditionally redraws Gravity's own viewport + Board.cells) on
+// ANY box-size change to that shared <svg> -- exactly what happens when a different mode's
+// sidebar content reflows the layout -- switching away from Gravity left a live tripwire that
+// repaints Gravity's stale board over whatever the new mode just drew, the next time anything
+// resizes the game area.
+// ────────────────────────────────────────────────────────────────────────
+
+test('INV-30: leaving Gravity mode stops it from repainting the board on a later resize', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+  expect(await page.evaluate(() => !!GravityMode._resizeObserver)).toBe(true);
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  expect(await page.evaluate(() => GravityMode._resizeObserver)).toBeNull();
+
+  // Spy on Render.drawLattice to see whether ANYTHING calls it with Gravity's own options after
+  // the switch -- this is what a leaked ResizeObserver callback would do.
+  await page.evaluate(() => {
+    window.__drawLatticeCalls = [];
+    const original = Render.drawLattice.bind(Render);
+    Render.drawLattice = (viewport, options) => {
+      window.__drawLatticeCalls.push({ isGravity: !!(options && options.isGravity) });
+      return original(viewport, options);
+    };
+  });
+
+  // Real resize -- exactly the kind of layout change a leaked observer would react to.
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.waitForTimeout(300); // ResizeObserver callbacks fire asynchronously
+
+  const calls = await page.evaluate(() => window.__drawLatticeCalls);
+  expect(calls.some(c => c.isGravity), 'no post-switch redraw should carry Gravity\'s own options').toBe(false);
+  expect(await page.evaluate(() => App.currentMode)).toBe('sandbox');
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Issue #12: real report from a ChromeOS play session -- Melody's MIDI-folder controls and
+// keyboard-instructions text overlapped the Tonnetz at a landscape width under 950px, leaving
+// much less usable board space. Root cause: the (max-width: 950px) and (orientation: landscape)
+// breakpoint turns #blast-stats/#gravity-controls/#snake-controls into small, corner-anchored
+// (top/left: 10px) HUD overlays capped at max-width: 200px -- but #midi-controls's own version
+// of that same rule never got the position/max-width pair its siblings have, so it defaulted to
+// its natural (wide, content-driven) flow width while still being position:absolute, floating
+// over the board instead of being constrained to a small corner box. Separately,
+// #midi-keyboard-instructions (.desktop-only) is only hidden by the touch-pointer and
+// max-width:767px rules -- not this landscape one -- so it kept contributing extra bulk here too.
+// ────────────────────────────────────────────────────────────────────────
+
+test('INV-31: Melody\'s controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  const midiControls = page.locator('#midi-controls');
+  await expect(midiControls).toBeVisible();
+
+  const box = await midiControls.boundingBox();
+  expect(box.width, 'midi-controls should be capped to a small HUD width, like its Blast/Gravity/Snake siblings').toBeLessThanOrEqual(210);
+
+  // The desktop-only keyboard instructions shouldn't contribute bulk to this compact overlay.
+  await expect(page.locator('#midi-keyboard-instructions')).toBeHidden();
+});
+
 test('panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds)', async ({ page }) => {
   await page.goto('/');
   for (const mode of ['snake', 'gravity']) {

@@ -104,8 +104,8 @@ const App = {
             Render.svg.onmousedown = null;
         }
 
-        if (typeof GravityMode !== 'undefined' && GravityMode.state.timer) {
-            clearInterval(GravityMode.state.timer);
+        if (typeof GravityMode !== 'undefined' && GravityMode.cleanup) {
+            GravityMode.cleanup();
         }
 
         if (typeof MidiMode !== 'undefined') {

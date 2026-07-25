@@ -546,14 +546,14 @@ button:hover {
         pointer-events: auto;
     }
 
-    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons {
+    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons, #midi-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
         gap: 6px;
         margin-top: 4px;
     }
 
-    #blast-stats button, #gravity-controls button, #snake-controls button {
+    #blast-stats button, #gravity-controls button, #snake-controls button, #midi-controls button {
         padding: 4px 8px;
         font-size: 11px;
         height: 24px;
@@ -563,14 +563,22 @@ button:hover {
         width: auto;
     }
 
+    /* Found live (issue #12): unlike its #blast-stats/#gravity-controls/#snake-controls siblings
+       above, this rule never got the same top/left/max-width triple, so it defaulted to its
+       natural (wide, content-driven) flow width while still being position:absolute -- floating
+       over a large share of the board instead of a small corner HUD like the others. */
     #midi-controls {
         position: absolute;
+        top: 10px;
+        left: 10px;
+        max-width: 200px;
         z-index: 100;
         background: rgba(20, 22, 28, 0.9);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--border);
-        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
         box-sizing: border-box;
         font-family: monospace;
         color: #fff;
@@ -580,6 +588,14 @@ button:hover {
         gap: 8px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         pointer-events: none;
+    }
+
+    /* Keyboard-instructions text (.desktop-only) is only hidden by the touch-pointer and
+       max-width:767px rules elsewhere -- not this landscape breakpoint -- so on a device that
+       matches only THIS rule (e.g. a laptop-class landscape width without a coarse pointer) it
+       kept contributing bulk to the now-compact #midi-controls HUD above. */
+    .desktop-only {
+        display: none !important;
     }
 }
 

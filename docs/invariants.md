@@ -495,6 +495,64 @@ and Space/G/Arrows rotate hints only show for Sandbox and Blast."
 
 ---
 
+### INV-30: Leaving Gravity mode actually stops Gravity from touching the shared board again
+
+Real report (issue #9, a ChromeOS play session): after finishing a Gravity game and switching to
+another mode, the "done" Gravity board stayed on screen instead of clearing — the new mode's own
+sidebar controls updated correctly, but the Tonnetz board itself reverted to Gravity's stale,
+game-over state.
+
+Root cause: `GravityMode.init()` (`js/gravity.js`) creates a `ResizeObserver` watching
+`Render.svg` — the one `<svg>` element every mode shares — to re-fit the board after mobile
+`100dvh` settles a tick late. Its callback calls `this.refreshBoard()`, which unconditionally
+redraws Gravity's own viewport and `Board.cells`, with no check on `App.currentMode` at all. That
+observer was never disconnected: `js/main.js`'s `setMode` only ever cleared
+`GravityMode.state.timer` inline — every *other* mode gets a real `.cleanup()` call, Gravity
+never did. So the observer kept watching forever, and the next time *anything* resized the game
+area (switching to a mode with different-sized sidebar content is exactly such a layout reflow),
+it fired again and repainted Gravity's stale board directly over whatever the new mode had just
+drawn on that same shared element.
+
+Fixed by giving `GravityMode` a real `cleanup()` (clears the timer *and* disconnects/nulls the
+`ResizeObserver`, matching the pattern `MidiMode`/`SnakeMode`/`SandboxMode`/`ComposeMode` already
+follow) and calling it from `setMode`, in place of the old inline timer-only clear.
+
+**Test:** `tests/desktop.spec.js` — "INV-30: leaving Gravity mode stops it from repainting the
+board on a later resize" — switches to Gravity, confirms the observer exists, switches away,
+confirms it's been nulled, then spies on `Render.drawLattice` through a real viewport resize to
+confirm nothing calls it with Gravity's own options afterward.
+
+---
+
+### INV-31: Melody's overlay controls stay a small corner HUD, not an unconstrained floating panel
+
+Real report (issue #12, the same ChromeOS play session): at a landscape width under 950px,
+Melody's MIDI-folder controls and keyboard-instructions text overlapped much of the Tonnetz,
+leaving too little board to actually play on.
+
+The `(max-width: 950px) and (orientation: landscape)` breakpoint turns
+`#blast-stats`/`#gravity-controls`/`#snake-controls` into small, corner-anchored
+(`top`/`left: 10px`) HUD overlays capped at `max-width: 200px`, with their own buttons shrunk to
+match. `#midi-controls`'s version of that same rule never got the `top`/`left`/`max-width` triple
+its siblings have — it stayed `position: absolute` but otherwise defaulted to its natural,
+content-driven flow width, so it floated over the board at whatever size "Choose MIDI Folder" +
+the difficulty selector + Play/Restart naturally wanted. Separately,
+`#midi-keyboard-instructions` (`.desktop-only`) is hidden by the touch-pointer rule and the
+`max-width: 767px` rule elsewhere, but *not* this landscape one, so on a device that matches only
+this breakpoint (a laptop-class landscape width without a coarse pointer, e.g. a Chromebook) it
+kept contributing bulk to the overlay too.
+
+Fixed by giving `#midi-controls` the same `top`/`left`/`max-width` treatment (and adding it to
+the shared compact-button selectors its siblings already use), and adding `.desktop-only` to this
+breakpoint's hidden set, matching the other two breakpoints that already hide it.
+
+**Test:** `tests/desktop.spec.js` — "INV-31: Melody's controls stay a small corner HUD (not a
+wide overlay) at a landscape width under 950px" — asserts `#midi-controls`'s rendered width and
+that `#midi-keyboard-instructions` is hidden, at exactly the width class that reproduced the
+report.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
