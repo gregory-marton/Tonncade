@@ -385,6 +385,41 @@ re-played), and the mistake-branch reset landing on `startIndex` rather than alw
 
 ---
 
+### INV-27: A documented input-method promise (e.g. "Shift-G / Click: Place/Pick up") must stay true for every method it names
+
+Sandbox's desktop-only instructional text (`#placement-controls`, next to the board) reads
+"Shift-G / Click: Place/Pick up," explicitly promising a plain mouse click does the same thing
+as Shift-G. Issue #8: it didn't. #40's place-wedge redesign deliberately stopped a plain TOUCH
+tap from placing a NEW piece (fixing a real gesture-timing bug — rapid rotate-taps misfiring as
+double-tap placements), but the fix's gate in `SandboxMode`'s `svg.onmousedown` —
+`if (isExistingPiece || !this.state.selectedPiece) { this.handleAction(p, q); }` — applied to
+every input equally, including desktop mouse clicks, which have none of that touch-timing
+ambiguity. A plain click on an empty cell with a piece selected silently did nothing (pan-drag
+tracking still started, which is what made it look like "it starts dragging instead"), while
+Shift-G (which calls `handleAction` unconditionally) kept working. Nothing caught this because
+every existing Sandbox placement test either called `SandboxMode.placePiece()`/`canPlace()`
+directly — bypassing the input layer entirely — or drove the TOUCH gesture path
+(`tests/mobile.spec.js`'s wedge/swipe-down tests, a different code path in `js/main.js`'s own
+`touchstart`/`touchend` handlers). Zero tests exercised a real desktop mouse click into
+Sandbox's placement logic at all, despite the UI's own text making it a documented promise.
+
+Fixed by widening the gate to `isExistingPiece || !this.state.selectedPiece || !isTouch` — a
+plain click still can't place on touch (preserving the #40 fix), but a desktop mouse click now
+always reaches `handleAction`, restoring "Click" and "Shift-G" to genuinely identical behavior.
+
+**Test:** `tests/desktop.spec.js` — "INV-27: Sandbox (desktop) -- clicking an empty cell
+places the selected piece, as \"Shift-G / Click: Place/Pick up\" promises" and "INV-27: Sandbox
+(desktop) -- clicking a cell with an existing piece still picks it up, unambiguous from
+placing." Documented as an invariant — since the underlying failure mode (a documented
+behavioral promise drifting out of sync with a future redesign of this same area) is exactly the
+class of regression the invariants system exists to catch on an ongoing basis, not just this one
+time — but the tests themselves live in `desktop.spec.js`, not `invariants.spec.js`: this
+invariant is inherently desktop-mouse-only, and `playwright.config.js`'s `testMatch` only runs
+`invariants.spec.js` against the touch-enabled Mobile/Tablet Chrome projects, never Desktop
+Chrome (INV-26 sets the same precedent already).
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

@@ -310,18 +310,23 @@ const SandboxMode = {
                     this.updateGhost();
                 }
 
-                // Instantly pick up existing pieces on tap. Placing a NEW piece is deliberately
-                // never triggered by a plain board tap (double-tap-to-place was tried and didn't
-                // work well -- it collided with pickup, since placing then immediately re-tapping
-                // the same now-occupied cell would instantly pick the piece back up, silently
-                // undoing a placement the player never intended to reverse) -- only the place
-                // wedge, a carousel drag, or swipe-down place a piece.
+                // Instantly pick up existing pieces on tap. Placing a NEW piece via a plain TOUCH
+                // tap is deliberately never triggered (double-tap-to-place was tried and didn't
+                // work well -- it collided with rapid rotate-taps sharing the same timing state,
+                // see #40) -- touch relies on the place wedge, a carousel drag, or swipe-down
+                // instead. A desktop mouse click has none of that gesture-timing ambiguity, and
+                // the UI text next to the board (#placement-controls: "Shift-G / Click: Place/
+                // Pick up") explicitly promises a plain click does the same as Shift-G -- #40's
+                // redesign accidentally narrowed that to pickup-only-or-play-note for EVERY input,
+                // silently breaking the promise for desktop too (issue #8). Restoring full
+                // handleAction on desktop mouse clicks specifically avoids reintroducing the touch
+                // timing bug while keeping the promised behavior true again.
                 const isExistingPiece = this.state.placedPieces.some(piece => {
                     const cells = Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation);
                     return cells.some(c => c.p === p && c.q === q);
                 });
 
-                if (isExistingPiece || !this.state.selectedPiece) {
+                if (isExistingPiece || !this.state.selectedPiece || !isTouch) {
                     this.handleAction(p, q);
                 }
             }

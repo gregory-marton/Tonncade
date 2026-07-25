@@ -125,6 +125,57 @@ test('chord guide X button resets the dropdown without touching a selected candi
   expect(selectedAfter).toBe(selectedBefore);
 });
 
+// ────────────────────────────────────────────────────────────────────────
+// INV-27 (docs/invariants.md, issue #8): Sandbox's desktop instructional text next to the
+// board (#placement-controls: "Shift-G / Click: Place/Pick up") promises a plain click does
+// the same thing as Shift-G. #40's place-wedge redesign (deliberately, to fix a TOUCH
+// rotate-tap timing bug) narrowed a plain click to pickup-or-play-note for every input,
+// silently breaking that promise for desktop mouse clicks too. Lives here (not
+// invariants.spec.js) because that file's playwright.config.js testMatch only runs on the
+// touch-enabled Mobile/Tablet Chrome projects -- never Desktop Chrome -- so a desktop-mouse-
+// specific invariant has to be tested here instead, same as INV-26 already is.
+// ────────────────────────────────────────────────────────────────────────
+
+test('INV-27: Sandbox (desktop) -- clicking an empty cell places the selected piece, as "Shift-G / Click: Place/Pick up" promises', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  // The single-hex piece ('.') -- simplest shape, no rotation/multi-cell shape to account for.
+  await page.locator('.piece-item[data-key="."]').click();
+  expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBe('.');
+
+  const cell = page.locator('polygon.cell:not(.ghost)[data-p="3"][data-q="3"]');
+  await cell.hover(); // moves the ghost onto this cell first, same as a real cursor would
+  await cell.click();
+
+  const placed = await page.evaluate(() =>
+    SandboxMode.state.placedPieces.some(pc => pc.type === '.' && pc.p === 3 && pc.q === 3)
+  );
+  expect(placed).toBe(true);
+});
+
+test('INV-27: Sandbox (desktop) -- clicking a cell with an existing piece still picks it up, unambiguous from placing', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  await page.evaluate(() => {
+    SandboxMode.state.placedPieces.push({ type: '.', p: 5, q: 5, rotation: 0 });
+    SandboxMode.refreshLattice();
+  });
+
+  // A placed piece renders its own top polygon (.placed-piece) layered over the base cell --
+  // target that one specifically, matching what a real click actually lands on.
+  const cell = page.locator('polygon.placed-piece[data-p="5"][data-q="5"]');
+  await cell.hover();
+  await cell.click();
+
+  const stillPlaced = await page.evaluate(() =>
+    SandboxMode.state.placedPieces.some(pc => pc.p === 5 && pc.q === 5)
+  );
+  expect(stillPlaced).toBe(false); // picked up, not left in place or duplicated
+  expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBe('.');
+});
+
 test('midi note list fades past notes progressively by recency', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
