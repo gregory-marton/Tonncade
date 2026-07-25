@@ -33,6 +33,8 @@ const MidiMode = {
         startIndex: 0,         // Where the drilled segment begins (see #46 scrub control) --
                                 // always <= targetLength - 1, letting a player replay from any
                                 // note already reached instead of always from note 0.
+        isDraggingScrub: false, // Live-drag state for the inline scrub marker (see setupScrubMarker)
+        scrubDragIndex: 0,      // The marker's candidate position while mid-drag, before it's committed
         isPlayingPreview: false,
         isPlayingSequence: false,
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
@@ -169,14 +171,7 @@ const MidiMode = {
             };
         }
 
-        const startSlider = document.getElementById('midi-start-slider');
-        if (startSlider) {
-            // 'change' (not 'input') fires once on release/arrow-key commit, so dragging through
-            // intermediate notes doesn't spam a replay on every pixel of motion.
-            startSlider.onchange = (e) => {
-                this.seekTo(parseInt(e.target.value));
-            };
-        }
+        this.setupScrubMarker();
 
         const diffSelect = document.getElementById('midi-difficulty');
         if (diffSelect) {
@@ -400,8 +395,6 @@ const MidiMode = {
         const listEl = document.getElementById('midi-note-list');
         const diff = this.state.difficulty;
 
-        this.updateStartSliderRange();
-
         // Clear old glows
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
@@ -416,6 +409,9 @@ const MidiMode = {
         const melody = this.state.melody;
         const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
 
+        // {idx, html} per note, oldest to newest -- kept as structured entries (not a flat
+        // string) so the scrub marker (below) can be inserted at the exact gap between two
+        // specific notes, and each note token can carry a data-note-idx the drag logic reads.
         let displayNotes = [];
         const pastWindow = 3;
         const futureWindow = diff === 'easy' ? 4 : 0; // Current + 3 ahead
@@ -435,7 +431,7 @@ const MidiMode = {
             const name = qualifiedName(midi);
             const distance = current - i;
             const opacity = pastOpacityByDistance[distance] || 0.3;
-            displayNotes.push(`<span data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>`);
+            displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
 
             // Add past glow
             const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
@@ -449,9 +445,9 @@ const MidiMode = {
                 const name = qualifiedName(midi);
                 if (i === current) {
                     const hz = Math.round(Tonnetz.getFrequency(midi));
-                    displayNotes.push(`<span data-note-role="current" style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span><span style="opacity: 0.6; font-weight: normal; font-size: 0.85em;"> (${hz}Hz)</span>`);
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="current" style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span><span style="opacity: 0.6; font-weight: normal; font-size: 0.85em;"> (${hz}Hz)</span>` });
                 } else {
-                    displayNotes.push(`<span data-note-role="future" style="opacity: 0.8;">${name}</span>`);
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.8;">${name}</span>` });
                 }
 
                 // Add future glow
@@ -460,7 +456,62 @@ const MidiMode = {
             }
         }
 
-        listEl.innerHTML = displayNotes.join(' - ');
+        // Note tokens only here -- no separators/marker inline. positionScrubMarker (below)
+        // inserts those afterward, since it also runs mid-drag on its own, WITHOUT rebuilding
+        // these note-token spans (rebuilding them via innerHTML here happens once per render;
+        // rebuilding the scrub marker's own DOM node specifically must not happen mid-drag, or a
+        // real touchstart's captured target goes stale -- see positionScrubMarker's own comment).
+        listEl.innerHTML = displayNotes.map(n => n.html).join('');
+
+        const markerIdx = this.state.isDraggingScrub ? this.state.scrubDragIndex : this.state.startIndex;
+        this.positionScrubMarker(markerIdx);
+    },
+
+    // The scrub marker: a small draggable glyph shown in the gap right before whichever note it
+    // targets, so it's visually clear which two notes you'd start between -- not a separate,
+    // disconnected slider (see INV-26's original version). Only shown if that target note is
+    // actually in the visible window AND there's more than one note reached so far
+    // (targetLength > 1) -- nothing to scrub to yet on the very first note.
+    //
+    // Reuses the SAME marker DOM node across calls (moving it, never recreating it) specifically
+    // so a live touch-drag capture on it survives every reposition during the gesture -- found
+    // the hard way via this project's own real-touch-event testing discipline: a full re-render
+    // (innerHTML) mid-drag would detach whatever a real touchstart captured as its event target,
+    // silently breaking the rest of the gesture. Separator spans (.note-sep) are cheap to
+    // recreate each call since nothing ever captures touch/mouse on them.
+    positionScrubMarker: function(targetIdx) {
+        const listEl = document.getElementById('midi-note-list');
+        if (!listEl) return;
+
+        Array.from(listEl.querySelectorAll('.note-sep')).forEach(el => el.remove());
+        const tokens = Array.from(listEl.querySelectorAll('.note-token'));
+
+        let marker = listEl.querySelector('.scrub-marker');
+        const showMarker = tokens.length > 0 && this.getMaxStartIndex() > 0 &&
+            tokens.some(t => parseInt(t.getAttribute('data-note-idx'), 10) === targetIdx);
+
+        if (!showMarker) {
+            if (marker) marker.remove();
+            return;
+        }
+        if (!marker) {
+            marker = document.createElement('span');
+            marker.className = 'scrub-marker';
+            marker.title = 'Drag to replay from here';
+            marker.textContent = '▾';
+        }
+
+        tokens.forEach((token, pos) => {
+            const isTarget = parseInt(token.getAttribute('data-note-idx'), 10) === targetIdx;
+            if (isTarget) {
+                listEl.insertBefore(marker, token);
+            } else if (pos > 0) {
+                const sep = document.createElement('span');
+                sep.className = 'note-sep';
+                sep.textContent = ' - ';
+                listEl.insertBefore(sep, token);
+            }
+        });
     },
 
     resetGame: function() {
@@ -547,19 +598,75 @@ const MidiMode = {
         this.playTargetSequence();
     },
 
-    updateStartSliderRange: function() {
-        const slider = document.getElementById('midi-start-slider');
-        const icon = document.getElementById('midi-start-icon');
-        if (!slider) return;
+    // Drag disambiguation for the scrub marker (setupScrubMarker below) -- mirrors the
+    // mousedown-tracks-then-mousemove-updates-then-mouseup-commits shape every other drag
+    // gesture in this project already uses (Sandbox's ghost drag, Melody's own pan/pinch fix).
+    setupScrubMarker: function() {
+        const listEl = document.getElementById('midi-note-list');
+        if (!listEl) return;
+        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-        // Toggles the slider (and icon) THEMSELVES, not a wrapping div -- see INV-3 and the
-        // comment on #midi-start-scrub-group in index.html for why that distinction matters.
-        const maxIdx = this.getMaxStartIndex();
-        const show = this.state.difficulty !== 'hard' && this.state.melody.length > 0 && maxIdx > 0;
-        slider.style.display = show ? '' : 'none';
-        if (icon) icon.style.display = show ? '' : 'none';
-        slider.max = maxIdx;
-        slider.value = this.state.startIndex;
+        const startDrag = (clientX) => {
+            this.state.isDraggingScrub = true;
+            this.state.scrubDragIndex = this.state.startIndex;
+            this.updateScrubDragTarget(clientX);
+        };
+        const moveDrag = (clientX) => {
+            if (!this.state.isDraggingScrub) return;
+            this.updateScrubDragTarget(clientX);
+        };
+        const endDrag = () => {
+            if (!this.state.isDraggingScrub) return;
+            this.state.isDraggingScrub = false;
+            this.seekTo(this.state.scrubDragIndex);
+        };
+
+        listEl.addEventListener('mousedown', (e) => {
+            if (isTouch) return;
+            if (!e.target.classList.contains('scrub-marker')) return;
+            e.preventDefault();
+            startDrag(e.clientX);
+        });
+        window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
+        window.addEventListener('mouseup', endDrag);
+
+        listEl.addEventListener('touchstart', (e) => {
+            if (!e.target.classList.contains('scrub-marker')) return;
+            e.preventDefault();
+            startDrag(e.touches[0].clientX);
+        }, { passive: false });
+        listEl.addEventListener('touchmove', (e) => {
+            if (!this.state.isDraggingScrub) return;
+            e.preventDefault();
+            moveDrag(e.touches[0].clientX);
+        }, { passive: false });
+        listEl.addEventListener('touchend', endDrag);
+    },
+
+    // While dragging, finds whichever rendered note token's horizontal center is closest to the
+    // pointer and repositions the marker there via positionScrubMarker -- a live preview of
+    // where the drag would land, WITHOUT a full note-list re-render (see that function's own
+    // comment for why: it would detach whatever a real touchstart captured as its event target
+    // mid-gesture). seekTo() on release re-renders for real once the drag is over.
+    updateScrubDragTarget: function(clientX) {
+        const tokens = Array.from(document.querySelectorAll('#midi-note-list .note-token'));
+        if (tokens.length === 0) return;
+
+        let closest = tokens[0];
+        let closestDist = Infinity;
+        tokens.forEach(token => {
+            const rect = token.getBoundingClientRect();
+            const center = rect.left + rect.width / 2;
+            const dist = Math.abs(clientX - center);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = token;
+            }
+        });
+
+        const candidateIdx = parseInt(closest.getAttribute('data-note-idx'), 10);
+        this.state.scrubDragIndex = Math.max(0, Math.min(candidateIdx, this.getMaxStartIndex()));
+        this.positionScrubMarker(this.state.scrubDragIndex);
     },
 
     playPreview: function() {

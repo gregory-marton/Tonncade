@@ -358,30 +358,45 @@ an ever-longer prefix before the player gets to attempt the new note, and a sing
 the end throws away the whole segment's progress.
 
 `MidiMode.state.startIndex` now tracks where the drilled segment begins, clamped to
-`[0, targetLength - 1]` — never past the notes already reached. A scrub control
-(`#midi-start-slider`, shown next to the note list whenever there's more than one note to
-replay-from) lets a player drag it to any of those notes and immediately hear the segment replay
-from there: `MidiMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets
-`startIndex`, and calls `playTargetSequence()`, which now schedules relative to
-`melody[startIndex].time` instead of always `melody[0].time`. A wrong note resets
-`userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an earlier stretch
-also becomes the new starting point for mistake-recovery within that practice pass. Dragging the
-slider forward (within the already-reached range) lets a player skip replaying notes they've
-already mastered; dragging it back replays an earlier stretch they want to relisten to. The
-slider stays hidden in Hard mode along with the rest of the note-list readout it's paired with,
-and `seekTo` is a no-op while a full-melody preview (`isPlayingPreview`) is playing, since that's
-a different, position-independent playback path.
+`[0, targetLength - 1]` — never past the notes already reached. `MidiMode.seekTo(index)` clears
+any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`,
+which now schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A
+wrong note resets `userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an
+earlier stretch also becomes the new starting point for mistake-recovery within that practice
+pass. Scrubbing forward (within the already-reached range) lets a player skip replaying notes
+they've already mastered; scrubbing back replays an earlier stretch they want to relisten to.
+`seekTo` is a no-op while a full-melody preview (`isPlayingPreview`) is playing, since that's a
+different, position-independent playback path.
 
-Per INV-3, `updateStartSliderRange` toggles `display` on the slider (and its icon) directly
-rather than on a wrapping container: `js/main.js` relocates `#midi-stats-group` wholesale into
-the always-visible mobile drawer area, and a hidden wrapper there would read as an orphaned
-control (a hidden ancestor around a real `<input>`) even though it's legitimately just empty for
-now.
+**UI, v2**: the original control was a plain HTML `<input type=range>` slider next to the note
+list. The user's own feedback: it read as an abstract, disconnected control — dragging it gave no
+sense of *which two notes* you were about to start between. Replaced with a small draggable
+marker (`▾`, `.scrub-marker`) rendered *inline, inside* `#midi-note-list` itself, in the gap
+right before whichever note it targets — so the note list literally reads "...D4 ▾ C4..." when
+the marker sits between D4 and C4. `MidiMode.positionScrubMarker(targetIdx)` places it (and
+plain `.note-sep` separator spans everywhere else) by walking the currently-rendered
+`.note-token` elements; it only shows at all if its target note is within the currently-visible
+window (nothing to drag to if it's off-screen — an accepted scope limit, not a bug) and there's
+more than one note reached yet.
 
-**Test:** `tests/desktop.spec.js` — six "Melody mode: ... scrub control ..." / "a wrong note
-resets progress back to the scrub position" tests, covering visibility, range growth, clamping,
-backward replay (skipped notes actually re-sound), forward skip (mastered notes are skipped, not
-re-played), and the mistake-branch reset landing on `startIndex` rather than always 0.
+Dragging is `mousedown`/`touchstart` on `.scrub-marker` → `mousemove`/`touchmove` calls
+`updateScrubDragTarget`, which finds whichever rendered note token's center is closest to the
+pointer and repositions the marker there live (`state.scrubDragIndex`, not yet committed) →
+`mouseup`/`touchend` commits via `seekTo`. Critically, live repositioning during the drag reuses
+the *same* marker DOM node every time (moving it, never recreating it) instead of going through a
+full `updateDifficultyUI()` re-render on every move — found necessary via a real
+touchstart/touchmove/touchend test (not a synthetic `.click()`, per this project's standing
+touch-testing discipline): a full re-render replaces the marker's own element via `innerHTML`,
+which detaches whatever the original `touchstart` captured as its event target, silently breaking
+the rest of the gesture on a real device. Separator spans are cheap to recreate each call, since
+nothing ever captures touch/mouse on them.
+
+**Test:** `tests/desktop.spec.js` — "Melody mode: ... scrub marker/control ..." / "a wrong note
+resets progress back to the scrub position" tests (visibility, correct gap placement, clamping,
+real mouse-drag back/forward, mistake-branch reset landing on `startIndex`).
+`tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to the touched
+note", using genuine dispatched `Touch`/`TouchEvent` objects (this is the test that caught the
+detached-touch-target bug above — a mouse-only test wouldn't have).
 
 ---
 

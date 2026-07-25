@@ -587,6 +587,51 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(after).not.toEqual(before);
   });
 
+  test('Melody mode: a real single-finger touch drag moves the scrub marker to the touched note', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+    await page.evaluate(() => {
+      MidiMode.state.targetLength = 4;
+      MidiMode.state.startIndex = 2;
+      MidiMode.updateDifficultyUI();
+
+      // Targets whichever element the touch actually STARTED on (real "implicit capture"
+      // semantics), same discipline as this file's other real-touch helpers -- a synthetic
+      // .click() would mask exactly the kind of touch-target race this project has been bitten
+      // by before.
+      window.__touchDragTarget = null;
+      window.__dispatchScrubTouch = function(type, x, y) {
+        if (type === 'touchstart') {
+          window.__touchDragTarget = document.elementFromPoint(x, y) || document.body;
+        }
+        const el = window.__touchDragTarget || document.body;
+        const touch = new Touch({ identifier: 9, target: el, clientX: x, clientY: y, pageX: x, pageY: y });
+        const config = { bubbles: true, cancelable: true, changedTouches: [touch] };
+        if (type === 'touchend') {
+          config.touches = [];
+          config.targetTouches = [];
+        } else {
+          config.touches = [touch];
+          config.targetTouches = [touch];
+        }
+        el.dispatchEvent(new TouchEvent(type, config));
+      };
+    });
+
+    const markerBox = await page.locator('.scrub-marker').boundingBox();
+    const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
+    const startX = markerBox.x + markerBox.width / 2;
+    const startY = markerBox.y + markerBox.height / 2;
+    const endX = targetBox.x + targetBox.width / 2;
+    const endY = targetBox.y + targetBox.height / 2;
+
+    await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchstart', x, y), [startX, startY]);
+    await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchmove', x, y), [(startX + endX) / 2, (startY + endY) / 2]);
+    await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchmove', x, y), [endX, endY]);
+    await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchend', x, y), [endX, endY]);
+
+    expect(await page.evaluate(() => MidiMode.state.startIndex)).toBe(0);
+  });
+
   test('drag repositions ghost WITHOUT placing or picking up', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

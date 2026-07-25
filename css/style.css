@@ -301,6 +301,21 @@ svg {
     word-break: break-all;
 }
 
+/* #46 scrub marker: a small draggable glyph shown IN #midi-note-list, in the gap right before
+   the note it targets -- so it's visually clear which two notes a replay would start between,
+   unlike the plain range-slider version this replaced (see INV-26/docs/invariants.md). */
+.scrub-marker {
+    display: inline-block;
+    color: var(--accent);
+    cursor: grab;
+    padding: 0 2px;
+    touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
+}
+
+.scrub-marker:active {
+    cursor: grabbing;
+}
+
 #midi-connect-btn.connected {
     opacity: 1;
     filter: drop-shadow(0 0 3px var(--accent));

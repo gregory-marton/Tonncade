@@ -136,21 +136,16 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             <p>Longest Streak: <span id="midi-best-streak">0</span></p>
                         </div>
                         <p id="midi-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
-                        <p id="midi-note-list" style="font-size: 13px; color: var(--dim); margin-top: 4px; min-height: 18px; font-weight: bold;"></p>
                         <!-- #46 low-hanging fruit: lets a player replay from any note already
                              reached, instead of always restarting the drilled segment from its
-                             own beginning. Range is clamped in js/midi.js to [0, targetLength-1]
-                             -- "anywhere you've already played," never into unplayed territory.
-                             Per INV-3, visibility toggles on the slider (and icon) THEMSELVES,
-                             not a wrapping div -- js/main.js relocates #midi-stats-group wholesale
-                             into the always-visible mobile area, and a hidden wrapper there would
-                             read as an orphaned control even though it's intentionally empty. -->
-                        <div id="midi-start-scrub-group" style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
-                            <span id="midi-start-icon" aria-hidden="true" style="display: none; font-size: 13px; color: var(--dim);">⏮</span>
-                            <input id="midi-start-slider" type="range" min="0" max="0" value="0" step="1"
-                                   aria-label="Replay from note" title="Drag to replay from any note you've already reached"
-                                   style="display: none; flex: 1; accent-color: var(--accent);" />
-                        </div>
+                             own beginning. Rendered inline as a small draggable marker sitting
+                             IN the note list itself, between two note tokens, rather than a
+                             separate range slider below it (tried first -- see INV-26 -- but it
+                             read as an abstract, disconnected control; a marker between the
+                             actual notes shows directly which two notes you're starting between).
+                             Range is clamped in js/midi.js to [0, targetLength-1] -- "anywhere
+                             you've already played," never into unplayed territory. -->
+                        <p id="midi-note-list" style="font-size: 13px; color: var(--dim); margin-top: 4px; min-height: 18px; font-weight: bold;"></p>
                     </div>
                     <div id="midi-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
                         <p style="margin: 0 0 5px 0;"><strong>Keyboard Play Controls:</strong></p>

@@ -646,26 +646,34 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
 // mastered. Clamped to [0, targetLength - 1].
 // ────────────────────────────────────────────────────────────────────────
 
-test('Melody mode: the replay-from scrub control stays hidden until more than one note has been reached', async ({ page }) => {
+test('Melody mode: the replay-from scrub marker stays hidden until more than one note has been reached', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
   await page.clock.fastForward(2000); // let the auto-kickoff intro finish; targetLength stays 1
 
-  await expect(page.locator('#midi-start-slider')).toBeHidden();
+  await expect(page.locator('.scrub-marker')).toHaveCount(0);
 });
 
-test('Melody mode: the scrub control appears and its range grows as the drilled segment grows', async ({ page }) => {
+test('Melody mode: the scrub marker appears once the drilled segment grows, sitting right before the note it targets', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
   await page.evaluate(() => {
     MidiMode.state.targetLength = 4;
+    MidiMode.state.startIndex = 2;
     MidiMode.updateDifficultyUI();
   });
 
-  await expect(page.locator('#midi-start-slider')).toBeVisible();
-  expect(await page.locator('#midi-start-slider').getAttribute('max')).toBe('3'); // targetLength - 1
+  await expect(page.locator('.scrub-marker')).toHaveCount(1);
+  // The marker must sit immediately before the note token it targets (startIndex), not just
+  // anywhere in the list.
+  const isImmediatelyBefore = await page.evaluate(() => {
+    const marker = document.querySelector('.scrub-marker');
+    const nextEl = marker.nextElementSibling;
+    return nextEl && nextEl.classList.contains('note-token') && nextEl.getAttribute('data-note-idx') === String(MidiMode.state.startIndex);
+  });
+  expect(isImmediatelyBefore).toBe(true);
 });
 
 test('Melody mode: the scrub control clamps to notes already reached, never past targetLength', async ({ page }) => {
@@ -684,7 +692,7 @@ test('Melody mode: the scrub control clamps to notes already reached, never past
   expect(clamped).toBe(3);
 });
 
-test('Melody mode: dragging the scrub control back replays the skipped-over earlier notes', async ({ page }) => {
+test('Melody mode: dragging the scrub marker back replays the skipped-over earlier notes', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
@@ -698,11 +706,12 @@ test('Melody mode: dragging the scrub control back replays the skipped-over earl
     MidiMode.updateDifficultyUI();
   });
 
-  await page.evaluate(() => {
-    const slider = document.getElementById('midi-start-slider');
-    slider.value = '0';
-    slider.dispatchEvent(new Event('change'));
-  });
+  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
+  await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 5 });
+  await page.mouse.up();
   expect(await page.evaluate(() => MidiMode.state.startIndex)).toBe(0);
 
   await page.clock.fastForward(5000); // let the whole replayed segment (notes 0..3) finish
@@ -715,7 +724,7 @@ test('Melody mode: dragging the scrub control back replays the skipped-over earl
   expect(await page.evaluate(() => MidiMode.state.userIndex)).toBe(0);
 });
 
-test('Melody mode: dragging the scrub control forward skips already-mastered notes on replay', async ({ page }) => {
+test('Melody mode: dragging the scrub marker forward skips already-mastered notes on replay', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
@@ -728,11 +737,12 @@ test('Melody mode: dragging the scrub control forward skips already-mastered not
     MidiMode.updateDifficultyUI();
   });
 
-  await page.evaluate(() => {
-    const slider = document.getElementById('midi-start-slider');
-    slider.value = '2';
-    slider.dispatchEvent(new Event('change'));
-  });
+  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();
+  await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 5 });
+  await page.mouse.up();
 
   await page.clock.fastForward(5000);
 
