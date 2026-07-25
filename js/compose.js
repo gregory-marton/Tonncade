@@ -35,6 +35,7 @@ for the JavaScript code in this file.
 const ComposeMode = {
     state: {
         notes: [],              // { midi, p, q, time, duration }
+        selectedIndices: [],    // indices into notes currently selected for editing
         isRecording: false,
         recordStartTime: 0,
         isPlaying: false,
@@ -42,7 +43,8 @@ const ComposeMode = {
         viewX: -400,
         viewY: -300,
         isPanning: false,
-        lastMouse: { x: 0, y: 0 }
+        lastMouse: { x: 0, y: 0 },
+        dragCandidate: null     // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
     },
 
     DEFAULT_DURATION: 0.4,
@@ -79,6 +81,14 @@ const ComposeMode = {
         if (clearBtn) clearBtn.onclick = () => this.clear();
         if (saveBtn) saveBtn.onclick = () => this.save();
 
+        const deleteBtn = document.getElementById('compose-delete');
+        const rotateCWBtn = document.getElementById('compose-rotate-cw');
+        const rotateCCWBtn = document.getElementById('compose-rotate-ccw');
+
+        if (deleteBtn) deleteBtn.onclick = () => this.deleteSelected();
+        if (rotateCWBtn) rotateCWBtn.onclick = () => this.rotateSelection(1);
+        if (rotateCCWBtn) rotateCCWBtn.onclick = () => this.rotateSelection(-1);
+
         if (fileInput) {
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
@@ -106,8 +116,16 @@ const ComposeMode = {
     setupEvents: function() {
         const svg = Render.svg;
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const DRAG_THRESHOLD_PX = 6;
 
         window.onmousemove = (e) => {
+            if (!isTouch && this.state.dragCandidate) {
+                const dc = this.state.dragCandidate;
+                const dx = e.clientX - dc.startClientX;
+                const dy = e.clientY - dc.startClientY;
+                if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) dc.moved = true;
+                return; // suppress panning while a note-drag is in progress
+            }
             if (!isTouch && this.state.isPanning) {
                 const dx = e.clientX - this.state.lastMouse.x;
                 const dy = e.clientY - this.state.lastMouse.y;
@@ -120,7 +138,23 @@ const ComposeMode = {
             }
         };
 
-        window.onmouseup = () => {
+        window.onmouseup = (e) => {
+            if (!isTouch && this.state.dragCandidate) {
+                const dc = this.state.dragCandidate;
+                this.state.dragCandidate = null;
+                this.state.isPanning = false;
+                if (dc.moved) {
+                    const target = document.elementFromPoint(e.clientX, e.clientY);
+                    if (target && target.tagName.toLowerCase() === 'polygon' && target.hasAttribute('data-p')) {
+                        const p = parseInt(target.getAttribute('data-p'));
+                        const q = parseInt(target.getAttribute('data-q'));
+                        this.translateSelection(p - dc.startP, q - dc.startQ);
+                    }
+                } else {
+                    this.tapCell(dc.startP, dc.startQ, { shiftKey: e.shiftKey });
+                }
+                return;
+            }
             this.state.isPanning = false;
         };
 
@@ -129,7 +163,14 @@ const ComposeMode = {
             if (isHex) {
                 const p = parseInt(e.target.getAttribute('data-p'));
                 const q = parseInt(e.target.getAttribute('data-q'));
-                this.tapCell(p, q);
+                const matches = this.notesAt(p, q);
+                const isDraggable = !isTouch && !this.state.isRecording &&
+                    matches.some(i => this.state.selectedIndices.includes(i));
+                if (isDraggable) {
+                    this.state.dragCandidate = { startClientX: e.clientX, startClientY: e.clientY, startP: p, startQ: q, moved: false };
+                } else {
+                    this.tapCell(p, q, { shiftKey: e.shiftKey });
+                }
             }
             if (!isTouch) {
                 this.state.isPanning = true;
@@ -138,20 +179,170 @@ const ComposeMode = {
         };
     },
 
+    // Every index into state.notes whose lattice cell matches (p, q) -- a melody can revisit the
+    // same cell (a repeated pitch), so this is a list, not a single note.
+    notesAt: function(p, q) {
+        const indices = [];
+        this.state.notes.forEach((n, i) => { if (n.p === p && n.q === q) indices.push(i); });
+        return indices;
+    },
+
     // A tap always plays the cell's note (like Sandbox's note-play tool); while recording, it
     // ALSO appends the note to state.notes with its elapsed-time timestamp. (p,q) is exactly
     // whatever cell was clicked -- no reverse-mapping ambiguity, unlike loading a file below,
     // since the player is choosing the cell directly at note-creation time.
-    tapCell: function(p, q) {
+    //
+    // When not recording, a tap instead drives selection/insertion for editing: tapping a cell
+    // that already hosts note(s) selects (or, with shift, toggles) one of them -- repeated taps
+    // step through duplicates sharing a cell; tapping an empty cell while exactly one note is
+    // selected inserts a new note right after it; tapping an empty cell otherwise just clears
+    // the selection (if any) and plays the note.
+    tapCell: function(p, q, opts) {
+        const shiftKey = !!(opts && opts.shiftKey);
         const midi = Tonnetz.getMidi(p, q);
-        Render.highlightByMidi(midi, 250);
-        Synth.playNote(midi);
 
         if (this.state.isRecording) {
+            Render.highlightByMidi(midi, 250);
+            Synth.playNote(midi);
             const time = (performance.now() - this.state.recordStartTime) / 1000;
             this.state.notes.push({ midi, p, q, time, duration: this.DEFAULT_DURATION });
             this.updateStats();
+            return;
         }
+
+        const matches = this.notesAt(p, q);
+        if (matches.length > 0) {
+            this.selectAtCell(matches, shiftKey);
+            Render.highlightByMidi(midi, 250);
+            Synth.playNote(midi);
+            return;
+        }
+
+        if (this.state.selectedIndices.length === 1 && !shiftKey) {
+            this.insertAfterSelected(p, q);
+            return;
+        }
+
+        if (!shiftKey && this.state.selectedIndices.length > 0) {
+            this.state.selectedIndices = [];
+            this.updateEditControls();
+            this.refreshBoard();
+        }
+        Render.highlightByMidi(midi, 250);
+        Synth.playNote(midi);
+    },
+
+    // Resolves which specific note a tap on a (possibly duplicate-pitch) cell targets: the first
+    // match not currently selected, cycling back to the first match once they're all selected --
+    // so repeated taps step through notes that share a cell instead of getting stuck on one.
+    selectAtCell: function(matches, shiftKey) {
+        const sel = this.state.selectedIndices;
+        let target = matches.find(i => !sel.includes(i));
+        if (target === undefined) target = matches[0];
+
+        if (shiftKey) {
+            const pos = sel.indexOf(target);
+            if (pos >= 0) sel.splice(pos, 1);
+            else sel.push(target);
+        } else {
+            this.state.selectedIndices = [target];
+        }
+        this.updateEditControls();
+        this.refreshBoard();
+    },
+
+    // Removes every selected note and closes exactly the time each one occupied -- every later
+    // note shifts earlier by the deleted note's own duration, not by the full gap to whatever
+    // comes next, so any other intentional rests between notes are left alone.
+    deleteSelected: function() {
+        if (this.state.selectedIndices.length === 0) return;
+        const toDelete = new Set(this.state.selectedIndices);
+        const ordered = this.state.notes.map((n, i) => ({ n, i })).sort((a, b) => a.n.time - b.n.time);
+
+        let shift = 0;
+        const kept = [];
+        ordered.forEach(({ n, i }) => {
+            if (toDelete.has(i)) {
+                shift += n.duration;
+            } else {
+                kept.push({ midi: n.midi, p: n.p, q: n.q, time: n.time - shift, duration: n.duration });
+            }
+        });
+
+        this.state.notes = kept;
+        this.state.selectedIndices = [];
+        this.updateStats();
+        this.updateEditControls();
+        this.refreshBoard();
+    },
+
+    // Inserts a new note at (p, q) right after the sole selected note, taking its duration as a
+    // default, and pushes every note at or after the insertion point later by that same duration
+    // -- the mirror of deleteSelected's gap-closing.
+    insertAfterSelected: function(p, q) {
+        const idx = this.state.selectedIndices[0];
+        const anchor = this.state.notes[idx];
+        const midi = Tonnetz.getMidi(p, q);
+        const insertTime = anchor.time + anchor.duration;
+        const newNote = { midi, p, q, time: insertTime, duration: anchor.duration };
+
+        this.state.notes.forEach(n => { if (n.time >= insertTime) n.time += newNote.duration; });
+        this.state.notes.splice(idx + 1, 0, newNote);
+        this.state.selectedIndices = [idx + 1];
+
+        Render.highlightByMidi(midi, 250);
+        Synth.playNote(midi);
+        this.updateStats();
+        this.updateEditControls();
+        this.refreshBoard();
+    },
+
+    // Translates every selected note by the same (dp, dq) -- since Tonnetz.getMidi is linear,
+    // this shifts every selected note's pitch by the exact same number of semitones, i.e. a
+    // clean transposition, not a per-note special case.
+    translateSelection: function(dp, dq) {
+        if (dp === 0 && dq === 0) return;
+        this.state.selectedIndices.forEach(i => {
+            const n = this.state.notes[i];
+            n.p += dp;
+            n.q += dq;
+            n.midi = Tonnetz.getMidi(n.p, n.q);
+        });
+        this.updateStats();
+        this.refreshBoard();
+    },
+
+    // Rotates every selected note around the first-selected note (the anchor) by one 60-degree
+    // hex step, reusing the exact same rigid-rotation math Pieces.js already uses for rotating a
+    // piece shape -- rotating a set of lattice offsets around a pivot, not a new transform.
+    rotateSelection: function(direction) {
+        if (this.state.selectedIndices.length === 0) return;
+        const pivotIdx = this.state.selectedIndices[0];
+        const pivot = this.state.notes[pivotIdx];
+        this.state.selectedIndices.forEach(i => {
+            if (i === pivotIdx) return;
+            const n = this.state.notes[i];
+            const rel = { p: n.p - pivot.p, q: n.q - pivot.q };
+            const rotated = (direction > 0 ? Pieces.rotate([rel]) : Pieces.rotateCCW([rel]))[0];
+            n.p = pivot.p + rotated.p;
+            n.q = pivot.q + rotated.q;
+            n.midi = Tonnetz.getMidi(n.p, n.q);
+        });
+        this.updateStats();
+        this.refreshBoard();
+    },
+
+    // Timing edits (retiming a note, expressing triplets/32nd-notes/chords precisely) are
+    // deliberately out of scope here -- see next_steps.md #52. A rough recording is cheap to
+    // redo from scratch; anything needing real rhythm precision is better served by re-recording
+    // or, past that, a real MIDI editor working on the saved .mid file directly.
+    updateEditControls: function() {
+        const count = this.state.selectedIndices.length;
+        const group = document.getElementById('compose-edit-group');
+        if (group) group.style.display = count > 0 ? 'block' : 'none';
+
+        const label = document.getElementById('compose-selection-label');
+        if (label) label.textContent = count === 0 ? '' : `Selected: ${count} note${count === 1 ? '' : 's'}`;
     },
 
     startRecording: function() {
@@ -203,15 +394,21 @@ const ComposeMode = {
 
     undo: function() {
         this.state.notes.pop();
+        this.state.selectedIndices = [];
         this.updateStats();
+        this.updateEditControls();
+        this.refreshBoard();
     },
 
     clear: function() {
         this.stopPlayback();
         this.stopRecording();
         this.state.notes = [];
+        this.state.selectedIndices = [];
         this.updateStats();
+        this.updateEditControls();
         this.setStatus('Ready to record.');
+        this.refreshBoard();
     },
 
     save: async function() {
@@ -248,11 +445,14 @@ const ComposeMode = {
                 prev = coord;
                 return { midi: note.midi, p: coord.p, q: coord.q, time: note.time, duration: note.duration };
             });
+            this.state.selectedIndices = [];
 
             this.stopPlayback();
             this.stopRecording();
             this.updateStats();
+            this.updateEditControls();
             this.setStatus(`Loaded "${displayName}" -- ready to play, edit, or save.`);
+            this.refreshBoard();
         } catch (err) {
             console.error(err);
             alert('Error parsing MIDI file. Please make sure it is a valid Standard MIDI File.');
@@ -282,6 +482,24 @@ const ComposeMode = {
         Render.updateView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
         this.state.viewX = Render.viewX;
         this.state.viewY = Render.viewY;
+        this.renderSelectionMarkers();
+    },
+
+    // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash
+    // -- drawLattice wipes the whole <svg>, so these have to be re-added after every redraw
+    // rather than surviving as a diff.
+    renderSelectionMarkers: function() {
+        this.state.selectedIndices.forEach(i => {
+            const n = this.state.notes[i];
+            if (!n) return;
+            const pos = Render.getScreenPos(n.p, n.q);
+            const ring = document.createElementNS(Render.NS, 'circle');
+            ring.setAttribute('cx', pos.x);
+            ring.setAttribute('cy', pos.y);
+            ring.setAttribute('r', Render.HEX_R * 0.55);
+            ring.setAttribute('class', 'compose-selected-note');
+            Render.appendToLattice(ring);
+        });
     },
 
     cleanup: function() {

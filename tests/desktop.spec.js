@@ -581,6 +581,145 @@ test('Compose: loading an existing MIDI file lays its notes out as one connected
   result.distances.forEach(dist => expect(dist).toBeLessThanOrEqual(3));
 });
 
+// Compose per-note editing (task #64): select/delete/insert/drag/rotate on the lattice.
+// Deliberately excludes any timing-edit UI (nudge buttons, a timeline) -- see next_steps.md #52
+// and js/compose.js's own comment: a rough recording is cheap to redo, rhythm-precision editing
+// is better served by a real MIDI editor on the saved .mid file.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Compose: tapping an existing note selects it; Delete removes it and closes the time gap', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: Tonnetz.getMidi(1, 0), p: 1, q: 0, time: 0.5, duration: 0.4 },
+      { midi: Tonnetz.getMidi(2, 0), p: 2, q: 0, time: 1.0, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [];
+    ComposeMode.refreshBoard();
+  });
+
+  await page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="0"]').click();
+
+  expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([1]);
+  await expect(page.locator('.compose-selected-note')).toHaveCount(1);
+  expect(await page.locator('#compose-selection-label').textContent()).toContain('1 note');
+
+  await page.locator('#compose-delete').click();
+
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes.length).toBe(2);
+  expect(notes[0]).toMatchObject({ p: 0, q: 0, time: 0 });
+  // The deleted note's own 0.4s duration is closed, not the full 1.0s gap to the next note.
+  expect(notes[1]).toMatchObject({ p: 2, q: 0, time: 0.6 });
+  await expect(page.locator('.compose-selected-note')).toHaveCount(0);
+});
+
+test('Compose: shift-tap multi-selects, and dragging one selected note transposes the whole selection', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: Tonnetz.getMidi(1, 0), p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [];
+    ComposeMode.refreshBoard();
+  });
+
+  const cellA = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+  const cellB = page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="0"]');
+  await cellA.click();
+  await cellB.click({ modifiers: ['Shift'] });
+
+  expect(await page.evaluate(() => ComposeMode.state.selectedIndices.slice().sort())).toEqual([0, 1]);
+
+  // Drag the note at (0,0) to (0,1) -- delta (dp,dq) = (0,1), applied to the WHOLE selection.
+  const fromBox = await cellA.boundingBox();
+  const toBox = await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="1"]').boundingBox();
+
+  await page.mouse.move(fromBox.x + fromBox.width / 2, fromBox.y + fromBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(toBox.x + toBox.width / 2, toBox.y + toBox.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  const result = await page.evaluate(() => {
+    const notes = ComposeMode.state.notes;
+    return {
+      cells: notes.map(n => ({ p: n.p, q: n.q })),
+      midiMatches: notes.every(n => n.midi === Tonnetz.getMidi(n.p, n.q)),
+    };
+  });
+  expect(result.cells).toEqual([{ p: 0, q: 1 }, { p: 1, q: 1 }]);
+  expect(result.midiMatches).toBe(true);
+});
+
+test('Compose: tapping an empty cell while one note is selected inserts a new note right after it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: Tonnetz.getMidi(2, 0), p: 2, q: 0, time: 1.0, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [];
+    ComposeMode.refreshBoard();
+  });
+
+  await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').click();
+  await page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="0"]').click();
+
+  const result = await page.evaluate(() => {
+    const notes = ComposeMode.state.notes;
+    return {
+      count: notes.length,
+      inserted: { p: notes[1].p, q: notes[1].q, time: notes[1].time, duration: notes[1].duration },
+      midiMatches: Tonnetz.getMidi(notes[1].p, notes[1].q) === notes[1].midi,
+      selected: ComposeMode.state.selectedIndices,
+      lastTime: notes[2].time,
+    };
+  });
+  expect(result.count).toBe(3);
+  expect(result.inserted).toMatchObject({ p: 1, q: 0, time: 0.4, duration: 0.4 });
+  expect(result.midiMatches).toBe(true);
+  expect(result.selected).toEqual([1]);
+  // The later note shifted later by exactly the new note's own duration.
+  expect(result.lastTime).toBeCloseTo(1.4, 5);
+});
+
+test('Compose: Rotate CW rotates the selection around the first-selected note, reusing Pieces\' rotation math', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: Tonnetz.getMidi(1, 0), p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [0, 1];
+    ComposeMode.updateEditControls();
+  });
+
+  await page.locator('#compose-rotate-cw').click();
+
+  const result = await page.evaluate(() => {
+    const notes = ComposeMode.state.notes;
+    return {
+      pivotUnchanged: notes[0].p === 0 && notes[0].q === 0,
+      rotated: { p: notes[1].p, q: notes[1].q },
+      midiMatches: notes[1].midi === Tonnetz.getMidi(notes[1].p, notes[1].q),
+    };
+  });
+  expect(result.pivotUnchanged).toBe(true);
+  // Pieces.rotate([{p:1,q:0}]) => {p:-0, q:1+0} = {p:0,q:1} -- js/pieces.js's own rotation math.
+  expect(result.rotated).toEqual({ p: 0, q: 1 });
+  expect(result.midiMatches).toBe(true);
+});
+
 // ────────────────────────────────────────────────────────────────────────
 // Melody mode mouse-drag panning -- real report: rotating the view (INV-24) could move a
 // melody's notes off-screen with no way back, since Melody had no pan capability at all (touch

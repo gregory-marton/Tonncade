@@ -184,6 +184,18 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         </div>
                         <button id="compose-save" style="width: 100%;">Save</button>
                     </div>
+                    <!-- Shown only once at least one note is selected (see ComposeMode.updateEditControls).
+                         Selection: shift-tap a note on the board to add/remove it; a plain tap on an
+                         unselected note selects only it; tapping an empty cell while exactly one note is
+                         selected inserts a new note right after it. -->
+                    <div id="compose-edit-group" class="control-group" style="margin-top: 10px; display: none;">
+                        <p id="compose-selection-label" style="font-size: 13px; color: var(--accent); margin: 0 0 6px 0;"></p>
+                        <button id="compose-delete" style="width: 100%;">Delete Selected</button>
+                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%; margin-top: 8px;">
+                            <button id="compose-rotate-ccw" style="flex: 1;">Rotate ↺</button>
+                            <button id="compose-rotate-cw" style="flex: 1;">Rotate ↻</button>
+                        </div>
+                    </div>
                     <div id="compose-stats-group" class="stats-panel" style="margin-top: 15px;">
                         <div style="display: flex; gap: 10px;">
                             <p>Notes: <span id="compose-note-count">0</span></p>

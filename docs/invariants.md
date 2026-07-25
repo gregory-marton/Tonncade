@@ -620,6 +620,66 @@ timing.
 
 ---
 
+### INV-33: Compose's note-editing transforms (select/delete/insert/drag/rotate) are exact lattice operations, not approximations
+
+Task #64, the first slice of INV-28's deferred list (multi-select, drag-to-reposition,
+inserting mid-sequence). The key realization, corrected mid-design by the user: translation and
+rotation on the Tonnetz are both *linear* transforms on `(p,q)`, and `Tonnetz.getMidi(p,q) = 60 +
+7p + 3q` is linear too — so applying the same transform to an entire multi-note selection isn't
+separate, harder work from the single-note case, it's the exact same operation applied to a set.
+Multi-select was never the hard part; it just looked that way before working out the math.
+
+- **Selection**: `ComposeMode.notesAt(p,q)` returns every note index at a cell (a melody can
+  repeat a pitch, so this is a list). `selectAtCell` resolves which one a tap targets — the first
+  match not already selected, cycling back to the first once they all are, so repeated taps step
+  through same-cell duplicates instead of getting stuck. A plain tap replaces the selection with
+  just that note; shift-tap toggles it in/out of a growing selection. A persistent ring
+  (`.compose-selected-note`, `renderSelectionMarkers`) marks selected notes on the board,
+  distinct from `highlightByMidi`'s momentary play-flash — it has to be re-added after every
+  `drawLattice()` call, since that wipes the whole `<svg>`.
+- **Delete**: removes every selected note and closes exactly the time each one occupied — later
+  notes shift earlier by the deleted note's own `duration`, not by the full gap to whatever comes
+  next, so any other intentional rests are left alone.
+- **Insert**: tapping an empty cell while exactly one note is selected inserts a new note right
+  after it (default duration = the anchor's own), pushing everything at or after the insertion
+  point later by that same duration — the exact mirror of Delete's gap-closing.
+- **Drag (translate)**: dragging a selected note by `(Δp,Δq)` applies that same `(Δp,Δq)` to
+  every selected note. Because `getMidi` is linear, this shifts every selected note's pitch by
+  the *same* number of semitones — literally a clean transposition, no per-note special-casing.
+  Implemented as a genuine press-move-release drag (`state.dragCandidate`, a 6px movement
+  threshold), landing cell resolved via `document.elementFromPoint` at mouseup — mouse-only for
+  now (matching this app's existing convention that this kind of drag is a desktop gesture; see
+  Deferred below).
+- **Rotate**: `Rotate CW`/`Rotate CCW` buttons (not a two-finger gesture — this app has no
+  existing gesture-based rotate anywhere, only button/key-based, so this matches that convention
+  rather than inventing a new one that would also collide with the existing two-finger-pan
+  gesture on the same board) rotate every selected note around the first-selected note (the
+  pivot), reusing `Pieces.rotate`/`Pieces.rotateCCW` — the *exact* rigid-rotation math already
+  used for rotating a piece shape, applied to a selection's relative offsets instead.
+
+**Deliberately not built**: timing edits (retiming a note, expressing it as a triplet/32nd-note,
+simultaneous-time chord entry). Raised mid-design: MIDI's real timing model is ticks against a
+declared PPQN converted via a tempo meta-event, which `writeMIDI`/`parseMIDI` don't actually use
+today (they assume one fixed 120bpm tempo) — getting real rhythm precision would need a genuine
+tempo/quantization grid, tracked separately as `next_steps.md` #52, not folded in here. Per the
+user's own explicit call: a rough recording is cheap to re-record from scratch, and real
+rhythm-precision editing is better served by a dedicated external MIDI editor working on the
+saved `.mid` file directly than by in-app nudge buttons or a timeline widget (`next_steps.md`
+#53 tracks a possible link to one such tool, Signal, gated on the user trying it firsthand
+first). Touch-based drag-to-transpose is also not yet built — touch's single-tap already gets
+select/insert for free (`main.js`'s existing `ComposeMode.tapCell` routing), but wiring a
+touch-drag-vs-pan disambiguation into `main.js`'s already-dense central touch handler is real,
+separate work not attempted this pass.
+
+**Test:** `tests/desktop.spec.js` — four "Compose: ..." tests: tap-to-select + Delete's gap-close
+math, shift-tap multi-select + mouse-drag transposing the whole selection (verified via real
+`page.mouse` press-move-release, landing-cell resolution included), tap-to-insert's shift math
+(both the new note's placement and the pushed-later note's exact new time), and Rotate CW's pivot
+math (pivot note unchanged, the other note's new `(p,q)` matching `Pieces.rotate`'s own formula
+by hand).
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
