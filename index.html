@@ -105,7 +105,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             Upload MIDI File
                         </label>
                         <input id="midi-file-input" type="file" accept=".mid,.midi" style="display: none;" />
-                        <span id="midi-filename">Default: Hot Cross Buns</span>
+                        <span id="midi-filename"></span>
                     </div>
                     <!-- Chrome-only progressive enhancement (File System Access API) --
                          js/midi-folder.js shows this instead of #midi-upload-group above when
@@ -113,7 +113,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                          dropdown instead of re-picking a single file every time. -->
                     <div id="midi-folder-group" class="control-group" style="display: none;">
                         <button type="button" id="midi-choose-folder-btn">Choose MIDI Folder</button>
-                        <span id="midi-folder-status">Default: Hot Cross Buns</span>
+                        <span id="midi-folder-status"></span>
                         <select id="midi-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
                     <!-- Read-only online song folder (task #27) -- a plain relative fetch, works

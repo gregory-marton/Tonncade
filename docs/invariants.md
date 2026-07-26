@@ -821,6 +821,27 @@ active highlights same-named cells..." (touch, genuine `Touch`/`TouchEvent` disp
 
 ---
 
+### INV-37: The landscape drawer's width scales with the viewport, not a flat pixel value
+
+Task #57, found live via the random-tap exploratory matrix: `#top-drawer.expanded`'s
+`max-width` (the `max-width: 950px and (orientation: landscape)` media query) was a flat
+`320px` — a small, reasonable fraction of a wide landscape window, but 52% of a narrower one
+(614px). Changed to `min(320px, 40vw)`: unchanged at/above ~800px (40vw already exceeds 320px
+there, so the cap stays 320px), scales down proportionally below that.
+
+Testing this needed reading the CSS's own resolved `max-width` via `getComputedStyle`, not the
+drawer's rendered `boundingBox()` width — `#top-drawer`'s box is content-driven (auto width
+capped by `max-width`), so its actual rendered width can be narrower than the cap regardless of
+this fix, which isn't what #57 is about. Also found: `vw`-based computed styles can lag a tick
+behind `page.setViewportSize()` itself — reading immediately after a resize returned the PRIOR
+viewport's resolved value, so the test polls via `waitForFunction` rather than reading once.
+
+**Test:** `tests/mobile.spec.js` — "the expanded landscape drawer's max-width scales down at
+narrow widths instead of a flat 320px (#57)", confirmed failing against the pre-fix flat value
+before the CSS change, per red-green discipline.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

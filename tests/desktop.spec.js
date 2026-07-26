@@ -422,14 +422,18 @@ test('MidiFolder online: populates the dropdown from index.json, and selecting a
   await page.route('**/midi/b.mid', route => route.fulfill({ body: Buffer.from(bytes), contentType: 'audio/midi' }));
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.waitForFunction(() => document.getElementById('midi-online-files').options.length > 1);
+  await page.waitForFunction(() => document.getElementById('midi-online-files').options.length > 0);
 
+  const select = page.locator('#midi-online-files');
   const optionNames = await page.evaluate(() =>
     Array.from(document.getElementById('midi-online-files').options).map(o => o.textContent)
   );
-  expect(optionNames).toEqual(['Choose a song…', 'Test Song A', 'Test Song B']);
+  // No "Choose a song..." placeholder -- the first entry is simply the dropdown's own default
+  // selection, matching the melody already loaded on entry, not a separate status line.
+  expect(optionNames).toEqual(['Test Song A', 'Test Song B']);
+  expect(await select.inputValue()).toBe('0');
 
-  await page.locator('#midi-online-files').selectOption({ label: 'Test Song B' });
+  await select.selectOption({ label: 'Test Song B' });
   await page.waitForFunction(() => MidiMode.state.melody.length === 1 && MidiMode.state.melody[0].midi === 60);
 });
 
@@ -448,11 +452,11 @@ test('MidiFolder online: Compose gets the same bundled songs via its own dropdow
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
 
-  await page.waitForFunction(() => document.getElementById('compose-online-files').options.length > 1);
+  await page.waitForFunction(() => document.getElementById('compose-online-files').options.length > 0);
   const optionNames = await page.evaluate(() =>
     Array.from(document.getElementById('compose-online-files').options).map(o => o.textContent)
   );
-  expect(optionNames).toEqual(['Choose a song…', 'Test Song A']);
+  expect(optionNames).toEqual(['Test Song A']);
 });
 
 test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys', async ({ page }) => {

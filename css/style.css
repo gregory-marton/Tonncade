@@ -1272,7 +1272,11 @@ button:hover {
         border-right: 1px solid var(--border);
     }
     #top-drawer.expanded {
-        max-width: 320px;
+        /* A flat 320px is a small, reasonable fraction of a wide landscape window, but eats
+           over half a narrower one (found live via the random-tap exploratory matrix at 614px --
+           52% of the viewport). Scales down at narrower widths while staying exactly 320px
+           at/above 800px (950px's own max-width ceiling scaled by this same 40vw factor). */
+        max-width: min(320px, 40vw);
         overflow-y: auto;
     }
     .header-left {

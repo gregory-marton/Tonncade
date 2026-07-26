@@ -1592,6 +1592,39 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await expect(pieceItem).toBeVisible();
   });
 
+  test('the expanded landscape drawer\'s max-width scales down at narrow widths instead of a flat 320px (#57)', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    const drawer = page.locator('#top-drawer');
+    if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
+      await page.locator('#drawer-handle').click();
+    }
+
+    // Reads the CSS max-width the browser actually resolved, not the drawer's own rendered
+    // width -- #top-drawer's box is content-driven (auto width capped by max-width), so its
+    // boundingBox() can be narrower than the cap regardless of this fix; the cap itself is what
+    // #57 is actually about.
+    const resolvedMaxWidth = async (width) => {
+      await page.setViewportSize({ width, height: 393 });
+      // vw-based computed styles can lag a tick behind setViewportSize itself (observed: reading
+      // immediately after a resize returned the PRIOR viewport's value) -- poll instead of a
+      // single immediate read.
+      await page.waitForFunction((w) => {
+        const mw = parseFloat(getComputedStyle(document.getElementById('top-drawer')).maxWidth);
+        return Math.abs(mw - Math.min(320, w * 0.4)) < 1;
+      }, width);
+      return page.evaluate(() => parseFloat(getComputedStyle(document.getElementById('top-drawer')).maxWidth));
+    };
+
+    // Found live via the random-tap exploratory matrix at 614px, where a flat 320px ate 52% of
+    // the viewport -- these should scale down roughly proportionally instead.
+    expect(await resolvedMaxWidth(614), 'width=614').toBeLessThanOrEqual(614 * 0.42);
+    expect(await resolvedMaxWidth(480), 'width=480').toBeLessThanOrEqual(480 * 0.42);
+
+    // And the wide end is unchanged -- still 320px at/above the point where 40vw alone would
+    // exceed it, not silently shrunk everywhere by this fix.
+    expect(await resolvedMaxWidth(950)).toBeGreaterThan(315);
+  });
+
   test('drawer handle is visible on phone, hidden on tablet; clicking it reveals title and modes', async ({ page }) => {
     const width = page.viewportSize().width;
     const drawerHandle = page.locator('#drawer-handle');

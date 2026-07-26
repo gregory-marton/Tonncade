@@ -154,11 +154,15 @@ const MidiFolder = {
 
         group.style.display = '';
         if (select) {
-            select.innerHTML = '<option value="" disabled selected>Choose a song…</option>';
+            // No "choose a song" placeholder -- the first entry (Hot Cross Buns) IS the default
+            // melody already loaded on entry, so it's simply the dropdown's own default
+            // selection, not a separate "Default: ..." status line to keep in sync elsewhere.
+            select.innerHTML = '';
             this.onlineIndex.forEach((song, i) => {
                 const opt = document.createElement('option');
                 opt.value = i;
                 opt.textContent = song.name;
+                if (i === 0) opt.selected = true;
                 select.appendChild(opt);
             });
             select.onchange = () => this.loadOnlineFile(parseInt(select.value, 10));
