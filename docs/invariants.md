@@ -923,6 +923,82 @@ while recording and stops the instant recording stops, the Quantize checkbox act
 stop, and Save emits a real tempo event matching the chosen BPM when quantize was used. All
 confirmed failing against the pre-implementation code first, per red-green discipline.
 
+### INV-40: a restricted board's reference box matches ITS OWN shape, not whatever leftover space chrome happened to leave
+
+Found via a real user request ("breathe away whitespace... at small viewports") that led, through
+several false starts, to a genuinely different bug than the one first suspected. In order:
+
+1. **Chrome padding/gap/font/button-size were flat, unconditional pixel values** on mobile, so a
+   Snake/Gravity/Blast stats panel and D-pad reserved the same footprint at a 320px-tall phone as
+   at an 844px-tall one. Fixed with fluid `clamp()`s (`--chrome-*`/`--dpad-*` custom properties in
+   `css/style.css`'s shared mobile media query) tuned as two separate anchor pairs -- padding/gap/
+   button-size shrink first (full size down to a 640px-tall viewport, fully shrunk by 440px);
+   font/button-text only starts shrinking below that (500px down to 340px) -- "breathe first, then
+   shrink text," per the user's own two-stage framing.
+2. **`#tonnetz-svg`'s mobile inset was a flat guess** (`top:210px`/`bottom:150px` etc.), sized to
+   clear the widest possible chrome regardless of how much room it actually needs right now.
+   `Render.measureChromeClearance(mode)` measures the CURRENT mode's actually-visible stats panel,
+   D-pad (including Snake/Gravity's landscape left/right clusters, measured individually since
+   their shared wrapper spans the full width) and, for Blast, its independently-floating
+   next-piece queue (`#palette.floating-queue` -- missing from the first version of this
+   measurement, which caused a real, INV-10-caught overlap once the board was big enough to
+   actually reach the queue's corner, something the old undersized board never did). The result
+   feeds `--chrome-inset-*` CSS custom properties (`Render.updateChromeInsets`) as a fallback path.
+3. **The 80px `--mobile-pad-safe-bottom` floor** (generous margin for real device browser chrome)
+   was, at the shortest viewports, the single largest piece of the reserved space -- given the
+   same two-anchor fluid treatment as the rest of the chrome (unchanged down to 640px tall,
+   shrinks to a 30px floor -- still comfortably above a real home-indicator inset -- by 440px).
+4. **The actual bug, found only once the above measurements were live and a screenshot was
+   compared against the numbers**: even with accurate, minimal chrome clearance, the board still
+   rendered small and centered with visible waste on one axis. `getAspectMatchedRefBox()` derived
+   the fit's reference-box aspect ratio from `#tonnetz-svg`'s own on-screen element box -- whatever
+   shape LEFTOVER SPACE happened to produce -- not from the board's own natural shape. Fitting
+   content into a reference box with the WRONG aspect ratio makes `getFitView`'s "contain" math
+   necessarily waste space on whichever axis isn't the tight constraint: a short, wide leftover
+   strip (portrait, heavy insets) wasted the sides; a tall, narrow one (full-bleed, no insets)
+   wasted top/bottom. Neither "shrink chrome" nor "remove insets entirely" fixes this alone, since
+   it's a shape mismatch, not a size one.
+
+   The actual fix: `Render.fitContentBox(cells, padding)` sizes and positions `#tonnetz-svg`
+   itself (inline style, which wins over the CSS `@media` rules) to the LARGEST box matching the
+   cells' own natural aspect ratio (via the new `Render.computeCellBounds`, extracted from
+   `getFitView` so both always agree on exactly what content needs to fit) that fits within the
+   space left after `measureChromeClearance`'s real numbers -- not stretched to fill whatever
+   oddly-shaped leftover space the old insets produced. `getAspectMatchedRefBox()` then reads this
+   correctly-shaped element's own rect, so `getFitView`'s zoom naturally has near-zero waste on
+   either axis. The margin this frees up becomes free space FOR the chrome, rather than being
+   baked into an aspect-mismatched element box or an oversized viewBox.
+
+**Two real regressions found and fixed before this shipped**, both from the same underlying
+cause -- moving from CSS-percentage sizing (which a browser keeps continuously, automatically,
+correct) to JS-computed pixel sizing (which only updates when something explicitly re-triggers
+it):
+- The mobile drawer's open/close animation left the board's centered offset stuck mid-transition,
+  never settling back to its pre-open position. Each mode's `ResizeObserver` watched `Render.svg`
+  itself, but `fitContentBox`'s OWN output size is often insensitive to the exact container width
+  (a common case here: the board is usually height-bound, so its fitted size doesn't change even
+  though its centered X-offset should) -- meaning the observer could go quiet exactly when a
+  position correction was still needed. Fixed by observing `#game-container` instead: it's the
+  real upstream signal `fitContentBox` depends on, and reliably changes size throughout a CSS
+  transition, including its final settled frame.
+- `INV-10` flaked on rapid mode entry with no settling time between switches. Root cause: Blast's
+  and Gravity's own `refreshUI()` called `refreshBoard()` (which measures the stats panel's real
+  height) BEFORE setting that panel's own score/lines text content -- so the very first fit of a
+  session measured an empty, not-yet-sized panel instead of its true final height. Fixed by
+  reordering each `refreshUI()` to populate its own panel's text first. The test itself also
+  needed the same settling wait `INV-21` already uses for the identical class of issue (a
+  browser's own layout is synchronous; a JS `ResizeObserver` reacting to it is not) --  added
+  consistently rather than treated as a one-off.
+
+**Test:** `tests/invariants.spec.js`'s "INV-40: Snake/Gravity/Blast size #tonnetz-svg to match
+their own board shape, not the leftover chrome space" asserts `#tonnetz-svg`'s own rendered aspect
+ratio matches `Render.computeCellBounds`'s content aspect ratio (within 5%) for each restricted
+mode, in both portrait and landscape -- confirmed failing on the pre-fix code (the function it
+calls didn't exist) before implementing, per red-green discipline. `tests/exploratory.spec.js`'s
+"Random taps (full matrix)" comment was also corrected -- it used to describe this class of
+failure as expected/by-design flakiness to screenshot-and-ignore; it's a real defect, now fixed
+for the restricted-board modes it was actually catching.
+
 ---
 
 ## Primary Elements

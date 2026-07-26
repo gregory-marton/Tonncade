@@ -57,9 +57,18 @@ const SnakeMode = {
         // at mode entry, and never adapts to a later resize (found via a systematic centering
         // check applied uniformly across every restricted-board mode -- Snake never had this at
         // all, unlike Gravity/Blast).
+        //
+        // Observes #game-container, not Render.svg itself (INV-40): fitContentBox sizes Render.svg
+        // FROM #game-container's own box, so #game-container is the real upstream signal. Watching
+        // Render.svg directly missed real changes whenever fitContentBox's OWN output size
+        // happened to be insensitive to the exact container width (a common case: this board's
+        // shape is often height-bound, so its fitted size doesn't change even though its centered
+        // X-offset should) -- found live via the mobile drawer's open/close animation leaving the
+        // board offset stuck mid-transition, never settling back to its pre-open position.
         if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
             this._resizeObserver = new ResizeObserver(() => this.refreshBoard());
-            this._resizeObserver.observe(Render.svg);
+            const container = document.getElementById('game-container');
+            this._resizeObserver.observe(container || Render.svg);
         }
     },
 
@@ -459,6 +468,8 @@ const SnakeMode = {
                 if (this.isInBounds(p, q)) boardCells.push({ p, q });
             }
         }
+        Render.updateChromeInsets();
+        Render.fitContentBox(boardCells, Render.HEX_R * 2);
         const { refW, refH } = Render.getAspectMatchedRefBox();
         // A slightly larger scale margin than Blast's 1.25 -- Snake's radius-7 board is bigger
         // than Blast's radius-5 one, and 1.25 left 2 of 169 cells clipped at a narrow tablet

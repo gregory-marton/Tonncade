@@ -49,9 +49,18 @@ const BlastMode = {
         // cells -- the active-piece ghost is a separate updateGhost() step in refreshUI() -- so the
         // observer must call refreshUI(), not refreshBoard() alone, or its first (always-fires-once)
         // callback wipes the ghost via drawLattice() without redrawing it.
+        //
+        // Observes #game-container, not Render.svg itself (INV-40): fitContentBox sizes Render.svg
+        // FROM #game-container's own box, so #game-container is the real upstream signal. Watching
+        // Render.svg directly missed real changes whenever fitContentBox's OWN output size
+        // happened to be insensitive to the exact container width (a common case: this board's
+        // shape is often height-bound, so its fitted size doesn't change even though its centered
+        // X-offset should) -- found live via the mobile drawer's open/close animation leaving the
+        // board offset stuck mid-transition, never settling back to its pre-open position.
         if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
             this._resizeObserver = new ResizeObserver(() => this.refreshUI());
-            this._resizeObserver.observe(Render.svg);
+            const container = document.getElementById('game-container');
+            this._resizeObserver.observe(container || Render.svg);
         }
 
         this.reset();
@@ -87,9 +96,13 @@ const BlastMode = {
 
     refreshUI: function() {
         this.renderNextQueue();
-        this.refreshBoard();
-        this.updateGhost();
 
+        // #blast-stats/the queue's own text content must be set BEFORE refreshBoard() (which
+        // measures their real rendered size via Render.fitContentBox/measureChromeClearance,
+        // INV-40) -- these used to be populated AFTER refreshBoard(), so the very first fit of a
+        // session measured an empty, not-yet-sized "Lines: / Best: " panel instead of its true
+        // final height, occasionally leaving the board mis-fit until some later, unrelated
+        // resize happened to correct it (found live via INV-10 flaking on rapid mode entry).
         const linesEl = document.getElementById('lines-count');
         if (linesEl) linesEl.textContent = this.state.linesCleared;
 
@@ -101,6 +114,9 @@ const BlastMode = {
         if (bestEl) {
             bestEl.textContent = Math.max(best, this.state.linesCleared);
         }
+
+        this.refreshBoard();
+        this.updateGhost();
     },
 
     renderNextQueue: function() {
@@ -181,6 +197,8 @@ const BlastMode = {
         // Fit the viewBox against the SVG element's actual on-screen aspect ratio rather than the
         // historical fixed 4:3 default (see Render.getAspectMatchedRefBox and #44's Gravity fix),
         // so the board fills the available space instead of leaving letterboxed margins.
+        Render.updateChromeInsets();
+        Render.fitContentBox(boardCells, Render.HEX_R * 2);
         const { refW, refH } = Render.getAspectMatchedRefBox();
         const fit = Render.getFitView(boardCells, Render.HEX_R * 2, 1.25, refW, refH);
         Render.updateView(fit.viewX, fit.viewY, fit.zoom, refW, refH);

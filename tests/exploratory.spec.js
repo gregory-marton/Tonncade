@@ -271,12 +271,12 @@ test.describe('Exploratory tests (prototype)', () => {
 
   test('Random taps (full matrix): every mode x drawer-state x 5 random screen sizes', async ({ page }) => {
     test.setTimeout(600000);
-    // A fresh seed each run, not a fixed constant: some sampled screen sizes land on unrealistic
-    // extreme aspect ratios (very tall+narrow, very wide+short) where even a correctly laid-out
-    // fixed-size board naturally won't dominate an oddly-shaped viewport -- an occasional,
-    // expected failure, not a regression. A fixed seed would instead make that one scenario fail
-    // on literally every run forever. Whatever seed a given run draws is logged here so any
-    // specific failure is still exactly reproducible afterward.
+    // A fresh seed each run, not a fixed constant, so the sampled sizes vary run to run instead
+    // of a fixed seed permanently fixating on whichever one scenario happened to be chosen first.
+    // Whatever seed a given run draws is logged here so any specific failure is still exactly
+    // reproducible afterward. A failure here is a real signal, not expected noise (see the floor
+    // comment below) -- look at the automatically-attached failure screenshot (playwright.config's
+    // screenshot:'only-on-failure') before assuming it's an artifact of the sampled size.
     const seed = (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
     console.log(`Random tap matrix seed: ${seed} (rerun with this exact seed to reproduce any specific scenario)`);
     const rand = mulberry32(seed);
@@ -301,14 +301,12 @@ test.describe('Exploratory tests (prototype)', () => {
           // landscape widths it can eat over half the screen; 10% still catches "the Tonnetz is
           // effectively gone", just not "the drawer is unusually wide right now".
           //
-          // Independent width/height sampling can still produce an occasional failure beyond
-          // that, by design (kept on purpose -- see the seed comment above): confirmed visually,
-          // via the failure screenshot config below, that this isn't limited to extreme aspect
-          // ratios. A restricted-Tonnetz mode's board (Snake/Blast/Gravity) is a FIXED pixel
-          // size, not one that scales up with the viewport, so any sufficiently large or
-          // oddly-shaped sampled size naturally leaves it a smaller fraction of the screen, with
-          // real empty space around it -- not a hidden/covered board. When this happens, don't
-          // chase it: screenshot the failure and eyeball it.
+          // A failure here means the Tonnetz genuinely isn't getting a fair share of the
+          // available space -- confirmed live (see docs/invariants.md's INV-40) that this is a
+          // real space-filling defect (getFitView/getAspectMatchedRefBox can fit tightly on one
+          // axis while leaving the other mostly empty, when the reference box's aspect ratio
+          // doesn't match the board's own shape), not sampling noise from an unlucky size. Look
+          // at the attached failure screenshot -- don't assume it's expected and move on.
           const floor = drawerOpen ? 0.1 : 0.3;
           expect(result.tonnetzShare, `[${label}] Tonnetz should get a meaningful share of random taps (got ${(result.tonnetzShare * 100).toFixed(1)}%, floor ${floor * 100}%)`).toBeGreaterThan(floor);
         }

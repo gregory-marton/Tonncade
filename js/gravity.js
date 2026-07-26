@@ -53,9 +53,18 @@ const GravityMode = {
         // too-small size, since nothing else re-triggers it once the game is running. A
         // ResizeObserver re-fits whenever the element's actual box changes, for any reason,
         // self-correcting regardless of the specific cause.
+        //
+        // Observes #game-container, not Render.svg itself (INV-40): fitContentBox sizes Render.svg
+        // FROM #game-container's own box, so #game-container is the real upstream signal. Watching
+        // Render.svg directly missed real changes whenever fitContentBox's OWN output size
+        // happened to be insensitive to the exact container width (a common case: this board's
+        // shape is often height-bound, so its fitted size doesn't change even though its centered
+        // X-offset should) -- found live via the mobile drawer's open/close animation leaving the
+        // board offset stuck mid-transition, never settling back to its pre-open position.
         if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
             this._resizeObserver = new ResizeObserver(() => this.refreshBoard());
-            this._resizeObserver.observe(Render.svg);
+            const container = document.getElementById('game-container');
+            this._resizeObserver.observe(container || Render.svg);
         }
 
         this.reset();
@@ -348,8 +357,13 @@ const GravityMode = {
 
     refreshUI: function() {
         this.renderNextQueue();
-        this.refreshBoard();
 
+        // #gravity-controls's own text content must be set BEFORE refreshBoard() (which measures
+        // its real rendered size via Render.fitContentBox/measureChromeClearance, INV-40) --
+        // these used to be populated AFTER refreshBoard(), so the very first fit of a session
+        // measured an empty, not-yet-sized panel instead of its true final height, occasionally
+        // leaving the board mis-fit until some later, unrelated resize happened to correct it
+        // (found live via INV-10 flaking on rapid mode entry).
         const linesEl = document.getElementById('gravity-lines-count');
         if (linesEl) linesEl.textContent = this.state.linesCleared;
 
@@ -364,6 +378,8 @@ const GravityMode = {
 
         const speedEl = document.getElementById('gravity-speed-level');
         if (speedEl) speedEl.textContent = (1000 / this.state.dropInterval).toFixed(1) + 'x';
+
+        this.refreshBoard();
     },
 
     renderNextQueue: function() {
@@ -443,6 +459,8 @@ const GravityMode = {
         // aspect ratio (see Render.getAspectMatchedRefBox) rather than the historical fixed 4:3
         // reference box, so it fills the element's real box instead of being letterboxed inside
         // a mismatched shape.
+        Render.updateChromeInsets();
+        Render.fitContentBox(cupCells, Render.HEX_R * 2);
         const { refW, refH } = Render.getAspectMatchedRefBox();
         const fit = Render.getFitView(cupCells, Render.HEX_R * 2, 1, refW, refH);
         Render.updateView(fit.viewX, fit.viewY, fit.zoom, refW, refH);

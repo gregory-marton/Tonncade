@@ -262,6 +262,148 @@ const Render = {
         return window.matchMedia('(max-width: 950px) and (orientation: landscape)').matches;
     },
 
+    // INV-40: #tonnetz-svg's mobile inset (see the two @media blocks near the end of
+    // css/style.css) used to be a flat guess sized to clear the widest possible chrome
+    // regardless of how much room it actually needs right now. This measures the CURRENT mode's
+    // actual visible stats/controls panel and D-pad, and feeds the real numbers back in as CSS
+    // custom properties, so the board reclaims whatever the (now also shrinkable, see the
+    // --chrome-* clamp()s in the same CSS) chrome doesn't need. Call after anything that could
+    // change either the chrome's own size (a resize, a status message wrapping to another line)
+    // or which chrome elements are even visible (setupMobileControls, entering/leaving a mode).
+    // The real, currently-visible footprint of the current mode's stats panel and D-pad, as
+    // {top, bottom, left, right} clearance needed from #game-container's own edges. Shared by
+    // updateChromeInsets (CSS custom properties, a fallback/compat path) and fitContentBox (the
+    // real fix, see INV-40) -- one measurement, two consumers.
+    measureChromeClearance: function(mode) {
+        const container = document.getElementById('game-container');
+        if (!container) return { top: 0, bottom: 0, left: 0, right: 0 };
+        const containerRect = container.getBoundingClientRect();
+        const GAP = 10;
+
+        const rectOf = (id) => {
+            const el = document.getElementById(id);
+            if (!el || getComputedStyle(el).display === 'none') return null;
+            return el.getBoundingClientRect();
+        };
+
+        const STATS_IDS = { snake: 'snake-controls', gravity: 'gravity-controls', blast: 'blast-stats' };
+        const statsRect = rectOf(STATS_IDS[mode]);
+
+        let top = 0, bottom = 0, left = 0, right = 0;
+
+        // Blast's next-piece queue (#palette.floating-queue) floats independently of the stats
+        // panel -- top-right in portrait, the full left column in landscape (see css/style.css)
+        // -- and was missing from this measurement entirely until INV-10's occlusion check
+        // caught real overlap: fitContentBox made the board big enough to actually reach the
+        // queue's corner, which the old, much-smaller-by-bug board never did.
+        const queueRect = mode === 'blast' ? rectOf('palette') : null;
+
+        if (this.isMobileLandscape()) {
+            if (statsRect) left = Math.max(left, statsRect.right - containerRect.left + GAP);
+            if (queueRect) left = Math.max(left, queueRect.right - containerRect.left + GAP);
+            // Snake/Gravity's D-pad splits into left/right clusters in landscape -- the shared
+            // wrapper (#snake-mobile-controls/#mobile-controls) spans the full width itself
+            // (left:10/right:10), so the clusters have to be measured individually, not the
+            // wrapper, or every landscape inset would come out as "the whole width."
+            const clusterSelectors = mode === 'snake'
+                ? ['.snake-pad-cluster.snake-pad-left', '.snake-pad-cluster.snake-pad-right']
+                : (mode === 'gravity' ? ['.gravity-pad-cluster.gravity-pad-left', '.gravity-pad-cluster.gravity-pad-right'] : []);
+            if (clusterSelectors.length) {
+                const wrapper = document.getElementById(mode === 'snake' ? 'snake-mobile-controls' : 'mobile-controls');
+                if (wrapper && getComputedStyle(wrapper).display !== 'none') {
+                    const leftCluster = document.querySelector(clusterSelectors[0]);
+                    const rightCluster = document.querySelector(clusterSelectors[1]);
+                    if (leftCluster) left = Math.max(left, leftCluster.getBoundingClientRect().right - containerRect.left + GAP);
+                    if (rightCluster) right = Math.max(right, containerRect.right - rightCluster.getBoundingClientRect().left + GAP);
+                }
+            }
+        } else {
+            if (statsRect) top = Math.max(top, statsRect.bottom - containerRect.top + GAP);
+            if (queueRect) top = Math.max(top, queueRect.bottom - containerRect.top + GAP);
+            const dpadRect = mode === 'snake' ? rectOf('snake-mobile-controls') : (mode === 'gravity' ? rectOf('mobile-controls') : null);
+            if (dpadRect) bottom = Math.max(bottom, containerRect.bottom - dpadRect.top + GAP);
+        }
+
+        return { top, bottom, left, right };
+    },
+
+    // INV-40: #tonnetz-svg's mobile inset (see the two @media blocks near the end of
+    // css/style.css) used to be a flat guess sized to clear the widest possible chrome
+    // regardless of how much room it actually needs right now. This measures the CURRENT mode's
+    // actual visible stats/controls panel and D-pad, and feeds the real numbers back in as CSS
+    // custom properties, so the board reclaims whatever the (now also shrinkable, see the
+    // --chrome-* clamp()s in the same CSS) chrome doesn't need. Superseded in practice by
+    // fitContentBox's own inline-style sizing (which wins over these CSS rules), kept as the
+    // fallback for whatever briefly renders before fitContentBox's first call, or an environment
+    // where cells/aspect aren't available yet.
+    updateChromeInsets: function() {
+        if (typeof App === 'undefined') return;
+        const mode = App.currentMode;
+        if (!this.isMobileViewport()) return; // desktop has no matching inset rule to feed
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        const { top, bottom, left, right } = this.measureChromeClearance(mode);
+
+        container.style.setProperty('--chrome-inset-top', `${Math.round(top)}px`);
+        container.style.setProperty('--chrome-inset-bottom', `${Math.round(bottom)}px`);
+        container.style.setProperty('--chrome-inset-left', `${Math.round(left)}px`);
+        container.style.setProperty('--chrome-inset-right', `${Math.round(right)}px`);
+    },
+
+    // The actual fix for INV-40: sizes and positions #tonnetz-svg itself (inline style, which
+    // wins over the CSS @media inset rules) to the LARGEST box matching the cells' own natural
+    // aspect ratio that fits within the space left after the current mode's real chrome
+    // clearance -- instead of stretching to fill whatever oddly-shaped leftover space fixed
+    // insets left behind. A reference box forced to match the LEFTOVER SCREEN's shape (rather
+    // than the CONTENT's shape) makes getFitView's "contain" math necessarily waste space on
+    // whichever axis isn't the tight constraint -- confirmed live: a radius-7 board's own raw
+    // bounding shape is close to square (slightly wide), so forcing it into a tall leftover
+    // strip (portrait) or a wide one (aggressively-inset landscape) always wasted the axis that
+    // wasn't binding. Sizing the element itself to match the content's own shape removes that
+    // waste; the margin it frees up becomes free space for chrome instead of being baked into
+    // either the viewBox or an aspect-mismatched element box. Desktop is left alone (returns
+    // false) -- there's no mobile chrome competing for space there, and the historical fixed
+    // 800x600-style fit already fills a normal desktop panel reasonably.
+    fitContentBox: function(cells, padding = 0) {
+        if (!this.isMobileViewport()) return false;
+        if (typeof App === 'undefined') return false;
+        const container = document.getElementById('game-container');
+        if (!container || !this.svg) return false;
+        const containerRect = container.getBoundingClientRect();
+        if (!containerRect.width || !containerRect.height) return false;
+
+        const bounds = this.computeCellBounds(cells, padding);
+        if (!bounds) return false;
+        const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
+        if (!isFinite(contentAspect) || contentAspect <= 0) return false;
+
+        const { top, bottom, left, right } = this.measureChromeClearance(App.currentMode);
+        const availW = containerRect.width - left - right;
+        const availH = containerRect.height - top - bottom;
+        if (availW <= 0 || availH <= 0) return false;
+
+        let boxW, boxH;
+        if (availW / availH > contentAspect) {
+            boxH = availH;
+            boxW = availH * contentAspect;
+        } else {
+            boxW = availW;
+            boxH = availW / contentAspect;
+        }
+
+        const offsetX = left + (availW - boxW) / 2;
+        const offsetY = top + (availH - boxH) / 2;
+
+        this.svg.style.position = 'absolute';
+        this.svg.style.left = `${offsetX}px`;
+        this.svg.style.top = `${offsetY}px`;
+        this.svg.style.right = 'auto';
+        this.svg.style.bottom = 'auto';
+        this.svg.style.width = `${boxW}px`;
+        this.svg.style.height = `${boxH}px`;
+        return true;
+    },
+
     // On phones, shrink the viewBox (relative to baseZoom) so each hex renders ~1.5x bigger.
     getResponsiveZoom: function(baseZoom = 1) {
         return this.isMobileViewport() ? baseZoom / 1.5 : baseZoom;
@@ -309,11 +451,12 @@ const Render = {
     // had zero visible effect -- preserveAspectRatio="xMidYMid meet" just moved the wasted space
     // from outside the SVG's DOM box to inside it). See updateView, which must be called with
     // the SAME refW/refH so the actual viewBox attribute agrees with this math.
-    getFitView: function(cells, padding = 0, scale = 1, refW = 800, refH = 600) {
-        if (!cells || cells.length === 0) {
-            return { viewX: -refW / 2, viewY: -refH / 2, zoom: 1 };
-        }
-
+    // Screen-space bounding box of the given {p, q} cells, padded by `padding` on every side.
+    // Shared by getFitView and fitContentBox so both always agree on exactly what content needs
+    // to fit -- the aspect ratio fitContentBox sizes the element to is otherwise trivially able
+    // to drift out of sync with what getFitView actually fits into it.
+    computeCellBounds: function(cells, padding = 0) {
+        if (!cells || cells.length === 0) return null;
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         cells.forEach(c => {
             const pos = this.getRotatedScreenPos(c.p, c.q);
@@ -322,11 +465,15 @@ const Render = {
             minY = Math.min(minY, pos.y - this.HEX_R);
             maxY = Math.max(maxY, pos.y + this.HEX_R);
         });
+        return { minX: minX - padding, maxX: maxX + padding, minY: minY - padding, maxY: maxY + padding };
+    },
 
-        minX -= padding;
-        maxX += padding;
-        minY -= padding;
-        maxY += padding;
+    getFitView: function(cells, padding = 0, scale = 1, refW = 800, refH = 600) {
+        const bounds = this.computeCellBounds(cells, padding);
+        if (!bounds) {
+            return { viewX: -refW / 2, viewY: -refH / 2, zoom: 1 };
+        }
+        const { minX, maxX, minY, maxY } = bounds;
 
         const zoom = Math.max((maxX - minX) / refW, (maxY - minY) / refH) / scale;
         const centerX = (minX + maxX) / 2;

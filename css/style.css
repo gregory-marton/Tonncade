@@ -456,14 +456,14 @@ button:hover {
 .snake-pad-cluster {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--dpad-gap, 8px);
     pointer-events: auto;
 }
 
 .snake-pad-cluster .m-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 18px;
+    width: var(--dpad-btn-size, 48px);
+    height: var(--dpad-btn-size, 48px);
+    font-size: var(--dpad-btn-font, 18px);
     background: rgba(20, 22, 28, 0.9);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -536,6 +536,42 @@ button:hover {
    block, so these panels fell back to position:static — and effectively broke — in
    landscape, the same root cause fixed for #mobile-controls/#snake-mobile-controls earlier. */
 @media (max-width: 767px), (max-width: 950px) and (orientation: landscape) {
+    /* Chrome-shrink knobs (#57 follow-up: fixed-pixel mobile chrome was found to starve the
+       restricted-board modes' own board disproportionately at short viewport heights,
+       independent of aspect ratio -- see docs/invariants.md's INV-40). Two anchor pairs, not
+       one: padding/gap/D-pad-button-size (the "whitespace" group) interpolate between a full
+       viewport-height=640px ceiling and a viewport-height=440px floor -- fully shrunk by 440px
+       tall. Font-size/button-text (the "text" group) don't start shrinking until BELOW that,
+       between a 500px ceiling and 340px floor -- so in the 500-640px band, only whitespace has
+       shrunk yet and text is still full-size; only below ~500px does text start shrinking too.
+       "breathe first, then shrink text" as two separate calc()-driven knees, not one. Actual
+       board-clearing insets are computed from real measured chrome size by
+       Render.updateChromeInsets(), not from these numbers directly -- shrinking the chrome only
+       helps the board if the reserved space shrinks correspondingly, which is what that function
+       does (see the #tonnetz-svg inset rules further down, which read its output). */
+    :root {
+        --chrome-pad-v: clamp(3px, calc(2.5vh - 8px), 8px);
+        --chrome-pad-h: clamp(6px, calc(7.5vw - 18px), 12px);
+        --chrome-gap: clamp(2px, calc(1vh - 2.4px), 4px);
+        --chrome-btn-pad-v: clamp(2px, calc(1vh - 2.4px), 4px);
+        --chrome-btn-pad-h: clamp(4px, calc(5vw - 12px), 8px);
+        --dpad-gap: clamp(3px, calc(2.5vh - 8px), 8px);
+        --chrome-font: clamp(9px, calc(1.875vh + 2.625px), 12px);
+        --chrome-btn-font: clamp(9px, calc(1.25vh + 4.75px), 11px);
+        --chrome-btn-h: clamp(16px, calc(5vh - 1px), 24px);
+        --dpad-btn-size: clamp(30px, calc(11.25vh - 8.25px), 48px);
+        --dpad-btn-font: clamp(12px, calc(3.75vh - 0.75px), 18px);
+        /* The 80px floor (see :root above) is a generous guess for real device browser chrome
+           (iOS Safari's address bar, etc.) -- appropriate on a normal-height phone, but found to
+           be the single largest piece of the restricted-board modes' bottom clearance at the
+           shortest sampled viewports (INV-40), consuming board space that same real-device
+           chrome usually doesn't even need at that point (the viewport height Chromium reports
+           already excludes most of it). Same two-anchor shrink as the --chrome-* vars above:
+           unchanged (80px) down to 640px tall, shrinks to a 30px floor (still comfortably above
+           a real home-indicator's own inset) by 440px tall. */
+        --mobile-pad-safe-bottom: calc(clamp(30px, calc(25vh - 80px), 80px) + env(safe-area-inset-bottom, 0px));
+    }
+
     #blast-stats, #gravity-controls, #snake-controls {
         position: absolute;
         top: 10px;
@@ -546,14 +582,14 @@ button:hover {
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 8px 12px;
+        padding: var(--chrome-pad-v) var(--chrome-pad-h);
         font-family: monospace;
         color: #fff;
         margin-top: 0 !important;
         pointer-events: none;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: var(--chrome-gap);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         /* An auto-width absolutely-positioned box grows to fit its widest unwrapped line —
            without this, Snake's "Game Over! Click Restart to play again." message drags the
@@ -580,7 +616,7 @@ button:hover {
        block below), ballooning #snake-controls/#gravity-controls over a third of the board. */
     #blast-stats p, #gravity-controls p, #midi-controls p, #snake-controls p {
         margin: 2px 0;
-        font-size: 12px;
+        font-size: var(--chrome-font);
         font-weight: bold;
     }
 
@@ -591,14 +627,14 @@ button:hover {
     #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons, #midi-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
-        gap: 6px;
-        margin-top: 4px;
+        gap: var(--chrome-gap);
+        margin-top: var(--chrome-gap);
     }
 
     #blast-stats button, #gravity-controls button, #snake-controls button, #midi-controls button {
-        padding: 4px 8px;
-        font-size: 11px;
-        height: 24px;
+        padding: var(--chrome-btn-pad-v) var(--chrome-btn-pad-h);
+        font-size: var(--chrome-btn-font);
+        height: var(--chrome-btn-h);
         /* The global `button { width: 100% }` rule sets flex-basis:auto's resolved value, so
            flex:none alone doesn't stop these from stretching — width must be overridden too. */
         flex: none;
@@ -620,14 +656,14 @@ button:hover {
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 8px 12px;
+        padding: var(--chrome-pad-v) var(--chrome-pad-h);
         box-sizing: border-box;
         font-family: monospace;
         color: #fff;
         margin-top: 0 !important;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--chrome-gap);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         pointer-events: none;
     }
@@ -880,14 +916,14 @@ button:hover {
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 8px 12px;
+        padding: var(--chrome-pad-v) var(--chrome-pad-h);
         font-family: monospace;
         color: #fff;
         margin-top: 0 !important;
         pointer-events: none; /* Let clicks pass to SVG by default */
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: var(--chrome-gap);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
 
@@ -949,14 +985,14 @@ button:hover {
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         border-bottom: 1px solid var(--border);
-        padding: 10px;
+        padding: var(--chrome-pad-v);
         box-sizing: border-box;
         font-family: monospace;
         color: #fff;
         margin-top: 0 !important;
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--chrome-gap);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
         pointer-events: none;
     }
@@ -965,13 +1001,13 @@ button:hover {
         margin-top: 0 !important;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--chrome-gap);
     }
 
     #midi-controls .control-buttons {
         margin-top: 0 !important;
         flex-direction: row !important;
-        gap: 8px;
+        gap: var(--chrome-gap);
     }
 
     #midi-controls .control-buttons button {
@@ -981,7 +1017,7 @@ button:hover {
     /* Keep stats text elements layout clean */
     #blast-stats p, #gravity-controls p, #midi-controls p, #snake-controls p {
         margin: 2px 0;
-        font-size: 12px;
+        font-size: var(--chrome-font);
         font-weight: bold;
     }
 
@@ -994,14 +1030,14 @@ button:hover {
     #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
-        gap: 6px;
-        margin-top: 4px;
+        gap: var(--chrome-gap);
+        margin-top: var(--chrome-gap);
     }
 
     #blast-stats button, #gravity-controls button, #snake-controls button {
-        padding: 4px 8px;
-        font-size: 11px;
-        height: 24px;
+        padding: var(--chrome-btn-pad-v) var(--chrome-btn-pad-h);
+        font-size: var(--chrome-btn-font);
+        height: var(--chrome-btn-h);
     }
 
     #piece-list h3 {
@@ -1084,13 +1120,13 @@ button:hover {
         z-index: 100;
         display: flex;
         flex-direction: row;
-        gap: 8px;
+        gap: var(--dpad-gap);
         background: rgba(20, 22, 28, 0.9);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 8px;
+        padding: var(--dpad-gap);
         margin: 0;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
     }
@@ -1131,14 +1167,13 @@ button:hover {
 
     #mobile-controls .m-btn {
         flex: 1;
-        height: 48px;
-        font-size: 18px;
+        height: var(--dpad-btn-size);
+        font-size: var(--dpad-btn-font);
         border-radius: 6px;
         background: #2a2e3a;
         color: var(--text);
         border: 1px solid var(--border);
     }
-
 
 
 /* Tooltip styles for Sandbox Mode */
@@ -1412,14 +1447,14 @@ button:hover {
     .gravity-pad-cluster {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--dpad-gap);
         pointer-events: auto;
     }
 
     #mobile-controls .m-btn {
         flex: none;
-        width: 48px;
-        height: 48px;
+        width: var(--dpad-btn-size);
+        height: var(--dpad-btn-size);
         background: rgba(20, 22, 28, 0.9);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
@@ -1520,24 +1555,30 @@ button:hover {
    entirely for both dimensions at once (fixing only one, still 'auto', flips the bug onto the
    other). See docs/invariants.md's INV-21 for the fill-ratio test this fixed. */
 @media (max-width: 767px) {
+    /* top/bottom read Render.updateChromeInsets()'s measured output (see js/render.js) when it's
+       run -- the literal px fallback only covers the brief window before that function's first
+       call, or an environment without it. INV-40: these used to be flat guesses sized to clear
+       the WIDEST case regardless of the chrome's actual current size; now the board reclaims
+       whatever the chrome (shrunk per INV-40's own clamp()s above) doesn't actually need. */
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg,
     #app[data-mode="blast"] #tonnetz-svg {
         position: absolute;
-        top: 210px;    /* clears the stats/controls panel (and Blast's queue, same corner-ish height) */
+        top: var(--chrome-inset-top, 210px);
         left: 0;
         right: 0;
         width: calc(100% - 0px - 0px);
     }
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg {
-        bottom: 150px; /* clears the D-pad row + --mobile-pad-safe-bottom */
-        height: calc(100% - 210px - 150px);
+        bottom: var(--chrome-inset-bottom, 150px);
+        height: calc(100% - var(--chrome-inset-top, 210px) - var(--chrome-inset-bottom, 150px));
     }
     #app[data-mode="blast"] #tonnetz-svg {
         bottom: 0;
-        height: calc(100% - 210px - 0px);
+        height: calc(100% - var(--chrome-inset-top, 210px) - 0px);
     }
+
 }
 
 @media (max-width: 950px) and (orientation: landscape) {
@@ -1547,16 +1588,16 @@ button:hover {
         position: absolute;
         top: 0;
         bottom: 0;
-        left: 210px;   /* clears the stats/controls panel (and, for Snake/Gravity, the left D-pad cluster) */
+        left: var(--chrome-inset-left, 210px);
         height: calc(100% - 0px - 0px);
     }
     #app[data-mode="snake"] #tonnetz-svg,
     #app[data-mode="gravity"] #tonnetz-svg {
-        right: 70px;   /* clears the right D-pad cluster */
-        width: calc(100% - 210px - 70px);
+        right: var(--chrome-inset-right, 70px);
+        width: calc(100% - var(--chrome-inset-left, 210px) - var(--chrome-inset-right, 70px));
     }
     #app[data-mode="blast"] #tonnetz-svg {
         right: 0;      /* Blast's queue is left-side only in landscape (see #app[data-mode="blast"] #palette.floating-queue above) */
-        width: calc(100% - 210px - 0px);
+        width: calc(100% - var(--chrome-inset-left, 210px) - 0px);
     }
 }

@@ -671,6 +671,14 @@ test.describe('Invariant tests', () => {
       await page.setViewportSize(viewport);
       for (const mode of ['snake', 'blast', 'gravity']) {
         await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        // Same settling wait INV-21 already uses, for the same reason (see docs/invariants.md):
+        // fitContentBox's fit can need a ResizeObserver-driven correction pass to catch layout
+        // that wasn't settled yet at mode-entry's own synchronous call (panel text populated a
+        // moment earlier, a CSS transition still animating) -- found live via this exact test
+        // flaking without it once INV-40's JS-computed sizing replaced the old CSS-percentage
+        // approach, which had no such settling dependency (a browser's own layout is synchronous;
+        // recomputing a value in JS in response to it is not).
+        await page.waitForTimeout(300);
         const { overlappingCells } = await measureBoardOcclusion(page);
         expect(overlappingCells, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBe(0);
       }
@@ -1198,6 +1206,61 @@ test.describe('Invariant tests', () => {
         boardHeightFraction,
         `[${label}, ${viewport.width}x${viewport.height}] Gravity board should fill a real share of the viewport height (got ${(boardHeightFraction * 100).toFixed(1)}%, floor ${minHeightFraction * 100}%)`
       ).toBeGreaterThan(minHeightFraction);
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-40: a restricted board's own reference box must match ITS shape, not whatever leftover
+  // shape the mobile chrome happened to leave behind -- see docs/invariants.md. Found live via
+  // the exploratory "Random taps" matrix and a deterministic 16x16 black-patch sweep: fitting
+  // content into a mismatched-aspect reference box wastes space on whichever axis isn't the
+  // tight constraint, regardless of how much total leftover area there is.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-40: Snake/Gravity/Blast size #tonnetz-svg to match their own board shape, not the leftover chrome space', async ({ page }) => {
+    const cases = [
+      { mode: 'snake', viewport: { width: 320, height: 480 } },
+      { mode: 'gravity', viewport: { width: 320, height: 480 } },
+      { mode: 'blast', viewport: { width: 320, height: 480 } },
+      { mode: 'snake', viewport: { width: 852, height: 393 } },
+    ];
+
+    for (const { mode, viewport } of cases) {
+      await page.setViewportSize(viewport);
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      await page.waitForTimeout(300);
+
+      const result = await page.evaluate((m) => {
+        let cells;
+        if (m === 'snake') {
+          cells = [];
+          for (let p = -7; p <= 7; p++) for (let q = -7; q <= 7; q++) if (SnakeMode.isInBounds(p, q)) cells.push({ p, q });
+        } else if (m === 'gravity') {
+          cells = [];
+          for (let q = 0; q < 20; q++) for (let p = -20; p <= 10; p++) {
+            const col = p + Math.floor(q / 2);
+            if (col >= -5 && col <= 4) cells.push({ p, q });
+          }
+        } else {
+          cells = [];
+          for (let p = -5; p <= 5; p++) for (let q = -5; q <= 5; q++) if (Board.isInBounds(p, q)) cells.push({ p, q });
+        }
+        const bounds = Render.computeCellBounds(cells, Render.HEX_R * 2);
+        const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
+        const rect = Render.svg.getBoundingClientRect();
+        const svgAspect = rect.width / rect.height;
+        return { contentAspect, svgAspect };
+      }, mode);
+
+      // Within 5% -- fitContentBox derives the element's own box directly from this same
+      // content-bounds computation, so any real drift here means something upstream (a resize,
+      // a mode switch) skipped calling it, not just floating-point noise.
+      const ratio = result.svgAspect / result.contentAspect;
+      expect(
+        ratio,
+        `[${mode}, ${viewport.width}x${viewport.height}] #tonnetz-svg's own aspect ratio (${result.svgAspect.toFixed(3)}) should match its board's natural shape (${result.contentAspect.toFixed(3)}), not leftover chrome space`
+      ).toBeGreaterThan(0.95);
+      expect(ratio).toBeLessThan(1.05);
     }
   });
 
