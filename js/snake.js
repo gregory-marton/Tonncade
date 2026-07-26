@@ -51,6 +51,16 @@ const SnakeMode = {
 
         this.setupDOMEvents();
         this.reset();
+
+        // Same ResizeObserver pattern as Gravity (INV-30)/Blast: without this, refreshBoard()'s
+        // aspect-matched fit is only ever computed against whatever size the SVG happened to be
+        // at mode entry, and never adapts to a later resize (found via a systematic centering
+        // check applied uniformly across every restricted-board mode -- Snake never had this at
+        // all, unlike Gravity/Blast).
+        if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
+            this._resizeObserver = new ResizeObserver(() => this.refreshBoard());
+            this._resizeObserver.observe(Render.svg);
+        }
     },
 
     cleanup: function() {
@@ -62,11 +72,15 @@ const SnakeMode = {
         this.state.flourishTimeouts = [];
         this.state.lastHighlightTimeouts.forEach(tId => clearTimeout(tId));
         this.state.lastHighlightTimeouts = [];
-        
+
         window.onkeydown = null;
         window.onmousemove = null;
         if (Render.svg) {
             Render.svg.onmousedown = null;
+        }
+        if (this._resizeObserver) {
+            this._resizeObserver.disconnect();
+            this._resizeObserver = null;
         }
     },
 
@@ -434,7 +448,23 @@ const SnakeMode = {
             Render.appendToLattice(label);
         }
 
-        Render.updateView(-440, -330, 1.1);
+        // Aspect-matched fit against the board's own fixed radius-7 hex, the same treatment
+        // Gravity (#44) and Blast (#48) already got -- Snake never did, and had used a fixed
+        // Render.updateView(-440, -330, 1.1) ever since, which doesn't adapt to the SVG's actual
+        // on-screen aspect ratio the way a restricted board should (found via a systematic
+        // centering check applied uniformly across every restricted-board mode).
+        const boardCells = [];
+        for (let p = -7; p <= 7; p++) {
+            for (let q = -7; q <= 7; q++) {
+                if (this.isInBounds(p, q)) boardCells.push({ p, q });
+            }
+        }
+        const { refW, refH } = Render.getAspectMatchedRefBox();
+        // A slightly larger scale margin than Blast's 1.25 -- Snake's radius-7 board is bigger
+        // than Blast's radius-5 one, and 1.25 left 2 of 169 cells clipped at a narrow tablet
+        // portrait width (712px); 1.15 gives enough breathing room at every tested viewport.
+        const fit = Render.getFitView(boardCells, Render.HEX_R * 2, 1.15, refW, refH);
+        Render.updateView(fit.viewX, fit.viewY, fit.zoom, refW, refH);
     },
 
     updateScore: function(score) {

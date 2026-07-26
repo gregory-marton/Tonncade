@@ -100,14 +100,65 @@ own dedicated, more specific test in `tests/mobile.spec.js`.)
 **Test:** `tests/invariants.spec.js` — "INV-8: no mobile control button sits within 10px of
 the viewport edge"
 
-### INV-9: Game state survives orientation change
+### INV-9 & INV-12 (unified): every mode's state survives resize, view rotation, and panning
 
-Rotating the device mid-game (switching between portrait and landscape) never resets or
-corrupts in-progress state — score, placed pieces, snake body, etc. A lot of layout
-reshuffling happens on resize (drawer restructuring, board refitting); none of it should touch
-game state.
+Originally two separate checks, each hand-written for exactly two modes (INV-9: Snake, Blast;
+INV-12: Sandbox, Melody) — generalized into one matrix over every mode, since a hand-picked pair
+per invariant is exactly the pattern that let Compose's touch-multi-select gap ship unnoticed:
+nothing forced a NEW mode to inherit either check. Now: adding a mode means adding one entry to
+`RESTRICTED_BOARD_CELLS`/`snapshotModeState` in the test, not writing a new test.
 
-**Tests:** `tests/invariants.spec.js` — the two "INV-9: ..." tests (Snake, Blast)
+For every mode: game state (score, placed pieces, snake body, notes, etc. — whatever that mode's
+`snapshotModeState` reads) must survive a resize, a view rotation (skipped for Gravity, INV-24's
+own documented exception), and — for unrestricted modes — an actual pan.
+
+The two kinds of mode need genuinely different view-position checks, not the same one applied
+uniformly, and this is derived from ONE partition, not two independently hand-picked lists:
+
+- **Unrestricted/free-pan modes** (Sandbox, Melody, Compose — everything NOT in
+  `RESTRICTED_BOARD_CELLS`): the exact pan/zoom position must survive resize and rotation
+  unchanged, and must also survive an actual pan gesture (only the game state is re-checked
+  after panning, not the position — panning is *supposed* to move the view, that's the point).
+- **Restricted/bounded-board modes** (Blast, Gravity, Snake): manual pan is deliberately NOT
+  expected to persist. `BlastMode.refreshBoard()` (and, after this fix, `SnakeMode.refreshBoard()`
+  and `GravityMode`'s own equivalent) always recompute a fresh aspect-matched fit on every
+  redraw — confirmed as the intended design, not a bug: a restricted board should always show as
+  much of itself as the screen allows, the same way it does at mode entry. So the right
+  post-resize/post-rotation check for these is "still correctly centered", not "identical to
+  before" — reusing the exact centering math `tests/mobile.spec.js`'s own centering tests use.
+
+**Two real bugs found building this generalized version, not hypothetical ones**: (1) Snake had
+no `ResizeObserver` at all (unlike Gravity/Blast), so its view never adapted to a later resize —
+added, matching the Gravity/Blast pattern exactly, cleaned up in `cleanup()` per INV-30. (2)
+`SnakeMode.refreshBoard()` used a hardcoded `Render.updateView(-440, -330, 1.1)` — never
+upgraded to the aspect-matched fit Gravity (#44) and Blast (#48) both received — now uses
+`Render.getFitView` against its own radius-7 board the same way, with a slightly larger scale
+margin (1.15 vs Blast's 1.25) since its bigger board otherwise clipped 2 of 169 cells at a
+narrow tablet portrait width.
+
+Two subtleties the test itself had to account for, not the product: `Render.rotationDeg` is a
+single global persisted across mode switches, so each mode's own check resets it to 0 first —
+otherwise one mode's rotate step changes the pan-bounds clamping baseline for the next mode's
+check, indistinguishable from a real bug. And Snake/Gravity both auto-advance on a real-time
+timer, unrelated to what's being tested but real enough to move the snake/piece during a
+resize/rotate step's own async work (opening the drawer, clicking a button) — both are paused
+for the duration of their own check.
+
+Melody's own pan capability has its own history worth keeping: `Render.getPanBounds()` listed
+`'midi'` among the free-pan modes well before anything actually wired up input to move Melody's
+view — no mouse-drag, no two-finger touch drag, and `refreshBoard()` always reset to a hardcoded
+`(-400, -300)`. Real report: rotating the view (INV-24) could move a melody's notes off-screen
+with no way back. Fixed by mirroring Sandbox's exact mouse-drag pattern and extending the shared
+two-finger touch-pan gesture to Melody. A related bug surfaced while fixing it: the mouse-drag
+handler's pan logic was gated behind the same flag that skips ghost-hover updates during
+playback, which a wrong-note click also sets for ~1.2s — leaving a player unable to drag the
+view for over a second after almost any accidental wrong-note click. Panning is camera movement,
+unrelated to note-input validity, so it now runs unconditionally.
+
+**Test:** `tests/invariants.spec.js` — "INV-9/INV-12: every mode's state survives resize, view
+rotation, and (where pannable) panning"; `tests/desktop.spec.js` — "Melody mode: dragging the
+mouse pans the Tonnetz..." and "...a pan survives refreshBoard()..."; `tests/mobile.spec.js` —
+"Melody mode: a real two-finger drag pans the Tonnetz".
 
 ### INV-10: On a restricted Tonnetz, nothing overlaps it
 
@@ -129,35 +180,6 @@ actually usable at once, regardless of how tightly the rest of the layout is squ
 
 **Test:** `tests/invariants.spec.js` — "INV-11: at least 20 distinct Tonnetz cells are visible
 and controllable, in every mode/orientation"
-
-### INV-12: On an unrestricted Tonnetz, pan/zoom persists
-
-Sandbox and Melody allow free pan/zoom. Once the player sets a pan/zoom, using some other
-control (selecting a carousel piece, opening the chord guide, etc.) must not reset it back to
-a default.
-
-This claim went unfulfilled for Melody for a while: `Render.getPanBounds()` already listed
-`'midi'` among the free-pan modes, but nothing ever actually wired up input to move Melody's
-view — no mouse-drag, no two-finger touch drag, and `MidiMode.refreshBoard()` always reset to a
-hardcoded `(-400, -300)` regardless of any pan. Real report: rotating the view (INV-24) could
-move a melody's notes off-screen with no way back, since there was no way to pan back at all.
-Fixed by mirroring Sandbox's exact mouse-drag pattern (`MidiMode.state.viewX/viewY/isPanning/
-lastMouse`, wired in `setupKeyboardEvents`) and extending the shared two-finger touch-pan
-gesture (`js/main.js`) to Melody — guarded so its "twist to rotate a piece" half stays
-Sandbox/Blast-only, since Melody has no selected/active-piece concept. `refreshBoard()` now
-reads back the player's own persisted `state.viewX/viewY` instead of the fixed default.
-
-One real bug surfaced while fixing this: the mouse-drag `onmousemove` handler's pan logic was
-initially gated behind the same `isPlayingSequence` check that skips ghost-hover updates during
-playback -- but a wrong-note click sets that same flag for ~1.2s (the "Oops! Let's listen
-again..." mistake recovery), which would have left a player unable to drag the view for over a
-second after almost any accidental wrong-note click. Panning is camera movement, unrelated to
-note-input validity, so it now runs unconditionally; only the ghost-hover update stays gated.
-
-**Test:** `tests/invariants.spec.js` — "INV-12: panning Sandbox's Tonnetz is preserved across
-an unrelated control interaction" and the analogous Melody version; `tests/desktop.spec.js` —
-"Melody mode: dragging the mouse pans the Tonnetz..." and "...a pan survives refreshBoard()...";
-`tests/mobile.spec.js` — "Melody mode: a real two-finger drag pans the Tonnetz".
 
 ### INV-13: Primary elements are reachable in every orientation
 
