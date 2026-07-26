@@ -1326,36 +1326,6 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   // F. Blast Mode Mobile Layout
   // ────────────────────────────────────────────────────────────────────────
 
-  test('blast board is centered within its viewBox on mobile', async ({ page }) => {
-    const width = page.viewportSize().width;
-    if (width >= 768) return;
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
-
-    const result = await page.evaluate(() => {
-      const cells = [];
-      for (let p = -Board.radius; p <= Board.radius; p++) {
-        for (let q = -Board.radius; q <= Board.radius; q++) {
-          if (Board.isInBounds(p, q)) cells.push({ p, q });
-        }
-      }
-      const positions = cells.map(c => Render.getScreenPos(c.p, c.q));
-      const boardCenterX = (Math.min(...positions.map(pos => pos.x)) + Math.max(...positions.map(pos => pos.x))) / 2;
-      const boardCenterY = (Math.min(...positions.map(pos => pos.y)) + Math.max(...positions.map(pos => pos.y))) / 2;
-
-      // The fit is against the SVG element's actual on-screen aspect ratio (see #48,
-      // Render.getAspectMatchedRefBox), not a fixed 800x600 box.
-      const { refW, refH } = Render.getAspectMatchedRefBox();
-      const viewBoxCenterX = Render.viewX + (refW * Render.zoom) / 2;
-      const viewBoxCenterY = Render.viewY + (refH * Render.zoom) / 2;
-
-      return { boardCenterX, boardCenterY, viewBoxCenterX, viewBoxCenterY };
-    });
-
-    expect(result.viewBoxCenterX).toBeCloseTo(result.boardCenterX, 0);
-    expect(result.viewBoxCenterY).toBeCloseTo(result.boardCenterY, 0);
-  });
-
   const gravityCupCells = () => {
     const cells = [];
     for (let q = 0; q < 20; q++) {
@@ -1368,29 +1338,57 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     return cells;
   };
 
-  test('gravity board is centered within its viewBox on mobile', async ({ page }) => {
-    const width = page.viewportSize().width;
-    if (width >= 768) return;
+  // Every restricted/bounded-board mode, with its own cell-set generator -- adding a new one
+  // means adding an entry here, not writing a new centering/cell-count test. Shared by the
+  // centering test right below AND the "every playable cell is visible" test further down, so
+  // there's exactly one definition of each mode's own board shape in this file, not several.
+  const RESTRICTED_BOARD_CELLS = {
+    snake: () => {
+      const cells = [];
+      for (let p = -7; p <= 7; p++) {
+        for (let q = -7; q <= 7; q++) {
+          if (Math.abs(p) <= 7 && Math.abs(q) <= 7 && Math.abs(p + q) <= 7) cells.push({ p, q });
+        }
+      }
+      return cells;
+    },
+    blast: () => {
+      const cells = [];
+      for (let p = -5; p <= 5; p++) {
+        for (let q = -5; q <= 5; q++) {
+          if (Math.abs(p) <= 5 && Math.abs(q) <= 5 && Math.abs(p + q) <= 5) cells.push({ p, q });
+        }
+      }
+      return cells;
+    },
+    gravity: gravityCupCells,
+  };
 
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+  for (const mode of Object.keys(RESTRICTED_BOARD_CELLS)) {
+    test(`${mode} board is centered within its viewBox on mobile`, async ({ page }) => {
+      const width = page.viewportSize().width;
+      if (width >= 768) return;
 
-    const result = await page.evaluate((cells) => {
-      const positions = cells.map(c => Render.getScreenPos(c.p, c.q));
-      const boardCenterX = (Math.min(...positions.map(pos => pos.x)) + Math.max(...positions.map(pos => pos.x))) / 2;
-      const boardCenterY = (Math.min(...positions.map(pos => pos.y)) + Math.max(...positions.map(pos => pos.y))) / 2;
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
 
-      // Gravity fits against #tonnetz-svg's own actual aspect ratio (see
-      // Render.getAspectMatchedRefBox, INV-21 in docs/invariants.md), not a fixed 800x600 box.
-      const { refW, refH } = Render.getAspectMatchedRefBox();
-      const viewBoxCenterX = Render.viewX + (refW * Render.zoom) / 2;
-      const viewBoxCenterY = Render.viewY + (refH * Render.zoom) / 2;
+      const result = await page.evaluate((cells) => {
+        const positions = cells.map(c => Render.getScreenPos(c.p, c.q));
+        const boardCenterX = (Math.min(...positions.map(pos => pos.x)) + Math.max(...positions.map(pos => pos.x))) / 2;
+        const boardCenterY = (Math.min(...positions.map(pos => pos.y)) + Math.max(...positions.map(pos => pos.y))) / 2;
 
-      return { boardCenterX, boardCenterY, viewBoxCenterX, viewBoxCenterY };
-    }, gravityCupCells());
+        // The fit is against the SVG element's actual on-screen aspect ratio (see #44/#48,
+        // Render.getAspectMatchedRefBox), not a fixed 800x600 box.
+        const { refW, refH } = Render.getAspectMatchedRefBox();
+        const viewBoxCenterX = Render.viewX + (refW * Render.zoom) / 2;
+        const viewBoxCenterY = Render.viewY + (refH * Render.zoom) / 2;
 
-    expect(result.viewBoxCenterX).toBeCloseTo(result.boardCenterX, 0);
-    expect(result.viewBoxCenterY).toBeCloseTo(result.boardCenterY, 0);
-  });
+        return { boardCenterX, boardCenterY, viewBoxCenterX, viewBoxCenterY };
+      }, RESTRICTED_BOARD_CELLS[mode]());
+
+      expect(result.viewBoxCenterX, `[${mode}] x-centering`).toBeCloseTo(result.boardCenterX, 0);
+      expect(result.viewBoxCenterY, `[${mode}] y-centering`).toBeCloseTo(result.boardCenterY, 0);
+    });
+  }
 
   // Shared by the parametrized "every playable cell is visible" test below: given a mode and
   // its own definition of "playable cells" (each mode has a differently-shaped board), returns
@@ -1413,38 +1411,14 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     }, { cells, containerRect: svgBox });
   }
 
-  const playableCellsByMode = {
-    // Snake's own radius-7 hex board (js/snake.js SnakeMode.isInBounds), distinct from Blast's
-    // radius-5 Board.isInBounds.
-    snake: () => {
-      const cells = [];
-      for (let p = -7; p <= 7; p++) {
-        for (let q = -7; q <= 7; q++) {
-          if (Math.abs(p) <= 7 && Math.abs(q) <= 7 && Math.abs(p + q) <= 7) cells.push({ p, q });
-        }
-      }
-      return cells;
-    },
-    blast: () => {
-      const cells = [];
-      for (let p = -5; p <= 5; p++) {
-        for (let q = -5; q <= 5; q++) {
-          if (Math.abs(p) <= 5 && Math.abs(q) <= 5 && Math.abs(p + q) <= 5) cells.push({ p, q });
-        }
-      }
-      return cells;
-    },
-    gravity: gravityCupCells,
-  };
-
-  for (const mode of ['snake', 'blast', 'gravity']) {
+  for (const mode of Object.keys(RESTRICTED_BOARD_CELLS)) {
     test(`every playable ${mode} board cell is visible on screen (none clipped by an undersized viewBox)`, async ({ page }) => {
       const width = page.viewportSize().width;
       if (width >= 768) return;
 
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
 
-      const result = await measureCellVisibility(page, playableCellsByMode[mode]());
+      const result = await measureCellVisibility(page, RESTRICTED_BOARD_CELLS[mode]());
 
       expect(result.total).toBeGreaterThan(0);
       expect(result.visible).toBe(result.total);
@@ -1466,48 +1440,50 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(result.actualZoom).toBeCloseTo(result.fitZoom, 1);
   });
 
-  test('switching Sandbox -> Gravity -> Sandbox on mobile leaves the piece palette visible in both', async ({ page }) => {
+  // Was two hand-written tests ("switching Sandbox -> Gravity -> Sandbox", "... -> Blast -> ...")
+  // -- generalized to every one of the 6x6x6=216 mode triplets, not just two paths that happen
+  // to start and end at Sandbox. #piece-list/#palette is a single shared DOM element repopulated
+  // differently per mode (Sandbox's carousel, Blast/Gravity's next-piece queue, hidden entirely
+  // for Melody/Snake/Compose) -- the property that actually matters is "whatever the FINAL mode
+  // is, its own content is correct", regardless of which two modes you passed through to get
+  // there.
+  const MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
+
+  const PALETTE_EXPECTATION = {
+    sandbox: async (page) => {
+      await expect(page.locator('.piece-item').first()).toBeVisible();
+    },
+    blast: async (page) => {
+      const box = await page.locator('#palette').boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.width).toBeGreaterThan(0);
+      expect(box.height).toBeGreaterThan(0);
+      const count = await page.evaluate(() => document.getElementById('piece-list').children.length);
+      expect(count).toBeGreaterThan(0);
+    },
+    gravity: async (page) => PALETTE_EXPECTATION.blast(page),
+    midi: async (page) => {
+      const hidden = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).display === 'none');
+      expect(hidden).toBe(true);
+    },
+    snake: async (page) => PALETTE_EXPECTATION.midi(page),
+    compose: async (page) => PALETTE_EXPECTATION.midi(page),
+  };
+
+  test('switching through any 3-mode sequence leaves the shared palette/piece-list correct for the final mode (6^3=216 triplets)', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
-    await expect(page.locator('.piece-item').first()).toBeVisible();
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
-    // Gravity's next-piece queue reuses #piece-list too — it should now be visible, not stuck
-    // inside the (now-hidden) Sandbox carousel container.
-    const paletteBox = await page.locator('#palette').boundingBox();
-    expect(paletteBox).not.toBeNull();
-    expect(paletteBox.width).toBeGreaterThan(0);
-    expect(paletteBox.height).toBeGreaterThan(0);
-    const pieceListChildCount = await page.evaluate(() => document.getElementById('piece-list').children.length);
-    expect(pieceListChildCount).toBeGreaterThan(0);
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
-    await expect(page.locator('.piece-item').first()).toBeVisible();
-  });
-
-  test('switching Sandbox -> Blast -> Sandbox on mobile leaves the piece palette visible in both', async ({ page }) => {
-    const width = page.viewportSize().width;
-    if (width >= 768) return;
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
-    await expect(page.locator('.piece-item').first()).toBeVisible();
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
-    // Blast's next-piece queue reuses #piece-list too — it should now be visible, not stuck
-    // inside the (now-hidden) Sandbox carousel container. getComputedStyle(el).display only
-    // reflects the element's own rule, not an ancestor's display:none, so check actual
-    // rendered size instead.
-    const paletteBox = await page.locator('#palette').boundingBox();
-    expect(paletteBox).not.toBeNull();
-    expect(paletteBox.width).toBeGreaterThan(0);
-    expect(paletteBox.height).toBeGreaterThan(0);
-    const pieceListChildCount = await page.evaluate(() => document.getElementById('piece-list').children.length);
-    expect(pieceListChildCount).toBeGreaterThan(0);
-
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
-    await expect(page.locator('.piece-item').first()).toBeVisible();
+    for (const a of MODES) {
+      for (const b of MODES) {
+        for (const c of MODES) {
+          await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), a);
+          await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), b);
+          await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), c);
+          await PALETTE_EXPECTATION[c](page);
+        }
+      }
+    }
   });
 
   test('blast-stats and the next-piece queue are positioned within the visible game area, not behind the header', async ({ page }) => {

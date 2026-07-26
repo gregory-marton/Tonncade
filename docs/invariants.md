@@ -728,6 +728,36 @@ first, per this project's own red-green discipline, before the `main.js` changes
 
 ---
 
+### INV-34: Board-shape and mode-triplet checks are driven by one shared config per file, not one hand-written test per mode/pair
+
+A direct continuation of INV-33's own lesson: three more places in `tests/mobile.spec.js` had
+the same "hand-picked pair/list, not a derived sweep" shape that let the touch-parity gap ship —
+found via the same audit, not new instances.
+
+- **Board centering** (`"${mode} board is centered..."`) and **cell-count consistency**
+  (`"every playable ${mode} board cell is visible..."`, task #35) each used to define their own
+  copy of Blast/Gravity's cell-set logic inline, and Snake had no centering test at all despite
+  already being checked for cell-count. Both now iterate a single `RESTRICTED_BOARD_CELLS`
+  config (one cell-generator per restricted-board mode) — adding a new bounded-board mode means
+  adding one entry, not two more hand-written tests, and Snake's centering gets checked for the
+  first time as a direct result.
+- **Mode-triplet interaction** ("switching Sandbox -> Gravity -> Sandbox...", "...-> Blast -> ...")
+  only ever checked two specific paths, both starting and ending at Sandbox. Generalized to a
+  sweep over all 6x6x6=216 possible mode triplets: whatever the *final* mode is, `#palette`/
+  `#piece-list` (a single shared DOM element repopulated differently per mode — Sandbox's
+  carousel, Blast/Gravity's next-piece queue, hidden entirely for Melody/Snake/Compose) must show
+  that mode's own correct content, regardless of which two modes were visited to get there.
+
+Building the unified `RESTRICTED_BOARD_CELLS` config surfaced two real bugs in Snake, not
+hypothetical ones — see INV-9/INV-12 above (no `ResizeObserver`, and a hardcoded fixed view that
+never got the aspect-matched-fit treatment Gravity/Blast already had).
+
+**Test:** `tests/mobile.spec.js` — `${mode} board is centered...` and `every playable ${mode}
+board cell is visible...` (looping `RESTRICTED_BOARD_CELLS`), and "switching through any 3-mode
+sequence leaves the shared palette/piece-list correct for the final mode (6^3=216 triplets)".
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
