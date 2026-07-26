@@ -49,10 +49,19 @@ const ComposeMode = {
         subdivision: '1/16',
         quantizeEnabled: false, // opt-in (task #52) -- a rough free-tapped recording stays as-is unless asked
         metronomeEnabled: false,
-        metronomeTimer: null
+        metronomeTimer: null,
+        chordBuffer: [],       // touches pending a shared time value -- see recordTouch
+        chordBufferTime: 0,
+        chordBufferTimer: null
     },
 
     DEFAULT_DURATION: 0.4,
+
+    // How long to wait for more fingers to land before committing a touch (or group of touches)
+    // to state.notes. Mirrors Blast's own near-simultaneous-note-on buffering window (issue #11):
+    // real fingers rarely land in the exact same event, so a short grace window is what turns
+    // "3 taps 10ms apart" into one recorded chord instead of a fast arpeggio.
+    CHORD_WINDOW_MS: 50,
 
     // Every grid unit quantizeNotes supports, as a fraction of one beat (quarter note) --
     // straight subdivisions down to 1/32, triplet subdivisions down to 1/6. WRITE_TICKS_PER_BEAT
@@ -276,6 +285,44 @@ const ComposeMode = {
         Synth.playNote(midi);
     },
 
+    // Touch equivalent of tapCell's recording branch, but built for real multitouch: mouse can
+    // only ever tap one cell at a time (no simultaneous input to buffer), so tapCell stays as-is
+    // for it. A touch always plays instantly (no perceptible audio latency), but its entry into
+    // state.notes is held for CHORD_WINDOW_MS so other fingers landing moments later share the
+    // same time value -- that shared time is what makes several cells one chord rather than a
+    // fast arpeggio of separately-timed notes.
+    //
+    // explicitTime, when given, is the moment this finger actually touched down (captured by the
+    // caller back when a multi-finger candidate group was first created) rather than whenever the
+    // touch/drag disambiguation happened to finish resolving it -- a chord's timestamp should be
+    // when it was pressed, not whenever main.js finished confirming it wasn't a pan gesture.
+    recordTouch: function(p, q, explicitTime) {
+        const midi = Tonnetz.getMidi(p, q);
+        Render.highlightByMidi(midi, 250);
+        Synth.playNote(midi);
+        const time = explicitTime !== undefined ? explicitTime : (performance.now() - this.state.recordStartTime) / 1000;
+
+        if (this.state.chordBuffer.length === 0) {
+            this.state.chordBufferTime = time;
+            clearTimeout(this.state.chordBufferTimer);
+            this.state.chordBufferTimer = setTimeout(() => this.flushChordBuffer(), this.CHORD_WINDOW_MS);
+        } else {
+            this.state.chordBufferTime = Math.min(this.state.chordBufferTime, time);
+        }
+        this.state.chordBuffer.push({ midi, p, q });
+    },
+
+    flushChordBuffer: function() {
+        const buffer = this.state.chordBuffer;
+        const time = this.state.chordBufferTime;
+        this.state.chordBuffer = [];
+        this.state.chordBufferTimer = null;
+        buffer.forEach(({ midi, p, q }) => {
+            this.state.notes.push({ midi, p, q, time, duration: this.DEFAULT_DURATION });
+        });
+        this.updateStats();
+    },
+
     // Resolves which specific note a tap on a (possibly duplicate-pitch) cell targets: the first
     // match not currently selected, cycling back to the first match once they're all selected --
     // so repeated taps step through notes that share a cell instead of getting stuck on one.
@@ -402,6 +449,13 @@ const ComposeMode = {
     stopRecording: function() {
         this.state.isRecording = false;
         this.stopMetronome();
+        // A chord still waiting out its grace window when Stop is pressed shouldn't be silently
+        // dropped -- commit it now instead of leaving the buffer for a timer that may never fire
+        // usefully again (isRecording is already false by the time it would).
+        if (this.state.chordBufferTimer) {
+            clearTimeout(this.state.chordBufferTimer);
+            this.flushChordBuffer();
+        }
         // Quantizing only changes time/duration, not (p,q) -- nothing about the board's own
         // visual layout needs a redraw from it.
         if (this.state.quantizeEnabled) this.quantizeNotes();

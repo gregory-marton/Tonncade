@@ -873,6 +873,47 @@ computed tempo was actually written.
 Chord entry (multiple notes at one time value, grouping near-simultaneous taps) remains
 explicitly out of scope here, tracked separately.
 
+### INV-39: Compose's real multitouch chord entry never sacrifices pan/rotate/pinch/twist to get it
+
+Real multitouch (several fingers landing on distinct cells while recording) records a chord --
+several notes sharing one `time` value -- without disabling the existing 2-finger pan/rotate
+gesture Melody and Compose already share. The two are told apart exactly the way a tap is told
+apart from a drag everywhere else in this codebase: a finger that never moves past the same
+10px threshold `main.js`'s existing single-touch drag logic already uses is a stationary
+chord-tap; a finger that moves past it promotes the whole gesture to the ordinary pan/rotate,
+discarding any not-yet-committed candidates (never recorded as notes).
+
+A first version disabled pan/rotate/pinch/twist entirely while recording, reasoning it was
+"unavailable mid-take anyway." That trade wasn't actually needed -- the movement-threshold
+disambiguation already used for single-touch drags elsewhere in this same file generalizes
+cleanly to N simultaneous fingers by tracking each one's own start position by `identifier`,
+so it was reverted in favor of preserving full pan/rotate/pinch/twist during recording.
+
+A lone touch has no competing gesture meaning (never has), so it still records instantly, exactly
+as before this feature existed. 2+ touches are held as candidates (`main.js`'s
+`composeChordCandidates`, keyed by touch `identifier`) until resolution: `touchmove` promotes to
+pan/rotate the moment any candidate moves past threshold (using the live event as the new
+baseline, matching how the existing 2-finger gesture already seeds itself); `touchend` commits
+any candidate that never moved, via `ComposeMode.recordTouch(p, q, time)`, using the time it
+actually touched down rather than whenever the disambiguation happened to finish -- a chord's
+timestamp is when it was pressed, not when main.js finished confirming it wasn't a pan.
+
+`recordTouch` buffers commits for `CHORD_WINDOW_MS` (50ms, mirroring Blast's own near-
+simultaneous-note-on buffering from issue #11) before pushing into `state.notes`, so fingers
+landing a few milliseconds apart -- real hands rarely land in the exact same event -- still
+share one `time` value instead of becoming a fast arpeggio of separately-timed notes. Mouse
+input is unaffected (`tapCell` unchanged): a mouse can only ever tap one cell at a time, so it
+has nothing to buffer or disambiguate against.
+
+**Scope note**: true simultaneous-event chords (fingers landing together in one `touchstart`)
+are the well-covered case. Fingers landing in genuinely separate events more than
+`CHORD_WINDOW_MS` apart resolve as separate notes/chords, an accepted limitation matching the
+same tolerance already documented for Blast's own chord-buffering window.
+
+Extending/overdubbing a recording (resuming to append more measures, or layering separate
+mouse-tapped takes into one merged chord-bearing sequence) is a distinct, larger piece of design
+work, tracked separately -- not folded in here.
+
 **Test:** `tests/run_tests.js` — "MidiMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event
 inspection, plus confirming the no-arg default is unchanged) and "ComposeMode.quantizeNotes
 tests" (grid-snapping math at two different tempo/subdivision combinations, confirming the

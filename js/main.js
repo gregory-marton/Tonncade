@@ -543,6 +543,15 @@ const App = {
         // whatever a stray one-finger drag over empty board would otherwise do (nothing).
         let composeDragCandidate = false;
 
+        // Compose recording, 2+ fingers: a stationary multi-finger touch is chord entry: still
+        // fingers on distinct cells that never moved past the same tap-vs-drag threshold every
+        // other drag in this file already uses. Movement past it promotes the whole gesture to
+        // the ordinary pan/rotate below instead -- pan/rotate stays fully available while
+        // recording, disambiguated the same way a tap is told apart from a drag anywhere else.
+        const CHORD_MOVE_THRESHOLD_PX = 10;
+        let composeChordCandidates = null; // [{ identifier, startX, startY, cell, time }]
+        let composeCommittedTouchIds = new Set(); // solo touches already recorded -- never re-added as a candidate
+
         // Phone-only: pickup and placement are each their own dedicated gesture (hold), so
         // a plain tap never does double duty. HOLD_DURATION_MS sits comfortably above the
         // 250ms tap-duration ceiling below, so a fired hold and a recognized tap can never
@@ -616,37 +625,66 @@ const App = {
                 return;
             }
 
+            if (this.currentMode === 'compose' && ComposeMode.state.isRecording) {
+                e.preventDefault();
+                if (isGesture) return; // already promoted to pan/rotate; extra touchdowns don't reset it
+
+                // A lone finger has no competing pan/rotate meaning to wait out (never has, even
+                // before chord entry existed) -- record it immediately, exactly as before.
+                if (e.touches.length === 1) {
+                    const t = e.touches[0];
+                    const cell = getCellFromTouch(t);
+                    if (cell) ComposeMode.recordTouch(cell.p, cell.q);
+                    composeCommittedTouchIds.add(t.identifier);
+                    return;
+                }
+
+                // 2+ fingers down: could be a stationary chord-tap or the start of a pan/rotate
+                // drag (2 fingers' existing meaning everywhere else) -- don't commit either way
+                // yet. Merge in any newly-arrived fingers rather than resetting ones already
+                // tracked (a chord can land across a couple of closely-spaced touchstart events,
+                // not only in one), and skip any identifier already recorded via the solo path
+                // above so it's never double-counted.
+                composeChordCandidates = composeChordCandidates || [];
+                const known = new Set(composeChordCandidates.map(c => c.identifier));
+                for (const t of e.touches) {
+                    if (known.has(t.identifier) || composeCommittedTouchIds.has(t.identifier)) continue;
+                    composeChordCandidates.push({
+                        identifier: t.identifier,
+                        startX: t.clientX,
+                        startY: t.clientY,
+                        cell: getCellFromTouch(t),
+                        time: (performance.now() - ComposeMode.state.recordStartTime) / 1000
+                    });
+                }
+                return;
+            }
+
             if (this.currentMode === 'midi' || this.currentMode === 'compose') {
                 if (e.touches.length === 1) {
                     const cell = getCellFromTouch(e.touches[0]);
                     if (cell) {
                         e.preventDefault();
                         if (this.currentMode === 'compose') {
-                            if (ComposeMode.state.isRecording) {
-                                // Recording stays exactly as before -- instant tap-to-play-and-
-                                // append, no hold/drag concept, since editing gestures only make
-                                // sense once you've stopped recording.
-                                ComposeMode.tapCell(cell.p, cell.q);
-                            } else {
-                                // Editing: don't resolve the tap yet. touchend resolves it as a
-                                // plain tap unless a hold fired (touch equivalent of shift-tap,
-                                // toggling selection) or a drag occurred (note-drag, see touchmove/
-                                // touchend below) -- mirrors compose.js's own mouse dragCandidate
-                                // handling, which has the same three-way split.
-                                touchStartCell = cell;
-                                touchStartX = e.touches[0].clientX;
-                                touchStartY = e.touches[0].clientY;
-                                touchStartTime = Date.now();
-                                isDragging = false;
-                                holdFired = false;
-                                composeDragCandidate = ComposeMode.notesAt(cell.p, cell.q)
-                                    .some(i => ComposeMode.state.selectedIndices.includes(i));
-                                clearTimeout(holdTimer);
-                                holdTimer = setTimeout(() => {
-                                    holdFired = true;
-                                    ComposeMode.tapCell(cell.p, cell.q, { shiftKey: true });
-                                }, HOLD_DURATION_MS);
-                            }
+                            // isRecording is handled entirely above now -- only editing reaches
+                            // here. Don't resolve the tap yet: touchend resolves it as a plain tap
+                            // unless a hold fired (touch equivalent of shift-tap, toggling
+                            // selection) or a drag occurred (note-drag, see touchmove/touchend
+                            // below) -- mirrors compose.js's own mouse dragCandidate handling,
+                            // which has the same three-way split.
+                            touchStartCell = cell;
+                            touchStartX = e.touches[0].clientX;
+                            touchStartY = e.touches[0].clientY;
+                            touchStartTime = Date.now();
+                            isDragging = false;
+                            holdFired = false;
+                            composeDragCandidate = ComposeMode.notesAt(cell.p, cell.q)
+                                .some(i => ComposeMode.state.selectedIndices.includes(i));
+                            clearTimeout(holdTimer);
+                            holdTimer = setTimeout(() => {
+                                holdFired = true;
+                                ComposeMode.tapCell(cell.p, cell.q, { shiftKey: true });
+                            }, HOLD_DURATION_MS);
                         } else {
                             const midi = Tonnetz.getMidi(cell.p, cell.q);
                             MidiMode.playUserNote(midi, cell.p, cell.q);
@@ -766,8 +804,43 @@ const App = {
                 return;
             }
 
-            // A single touch in Melody/Compose(-while-recording) is tap-to-play(-and-record)
-            // (handled entirely in touchstart) -- only a 2-touch pan gesture (below) applies here.
+            // Compose recording, 2+-finger candidates: movement past the same tap-vs-drag
+            // threshold used everywhere else promotes this into an ordinary pan/rotate gesture --
+            // the candidates are discarded (never committed as notes) and control passes to the
+            // shared 2-finger gesture code below, using this event as its baseline. No movement
+            // yet just re-blocks default scroll/zoom and waits.
+            if (this.currentMode === 'compose' && ComposeMode.state.isRecording && composeChordCandidates && composeChordCandidates.length > 0) {
+                const promote = Array.from(e.touches).some(t => {
+                    const c = composeChordCandidates.find(cand => cand.identifier === t.identifier);
+                    return c && (Math.abs(t.clientX - c.startX) > CHORD_MOVE_THRESHOLD_PX || Math.abs(t.clientY - c.startY) > CHORD_MOVE_THRESHOLD_PX);
+                });
+                if (!promote || e.touches.length < 2) {
+                    e.preventDefault();
+                    return;
+                }
+                composeChordCandidates = null;
+                isGesture = true;
+                startAngle = getAngle(e.touches[0], e.touches[1]);
+                lastAngle = startAngle;
+                twoFingerStartCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+                twoFingerStartView = { x: Render.viewX, y: Render.viewY };
+                e.preventDefault();
+                return;
+            }
+
+            // Compose recording, no live chord candidates: either a solo touch (handled entirely
+            // in touchstart, nothing to do on move) or an already-promoted gesture, which falls
+            // through to the shared 2-finger code below like every other mode.
+            if (this.currentMode === 'compose' && ComposeMode.state.isRecording && !isGesture) {
+                e.preventDefault();
+                return;
+            }
+
+            // A single touch in Melody/Compose is tap-to-play (handled entirely in touchstart) --
+            // only a 2-touch pan gesture (below) applies here.
             if ((this.currentMode === 'midi' || this.currentMode === 'compose') && e.touches.length !== 2) {
                 e.preventDefault();
                 return;
@@ -887,6 +960,25 @@ const App = {
 
             clearTimeout(holdTimer);
             if (this.currentMode === 'sandbox') SandboxMode.clearNoteHighlight();
+
+            // Compose recording: any candidate finger(s) that lifted without ever crossing the
+            // move threshold (never promoted to a pan/rotate drag) commit now as a chord, each
+            // using the time it actually touched down rather than whenever it happened to lift.
+            if (this.currentMode === 'compose' && ComposeMode.state.isRecording && composeChordCandidates) {
+                e.preventDefault();
+                for (const t of e.changedTouches) {
+                    const idx = composeChordCandidates.findIndex(c => c.identifier === t.identifier);
+                    if (idx === -1) continue;
+                    const c = composeChordCandidates[idx];
+                    composeChordCandidates.splice(idx, 1);
+                    if (c.cell) ComposeMode.recordTouch(c.cell.p, c.cell.q, c.time);
+                }
+                if (composeChordCandidates.length === 0) composeChordCandidates = null;
+                if (e.touches.length === 0) composeCommittedTouchIds.clear();
+                return;
+            }
+
+            if (e.touches.length === 0 && this.currentMode === 'compose') composeCommittedTouchIds.clear();
 
             if (e.changedTouches.length === 1 && this.currentMode === 'compose' && !ComposeMode.state.isRecording) {
                 e.preventDefault();

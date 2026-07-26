@@ -2110,4 +2110,118 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     });
     expect(result).toEqual({ p: 0, q: 1, midiMatches: true });
   });
+
+  // Real multitouch: a single TouchEvent carrying several simultaneous Touch entries, the way a
+  // genuine multi-finger landing actually arrives -- not several separate single-touch events.
+  function installMultiTouchDispatcher(page) {
+    return page.evaluate(() => {
+      window.__dispatchMultiTouch = function(type, points) {
+        const el = document.getElementById('tonnetz-svg');
+        const touches = points.map(pt => new Touch({ identifier: pt.id, target: el, clientX: pt.x, clientY: pt.y, pageX: pt.x, pageY: pt.y }));
+        const config = { bubbles: true, cancelable: true, changedTouches: touches };
+        if (type === 'touchend') {
+          config.touches = [];
+          config.targetTouches = [];
+        } else {
+          config.touches = touches;
+          config.targetTouches = touches;
+        }
+        el.dispatchEvent(new TouchEvent(type, config));
+      };
+    });
+  }
+
+  test('Compose: touching 3 distinct cells at once while recording appends a real chord -- one shared time, not three arpeggiated notes', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [];
+      ComposeMode.refreshBoard();
+      ComposeMode.startRecording();
+    });
+    await installMultiTouchDispatcher(page);
+
+    const boxes = await Promise.all([
+      page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').boundingBox(),
+      page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="0"]').boundingBox(),
+      page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="1"]').boundingBox(),
+    ]);
+    const points = boxes.map((box, i) => ({ id: i + 1, x: box.x + box.width / 2, y: box.y + box.height / 2 }));
+
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), points);
+    await page.waitForTimeout(150); // past the chord-grouping window
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), points);
+    await page.waitForTimeout(150); // recordTouch's chord buffer commits to state.notes after CHORD_WINDOW_MS
+
+    const result = await page.evaluate(() => ComposeMode.state.notes.map(n => ({ p: n.p, q: n.q, time: n.time })));
+    expect(result.length).toBe(3);
+    const times = new Set(result.map(n => n.time));
+    expect(times.size).toBe(1); // one shared time value is what makes this a chord, not 3 sequential taps
+    const cells = new Set(result.map(n => `${n.p},${n.q}`));
+    expect(cells).toEqual(new Set(['0,0', '1,0', '0,1']));
+  });
+
+  test('Compose: a genuine 2-finger drag while recording still pans the view (not a chord) -- movement is what tells a drag apart from a stationary chord-tap', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [];
+      ComposeMode.refreshBoard();
+      ComposeMode.startRecording();
+    });
+    await installMultiTouchDispatcher(page);
+
+    const before = await page.evaluate(() => ({ x: ComposeMode.state.viewX, y: ComposeMode.state.viewY }));
+
+    const startPoints = [{ id: 1, x: 200, y: 200 }, { id: 2, x: 260, y: 200 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), startPoints);
+    // First move crosses the tap-vs-drag threshold and promotes the gesture (setting up the pan
+    // baseline, same as an ordinary 2-finger touchstart would) -- a second move is needed for the
+    // baseline-relative delta to actually apply, matching the existing 2-finger pan/rotate code's
+    // own semantics elsewhere in this file.
+    const movePoints1 = [{ id: 1, x: 260, y: 230 }, { id: 2, x: 320, y: 230 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), movePoints1);
+    const movePoints2 = [{ id: 1, x: 320, y: 260 }, { id: 2, x: 380, y: 260 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), movePoints2);
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), movePoints2);
+
+    const after = await page.evaluate(() => ({ x: ComposeMode.state.viewX, y: ComposeMode.state.viewY }));
+    expect(after).not.toEqual(before); // the view actually panned
+
+    const notes = await page.evaluate(() => ComposeMode.state.notes.length);
+    expect(notes).toBe(0); // a drag is never also recorded as a chord
+  });
+
+  test('Compose: touching 2 distinct cells with no movement records a chord even after a genuine pan/rotate drag already happened -- the gesture state resets cleanly between them', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [];
+      ComposeMode.refreshBoard();
+      ComposeMode.startRecording();
+    });
+    await installMultiTouchDispatcher(page);
+
+    // First: a real drag, panning the view (as above) -- two moves, since the first only
+    // promotes the gesture and sets its baseline (see the dedicated pan test above).
+    const dragStart = [{ id: 1, x: 200, y: 200 }, { id: 2, x: 260, y: 200 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), dragStart);
+    const dragMove1 = [{ id: 1, x: 260, y: 230 }, { id: 2, x: 320, y: 230 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), dragMove1);
+    const dragMove2 = [{ id: 1, x: 320, y: 260 }, { id: 2, x: 380, y: 260 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), dragMove2);
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), dragMove2);
+
+    // Then: a stationary 2-finger chord tap on real cells.
+    const boxes = await Promise.all([
+      page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').boundingBox(),
+      page.locator('polygon.cell:not(.ghost)[data-p="1"][data-q="0"]').boundingBox(),
+    ]);
+    const points = boxes.map((box, i) => ({ id: i + 10, x: box.x + box.width / 2, y: box.y + box.height / 2 }));
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), points);
+    await page.waitForTimeout(150);
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), points);
+    await page.waitForTimeout(150); // recordTouch's chord buffer commits to state.notes after CHORD_WINDOW_MS
+
+    const result = await page.evaluate(() => ComposeMode.state.notes.map(n => ({ p: n.p, q: n.q, time: n.time })));
+    expect(result.length).toBe(2);
+    expect(new Set(result.map(n => n.time)).size).toBe(1);
+  });
 });
