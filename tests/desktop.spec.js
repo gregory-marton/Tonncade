@@ -815,6 +815,100 @@ test('Compose: Rotate CW rotates the selection around the first-selected note, r
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Compose tempo/quantization/metronome (task #52). Quantization's own math (grid rounding) is
+// covered as pure logic in tests/run_tests.js; these are the integration paths: the metronome
+// actually fires while recording, the Quantize checkbox actually applies on stop, and Save
+// actually emits a real tempo meta event when quantize was used.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Compose: the metronome clicks at the chosen tempo while recording, and stops the moment recording stops', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    window.__clicks = 0;
+    Synth.playClick = () => { window.__clicks++; };
+    ComposeMode.state.tempoBPM = 120; // 500ms/beat
+    ComposeMode.state.metronomeEnabled = true;
+  });
+
+  await page.locator('#compose-record').click();
+  expect(await page.evaluate(() => window.__clicks)).toBe(1); // immediate click at the downbeat
+
+  // Advance in small steps close to the actual 500ms beat interval -- Playwright's virtual
+  // clock doesn't reliably "catch up" every repeating-interval tick within one large jump, so a
+  // single big fastForward() undercounts. Small steps are what actually exercises the interval
+  // firing repeatedly, which is the property this test cares about.
+  for (let i = 0; i < 3; i++) await page.clock.fastForward(500);
+  const clicksWhileRecording = await page.evaluate(() => window.__clicks);
+  expect(clicksWhileRecording).toBeGreaterThanOrEqual(3); // at least 3 more beats have passed
+
+  await page.locator('#compose-record').click(); // stop
+  for (let i = 0; i < 3; i++) await page.clock.fastForward(500);
+
+  const clicksAfterStop = await page.evaluate(() => window.__clicks);
+  expect(clicksAfterStop).toBe(clicksWhileRecording); // no further clicks once stopped
+});
+
+test('Compose: enabling Quantize actually snaps recorded notes onto the grid when recording stops', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.tempoBPM = 120; // grid (1/16) = 0.125s
+    ComposeMode.state.subdivision = '1/16';
+    ComposeMode.state.quantizeEnabled = true;
+    ComposeMode.state.isRecording = true;
+    ComposeMode.state.recordStartTime = performance.now();
+    // Simulate a slightly-off-grid tap landing at 0.44s in, matching the pure-logic test's own
+    // "nearest 0.125 -> 0.5" case.
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0.44, duration: 0.2 }];
+  });
+
+  await page.locator('#compose-record').click(); // stop
+
+  const time = await page.evaluate(() => ComposeMode.state.notes[0].time);
+  expect(time).toBeCloseTo(0.5, 5);
+});
+
+test('Compose: Save emits a real tempo meta event when Quantize was used, matching the chosen BPM', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.__savedBytes = null;
+    MidiFolder.folderHandle = {
+      getFileHandle: async () => ({
+        createWritable: async () => ({
+          write: async (buf) => { window.__savedBytes = Array.from(new Uint8Array(buf)); },
+          close: async () => {},
+        }),
+      }),
+    };
+    window.prompt = () => 'quantized-song.mid';
+  });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.tempoBPM = 100;
+    ComposeMode.state.quantizeEnabled = true;
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+  });
+
+  await page.locator('#compose-save').click();
+  await page.waitForFunction(() => window.__savedBytes !== null);
+
+  const foundTempo = await page.evaluate(() => {
+    const bytes = window.__savedBytes;
+    for (let i = 0; i + 5 < bytes.length; i++) {
+      if (bytes[i] === 0xff && bytes[i + 1] === 0x51 && bytes[i + 2] === 0x03) {
+        return (bytes[i + 3] << 16) | (bytes[i + 4] << 8) | bytes[i + 5];
+      }
+    }
+    return null;
+  });
+  expect(foundTempo).toBe(Math.round(60000000 / 100));
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // Melody mode mouse-drag panning -- real report: rotating the view (INV-24) could move a
 // melody's notes off-screen with no way back, since Melody had no pan capability at all (touch
 // OR mouse), despite Render.getPanBounds() already listing 'midi' among the free-pan modes.

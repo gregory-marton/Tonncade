@@ -433,6 +433,96 @@ try {
     })();
     console.log("PASS: MidiMode.writeMIDI round-trips correctly through parseMIDI!");
 
+    // Task #52: writeMIDI must accept an explicit tempo and actually emit a real tempo meta
+    // event (FF 51 03 <3-byte usec-per-beat>) for it -- previously always silently assumed
+    // 120bpm and emitted no tempo event at all. NOTE: a round-trip-through-parseMIDI check alone
+    // CANNOT catch a missing/wrong tempo event here -- write and read always agree with
+    // whatever tempo they each independently assume (explicit or defaulted), so the seconds
+    // cancel out correctly regardless of what BPM was actually requested. Only inspecting the
+    // raw bytes for the real meta event proves one was actually written.
+    console.log("Running MidiMode.writeMIDI explicit-tempo tests...");
+    (function() {
+        const MidiModeObj = vm.runInContext("MidiMode", context);
+        const buffer = MidiModeObj.writeMIDI([{ midi: 60, time: 0, duration: 0.3 }], 90); // 90bpm
+        const bytes = new Uint8Array(buffer);
+
+        let foundTempo = null;
+        for (let i = 0; i + 2 < bytes.length; i++) {
+            if (bytes[i] === 0xff && bytes[i + 1] === 0x51 && bytes[i + 2] === 0x03) {
+                foundTempo = (bytes[i + 3] << 16) | (bytes[i + 4] << 8) | bytes[i + 5];
+                break;
+            }
+        }
+        if (foundTempo === null) {
+            console.error("FAIL: writeMIDI(notes, 90) emitted no FF 51 03 tempo meta event at all!");
+            process.exit(1);
+        }
+        const expectedUsecPerBeat = Math.round(60000000 / 90);
+        if (foundTempo !== expectedUsecPerBeat) {
+            console.error(`FAIL: writeMIDI(notes, 90)'s tempo event encodes ${foundTempo} usec/beat, expected ${expectedUsecPerBeat} (90bpm)!`);
+            process.exit(1);
+        }
+
+        // The default (no explicit tempo arg) must stay exactly as before -- existing callers
+        // (Melody's own future save flow, the round-trip test above) shouldn't see any change.
+        const defaultBuffer = MidiModeObj.writeMIDI([{ midi: 60, time: 0, duration: 0.3 }]);
+        const defaultParsed = MidiModeObj.parseMIDI(defaultBuffer);
+        if (Math.abs(defaultParsed.notes[0].time - 0) > 0.01) {
+            console.error("FAIL: writeMIDI's default (no tempo arg) call changed behavior!");
+            process.exit(1);
+        }
+    })();
+    console.log("PASS: MidiMode.writeMIDI emits a real tempo meta event matching an explicit BPM, and the no-arg default is unchanged!");
+
+    // Task #52: ComposeMode.quantizeNotes snaps each note's raw (freely-tapped) time/duration
+    // onto the chosen tempo/subdivision grid. WRITE_TICKS_PER_BEAT (480) is divisible by both 32
+    // and 3, so every grid unit here (straight or triplet) is an exact number of seconds at a
+    // "nice" BPM -- this test picks 120bpm specifically so the grid units land on round numbers,
+    // making the expected values easy to verify by hand rather than relying on the same rounding
+    // logic under test.
+    console.log("Running ComposeMode.quantizeNotes tests...");
+    (function() {
+        const ComposeModeObj = vm.runInContext("ComposeMode", context);
+        ComposeModeObj.state.tempoBPM = 120; // 1 beat = 0.5s
+        ComposeModeObj.state.subdivision = '1/16'; // grid = 1/4 beat = 0.125s
+
+        ComposeModeObj.state.notes = [
+            { midi: 60, p: 0, q: 0, time: 0.03, duration: 0.2 },  // time nearest 0.125 -> 0.0; duration 0.2/0.125=1.6 -> round 2 -> 0.25
+            { midi: 62, p: 1, q: 0, time: 0.44, duration: 0.2 },  // time nearest 0.125 -> 0.5; duration same as above -> 0.25
+            { midi: 64, p: 2, q: 0, time: 0.9, duration: 0.05 },  // time nearest 0.125 -> 0.875; duration 0.05/0.125=0.4 -> round 0 -> floored to 1 grid unit (0.125)
+        ];
+        ComposeModeObj.quantizeNotes();
+
+        const expected = [
+            { time: 0, duration: 0.25 },
+            { time: 0.5, duration: 0.25 },
+            { time: 0.875, duration: 0.125 },
+        ];
+        ComposeModeObj.state.notes.forEach((n, i) => {
+            if (Math.abs(n.time - expected[i].time) > 0.001) {
+                console.error(`FAIL: quantizeNotes note ${i} time -- expected ${expected[i].time}, got ${n.time}!`);
+                process.exit(1);
+            }
+            if (Math.abs(n.duration - expected[i].duration) > 0.001) {
+                console.error(`FAIL: quantizeNotes note ${i} duration -- expected ${expected[i].duration}, got ${n.duration}!`);
+                process.exit(1);
+            }
+        });
+
+        // A different tempo/subdivision must actually change the grid, not just be stored and
+        // ignored -- confirms quantizeNotes reads state.tempoBPM/subdivision, not a hardcoded
+        // constant duplicating them.
+        ComposeModeObj.state.tempoBPM = 60; // 1 beat = 1s
+        ComposeModeObj.state.subdivision = '1/8'; // grid = 1/2 beat = 0.5s
+        ComposeModeObj.state.notes = [{ midi: 60, p: 0, q: 0, time: 0.6, duration: 0.3 }];
+        ComposeModeObj.quantizeNotes();
+        if (Math.abs(ComposeModeObj.state.notes[0].time - 0.5) > 0.001) {
+            console.error(`FAIL: quantizeNotes didn't use the current tempo/subdivision -- expected time 0.5, got ${ComposeModeObj.state.notes[0].time}!`);
+            process.exit(1);
+        }
+    })();
+    console.log("PASS: ComposeMode.quantizeNotes snaps notes onto the current tempo/subdivision grid!");
+
     // Test issue #11's MIDI hardware routing for Gravity/Snake/Blast -- Sandbox/Melody's own
     // routing predates this and is covered elsewhere (INV-23).
     console.log("Running Gravity/Snake/Blast MIDI hardware routing tests...");

@@ -44,10 +44,27 @@ const ComposeMode = {
         viewY: -300,
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
-        dragCandidate: null     // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
+        dragCandidate: null,    // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
+        tempoBPM: 120,
+        subdivision: '1/16',
+        quantizeEnabled: false, // opt-in (task #52) -- a rough free-tapped recording stays as-is unless asked
+        metronomeEnabled: false,
+        metronomeTimer: null
     },
 
     DEFAULT_DURATION: 0.4,
+
+    // Every grid unit quantizeNotes supports, as a fraction of one beat (quarter note) --
+    // straight subdivisions down to 1/32, triplet subdivisions down to 1/6. WRITE_TICKS_PER_BEAT
+    // (480, js/midi.js) is divisible by both 32 and 3, so every one of these lands on an exact
+    // integer tick count once written -- no rounding drift from the grid choice itself.
+    QUANTIZE_GRID: {
+        '1/8': 0.5,
+        '1/16': 0.25,
+        '1/32': 0.125,
+        'triplet-1/8': 1 / 3,
+        'triplet-1/16': 1 / 6,
+    },
 
     init: function() {
         Render.init('tonnetz-svg');
@@ -80,6 +97,31 @@ const ComposeMode = {
         if (undoBtn) undoBtn.onclick = () => this.undo();
         if (clearBtn) clearBtn.onclick = () => this.clear();
         if (saveBtn) saveBtn.onclick = () => this.save();
+
+        const tempoInput = document.getElementById('compose-tempo');
+        const subdivisionSelect = document.getElementById('compose-subdivision');
+        const quantizeCheckbox = document.getElementById('compose-quantize');
+        const metronomeCheckbox = document.getElementById('compose-metronome');
+
+        if (tempoInput) {
+            tempoInput.value = this.state.tempoBPM;
+            tempoInput.onchange = () => {
+                const bpm = parseInt(tempoInput.value, 10);
+                if (bpm > 0) this.state.tempoBPM = bpm;
+            };
+        }
+        if (subdivisionSelect) {
+            subdivisionSelect.value = this.state.subdivision;
+            subdivisionSelect.onchange = () => { this.state.subdivision = subdivisionSelect.value; };
+        }
+        if (quantizeCheckbox) {
+            quantizeCheckbox.checked = this.state.quantizeEnabled;
+            quantizeCheckbox.onchange = () => { this.state.quantizeEnabled = quantizeCheckbox.checked; };
+        }
+        if (metronomeCheckbox) {
+            metronomeCheckbox.checked = this.state.metronomeEnabled;
+            metronomeCheckbox.onchange = () => { this.state.metronomeEnabled = metronomeCheckbox.checked; };
+        }
 
         const deleteBtn = document.getElementById('compose-delete');
         const rotateCWBtn = document.getElementById('compose-rotate-cw');
@@ -354,13 +396,49 @@ const ComposeMode = {
         const btn = document.getElementById('compose-record');
         if (btn) btn.textContent = 'Stop Recording';
         this.setStatus('Recording... tap cells to add notes.');
+        this.startMetronome();
     },
 
     stopRecording: function() {
         this.state.isRecording = false;
+        this.stopMetronome();
+        // Quantizing only changes time/duration, not (p,q) -- nothing about the board's own
+        // visual layout needs a redraw from it.
+        if (this.state.quantizeEnabled) this.quantizeNotes();
         const btn = document.getElementById('compose-record');
         if (btn) btn.textContent = 'Record';
         this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
+    },
+
+    // Snaps every note's raw (freely-tapped) time/duration onto the current tempo/subdivision
+    // grid -- task #52. Opt-in (state.quantizeEnabled), called automatically when recording
+    // stops: a rough recording is cheap to redo, so this only runs when actually asked for,
+    // rather than silently mangling every capture.
+    quantizeNotes: function() {
+        if (this.state.notes.length === 0) return;
+        const secondsPerBeat = 60 / this.state.tempoBPM;
+        const gridSeconds = this.QUANTIZE_GRID[this.state.subdivision] * secondsPerBeat;
+
+        this.state.notes.forEach(n => {
+            n.time = Math.round(n.time / gridSeconds) * gridSeconds;
+            n.duration = Math.max(gridSeconds, Math.round(n.duration / gridSeconds) * gridSeconds);
+        });
+        this.state.notes.sort((a, b) => a.time - b.time);
+    },
+
+    // A metronome click at the current tempo, running only while recording -- helps a live
+    // tapped performance actually land close to the grid quantizeNotes will snap it to.
+    startMetronome: function() {
+        if (!this.state.metronomeEnabled) return;
+        Synth.playClick();
+        this.state.metronomeTimer = setInterval(() => Synth.playClick(), 60000 / this.state.tempoBPM);
+    },
+
+    stopMetronome: function() {
+        if (this.state.metronomeTimer) {
+            clearInterval(this.state.metronomeTimer);
+            this.state.metronomeTimer = null;
+        }
     },
 
     play: function() {
@@ -420,7 +498,13 @@ const ComposeMode = {
         }
         const name = prompt('Save as:', 'my-song.mid');
         if (!name) return;
-        const buffer = MidiMode.writeMIDI(this.state.notes);
+        // Only pass an explicit tempo when quantization was actually used -- an un-quantized,
+        // freely-tapped recording's raw times aren't grid-aligned to any tempo, so writing one
+        // in wouldn't add real information (see task #52; the default, no-tempo-arg path is
+        // exactly today's existing behavior).
+        const buffer = this.state.quantizeEnabled
+            ? MidiMode.writeMIDI(this.state.notes, this.state.tempoBPM)
+            : MidiMode.writeMIDI(this.state.notes);
         if (typeof MidiFolder !== 'undefined') {
             const savedToFolder = await MidiFolder.saveFileAs(name, buffer);
             this.setStatus(savedToFolder ? `Saved "${name}" to your MIDI folder.` : `Downloaded "${name}".`);

@@ -842,6 +842,48 @@ before the CSS change, per red-green discipline.
 
 ---
 
+### INV-38: Compose's tempo/quantization is opt-in, and writeMIDI's real tempo event only appears when actually used
+
+Task #52: a recording-session tempo (BPM) and subdivision grid (`state.tempoBPM`/
+`state.subdivision`, `QUANTIZE_GRID` covers straight 1/8 through 1/32 and both triplet
+subdivisions), an optional metronome click while recording, and `quantizeNotes()` snapping
+`state.notes`' raw (freely-tapped) times/durations onto that grid. Deliberately opt-in (a
+`Quantize` checkbox, unchecked by default) rather than automatic on every recording — per the
+user's own explicit call earlier this session: a rough recording is cheap to redo, so this
+shouldn't silently mangle a capture nobody asked to have quantized.
+
+`MidiMode.writeMIDI` gained an optional second `tempoBPM` argument to make any of this
+meaningful in the saved file: previously it always assumed a fixed 120bpm and emitted no tempo
+meta event at all. Passing an explicit tempo now emits a real `FF 51 03` tempo meta event at
+tick 0; omitting it (every existing caller, and Compose's own Save when `quantizeEnabled` is
+false) is byte-for-byte identical to before — no behavior change for anything that doesn't ask
+for it. `WRITE_TICKS_PER_BEAT` (480) is divisible by both 32 and 3, so every grid unit
+`QUANTIZE_GRID` supports lands on an exact integer tick count once written, independent of the
+tempo/PPQN choice itself.
+
+**A genuinely vacuous test, caught before it shipped**: the first version of the tempo-emission
+test checked only that `parseMIDI(writeMIDI(notes, 90))` round-tripped to the same times as the
+input. That assertion can never fail regardless of whether a real tempo event is written or the
+BPM argument is silently ignored — `writeMIDI` and `parseMIDI` always agree with whatever tempo
+each one independently assumes (explicit or defaulted), so the seconds cancel out correctly no
+matter what value was actually requested. Fixed by inspecting the raw output bytes directly for
+the `FF 51 03` meta event and decoding its 3-byte value, which only passes if a real, correctly-
+computed tempo was actually written.
+
+Chord entry (multiple notes at one time value, grouping near-simultaneous taps) remains
+explicitly out of scope here, tracked separately.
+
+**Test:** `tests/run_tests.js` — "MidiMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event
+inspection, plus confirming the no-arg default is unchanged) and "ComposeMode.quantizeNotes
+tests" (grid-snapping math at two different tempo/subdivision combinations, confirming the
+function actually reads current state rather than a hardcoded assumption).
+`tests/desktop.spec.js` — three "Compose: ..." tests: the metronome clicks at the chosen tempo
+while recording and stops the instant recording stops, the Quantize checkbox actually applies on
+stop, and Save emits a real tempo event matching the chosen BPM when quantize was used. All
+confirmed failing against the pre-implementation code first, per red-green discipline.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

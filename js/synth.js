@@ -107,6 +107,28 @@ const Synth = {
         }
     },
 
+    // A short, non-melodic click for Compose's metronome (task #52) -- deliberately a plain sine
+    // burst, not playNote's triangle-wave tone, so a beat click is never mistaken for an actual
+    // note being played.
+    playClick: function(t0 = 0) {
+        this.init();
+        const startTime = this.ctx.currentTime + t0;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 1000;
+
+        gain.gain.setValueAtTime(0.0001, startTime);
+        gain.gain.linearRampToValueAtTime(0.2, startTime + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.04);
+
+        osc.connect(gain);
+        gain.connect(this.master);
+        osc.start(startTime);
+        osc.stop(startTime + 0.05);
+    },
+
     playChord: function(midis, rolled = true, peak = 0.16, dur = 1.2) {
         this.init();
         midis.forEach((m, i) => {

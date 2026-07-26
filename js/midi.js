@@ -1008,16 +1008,18 @@ const MidiMode = {
     },
 
     // Standard MIDI File writer -- the inverse of parseMIDI/tickToSec above, for Compose mode's
-    // Save. Single track, format 0. Deliberately emits NO tempo meta event: parseMIDI's tickToSec
-    // already defaults to 500000 usec/beat (120bpm) whenever no tempo change is present, so
-    // omitting one here (rather than writing a redundant, always-identical tempo event) keeps
-    // parseMIDI(writeMIDI(x)) an exact round trip at the fixed WRITE_TICKS_PER_BEAT resolution,
-    // not just an equivalent-sounding one.
+    // Save. Single track, format 0. Without an explicit tempoBPM (task #52's quantized recordings
+    // pass one; ordinary unquantized recordings don't), emits NO tempo meta event: parseMIDI's
+    // tickToSec already defaults to 500000 usec/beat (120bpm) whenever no tempo change is
+    // present, so omitting one here keeps parseMIDI(writeMIDI(x)) an exact round trip at the
+    // fixed WRITE_TICKS_PER_BEAT resolution, not just an equivalent-sounding one -- this is the
+    // ONLY behavior for any existing caller that doesn't pass tempoBPM.
     WRITE_TICKS_PER_BEAT: 480,
     WRITE_TEMPO_USEC_PER_BEAT: 500000, // 120bpm -- must match parseMIDI's tickToSec default
 
-    writeMIDI: function(melodySeq) {
-        const ticksPerSec = this.WRITE_TICKS_PER_BEAT * (1000000 / this.WRITE_TEMPO_USEC_PER_BEAT);
+    writeMIDI: function(melodySeq, tempoBPM) {
+        const usecPerBeat = tempoBPM ? Math.round(60000000 / tempoBPM) : this.WRITE_TEMPO_USEC_PER_BEAT;
+        const ticksPerSec = this.WRITE_TICKS_PER_BEAT * (1000000 / usecPerBeat);
 
         const events = [];
         melodySeq.forEach(note => {
@@ -1040,6 +1042,15 @@ const MidiMode = {
 
         const trackBytes = [];
         let lastTick = 0;
+        if (tempoBPM) {
+            // A real tempo meta event, so a reader (including our own parseMIDI/tickToSec) knows
+            // the actual BPM instead of silently relying on the same fixed default this writer
+            // otherwise assumes implicitly. WRITE_TICKS_PER_BEAT (480) is divisible by both 32
+            // and 3, so every grid unit task #52's quantizer supports (straight down to 1/32,
+            // triplet down to 1/6) lands on an exact integer tick count -- no rounding drift from
+            // the tempo/PPQN choice itself, only from the quantize step's own rounding.
+            trackBytes.push(...writeVarInt(0), 0xff, 0x51, 0x03, (usecPerBeat >> 16) & 0xff, (usecPerBeat >> 8) & 0xff, usecPerBeat & 0xff);
+        }
         events.forEach(ev => {
             trackBytes.push(...writeVarInt(ev.tick - lastTick));
             lastTick = ev.tick;
