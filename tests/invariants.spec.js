@@ -1264,6 +1264,97 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  // A sharper, more direct restatement of the same property INV-40 checks indirectly via aspect
+  // ratio: on whichever axis the board is actually bound by (its own shape vs. the available
+  // space's), the rendered board should reach within one hex-diameter of BOTH edges of the
+  // available area on that axis -- not just be correctly shaped, but actually maximized within
+  // it. Matching an aspect ratio while still being arbitrarily small (a scaling bug elsewhere)
+  // would pass INV-40 but fail this. `2 * Render.HEX_R` is the same "one hex diameter" constant
+  // every getFitView call already passes as its own `padding` argument, so this is checking that
+  // the fit lands where that padding convention already implies it should, not a new number.
+  test('INV-41: the restricted board reaches within one hex-diameter of two opposite edges of its available space', async ({ page }) => {
+    const cases = [
+      { mode: 'snake', viewport: { width: 320, height: 480 } },
+      { mode: 'snake', viewport: { width: 397, height: 537 } },
+      { mode: 'gravity', viewport: { width: 320, height: 480 } },
+      { mode: 'blast', viewport: { width: 320, height: 480 } },
+      { mode: 'snake', viewport: { width: 852, height: 393 } },
+    ];
+
+    for (const { mode, viewport } of cases) {
+      await page.setViewportSize(viewport);
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      await page.waitForTimeout(300);
+
+      const result = await page.evaluate((m) => {
+        let cells;
+        if (m === 'snake') {
+          cells = [];
+          for (let p = -7; p <= 7; p++) for (let q = -7; q <= 7; q++) if (SnakeMode.isInBounds(p, q)) cells.push({ p, q });
+        } else if (m === 'gravity') {
+          cells = [];
+          for (let q = 0; q < 20; q++) for (let p = -20; p <= 10; p++) {
+            const col = p + Math.floor(q / 2);
+            if (col >= -5 && col <= 4) cells.push({ p, q });
+          }
+        } else {
+          cells = [];
+          for (let p = -5; p <= 5; p++) for (let q = -5; q <= 5; q++) if (Board.isInBounds(p, q)) cells.push({ p, q });
+        }
+
+        const svg = Render.svg;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        cells.forEach(c => {
+          const pos = Render.getRotatedScreenPos(c.p, c.q);
+          const pt = svg.createSVGPoint();
+          pt.x = pos.x - Render.HEX_R; pt.y = pos.y - Render.HEX_R;
+          const s1 = pt.matrixTransform(svg.getScreenCTM());
+          pt.x = pos.x + Render.HEX_R; pt.y = pos.y + Render.HEX_R;
+          const s2 = pt.matrixTransform(svg.getScreenCTM());
+          minX = Math.min(minX, s1.x, s2.x); maxX = Math.max(maxX, s1.x, s2.x);
+          minY = Math.min(minY, s1.y, s2.y); maxY = Math.max(maxY, s1.y, s2.y);
+        });
+
+        const container = document.getElementById('game-container').getBoundingClientRect();
+        const clearance = Render.measureChromeClearance(m);
+        const avail = {
+          left: container.left + clearance.left, right: container.right - clearance.right,
+          top: container.top + clearance.top, bottom: container.bottom - clearance.bottom,
+        };
+
+        // One hex diameter, in on-screen pixels at the current zoom -- transform two points
+        // 2*HEX_R world-units apart and measure the resulting screen distance, rather than
+        // assuming a fixed pixel constant that would drift with zoom/viewport.
+        const p1 = svg.createSVGPoint(); p1.x = 0; p1.y = 0;
+        const p2 = svg.createSVGPoint(); p2.x = Render.HEX_R * 2; p2.y = 0;
+        const s1 = p1.matrixTransform(svg.getScreenCTM());
+        const s2 = p2.matrixTransform(svg.getScreenCTM());
+        const cellDiameterPx = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+
+        return {
+          marginLeft: minX - avail.left, marginRight: avail.right - maxX,
+          marginTop: minY - avail.top, marginBottom: avail.bottom - maxY,
+          cellDiameterPx,
+        };
+      }, mode);
+
+      // A small tolerance, not a hard boundary: a scale=1 caller's margin is architecturally
+      // EXACTLY one hex diameter (the same padding constant every getFitView call already passes),
+      // landing right on this boundary -- floating-point rounding alone can push the measured
+      // value a hair past it.
+      const tolerance = result.cellDiameterPx * 1.05;
+      const horizontalBound = Math.max(result.marginLeft, result.marginRight) <= tolerance;
+      const verticalBound = Math.max(result.marginTop, result.marginBottom) <= tolerance;
+      expect(
+        horizontalBound || verticalBound,
+        `[${mode}, ${viewport.width}x${viewport.height}] board should reach within one hex-diameter ` +
+        `(${result.cellDiameterPx.toFixed(1)}px) of two opposite edges of its available space -- ` +
+        `margins L=${result.marginLeft.toFixed(1)} R=${result.marginRight.toFixed(1)} ` +
+        `T=${result.marginTop.toFixed(1)} B=${result.marginBottom.toFixed(1)}`
+      ).toBe(true);
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-24: rotating the Tonnetz view (js/main.js's #rotate-view-btn, js/render.js's
   // Render.rotationDeg/getEffectiveRotation) keeps everything else about the board correct --

@@ -999,6 +999,34 @@ calls didn't exist) before implementing, per red-green discipline. `tests/explor
 failure as expected/by-design flakiness to screenshot-and-ignore; it's a real defect, now fixed
 for the restricted-board modes it was actually catching.
 
+### INV-41: the restricted board reaches within one hex-diameter of two opposite edges of its available space
+
+A sharper, more direct restatement of the same property INV-40 checks indirectly via aspect
+ratio. Matching an aspect ratio while still being arbitrarily small (a scaling bug elsewhere,
+unrelated to the reference-box-shape bug INV-40 fixes) would pass INV-40 but shouldn't pass this:
+on whichever axis the board is actually bound by (its own shape vs. the available space's), the
+rendered board should reach within one hex diameter of *both* edges of the available area on that
+axis -- not just correctly shaped, but actually maximized within it. `2 * Render.HEX_R` (one hex
+diameter) is the same constant every `getFitView` call already passes as its own `padding`
+argument, so this checks that the fit lands where that existing padding convention already
+implies it should -- not a new number invented for the test.
+
+Verified against real numbers before writing the exact tolerance: at `scale=1` (Gravity, Blast),
+the margin on the binding axis is architecturally *exactly* one hex diameter (the padding itself,
+with no extra zoom-in beyond it); a `scale > 1` caller (Snake's 1.15, chosen so a very large
+radius-7 board doesn't clip 2 of 169 cells at some sampled aspect ratios) zooms in *past* the
+padding, so its own margin ends up smaller still. A 5% tolerance above the exact one-diameter
+figure absorbs floating-point rounding at that boundary case without weakening the check itself.
+
+**Test:** `tests/invariants.spec.js`'s "INV-41: ..." — for Snake/Gravity/Blast across both
+orientations, transforms the board's own lattice-space bounding box (cells ± `HEX_R`) through
+`getScreenCTM()` into real screen coordinates, compares against `measureChromeClearance`'s
+available-space edges, and requires the margin on at least one full axis (both left+right, or
+both top+bottom) to fall within one hex diameter -- itself measured on-screen via the same CTM
+transform, so it tracks the current zoom rather than assuming a fixed pixel constant. Confirmed
+failing on the pre-INV-40 code (`Render.measureChromeClearance` didn't exist yet) before writing
+the fix, per red-green discipline.
+
 ---
 
 ## Primary Elements
