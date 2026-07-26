@@ -794,6 +794,33 @@ same bundled list via its own dropdown.
 
 ---
 
+### INV-36: Sandbox's tap-and-hold same-note highlight is reachable via both mouse and touch
+
+Task #24: holding an empty cell while the note-play tool is active (nothing selected — the
+default state) highlights every other on-screen cell sharing the same note NAME, across every
+octave, not just the tapped cell's own pitch — `SandboxMode.showSameNoteHighlight` sweeps the
+full `-15..15` rendered range for any `(p,q)` whose `Tonnetz.getMidi(p,q) % 12` matches. Each
+highlighted cell gets its own label showing its own octave-qualified name and frequency (`${name}
+${octave} · ${Hz}Hz`), reusing `Tonnetz.getNoteName`/`getOctave`/`getFrequency` — the same
+formatting INV-25 already established for Melody, not a second implementation of "how do we
+show an octave-qualified note name."
+
+Built for both input methods from the start, not touch-only or mouse-only: mouse gets its own new
+hold-timer in `sandbox.js`'s own `onmousedown`/`onmousemove`/`onmouseup` (this app has no existing
+mouse-hold pattern anywhere else, so this is the first one — mirroring touch's existing
+`HOLD_DURATION_MS`/hold-timer shape rather than inventing a different one). Touch reuses
+`main.js`'s existing `performHoldAction` (previously Sandbox/Blast pickup-only), adding an `else`
+branch for the empty-cell/nothing-selected case it never had a behavior for before. Both tests
+were written first and confirmed failing against the pre-fix code before any implementation
+changes, per this project's red-green discipline.
+
+**Test:** `tests/desktop.spec.js` — "Sandbox: holding an empty cell highlights every same-named
+cell with its own octave+Hz label, and releasing clears it" (mouse, real `page.mouse`
+press-hold-release). `tests/mobile.spec.js` — "holding an empty cell with the note-play tool
+active highlights same-named cells..." (touch, genuine `Touch`/`TouchEvent` dispatch).
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

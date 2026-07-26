@@ -328,6 +328,23 @@ svg {
     transition: fill 0.05s ease-out, stroke 0.05s ease-out;
 }
 
+/* Sandbox tap-and-hold same-note highlight (task #24) -- every cell sharing the held cell's own
+   note name, for as long as the hold lasts. */
+.cell.same-note-highlight {
+    fill: var(--accent) !important;
+    stroke: white !important;
+    stroke-width: 2.5px !important;
+    opacity: 0.85;
+}
+
+.same-note-label {
+    fill: white;
+    font-size: 10px;
+    font-weight: bold;
+    pointer-events: none;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
 /* Persistent ring around a selected Compose note -- distinct from active-note's momentary
    play-flash, since a selection needs to survive well past a single highlight duration. */
 .compose-selected-note {

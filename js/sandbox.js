@@ -35,7 +35,54 @@ const SandboxMode = {
         placedPieces: [], // { type, p, q, rotation }
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
-        hoverCell: { p: 0, q: 0 }
+        hoverCell: { p: 0, q: 0 },
+        highlightedCells: [] // { p, q, midi } -- task #24's tap-and-hold same-note highlight
+    },
+
+    HOLD_DURATION_MS: 400,
+
+    // Every cell within the rendered lattice range sharing the tapped cell's own note NAME
+    // (any octave, not just the same pitch) -- e.g. holding a C4 also surfaces every C3/C5/etc.
+    // on screen, each labeled with ITS OWN octave-qualified name + frequency, since they're
+    // genuinely different pitches despite sharing a name.
+    showSameNoteHighlight: function(p, q) {
+        const targetPitchClass = ((Tonnetz.getMidi(p, q) % 12) + 12) % 12;
+        const matches = [];
+        for (let pp = -15; pp <= 15; pp++) {
+            for (let qq = -15; qq <= 15; qq++) {
+                const midi = Tonnetz.getMidi(pp, qq);
+                if (midi < 0 || midi > 127) continue;
+                if (((midi % 12) + 12) % 12 === targetPitchClass) matches.push({ p: pp, q: qq, midi });
+            }
+        }
+        this.state.highlightedCells = matches;
+        this.renderNoteHighlight();
+    },
+
+    clearNoteHighlight: function() {
+        if (this.state.highlightedCells.length === 0) return;
+        this.state.highlightedCells = [];
+        this.renderNoteHighlight();
+    },
+
+    renderNoteHighlight: function() {
+        document.querySelectorAll('.same-note-highlight').forEach(el => el.classList.remove('same-note-highlight'));
+        document.querySelectorAll('.same-note-label').forEach(el => el.remove());
+        this.state.highlightedCells.forEach(({ p, q, midi }) => {
+            const poly = document.querySelector(`#tonnetz-svg polygon.cell:not(.ghost)[data-p="${p}"][data-q="${q}"]`);
+            if (!poly) return;
+            poly.classList.add('same-note-highlight');
+
+            const pos = Render.getScreenPos(p, q);
+            const label = document.createElementNS(Render.NS, 'text');
+            label.setAttribute('x', pos.x);
+            label.setAttribute('y', pos.y + 5);
+            label.setAttribute('text-anchor', 'middle');
+            label.setAttribute('class', 'same-note-label');
+            label.textContent = `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)} · ${Math.round(Tonnetz.getFrequency(midi))}Hz`;
+            Render.applyLabelCounterRotation(label, pos.x, pos.y + 5);
+            Render.appendToLattice(label);
+        });
     },
 
     init: function() {
@@ -329,8 +376,17 @@ const SandboxMode = {
                 if (isExistingPiece || !this.state.selectedPiece || !isTouch) {
                     this.handleAction(p, q);
                 }
+
+                // Tap-and-hold same-note highlighting (task #24) -- mouse only; touch's
+                // equivalent is main.js's own performHoldAction, since touch already has a
+                // hold-vs-tap disambiguation mechanism this app-wide, mouse doesn't. Only makes
+                // sense for the note-play tool on an empty cell (matches touch's own gating).
+                if (!isTouch && !isExistingPiece && !this.state.selectedPiece) {
+                    clearTimeout(this._holdTimer);
+                    this._holdTimer = setTimeout(() => this.showSameNoteHighlight(p, q), this.HOLD_DURATION_MS);
+                }
             }
-            
+
             if (!isTouch) {
                 this.state.isPanning = true;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
@@ -339,6 +395,8 @@ const SandboxMode = {
 
         window.onmousemove = (e) => {
             if (!isTouch && this.state.isPanning) {
+                clearTimeout(this._holdTimer); // real movement means this isn't a hold-in-place
+                this.clearNoteHighlight();
                 const dx = e.clientX - this.state.lastMouse.x;
                 const dy = e.clientY - this.state.lastMouse.y;
                 this.state.viewX -= dx;
@@ -349,7 +407,7 @@ const SandboxMode = {
                 this.state.viewX = Render.viewX;
                 this.state.viewY = Render.viewY;
             }
-            
+
             if (this.state.selectedPiece) {
                 this.updateGhost(e);
             }
@@ -357,6 +415,8 @@ const SandboxMode = {
 
         window.onmouseup = () => {
             this.state.isPanning = false;
+            clearTimeout(this._holdTimer);
+            this.clearNoteHighlight();
         };
     },
 

@@ -474,6 +474,43 @@ test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for S
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Sandbox tap-and-hold same-note highlighting (task #24): holding an empty cell while the
+// note-play tool is active (nothing selected) highlights every OTHER cell sharing the same note
+// NAME (any octave, not just the same pitch), each labeled with its own octave-qualified name +
+// frequency -- reusing the exact Tonnetz.getNoteName/getOctave/getFrequency formatting INV-25
+// already established for Melody.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Sandbox: holding an empty cell highlights every same-named cell with its own octave+Hz label, and releasing clears it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  // (0,0) is C4 (midi 60); (0,4) is C5 (midi 72, since 7*0+3*4=12) -- same note name, different
+  // octave, a real "other cell" this feature is specifically about surfacing.
+  const cellBox = await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').boundingBox();
+  await page.mouse.move(cellBox.x + cellBox.width / 2, cellBox.y + cellBox.height / 2);
+  await page.mouse.down();
+  await page.waitForFunction(() => document.querySelectorAll('.same-note-highlight').length > 0);
+
+  const result = await page.evaluate(() => ({
+    highlightedCount: document.querySelectorAll('.same-note-highlight').length,
+    otherCellHighlighted: Array.from(document.querySelectorAll('.same-note-highlight'))
+      .some(el => el.getAttribute('data-p') === '0' && el.getAttribute('data-q') === '4'),
+    labelTexts: Array.from(document.querySelectorAll('.same-note-label')).map(el => el.textContent),
+  }));
+
+  expect(result.highlightedCount).toBeGreaterThan(1); // (0,0) itself plus at least one other
+  expect(result.otherCellHighlighted).toBe(true);
+  expect(result.labelTexts.some(t => t.includes('C4'))).toBe(true);
+  expect(result.labelTexts.some(t => t.includes('C5'))).toBe(true);
+  expect(result.labelTexts.some(t => /\d+Hz/.test(t))).toBe(true);
+
+  await page.mouse.up();
+  const afterRelease = await page.evaluate(() => document.querySelectorAll('.same-note-highlight, .same-note-label').length);
+  expect(afterRelease).toBe(0);
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // Compose mode (task #27's "edit any melody, record a new song" -- built as its own mode rather
 // than bolted onto Melody's practice loop, since drag/rotate-to-transpose belongs to composition,
 // not a structured drill). v1 scope: record by tapping cells in real time, play back, Undo/Clear,

@@ -796,6 +796,28 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(selectedAfter).not.toBe(secondType);
   });
 
+  test('holding an empty cell with the note-play tool active highlights same-named cells (touch equivalent of the mouse hold, task #24)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+
+    const cellBox = await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').boundingBox();
+    const cx = cellBox.x + cellBox.width / 2;
+    const cy = cellBox.y + cellBox.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x: cx, y: cy });
+    await page.waitForFunction(() => document.querySelectorAll('.same-note-highlight').length > 0);
+
+    const highlightedCount = await page.evaluate(() => document.querySelectorAll('.same-note-highlight').length);
+    expect(highlightedCount).toBeGreaterThan(1);
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x: cx, y: cy });
+    const afterRelease = await page.evaluate(() => document.querySelectorAll('.same-note-highlight, .same-note-label').length);
+    expect(afterRelease).toBe(0);
+  });
+
   test('tap on a locked cell in Blast Mode is ignored (no pickup, no rotation)', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;

@@ -601,6 +601,10 @@ const App = {
                         BlastMode.placePiece(modeObj.state.hoverCell.p, modeObj.state.hoverCell.q);
                     }
                 }
+            } else if (this.currentMode === 'sandbox') {
+                // Note-play tool, empty cell: touch equivalent of the same task #24 highlight
+                // mouse gets via sandbox.js's own hold-timer. Cleared in touchend below.
+                SandboxMode.showSameNoteHighlight(cell.p, cell.q);
             }
         };
 
@@ -882,6 +886,7 @@ const App = {
             }
 
             clearTimeout(holdTimer);
+            if (this.currentMode === 'sandbox') SandboxMode.clearNoteHighlight();
 
             if (e.changedTouches.length === 1 && this.currentMode === 'compose' && !ComposeMode.state.isRecording) {
                 e.preventDefault();
