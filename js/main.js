@@ -538,6 +538,11 @@ const App = {
         let twoFingerStartCenter = null;
         let twoFingerStartView = null;
 
+        // Compose-only: was the touched cell (at touchstart) an already-selected note? If so, a
+        // drag-past-threshold is a note-drag (translateSelection at touchend) rather than
+        // whatever a stray one-finger drag over empty board would otherwise do (nothing).
+        let composeDragCandidate = false;
+
         // Phone-only: pickup and placement are each their own dedicated gesture (hold), so
         // a plain tap never does double duty. HOLD_DURATION_MS sits comfortably above the
         // 250ms tap-duration ceiling below, so a fired hold and a recognized tap can never
@@ -613,7 +618,31 @@ const App = {
                     if (cell) {
                         e.preventDefault();
                         if (this.currentMode === 'compose') {
-                            ComposeMode.tapCell(cell.p, cell.q);
+                            if (ComposeMode.state.isRecording) {
+                                // Recording stays exactly as before -- instant tap-to-play-and-
+                                // append, no hold/drag concept, since editing gestures only make
+                                // sense once you've stopped recording.
+                                ComposeMode.tapCell(cell.p, cell.q);
+                            } else {
+                                // Editing: don't resolve the tap yet. touchend resolves it as a
+                                // plain tap unless a hold fired (touch equivalent of shift-tap,
+                                // toggling selection) or a drag occurred (note-drag, see touchmove/
+                                // touchend below) -- mirrors compose.js's own mouse dragCandidate
+                                // handling, which has the same three-way split.
+                                touchStartCell = cell;
+                                touchStartX = e.touches[0].clientX;
+                                touchStartY = e.touches[0].clientY;
+                                touchStartTime = Date.now();
+                                isDragging = false;
+                                holdFired = false;
+                                composeDragCandidate = ComposeMode.notesAt(cell.p, cell.q)
+                                    .some(i => ComposeMode.state.selectedIndices.includes(i));
+                                clearTimeout(holdTimer);
+                                holdTimer = setTimeout(() => {
+                                    holdFired = true;
+                                    ComposeMode.tapCell(cell.p, cell.q, { shiftKey: true });
+                                }, HOLD_DURATION_MS);
+                            }
                         } else {
                             const midi = Tonnetz.getMidi(cell.p, cell.q);
                             MidiMode.playUserNote(midi, cell.p, cell.q);
@@ -718,8 +747,23 @@ const App = {
                 return;
             }
 
-            // A single touch in Melody/Compose is tap-to-play(-and-record) (handled entirely in
-            // touchstart) -- only a 2-touch pan gesture (below) applies here.
+            // Compose editing (not recording): track movement so touchend can tell a plain tap
+            // from a note-drag. A single touch while recording is still tap-to-play(-and-record),
+            // handled entirely in touchstart -- unaffected here.
+            if (this.currentMode === 'compose' && !ComposeMode.state.isRecording && e.touches.length === 1) {
+                const touch = e.touches[0];
+                const dx = touch.clientX - touchStartX;
+                const dy = touch.clientY - touchStartY;
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    if (!isDragging) clearTimeout(holdTimer); // real movement means this isn't a hold
+                    isDragging = true;
+                }
+                if (isDragging && composeDragCandidate) e.preventDefault(); // suppress scroll while dragging a note
+                return;
+            }
+
+            // A single touch in Melody/Compose(-while-recording) is tap-to-play(-and-record)
+            // (handled entirely in touchstart) -- only a 2-touch pan gesture (below) applies here.
             if ((this.currentMode === 'midi' || this.currentMode === 'compose') && e.touches.length !== 2) {
                 e.preventDefault();
                 return;
@@ -838,6 +882,25 @@ const App = {
             }
 
             clearTimeout(holdTimer);
+
+            if (e.changedTouches.length === 1 && this.currentMode === 'compose' && !ComposeMode.state.isRecording) {
+                e.preventDefault();
+                if (isDragging && composeDragCandidate) {
+                    // A note-drag: resolve the final cell and translate the whole selection by
+                    // the same (dp, dq) -- mirrors compose.js's own mouse dragCandidate handling.
+                    const endCell = getCellFromTouch(e.changedTouches[0]);
+                    if (endCell && touchStartCell) {
+                        ComposeMode.translateSelection(endCell.p - touchStartCell.p, endCell.q - touchStartCell.q);
+                    }
+                } else if (!holdFired && !isDragging && touchStartCell) {
+                    // A plain tap (not a hold, not a drag): resolve exactly as a non-shift tap --
+                    // select-only, insert-after-selected, or clear-selection-and-play. The hold
+                    // case already resolved its own action from touchstart's timer; nothing
+                    // further needed here for it.
+                    ComposeMode.tapCell(touchStartCell.p, touchStartCell.q, { shiftKey: false });
+                }
+                return;
+            }
 
             if (e.changedTouches.length === 1 && (this.currentMode === 'sandbox' || this.currentMode === 'blast')) {
                 e.preventDefault();

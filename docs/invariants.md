@@ -666,17 +666,43 @@ user's own explicit call: a rough recording is cheap to re-record from scratch, 
 rhythm-precision editing is better served by a dedicated external MIDI editor working on the
 saved `.mid` file directly than by in-app nudge buttons or a timeline widget (`next_steps.md`
 #53 tracks a possible link to one such tool, Signal, gated on the user trying it firsthand
-first). Touch-based drag-to-transpose is also not yet built — touch's single-tap already gets
-select/insert for free (`main.js`'s existing `ComposeMode.tapCell` routing), but wiring a
-touch-drag-vs-pan disambiguation into `main.js`'s already-dense central touch handler is real,
-separate work not attempted this pass.
+first).
 
-**Test:** `tests/desktop.spec.js` — four "Compose: ..." tests: tap-to-select + Delete's gap-close
-math, shift-tap multi-select + mouse-drag transposing the whole selection (verified via real
-`page.mouse` press-move-release, landing-cell resolution included), tap-to-insert's shift math
-(both the new note's placement and the pushed-later note's exact new time), and Rotate CW's pivot
-math (pivot note unchanged, the other note's new `(p,q)` matching `Pieces.rotate`'s own formula
-by hand).
+**Touch parity (task #65, added after the fact — see below)**: the first pass of this invariant
+shipped with multi-select and drag-to-transpose reachable via mouse only — touch's single tap
+already got select/insert "for free" through `main.js`'s existing `ComposeMode.tapCell` routing,
+but shift-tap and mouse-drag have no touch equivalent, and nothing caught that until it came up
+in conversation, not through any test. Fixed by extending `main.js`'s existing hold-timer
+infrastructure (previously Sandbox/Blast-only, for hold-to-pick-up) into Compose's own
+touchstart/touchmove/touchend branches, gated on `!ComposeMode.state.isRecording` so recording's
+instant tap-to-play-and-append is completely untouched: **long-press an existing note** toggles
+it in/out of the selection (`ComposeMode.tapCell(p, q, { shiftKey: true })` — the touch
+equivalent of shift-tap, reusing the exact same toggle logic rather than inventing a parallel
+one), and **a single-finger drag on a selected note** translates the whole selection
+(`ComposeMode.translateSelection`), mirroring `compose.js`'s own mouse `dragCandidate` pattern:
+touchstart records the start cell and whether it's drag-eligible (an already-selected note),
+touchmove tracks movement past a threshold (clearing the hold timer once real movement occurs),
+and touchend resolves to a note-drag, a hold's already-fired action, or a plain tap accordingly.
+
+This was found and fixed under a broader, explicit standing rule (not just this one instance):
+a bug isn't resolved until the *systematic* test that would catch the whole class exists, not
+just a one-off regression for the reported case. The applicable axis here is input method, and
+this project's existing convention for sweeping it is splitting coverage across
+`tests/desktop.spec.js` (mouse) and `tests/mobile.spec.js` (real touch events) per capability —
+the same pattern Melody's own pan test already used (a mouse-drag test and a real-touch-drag
+test, same underlying property). Before this fix, Compose had zero `tests/mobile.spec.js`
+coverage at all, so this gap couldn't have been caught by anything already in place.
+
+**Test:** `tests/desktop.spec.js` — four "Compose: ..." tests (mouse path): tap-to-select +
+Delete's gap-close math, shift-tap multi-select + mouse-drag transposing the whole selection
+(verified via real `page.mouse` press-move-release, landing-cell resolution included),
+tap-to-insert's shift math (both the new note's placement and the pushed-later note's exact new
+time), and Rotate CW's pivot math (pivot note unchanged, the other note's new `(p,q)` matching
+`Pieces.rotate`'s own formula by hand). `tests/mobile.spec.js` — two "Compose: a real ..." tests
+(touch path, genuine `Touch`/`TouchEvent` dispatch, not `.click()`): a long-press toggling
+selection on and back off (a real toggle, not "always selects"), and a single-finger drag
+transposing a selected note — both written and confirmed failing against the pre-fix code
+first, per this project's own red-green discipline, before the `main.js` changes were made.
 
 ---
 

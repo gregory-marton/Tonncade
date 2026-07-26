@@ -1984,4 +1984,99 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(open).toBeLessThanOrEqual(closedBefore);
     expect(closedAfter).toBe(closedBefore);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Compose touch parity (task #64 follow-up): shift-tap (multi-select) and mouse-drag
+  // (transpose) have no touch equivalent without this. Real Touch/TouchEvent dispatch, not
+  // .click() -- a synthetic click can't exercise a hold-timer or drag-vs-tap disambiguation.
+  // ────────────────────────────────────────────────────────────────────────
+
+  function installComposeTouchDispatcher(page) {
+    return page.evaluate(() => {
+      window.__composeTouchTarget = null;
+      window.__dispatchComposeTouch = function(type, x, y) {
+        if (type === 'touchstart') {
+          window.__composeTouchTarget = document.elementFromPoint(x, y) || document.body;
+        }
+        const el = window.__composeTouchTarget || document.body;
+        const touch = new Touch({ identifier: 7, target: el, clientX: x, clientY: y, pageX: x, pageY: y });
+        const config = { bubbles: true, cancelable: true, changedTouches: [touch] };
+        if (type === 'touchend') {
+          config.touches = [];
+          config.targetTouches = [];
+        } else {
+          config.touches = [touch];
+          config.targetTouches = [touch];
+        }
+        el.dispatchEvent(new TouchEvent(type, config));
+      };
+    });
+  }
+
+  test('Compose: a real long-press on an existing note toggles it into/out of the selection (touch equivalent of shift-tap)', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [
+        { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+        { midi: Tonnetz.getMidi(1, 0), p: 1, q: 0, time: 0.5, duration: 0.4 },
+      ];
+      ComposeMode.state.selectedIndices = [];
+      ComposeMode.refreshBoard();
+    });
+    await installComposeTouchDispatcher(page);
+
+    // Recomputed before EACH press, not cached -- selecting a note shows the edit-controls
+    // panel, which reflows the SVG's available space and re-fits zoom/pan (this app always
+    // re-fits to current available space on refresh, e.g. Gravity's own "zoom fit to the cup,
+    // not a fixed value"), so the same absolute pixel can point at a different cell afterward.
+    // A real second tap targets wherever the note visually is *now*, not a stale coordinate.
+    const cellLocator = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+
+    // A long press: touchstart, then wait past the hold threshold before touchend, no movement.
+    let box = await cellLocator.boundingBox();
+    await page.evaluate(([px, py]) => window.__dispatchComposeTouch('touchstart', px, py), [box.x + box.width / 2, box.y + box.height / 2]);
+    await page.waitForTimeout(500);
+    await page.evaluate(([px, py]) => window.__dispatchComposeTouch('touchend', px, py), [box.x + box.width / 2, box.y + box.height / 2]);
+
+    expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([0]);
+
+    // A second long-press on the same note toggles it back out -- a real toggle, not "always on".
+    box = await cellLocator.boundingBox();
+    await page.evaluate(([px, py]) => window.__dispatchComposeTouch('touchstart', px, py), [box.x + box.width / 2, box.y + box.height / 2]);
+    await page.waitForTimeout(500);
+    await page.evaluate(([px, py]) => window.__dispatchComposeTouch('touchend', px, py), [box.x + box.width / 2, box.y + box.height / 2]);
+
+    expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([]);
+  });
+
+  test('Compose: a real single-finger touch drag on a selected note transposes it (touch equivalent of mouse-drag)', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [
+        { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      ];
+      ComposeMode.state.selectedIndices = [0];
+      ComposeMode.updateEditControls();
+      ComposeMode.refreshBoard();
+    });
+    await installComposeTouchDispatcher(page);
+
+    const fromBox = await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').boundingBox();
+    const toBox = await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="1"]').boundingBox();
+    const startX = fromBox.x + fromBox.width / 2;
+    const startY = fromBox.y + fromBox.height / 2;
+    const endX = toBox.x + toBox.width / 2;
+    const endY = toBox.y + toBox.height / 2;
+
+    await page.evaluate(([x, y]) => window.__dispatchComposeTouch('touchstart', x, y), [startX, startY]);
+    await page.evaluate(([x, y]) => window.__dispatchComposeTouch('touchmove', x, y), [(startX + endX) / 2, (startY + endY) / 2]);
+    await page.evaluate(([x, y]) => window.__dispatchComposeTouch('touchmove', x, y), [endX, endY]);
+    await page.evaluate(([x, y]) => window.__dispatchComposeTouch('touchend', x, y), [endX, endY]);
+
+    const result = await page.evaluate(() => {
+      const n = ComposeMode.state.notes[0];
+      return { p: n.p, q: n.q, midiMatches: n.midi === Tonnetz.getMidi(n.p, n.q) };
+    });
+    expect(result).toEqual({ p: 0, q: 1, midiMatches: true });
+  });
 });
