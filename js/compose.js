@@ -109,6 +109,8 @@ const ComposeMode = {
                 chooseBtn: 'compose-choose-folder-btn',
                 filesSelect: 'compose-folder-files',
                 folderStatus: 'compose-folder-status',
+                onlineGroup: 'compose-online-group',
+                onlineSelect: 'compose-online-files',
             });
         }
     },

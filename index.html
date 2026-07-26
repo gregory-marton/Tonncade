@@ -116,6 +116,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <span id="midi-folder-status">Default: Hot Cross Buns</span>
                         <select id="midi-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
+                    <!-- Read-only online song folder (task #27) -- a plain relative fetch, works
+                         in every browser (no File System Access requirement), gracefully absent
+                         under file:// or offline (js/midi-folder.js hides this group then). -->
+                    <div id="midi-online-group" class="control-group" style="display: none; margin-top: 6px;">
+                        <label for="midi-online-files" style="font-size: 12px; color: var(--dim);">More songs:</label>
+                        <select id="midi-online-files" style="width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
+                    </div>
                     <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <label for="midi-difficulty" style="font-size: 13px;">Difficulty:</label>
@@ -172,6 +179,12 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button type="button" id="compose-choose-folder-btn">Choose MIDI Folder</button>
                         <span id="compose-folder-status"></span>
                         <select id="compose-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
+                    </div>
+                    <!-- Same read-only online song folder as Melody (task #27) -- see
+                         #midi-online-group's own comment. -->
+                    <div id="compose-online-group" class="control-group" style="display: none; margin-top: 6px;">
+                        <label for="compose-online-files" style="font-size: 12px; color: var(--dim);">Load a bundled song:</label>
+                        <select id="compose-online-files" style="width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
                     <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
                         <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">

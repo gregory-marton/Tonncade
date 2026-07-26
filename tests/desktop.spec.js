@@ -402,6 +402,59 @@ test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the 
   await expect(page.locator('#midi-upload-group')).toBeVisible();
 });
 
+// ────────────────────────────────────────────────────────────────────────
+// MidiFolder's online song folder (task #27): a plain relative fetch to ./midi/index.json, no
+// File System Access API involved -- works in every browser, degrades to "hidden" on any
+// failure (offline, file://, 404) rather than surfacing an error, since it's a bonus content
+// tier, not a required one.
+// ────────────────────────────────────────────────────────────────────────
+
+test('MidiFolder online: populates the dropdown from index.json, and selecting a song loads the real fetched file', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.fulfill({
+    json: [{ name: 'Test Song A', file: 'a.mid' }, { name: 'Test Song B', file: 'b.mid' }],
+  }));
+  await page.goto('/');
+
+  // MIDI 60 specifically -- MidiMode.loadMelodyFromArrayBuffer runs loaded notes through
+  // centerMelody(), which shifts by whole octaves toward 60; a non-centered test note would get
+  // silently transposed, making this assertion fail for the wrong reason.
+  const bytes = await page.evaluate(() => Array.from(new Uint8Array(MidiMode.writeMIDI([{ midi: 60, time: 0, duration: 0.4 }]))));
+  await page.route('**/midi/b.mid', route => route.fulfill({ body: Buffer.from(bytes), contentType: 'audio/midi' }));
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.waitForFunction(() => document.getElementById('midi-online-files').options.length > 1);
+
+  const optionNames = await page.evaluate(() =>
+    Array.from(document.getElementById('midi-online-files').options).map(o => o.textContent)
+  );
+  expect(optionNames).toEqual(['Choose a song…', 'Test Song A', 'Test Song B']);
+
+  await page.locator('#midi-online-files').selectOption({ label: 'Test Song B' });
+  await page.waitForFunction(() => MidiMode.state.melody.length === 1 && MidiMode.state.melody[0].midi === 60);
+});
+
+test('MidiFolder online: a failed fetch (offline/404) hides the online group instead of erroring', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.fulfill({ status: 404, body: 'not found' }));
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  await expect(page.locator('#midi-online-group')).toBeHidden();
+});
+
+test('MidiFolder online: Compose gets the same bundled songs via its own dropdown', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.fulfill({
+    json: [{ name: 'Test Song A', file: 'a.mid' }],
+  }));
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.waitForFunction(() => document.getElementById('compose-online-files').options.length > 1);
+  const optionNames = await page.evaluate(() =>
+    Array.from(document.getElementById('compose-online-files').options).map(o => o.textContent)
+  );
+  expect(optionNames).toEqual(['Choose a song…', 'Test Song A']);
+});
+
 test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys', async ({ page }) => {
   await page.goto('/');
   const hexNav = page.locator('#hex-nav-controls');

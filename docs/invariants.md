@@ -766,6 +766,34 @@ sequence leaves the shared palette/piece-list correct for the final mode (6^3=21
 
 ---
 
+### INV-35: A read-only online song folder, degrading to absent rather than erroring
+
+Task #27's remaining piece: `midi/index.json` + `midi/*.mid` in the repo itself — a third content
+tier for Melody/Compose alongside the built-in default and the player's own local folder,
+fetched via a plain relative `fetch('./midi/index.json')` in `js/midi-folder.js`'s new
+`setupOnline`/`loadOnlineFile`. Deliberately a relative path, not an absolute
+`raw.githubusercontent.com` URL: works identically on any http(s) host (GitHub Pages, a local
+dev server, anything else this app is ever served from) and simply fails under `file://` (no
+origin to fetch from) or offline — the same already-established file://-degradation philosophy
+as #47, not a new failure mode. Any failure (offline, `file://`, a 404) just hides
+`#midi-online-group`/`#compose-online-group` rather than surfacing an error, since this is a
+bonus tier, not a required one — the app works identically without it.
+
+The six bundled songs (Hot Cross Buns plus Frère Jacques, Happy Birthday, the Alphabet Song/
+Twinkle Twinkle, Mary Had a Little Lamb, Row Row Row Your Boat) are real `.mid` files, generated
+by `scripts/generate-bundled-midi.js` from plain `[noteName, beats]` data using the actual
+`MidiMode.writeMIDI` — the correct tool now that it exists and is tested, rather than hand-rolling
+SMF bytes a second time. Run that script again to regenerate the files (e.g. after a `writeMIDI`
+change) or to add another song.
+
+**Test:** `tests/desktop.spec.js` — three "MidiFolder online: ..." tests using `page.route` to
+mock the `index.json`/`.mid` fetches: the dropdown populates and a selected song actually loads
+(verified via a real `writeMIDI`-produced buffer parsed back through the real `loadMelodyFromArrayBuffer`,
+not a stubbed loader), a failed fetch hides the group instead of erroring, and Compose gets the
+same bundled list via its own dropdown.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

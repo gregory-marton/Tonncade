@@ -92,7 +92,16 @@ const MidiFolder = {
         chooseBtn: 'midi-choose-folder-btn',
         filesSelect: 'midi-folder-files',
         folderStatus: 'midi-folder-status',
+        onlineGroup: 'midi-online-group',
+        onlineSelect: 'midi-online-files',
     },
+
+    // A read-only online song folder (task #27) -- a plain relative fetch, so it works
+    // identically on any http(s) host (including GitHub Pages) and simply fails, caught, under
+    // file:// (no origin to fetch from) or offline, matching this project's established
+    // file://-degradation philosophy elsewhere (#47). Unlike the local folder above, this needs
+    // no browser feature detection at all -- it's available in every browser this app supports.
+    ONLINE_INDEX_URL: './midi/index.json',
 
     setup: async function(mode, ids) {
         this.mode = mode;
@@ -100,6 +109,9 @@ const MidiFolder = {
 
         const uploadGroup = document.getElementById(this.ids.uploadGroup);
         const folderGroup = document.getElementById(this.ids.folderGroup);
+
+        await this.setupOnline();
+
         if (!folderGroup) return;
 
         if (!this.isSupported()) {
@@ -116,6 +128,54 @@ const MidiFolder = {
         if (select) select.onchange = () => this.loadSelectedFile();
 
         await this.restore();
+    },
+
+    // Populates the online-songs dropdown from ONLINE_INDEX_URL. Any failure (file://, offline,
+    // 404) just hides the group rather than surfacing an error -- this is a bonus content tier,
+    // not a required one, and the built-in default / local folder both work fine without it.
+    setupOnline: async function() {
+        const group = document.getElementById(this.ids.onlineGroup);
+        if (!group) return;
+        const select = document.getElementById(this.ids.onlineSelect);
+
+        try {
+            const res = await fetch(this.ONLINE_INDEX_URL);
+            if (!res.ok) throw new Error(`${res.status}`);
+            this.onlineIndex = await res.json();
+        } catch (err) {
+            group.style.display = 'none';
+            return;
+        }
+
+        if (!Array.isArray(this.onlineIndex) || this.onlineIndex.length === 0) {
+            group.style.display = 'none';
+            return;
+        }
+
+        group.style.display = '';
+        if (select) {
+            select.innerHTML = '<option value="" disabled selected>Choose a song…</option>';
+            this.onlineIndex.forEach((song, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = song.name;
+                select.appendChild(opt);
+            });
+            select.onchange = () => this.loadOnlineFile(parseInt(select.value, 10));
+        }
+    },
+
+    loadOnlineFile: async function(index) {
+        const song = this.onlineIndex && this.onlineIndex[index];
+        if (!song) return;
+        try {
+            const res = await fetch(`./midi/${song.file}`);
+            if (!res.ok) throw new Error(`${res.status}`);
+            const buffer = await res.arrayBuffer();
+            this.mode.loadMelodyFromArrayBuffer(buffer, song.file);
+        } catch (err) {
+            console.warn(`Could not load online song "${song.name}":`, err);
+        }
     },
 
     chooseFolder: async function() {
