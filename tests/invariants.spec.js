@@ -1355,6 +1355,22 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  test('INV-42: exactly one of #blast-stats/#gravity-controls/#snake-controls is visible at a time on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 480 });
+    await page.goto('/');
+    const ids = ['blast-stats', 'gravity-controls', 'snake-controls'];
+    for (const activeMode of ['blast', 'gravity', 'snake']) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), activeMode);
+      await page.waitForTimeout(300);
+      const displays = await page.evaluate((ids) =>
+        ids.map(id => getComputedStyle(document.getElementById(id)).display), ids);
+      ids.forEach((id, i) => {
+        const shouldBeVisible = id.startsWith(activeMode);
+        expect(displays[i], `mode=${activeMode} #${id}`).toBe(shouldBeVisible ? 'flex' : 'none');
+      });
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-24: rotating the Tonnetz view (js/main.js's #rotate-view-btn, js/render.js's
   // Render.rotationDeg/getEffectiveRotation) keeps everything else about the board correct --

@@ -1027,6 +1027,46 @@ transform, so it tracks the current zoom rather than assuming a fixed pixel cons
 failing on the pre-INV-40 code (`Render.measureChromeClearance` didn't exist yet) before writing
 the fix, per red-green discipline.
 
+### INV-42: exactly one of #blast-stats/#gravity-controls/#snake-controls is visible at a time on mobile
+
+A stats-panel single-row redesign (stats/supporting text matter far less than Tonnetz space, so
+these were flattened from a stacked corner card into a single horizontal strip, freeing vertical
+room for the board) surfaced a real, session-old defect that INV-10's occlusion check never
+caught: `js/main.js`'s `App.setMode` toggles each of these three panels' visibility via plain
+inline `element.style.display = 'block'`/`'none'`, but the mobile CSS needs `display: flex` (a row
+layout) when shown. A first fix hardcoded `display: flex !important` in the CSS -- which does beat
+the inline `'block'` when *showing* a panel, but by the same token also beats the inline `'none'`
+used to *hide* the other two, since `!important` wins over an inline style regardless of which
+direction the override needs to go. Net effect: all three panels were visible simultaneously,
+stacked exactly on top of each other (same `position: absolute; top: 10px; left: 10px;`), the
+whole time these panels have existed -- invisible to INV-10 because that check is about board
+*cells* being occluded, not the chrome panels occluding each other. The real fix (see
+`js/main.js`'s own comment on this) has JS clear the inline style (`''`) rather than force a value
+when showing a panel, so the CSS media query's own `display: flex` (no `!important` needed)
+applies on mobile and default block styling applies on desktop, with only `'none'` ever set
+inline.
+
+**Test:** `tests/invariants.spec.js`'s "INV-42: ..." switches between Blast/Gravity/Snake on a
+mobile viewport and asserts `getComputedStyle(...).display` is `'flex'` for the active mode's own
+panel and `'none'` for the other two. Confirmed failing (`'block'`, not `'flex'`, for the active
+panel) against the pre-fix code before writing the fix, per red-green discipline.
+
+Two related, narrower follow-ups landed alongside this fix, both in portrait only (a user
+observation: Gravity's board is tall/narrow with real side margin once aspect-fit centers it,
+where Blast's is wide with none -- so this applies to Gravity only, not Blast):
+
+- Gravity's next-piece queue (`#palette.floating-queue`) moves from above the board to a narrow
+  icon-only strip beside it (`js/render.js`'s `measureChromeClearance` now reserves `right`
+  clearance for it in portrait, mirroring the pattern already used for Blast's `top`), freeing the
+  whole top band for `#gravity-controls` to fit Pause/Restart and Lines/Best/Speed on one row
+  instead of wrapping.
+- `fitContentBox` reclaims one hex-row's worth of the flat clearance below Gravity's board (its
+  bottom D-pad), rather than the full margin that would be safe -- since the hex board tapers to a
+  point at its bottom corners, a fingertip on the D-pad doesn't actually land under real cells
+  until closer than the old flat gap assumed, but a full reclaim would leave no touch clearance at
+  all. Covered by INV-10/11's existing occlusion checks (any mode/viewport combination they cover
+  already catches a board/D-pad overlap regression), not a new invariant of its own.
+
 ---
 
 ## Primary Elements

@@ -291,12 +291,15 @@ const Render = {
 
         let top = 0, bottom = 0, left = 0, right = 0;
 
-        // Blast's next-piece queue (#palette.floating-queue) floats independently of the stats
-        // panel -- top-right in portrait, the full left column in landscape (see css/style.css)
-        // -- and was missing from this measurement entirely until INV-10's occlusion check
-        // caught real overlap: fitContentBox made the board big enough to actually reach the
-        // queue's corner, which the old, much-smaller-by-bug board never did.
-        const queueRect = mode === 'blast' ? rectOf('palette') : null;
+        // Blast/Gravity's next-piece queue (#palette.floating-queue) floats independently of the
+        // stats panel -- top-right for Blast in portrait (its board is wide, no side room), to
+        // the side of the board for Gravity in portrait (its board is tall/narrow, so real side
+        // margin exists once the aspect-fit centers it -- see css/style.css), the full left
+        // column in landscape for both -- and was missing from this measurement entirely until
+        // INV-10's occlusion check caught real overlap: fitContentBox made the board big enough
+        // to actually reach the queue's corner, which the old, much-smaller-by-bug board never
+        // did.
+        const queueRect = (mode === 'blast' || mode === 'gravity') ? rectOf('palette') : null;
 
         if (this.isMobileLandscape()) {
             if (statsRect) left = Math.max(left, statsRect.right - containerRect.left + GAP);
@@ -319,7 +322,13 @@ const Render = {
             }
         } else {
             if (statsRect) top = Math.max(top, statsRect.bottom - containerRect.top + GAP);
-            if (queueRect) top = Math.max(top, queueRect.bottom - containerRect.top + GAP);
+            if (queueRect) {
+                if (mode === 'gravity') {
+                    right = Math.max(right, containerRect.right - queueRect.left + GAP);
+                } else {
+                    top = Math.max(top, queueRect.bottom - containerRect.top + GAP);
+                }
+            }
             const dpadRect = mode === 'snake' ? rectOf('snake-mobile-controls') : (mode === 'gravity' ? rectOf('mobile-controls') : null);
             if (dpadRect) bottom = Math.max(bottom, containerRect.bottom - dpadRect.top + GAP);
         }
@@ -348,6 +357,17 @@ const Render = {
         container.style.setProperty('--chrome-inset-bottom', `${Math.round(bottom)}px`);
         container.style.setProperty('--chrome-inset-left', `${Math.round(left)}px`);
         container.style.setProperty('--chrome-inset-right', `${Math.round(right)}px`);
+
+        // Also set on <html>: CSS custom properties only cascade to actual DOM descendants, and
+        // #palette (Gravity's side-of-board queue reads these) lives in #sidebar -- a SIBLING of
+        // #game-container in the DOM, not a descendant of it -- so it could never see the values
+        // above. <html> is a real ancestor of both, so this is the one place both #game-container
+        // and #sidebar's own descendants can reliably inherit from. #game-container's own
+        // (closer) copy above still wins for its own descendants, same value either way.
+        document.documentElement.style.setProperty('--chrome-inset-top', `${Math.round(top)}px`);
+        document.documentElement.style.setProperty('--chrome-inset-bottom', `${Math.round(bottom)}px`);
+        document.documentElement.style.setProperty('--chrome-inset-left', `${Math.round(left)}px`);
+        document.documentElement.style.setProperty('--chrome-inset-right', `${Math.round(right)}px`);
     },
 
     // The actual fix for INV-40: sizes and positions #tonnetz-svg itself (inline style, which
@@ -377,7 +397,23 @@ const Render = {
         const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
         if (!isFinite(contentAspect) || contentAspect <= 0) return false;
 
-        const { top, bottom, left, right } = this.measureChromeClearance(App.currentMode);
+        let { top, bottom, left, right } = this.measureChromeClearance(App.currentMode);
+
+        // Gravity's board tapers to a point at its bottom corners, so the D-pad's flat GAP-based
+        // clearance below it (measureChromeClearance) is more conservative than it needs to be --
+        // real fingertips don't land under the board's own narrow bottom corners regardless.
+        // Reclaim one hex-row's worth of that clearance for the board (not the full margin that
+        // would be safe, so a touch on the D-pad still keeps a little breathing room from the
+        // board above it). approxScale is a one-shot estimate (this mode's OWN previous fit would
+        // be exact, but isn't worth the extra render pass this ties into every resize/update).
+        if (App.currentMode === 'gravity' && bottom > 0) {
+            const boardHeightUnits = bounds.maxY - bounds.minY;
+            if (boardHeightUnits > 0) {
+                const approxScale = (containerRect.height - top - bottom) / boardHeightUnits;
+                bottom = Math.max(0, bottom - this.HEX_H * approxScale);
+            }
+        }
+
         const availW = containerRect.width - left - right;
         const availH = containerRect.height - top - bottom;
         if (availW <= 0 || availH <= 0) return false;

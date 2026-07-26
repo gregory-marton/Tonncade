@@ -232,19 +232,26 @@ const App = {
             if (clickAction) clickAction.textContent = 'Place/Pick up';
             SandboxMode.init();
         } else if (mode === 'blast') {
-            stats.style.display = 'block';
+            // '' (not 'block'): #blast-stats needs to be a flex row on mobile but a plain block
+            // on desktop (see css/style.css), and CSS alone can't express that once JS also owns
+            // this same inline property for hide/show -- clearing it lets each breakpoint's own
+            // CSS rule apply. Found live: hardcoding either 'block' or 'flex' here needs a CSS
+            // !important to win on the OTHER breakpoint, and !important on 'display: flex' also
+            // defeats this same inline style's 'none' when hiding the panel in other modes --
+            // that's exactly what made all three panels stack visibly on top of each other.
+            stats.style.display = '';
             document.getElementById('placement-controls').style.display = 'block';
             if (hexNavControls) hexNavControls.style.display = 'block';
             if (clickAction) clickAction.textContent = 'Place Piece';
             BlastMode.init();
         } else if (mode === 'gravity') {
-            document.getElementById('gravity-controls').style.display = 'block';
+            document.getElementById('gravity-controls').style.display = '';
             GravityMode.init();
         } else if (mode === 'midi') {
             document.getElementById('midi-controls').style.display = 'block';
             MidiMode.init();
         } else if (mode === 'snake') {
-            document.getElementById('snake-controls').style.display = 'block';
+            document.getElementById('snake-controls').style.display = '';
             SnakeMode.init();
         } else if (mode === 'compose') {
             document.getElementById('compose-controls').style.display = 'block';
