@@ -634,11 +634,19 @@ placement still goes through however it always has (click the queue item, swipe 
 mobile action button) — the open question in the report ("how to indicate 'place' on the MIDI
 device itself") is sidestepped by not needing a new gesture there at all.
 
+**Follow-up**: this originally shipped as three separately hand-written `tests/invariants.spec.js`
+tests, each with its own copy of the connect-device/switch-mode boilerplate — flagged as a gap
+on the GitHub issue itself (a 4th mode gaining MIDI support wouldn't have automatically inherited
+coverage). Generalized into one `MIDI_ROUTING_CHECKS` config plus a single loop: each mode's own
+routing logic is still genuinely different (the issue's own spec maps MIDI differently per mode),
+so each entry still supplies its own check, but adding a mode now means adding one config entry,
+not a new bespoke test.
+
 **Test:** `tests/run_tests.js` — "Gravity/Snake/Blast MIDI hardware routing tests" (pure state-
 mutation logic, each mode's `refreshUI`/`updateDirectionHighlight` DOM tail stubbed out).
-`tests/invariants.spec.js` — three "issue #11: ..." tests using the same fake-MIDI-device
-pattern INV-23 established, exercising the real end-to-end path including the chord-buffering
-timing.
+`tests/invariants.spec.js` — "issue #11: live MIDI hardware input drives Gravity/Snake/Blast,
+each per its own spec", using the same fake-MIDI-device pattern INV-23 established, exercising
+the real end-to-end path including the chord-buffering timing.
 
 ---
 

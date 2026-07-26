@@ -313,64 +313,66 @@ test.describe('Invariant tests', () => {
 
   // ────────────────────────────────────────────────────────────────────────
   // Issue #11: extending live MIDI hardware input to Gravity/Snake/Blast, per the report's own
-  // detailed spec for each mode.
+  // detailed spec for each mode. Generalized from 3 separately hand-written tests (each with its
+  // own copy of the connect-device/switch-mode boilerplate -- flagged as a gap on the GitHub
+  // issue itself) into one shared MIDI_ROUTING_CHECKS config plus a single loop: a future mode
+  // gaining MIDI support means adding one entry here, not a new bespoke test. Each mode's own
+  // routing logic is still genuinely different -- the issue's own spec maps MIDI differently per
+  // mode (move/rotate for Gravity, turn-toward-closest-pitch for Snake, chord-to-placement for
+  // Blast) -- so each entry supplies its own check; only the harness is shared.
   // ────────────────────────────────────────────────────────────────────────
 
-  test('issue #11: MIDI note 60 (middle C) moves Gravity\'s active piece left, matching the D-pad', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
-    await connectFakeMidiDevice(page);
+  const MIDI_ROUTING_CHECKS = {
+    gravity: async (page) => {
+      const before = await page.evaluate(() => GravityMode.state.p);
+      await sendFakeNoteOn(page, 60);
+      const after = await page.evaluate(() => GravityMode.state.p);
+      expect(after, 'MIDI note 60 (middle C) should move Gravity\'s piece left, matching the D-pad').toBe(before - 1);
+    },
+    snake: async (page) => {
+      const targetDir = await page.evaluate(() => {
+        const head = SnakeMode.state.snake[0];
+        // The neighbor directly opposite the snake's current direction is never a legal turn, so
+        // pick a different one to target -- any neighbor whose own pitch we can request exactly.
+        const neighbors = Tonnetz.getNeighbors(head.p, head.q);
+        const current = SnakeMode.state.direction;
+        const candidate = neighbors.find(n => (n.p - head.p) !== -current.p || (n.q - head.q) !== -current.q);
+        return { dp: candidate.p - head.p, dq: candidate.q - head.q, midi: Tonnetz.getMidi(candidate.p, candidate.q) };
+      });
+      await sendFakeNoteOn(page, targetDir.midi);
+      const nextDirection = await page.evaluate(() => SnakeMode.state.nextDirection);
+      expect(nextDirection, 'Snake should turn toward the neighbor with the closest pitch').toEqual({ p: targetDir.dp, q: targetDir.dq });
+    },
+    blast: async (page) => {
+      // Derive a real, playable chord from the actual (randomly-chosen) active piece at
+      // rotation 0, anchored wherever it already legally sits -- rather than assuming a
+      // specific piece shape.
+      const chord = await page.evaluate(() => {
+        const type = BlastMode.state.activePiece;
+        const cells = Pieces.getAbsoluteCells(type, BlastMode.state.hoverCell.p, BlastMode.state.hoverCell.q, 0);
+        return cells.map(c => Tonnetz.getMidi(c.p, c.q));
+      });
+      // Real hardware never fires simultaneous note-ons in the same JS tick -- space them out
+      // slightly, still well within MidiInput's chord-buffering window.
+      for (const midi of chord) {
+        await sendFakeNoteOn(page, midi);
+        await page.waitForTimeout(5);
+      }
+      await page.waitForTimeout(150); // let the chord buffer window (50ms) elapse
+      const result = await page.evaluate(() => {
+        const cells = Pieces.getAbsoluteCells(BlastMode.state.activePiece, BlastMode.state.hoverCell.p, BlastMode.state.hoverCell.q, BlastMode.state.rotation);
+        return cells.map(c => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
+      });
+      expect(result, 'Blast\'s ghost should move to a placement reproducing the played chord').toEqual(chord.slice().sort((a, b) => a - b));
+    },
+  };
 
-    const before = await page.evaluate(() => GravityMode.state.p);
-    await sendFakeNoteOn(page, 60);
-    const after = await page.evaluate(() => GravityMode.state.p);
-    expect(after).toBe(before - 1);
-  });
-
-  test('issue #11: MIDI note-on turns Snake toward the neighbor cell with the closest pitch', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
-    await connectFakeMidiDevice(page);
-
-    const targetDir = await page.evaluate(() => {
-      const head = SnakeMode.state.snake[0];
-      // The neighbor directly opposite the snake's current direction is never a legal turn, so
-      // pick a different one to target -- any neighbor whose own pitch we can request exactly.
-      const neighbors = Tonnetz.getNeighbors(head.p, head.q);
-      const current = SnakeMode.state.direction;
-      const candidate = neighbors.find(n => (n.p - head.p) !== -current.p || (n.q - head.q) !== -current.q);
-      return { dp: candidate.p - head.p, dq: candidate.q - head.q, midi: Tonnetz.getMidi(candidate.p, candidate.q) };
-    });
-
-    await sendFakeNoteOn(page, targetDir.midi);
-
-    const nextDirection = await page.evaluate(() => SnakeMode.state.nextDirection);
-    expect(nextDirection).toEqual({ p: targetDir.dp, q: targetDir.dq });
-  });
-
-  test('issue #11: playing a matching chord on MIDI moves Blast\'s ghost to a placement that reproduces it', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
-    await connectFakeMidiDevice(page);
-
-    // Derive a real, playable chord from the actual (randomly-chosen) active piece at rotation 0,
-    // anchored wherever it already legally sits -- rather than assuming a specific piece shape.
-    const chord = await page.evaluate(() => {
-      const type = BlastMode.state.activePiece;
-      const cells = Pieces.getAbsoluteCells(type, BlastMode.state.hoverCell.p, BlastMode.state.hoverCell.q, 0);
-      return cells.map(c => Tonnetz.getMidi(c.p, c.q));
-    });
-
-    // Real hardware never fires simultaneous note-ons in the same JS tick -- space them out
-    // slightly, still well within MidiInput's chord-buffering window.
-    for (const midi of chord) {
-      await sendFakeNoteOn(page, midi);
-      await page.waitForTimeout(5);
+  test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast, each per its own spec', async ({ page }) => {
+    await connectFakeMidiDevice(page); // hardware connection is session-level, not per-mode
+    for (const mode of Object.keys(MIDI_ROUTING_CHECKS)) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      await MIDI_ROUTING_CHECKS[mode](page);
     }
-    await page.waitForTimeout(150); // let the chord buffer window (50ms) elapse
-
-    const result = await page.evaluate(() => {
-      const cells = Pieces.getAbsoluteCells(BlastMode.state.activePiece, BlastMode.state.hoverCell.p, BlastMode.state.hoverCell.q, BlastMode.state.rotation);
-      return cells.map(c => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
-    });
-    expect(result).toEqual(chord.slice().sort((a, b) => a - b));
   });
 
   // ────────────────────────────────────────────────────────────────────────
