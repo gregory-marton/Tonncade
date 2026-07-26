@@ -10,3 +10,9 @@ test-results/
 # living in-tree (not a job-scoped tmp dir) so they're a durable, easy-to-find local location
 # instead of disappearing when a session/job is cleaned up.
 replays/
+
+# tests/exploratory.spec.js's "Random taps (full matrix)" test regenerates these on every run --
+# a standing local visual fixture (see screenshots/index.html, the one file here actually tracked
+# in git), not something that should accumulate binary diffs in history on every UI tweak.
+screenshots/*.png
+screenshots/manifest.js

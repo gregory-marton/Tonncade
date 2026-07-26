@@ -1371,6 +1371,55 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  test('INV-43: Snake portrait board spans nearly the full width, its hexagon points reaching past the corner D-pad columns', async ({ page }) => {
+    // Snake's portrait D-pad is two narrow columns hugging the left/right edges with a wide empty
+    // center gap; the board is a hexagon whose left/right VERTICES (its widest point) sit at its
+    // vertical center. So a correctly-fit board reaches nearly the full container width -- the
+    // vertices clear the columns because the hexagon's tapering lower flanks pull inward before
+    // reaching the columns' height. The old flat top/bottom/left/right clearance model couldn't
+    // express this and shrank the board to a fraction of the width (the reported bug). This checks
+    // both that the board is now wide AND that no cell actually overlaps the chrome.
+    const sizes = [
+      { width: 397, height: 537 },
+      { width: 360, height: 560 },
+      { width: 412, height: 600 },
+      { width: 320, height: 520 },
+    ];
+    for (const vp of sizes) {
+      await page.setViewportSize(vp);
+      await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+      await page.waitForTimeout(300);
+
+      const info = await page.evaluate(() => {
+        const cells = [];
+        for (let p = -7; p <= 7; p++) for (let q = -7; q <= 7; q++) if (SnakeMode.isInBounds(p, q)) cells.push({ p, q });
+        const svg = Render.svg;
+        let minX = Infinity, maxX = -Infinity;
+        cells.forEach(c => {
+          const pos = Render.getRotatedScreenPos(c.p, c.q);
+          for (const dx of [-Render.HEX_R, Render.HEX_R]) {
+            const pt = svg.createSVGPoint(); pt.x = pos.x + dx; pt.y = pos.y;
+            const s = pt.matrixTransform(svg.getScreenCTM());
+            minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x);
+          }
+        });
+        const container = document.getElementById('game-container').getBoundingClientRect();
+        return { boardWidth: maxX - minX, containerWidth: container.width };
+      });
+
+      // A full-width hexagon's points reach the side edges; 0.8 comfortably clears the old
+      // flat-fit result (~0.67 at 397x537) while leaving room for a slight inward pull when the
+      // D-pad columns are the binding constraint.
+      expect(
+        info.boardWidth / info.containerWidth,
+        `[${vp.width}x${vp.height}] board width ${info.boardWidth.toFixed(0)} should span most of container ${info.containerWidth.toFixed(0)}`
+      ).toBeGreaterThan(0.8);
+
+      const { overlappingCells } = await measureBoardOcclusion(page);
+      expect(overlappingCells, `[${vp.width}x${vp.height}] no cell should overlap chrome`).toBe(0);
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-24: rotating the Tonnetz view (js/main.js's #rotate-view-btn, js/render.js's
   // Render.rotationDeg/getEffectiveRotation) keeps everything else about the board correct --

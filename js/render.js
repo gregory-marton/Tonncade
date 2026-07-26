@@ -397,6 +397,31 @@ const Render = {
         const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
         if (!isFinite(contentAspect) || contentAspect <= 0) return false;
 
+        // Snake portrait: its D-pad is two narrow columns hugging the left/right edges with a wide
+        // empty center gap (unlike Gravity's full-width bottom bar), and the board is a hexagon
+        // whose left/right VERTICES -- its widest point -- sit at its vertical center. The flat
+        // top/bottom/left/right clearance model below can only reserve rectangular bands, so it
+        // shrinks the board to whatever fits ABOVE the whole D-pad row, wasting the entire center
+        // gap and most of the width. A shape-aware fit instead lets the board be nearly full width,
+        // its tapering lower flanks sliding into the gap between the two columns (the SVG box's own
+        // empty corners are what overlap the columns, never a real cell). See fitBoardShapeAware.
+        if (App.currentMode === 'snake' && !this.isMobileLandscape()) {
+            const placed = this.fitBoardShapeAware(cells, bounds, containerRect);
+            if (placed) {
+                this.svg.style.position = 'absolute';
+                this.svg.style.left = `${placed.offsetX}px`;
+                this.svg.style.top = `${placed.offsetY}px`;
+                this.svg.style.right = 'auto';
+                this.svg.style.bottom = 'auto';
+                this.svg.style.width = `${placed.boxW}px`;
+                this.svg.style.height = `${placed.boxH}px`;
+                return true;
+            }
+            // Fall through to the flat-clearance fit if no shape-aware placement was found (e.g. a
+            // viewport so small the chrome leaves no gap at all) -- a smaller centered board is
+            // still better than nothing.
+        }
+
         let { top, bottom, left, right } = this.measureChromeClearance(App.currentMode);
 
         // Gravity's board tapers to a point at its bottom corners, so the D-pad's flat GAP-based
@@ -438,6 +463,108 @@ const Render = {
         this.svg.style.width = `${boxW}px`;
         this.svg.style.height = `${boxH}px`;
         return true;
+    },
+
+    // The actual chrome rectangles for Snake portrait, container-relative and expanded by GAP for
+    // visible separation. Deliberately the individual D-pad CLUSTERS (.snake-pad-cluster, the two
+    // narrow corner columns), not their full-width wrapper (#snake-mobile-controls, which is
+    // pointer-events:none and spans edge-to-edge) -- the wide empty gap between the clusters is
+    // exactly the space the shape-aware fit reclaims, so treating the wrapper as one obstacle
+    // would defeat the whole point.
+    getSnakeChromeRects: function(containerRect) {
+        const GAP = 10;
+        const rects = [];
+        const add = (el) => {
+            if (!el || getComputedStyle(el).display === 'none') return;
+            const r = el.getBoundingClientRect();
+            if (!r.width || !r.height) return;
+            rects.push({
+                x0: r.left - containerRect.left - GAP,
+                y0: r.top - containerRect.top - GAP,
+                x1: r.right - containerRect.left + GAP,
+                y1: r.bottom - containerRect.top + GAP,
+            });
+        };
+        add(document.getElementById('snake-controls'));
+        document.querySelectorAll('.snake-pad-cluster').forEach(add);
+        return rects;
+    },
+
+    // Largest board (at its own aspect ratio, horizontally centered) whose ACTUAL cells clear
+    // every chrome rectangle, allowing the SVG box's empty corners to overlap the corner D-pad
+    // columns. Returns {offsetX, offsetY, boxW, boxH} (container-relative, ready for #tonnetz-svg's
+    // inline style) or null if nothing fits.
+    //
+    // Cell positions are predicted through the EXACT getFitView->viewBox mapping snake.js applies
+    // downstream (getAspectMatchedRefBox + getFitView(scale=1.15) + updateView), so this
+    // prediction can't drift from what actually renders: with the box aspect matched to the
+    // content aspect, preserveAspectRatio="xMidYMid meet" maps the viewBox onto the box with no
+    // letterboxing, giving a single uniform pixels-per-lattice-unit on both axes.
+    fitBoardShapeAware: function(cells, bounds, containerRect) {
+        const chrome = this.getSnakeChromeRects(containerRect);
+        const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
+        const cW = containerRect.width, cH = containerRect.height;
+        const MARGIN = 4;
+
+        const cellScreens = (offsetX, offsetY, boxW, boxH) => {
+            const refW = 800, refH = 800 * (boxH / boxW);
+            const fit = this.getFitView(cells, this.HEX_R * 2, 1.15, refW, refH);
+            const ppu = boxW / (refW * fit.zoom); // == boxH/(refH*fit.zoom); uniform (square hexes)
+            const r = this.HEX_R * ppu;
+            return cells.map(c => {
+                const p = this.getRotatedScreenPos(c.p, c.q);
+                return {
+                    cx: offsetX + (p.x - fit.viewX) * ppu,
+                    cy: offsetY + (p.y - fit.viewY) * ppu,
+                    r,
+                };
+            });
+        };
+
+        const feasibleAt = (boxW, offsetY) => {
+            const boxH = boxW / contentAspect;
+            const offsetX = (cW - boxW) / 2;
+            const screens = cellScreens(offsetX, offsetY, boxW, boxH);
+            for (const s of screens) {
+                if (s.cx - s.r < MARGIN || s.cx + s.r > cW - MARGIN) return false;
+                if (s.cy - s.r < MARGIN || s.cy + s.r > cH - MARGIN) return false;
+                for (const rc of chrome) {
+                    if (s.cx + s.r > rc.x0 && s.cx - s.r < rc.x1 &&
+                        s.cy + s.r > rc.y0 && s.cy - s.r < rc.y1) return false;
+                }
+            }
+            return true;
+        };
+
+        // For a given width, the HIGHEST feasible vertical placement -- the board tucked just under
+        // the stats panel, where a person expects it -- found by scanning top-down. The box may
+        // overhang the container top/bottom (its empty corners), so the scan starts above 0.
+        const findOffsetY = (boxW) => {
+            const boxH = boxW / contentAspect;
+            const STEPS = 160;
+            const yMin = -boxH * 0.5, yMax = cH;
+            for (let i = 0; i <= STEPS; i++) {
+                const offsetY = yMin + (yMax - yMin) * (i / STEPS);
+                if (feasibleAt(boxW, offsetY)) return offsetY;
+            }
+            return null;
+        };
+
+        // Binary search the largest feasible box width (full container width is the ceiling for a
+        // horizontally-centered board). Feasibility is monotone: any smaller board fits wherever a
+        // larger one did, so the search converges on the maximum.
+        let lo = 0, hi = cW, best = null;
+        for (let iter = 0; iter < 24; iter++) {
+            const mid = (lo + hi) / 2;
+            const offsetY = findOffsetY(mid);
+            if (offsetY !== null) {
+                best = { offsetX: (cW - mid) / 2, offsetY, boxW: mid, boxH: mid / contentAspect };
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        return best;
     },
 
     // On phones, shrink the viewBox (relative to baseZoom) so each hex renders ~1.5x bigger.

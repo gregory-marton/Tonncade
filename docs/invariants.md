@@ -1067,6 +1067,36 @@ where Blast's is wide with none -- so this applies to Gravity only, not Blast):
   all. Covered by INV-10/11's existing occlusion checks (any mode/viewport combination they cover
   already catches a board/D-pad overlap regression), not a new invariant of its own.
 
+### INV-43: Snake portrait fits the board shape-aware, not by a flat clearance rectangle
+
+The flat `{top, bottom, left, right}` clearance model (`measureChromeClearance`) can only reserve
+rectangular bands, so it necessarily assumes any chrome in the bottom region blocks the *entire*
+width there. That's true for Gravity (a full-width bottom D-pad bar) but badly wrong for Snake in
+portrait: Snake's D-pad is **two narrow columns hugging the left and right edges**, with a wide
+empty gap down the center. And the board is a hexagon whose left/right *vertices* -- its widest
+point -- sit at its vertical center. So the correct fit is nearly full-width: the vertices reach
+the side edges (above the columns' height), and the hexagon's tapering lower flanks slide down
+*into the gap between the columns*. The flat model instead shrank the board to whatever fit above
+the whole D-pad row -- about 67% of the container width, wasting the entire center gap (the
+reported bug: the board looked tiny with vast empty margins).
+
+`Render.fitBoardShapeAware` (Snake portrait only) binary-searches the largest board, at its own
+aspect ratio and horizontally centered, whose **actual cells** clear every real chrome rectangle
+(the stats panel and the two `.snake-pad-cluster` columns, individually -- never their
+full-width `pointer-events:none` wrapper) by the standard GAP. The SVG box's own empty corners
+are free to overlap the columns, since no cell lives there (the board is a hexagon inscribed in
+the box). Cell screen positions are predicted through the *exact* `getFitView`→viewBox mapping
+snake.js applies downstream, so the prediction can't drift from what renders. Placement picks the
+highest feasible vertical position (board tucked just under the stats panel). Gravity and Blast
+keep the flat-clearance path -- their boards genuinely are bounded by full-width chrome bands.
+
+**Test:** `tests/invariants.spec.js`'s "INV-43: ..." asserts, across a sweep of portrait sizes,
+that the board's rendered width spans more than 80% of the container width (a full-width hexagon's
+points reach the side edges) AND that no cell overlaps chrome (`measureBoardOcclusion`). Confirmed
+failing on the pre-fix flat-clearance code (~67% width at 397×537) before implementing, per
+red-green discipline. This is a Tonnetz-space maximization on top of INV-10's no-overlap floor and
+INV-40/41's aspect/edge-reach checks -- all four still hold for Snake under the new fit.
+
 ---
 
 ## Primary Elements
