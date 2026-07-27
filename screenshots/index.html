@@ -83,7 +83,7 @@ for the same reasoning applied elsewhere in this project).
   this page.
 </div>
 
-<div class="legend">Each caption shows the largest contiguous <b>black</b> (empty) region as a % of the play area (secondary: edges the board reaches). <b>Red-framed</b> cards exceed 50% — one big empty region means the board is floating/undersized, not bisecting the space.</div>
+<div class="legend">Each caption shows two fill metrics: the largest contiguous <b>black</b> (empty) region as a % of the play area, and how many screen <b>edges</b> the Tonnetz reaches (within ~2 cells). <b>Red-framed</b> cards fail one: a black region over 50% (board floating/undersized) or fewer than 2 edges reached (board not spanning the space — move non-height chrome out of its way).</div>
 
 <div id="groups"></div>
 
@@ -123,12 +123,14 @@ for the same reasoning applied elsewhere in this project).
       img.loading = 'lazy';
       img.alt = `${entry.mode}, drawer ${entry.drawerOpen ? 'open' : 'closed'}, ${entry.width}x${entry.height}`;
       const caption = document.createElement('figcaption');
-      // Primary metric: largest contiguous black (empty) region as a fraction of the play area.
-      // >50% (flagged) = the board is floating/undersized (not bisecting the space). Edge-reach
-      // shown as secondary context.
+      // Two essential metrics, each red when it's the one failing: largest contiguous black
+      // (empty) region as a fraction of the play area (>50% = board floating/undersized), and how
+      // many screen edges the Tonnetz reaches (<2 = board not spanning the space).
+      const blackFail = entry.largestBlackFrac != null && entry.largestBlackFrac > 0.5;
+      const edgeFail = entry.edgeReaches != null && entry.edgeReaches < 2;
       const bf = entry.largestBlackFrac != null
-        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">${Math.round(entry.largestBlackFrac * 100)}% black${entry.belowFloor ? ' ⚠' : ''}</span>` +
-          (entry.edgeReaches != null ? ` <span style="color:#6b7280">(${entry.edgeReaches}/4 edges)</span>` : '')
+        ? ` — <span class="share${blackFail ? ' low' : ''}">${Math.round(entry.largestBlackFrac * 100)}% black${blackFail ? ' ⚠' : ''}</span>` +
+          (entry.edgeReaches != null ? ` <span class="share${edgeFail ? ' low' : ''}" style="${edgeFail ? '' : 'color:#6b7280'}">${entry.edgeReaches}/4 edges${edgeFail ? ' ⚠' : ''}</span>` : '')
         : '';
       caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}`;
       figure.appendChild(img);

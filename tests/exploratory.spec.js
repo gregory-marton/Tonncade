@@ -438,14 +438,17 @@ test.describe('Exploratory tests (prototype)', () => {
             results.push({ label, ...result });
             manifest.push({
               mode, drawerOpen, width, height, file: `${fileLabel}.png`,
-              // PRIMARY flag: largest contiguous black (empty) region as a fraction of the play area
-              // (the user's flood-fill metric). A well-placed board bisects the play area so no black
-              // region dominates; >50% means the board is floating/undersized. Robust to aspect and
-              // to legitimate chrome (unlike edge-reach vs the container, which mis-flags Gravity's
-              // chrome-on-two-edges case). edge-reach kept as secondary info.
+              // Two essential fill metrics, both asserted and both flagged in the fixture:
+              //  - flood-fill: largest contiguous black (empty) region as a fraction of the play
+              //    area. A well-placed board bisects the play area so no black region dominates;
+              //    >50% means the board is floating/undersized.
+              //  - edge-reach: the Tonnetz must come within ~2 cells of at least TWO screen edges.
+              //    Applies to every mode -- the board is the one thing that needs room, so whatever
+              //    doesn't need height (stats bars, transport) belongs out of its way against an
+              //    edge, leaving the board free to reach two edges itself.
               largestBlackFrac: result.largestBlackFrac, totalBlackFrac: result.totalBlackFrac,
-              belowFloor: result.largestBlackFrac > 0.5,
               edgeReaches: result.edgeReaches, edgeMargins: result.edgeMargins,
+              belowFloor: result.largestBlackFrac > 0.5 || result.edgeReaches < 2,
               tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
             });
 
@@ -466,6 +469,12 @@ test.describe('Exploratory tests (prototype)', () => {
             // so it's uniform across every mode. Soft so the loop still captures the whole fixture;
             // look at the attached failure screenshot.
             expect.soft(result.largestBlackFrac, `[${label}] the largest empty (black) region should be <=50% of the play area (was ${(result.largestBlackFrac*100).toFixed(0)}%; the board isn't bisecting the space)`).toBeLessThanOrEqual(0.5);
+            // The edge-reach invariant, applied to EVERY mode: the Tonnetz must come within ~2
+            // cells of at least two screen edges. Whatever chrome doesn't need height (a stats bar,
+            // transport buttons) belongs against a single edge, not stacked above AND below the one
+            // thing that needs the room. Measured off the drawn cells vs #game-container, in
+            // cell-diameters, so it's zoom/size independent.
+            expect.soft(result.edgeReaches, `[${label}] the Tonnetz should reach at least 2 screen edges (reached ${result.edgeReaches}: margins ${JSON.stringify(result.edgeMargins)} in cell-diameters); move non-height chrome out of the board's way`).toBeGreaterThanOrEqual(2);
           }
         }
       }
