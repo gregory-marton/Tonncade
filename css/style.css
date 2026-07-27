@@ -1100,16 +1100,22 @@ button:hover {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
 
+    /* "Next Pieces" heading dropped on mobile -- a highlighted active tile plus a strip of
+       upcoming tiles reads as a next-queue on its own, and the label ate space + was English UI
+       text (i18n bias, task #29). */
     #palette.floating-queue h3 {
-        font-size: 11px;
-        margin: 0 0 6px 0;
-        color: var(--accent);
+        display: none;
     }
 
+    /* Portrait: a single horizontal row that SCROLLS rather than overflowing off the screen edge
+       (task #79). nowrap keeps it one line; overflow-x:auto makes the rest reachable. */
     #palette.floating-queue #piece-list {
         display: flex;
         flex-direction: row;
+        flex-wrap: nowrap;
         gap: 6px;
+        overflow-x: auto;
+        max-width: 100%;
     }
 
     #palette.floating-queue .piece-item {
@@ -1856,6 +1862,12 @@ button:hover {
         overflow-y: auto;
     }
 
+    /* Drop the "Next Pieces" heading in landscape too (the max-width:767 rule that hides it
+       doesn't match this breakpoint) -- for BOTH modes' narrow queue columns. i18n + space. */
+    #palette.floating-queue h3 {
+        display: none;
+    }
+
     #app[data-mode="gravity"] #palette.floating-queue h3 {
         display: none; /* no room for a heading in a 50px-wide strip */
     }
@@ -1891,13 +1903,15 @@ button:hover {
         bottom: var(--mobile-pad-safe-bottom);
         right: auto;
         left: 10px;
-        max-width: 110px;
+        max-width: 62px; /* a single tile column (~44px + padding) now the heading is gone */
         max-height: none;
         padding-bottom: 70px; /* reserve room for the docked .active-item below */
     }
 
     #app[data-mode="blast"] #palette.floating-queue #piece-list {
         flex-direction: column;
+        flex-wrap: nowrap;
+        overflow-x: visible;
     }
 
     #app[data-mode="blast"] #palette.floating-queue .active-item {
