@@ -1491,6 +1491,47 @@ test('Life step advances one generation over the live set and birthable neighbou
   expect(result).toEqual(['-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0'].sort());
 });
 
+// #85: Life YAML loader -- a minimal indent-aware parser for the automaton schema (block maps +
+// block sequences + flow collections + scalars). No external dependency.
+test('Life parses an automaton YAML (block maps, sequences, flow, scalars, comments)', async ({ page }) => {
+  await page.goto('/');
+  const parsed = await page.evaluate(() => {
+    const yaml = [
+      '# see docs/life-rules.md',
+      'name: "3,5 / 2"',
+      'rule:',
+      '  survival: [3, 5]   # flow list of numbers',
+      '  birth: [2]',
+      'sound: { when: born, duration: 0.5 }',
+      'initial:',
+      '  cells:',
+      '    - [0, 0]',
+      '    - [1, 0]',
+      'tempo: 180',
+    ].join('\n');
+    return Life.parseYaml(yaml);
+  });
+  expect(parsed.name).toBe('3,5 / 2');
+  expect(parsed.rule).toEqual({ survival: [3, 5], birth: [2] });
+  expect(parsed.sound).toEqual({ when: 'born', duration: 0.5 });
+  expect(parsed.initial).toEqual({ cells: [[0, 0], [1, 0]] });
+  expect(parsed.tempo).toBe(180);
+});
+
+test('Life parses block-sequence-of-maps rule clauses', async ({ page }) => {
+  await page.goto('/');
+  const parsed = await page.evaluate(() => Life.parseYaml([
+    'rule:',
+    '  birth:',
+    '    - ring_count: [2]',
+    '      isotropy: [para]',
+    '    - ring_count: [3]',
+    '  survival: []',
+  ].join('\n')));
+  expect(parsed.rule.birth).toEqual([{ ring_count: [2], isotropy: ['para'] }, { ring_count: [3] }]);
+  expect(parsed.rule.survival).toEqual([]);
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

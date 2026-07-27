@@ -106,6 +106,8 @@ sound:
   duration: 0.4       # seconds (a number), or "generation" to sustain until the next step
   velocity: 80        # 1..127
   # A cell sounds its own Tonnetz pitch, getMidi(p, q).
+  # DEFAULT: a file that omits `sound` entirely sounds each cell on BIRTH
+  # (when: born, a short duration) — the built-in default.
 
 initial:
   # The starting live cells, as [p, q] lattice pairs.

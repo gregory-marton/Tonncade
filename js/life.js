@@ -190,6 +190,162 @@ const Life = {
         }
         return next;
     },
+
+    // ---- YAML loading -------------------------------------------------------------------------
+    // A deliberately small YAML SUBSET parser for automaton files (docs/life-rules.md): block
+    // mappings (indent-based), block sequences (`- ...`), flow collections (`[...]` / `{...}`),
+    // scalars (numbers, booleans, quoted/bare strings) and `#` comments. Enough for the schema,
+    // with no external dependency (keeps the app free-software-clean, no vendored YAML lib).
+
+    parseYaml: function(text) {
+        const lines = [];
+        for (const raw of String(text).split(/\r?\n/)) {
+            const noComment = this._stripComment(raw);
+            if (noComment.trim() === '') continue;
+            lines.push({ indent: noComment.match(/^ */)[0].length, text: noComment.trim() });
+        }
+        const state = { lines, i: 0 };
+        return this._parseNode(state, 0);
+    },
+
+    _parseNode: function(st, minIndent) {
+        if (st.i >= st.lines.length || st.lines[st.i].indent < minIndent) return null;
+        const indent = st.lines[st.i].indent;
+        if (st.lines[st.i].text[0] === '-') {
+            const arr = [];
+            while (st.i < st.lines.length && st.lines[st.i].indent === indent && st.lines[st.i].text[0] === '-') {
+                const after = st.lines[st.i].text.slice(1).trim();
+                if (after === '') {
+                    st.i++;
+                    arr.push(this._parseNode(st, indent + 1));
+                } else if (this._isMapEntry(after)) {
+                    // `- key: value` starts an inline map; its entries continue on following lines
+                    // aligned two columns in (past the "- ").
+                    st.lines[st.i] = { indent: indent + 2, text: after };
+                    arr.push(this._parseNode(st, indent + 2));
+                } else {
+                    arr.push(this._scalar(after));
+                    st.i++;
+                }
+            }
+            return arr;
+        }
+        const map = {};
+        while (st.i < st.lines.length && st.lines[st.i].indent === indent && st.lines[st.i].text[0] !== '-') {
+            const kv = this._splitKey(st.lines[st.i].text);
+            if (kv.val === '') {
+                st.i++;
+                map[kv.key] = this._parseNode(st, indent + 1);
+            } else {
+                map[kv.key] = this._scalar(kv.val);
+                st.i++;
+            }
+        }
+        return map;
+    },
+
+    _stripComment: function(line) {
+        let inQ = null;
+        for (let i = 0; i < line.length; i++) {
+            const c = line[i];
+            if (inQ) { if (c === inQ) inQ = null; }
+            else if (c === '"' || c === "'") inQ = c;
+            else if (c === '#' && (i === 0 || line[i - 1] === ' ' || line[i - 1] === '\t')) return line.slice(0, i);
+        }
+        return line;
+    },
+
+    // Split "key: value" at the first top-level colon (outside brackets/quotes, followed by space
+    // or end of line). Returns { key, val }; val is '' when the value is a nested block below.
+    _splitKey: function(text) {
+        let depth = 0, inQ = null;
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
+            if (inQ) { if (c === inQ) inQ = null; continue; }
+            if (c === '"' || c === "'") inQ = c;
+            else if (c === '[' || c === '{') depth++;
+            else if (c === ']' || c === '}') depth--;
+            else if (c === ':' && depth === 0 && (i + 1 >= text.length || text[i + 1] === ' ')) {
+                return { key: text.slice(0, i).trim(), val: text.slice(i + 1).trim() };
+            }
+        }
+        return { key: text.trim(), val: '' };
+    },
+
+    _isMapEntry: function(text) {
+        return this._splitKey(text).val !== '' || /:\s*$/.test(text);
+    },
+
+    // A block scalar value: a flow collection, a quoted or bare string, a number or a boolean.
+    _scalar: function(str) {
+        const s = str.trim();
+        if (s === '') return null;
+        if (s[0] === '[' || s[0] === '{') return this._parseFlow(s);
+        if (s[0] === '"' || s[0] === "'") return this._flowQuoted({ s, i: 0 });
+        return this._coerce(s);
+    },
+
+    _coerce: function(tok) {
+        if (tok === 'true') return true;
+        if (tok === 'false') return false;
+        if (tok === 'null' || tok === '~') return null;
+        if (/^-?\d+(\.\d+)?$/.test(tok)) return Number(tok);
+        return tok;
+    },
+
+    // Flow collections: JSON-like [...] / {...} with bare or quoted keys/values.
+    _parseFlow: function(s) {
+        const ctx = { s: s.trim(), i: 0 };
+        return this._flowValue(ctx);
+    },
+    _flowWs: function(ctx) { while (ctx.i < ctx.s.length && /\s/.test(ctx.s[ctx.i])) ctx.i++; },
+    _flowValue: function(ctx) {
+        this._flowWs(ctx);
+        const c = ctx.s[ctx.i];
+        if (c === '[') return this._flowSeq(ctx);
+        if (c === '{') return this._flowMap(ctx);
+        if (c === '"' || c === "'") return this._flowQuoted(ctx);
+        let start = ctx.i;
+        while (ctx.i < ctx.s.length && ',]}'.indexOf(ctx.s[ctx.i]) === -1) ctx.i++;
+        return this._coerce(ctx.s.slice(start, ctx.i).trim());
+    },
+    _flowSeq: function(ctx) {
+        ctx.i++; const arr = []; this._flowWs(ctx);
+        if (ctx.s[ctx.i] === ']') { ctx.i++; return arr; }
+        while (ctx.i < ctx.s.length) {
+            arr.push(this._flowValue(ctx));
+            this._flowWs(ctx);
+            if (ctx.s[ctx.i] === ',') { ctx.i++; continue; }
+            if (ctx.s[ctx.i] === ']') { ctx.i++; break; }
+            break;
+        }
+        return arr;
+    },
+    _flowMap: function(ctx) {
+        ctx.i++; const map = {}; this._flowWs(ctx);
+        if (ctx.s[ctx.i] === '}') { ctx.i++; return map; }
+        while (ctx.i < ctx.s.length) {
+            this._flowWs(ctx);
+            let key;
+            if (ctx.s[ctx.i] === '"' || ctx.s[ctx.i] === "'") key = this._flowQuoted(ctx);
+            else { let s = ctx.i; while (ctx.i < ctx.s.length && ':,}]'.indexOf(ctx.s[ctx.i]) === -1) ctx.i++; key = ctx.s.slice(s, ctx.i).trim(); }
+            this._flowWs(ctx);
+            if (ctx.s[ctx.i] === ':') ctx.i++;
+            map[key] = this._flowValue(ctx);
+            this._flowWs(ctx);
+            if (ctx.s[ctx.i] === ',') { ctx.i++; continue; }
+            if (ctx.s[ctx.i] === '}') { ctx.i++; break; }
+            break;
+        }
+        return map;
+    },
+    _flowQuoted: function(ctx) {
+        const q = ctx.s[ctx.i]; ctx.i++;
+        let start = ctx.i;
+        while (ctx.i < ctx.s.length && ctx.s[ctx.i] !== q) ctx.i++;
+        const str = ctx.s.slice(start, ctx.i); ctx.i++;
+        return str;
+    },
 };
 
 if (typeof module !== 'undefined') {
