@@ -131,8 +131,8 @@ const MidiFolder = {
     },
 
     // Populates the online-songs dropdown from ONLINE_INDEX_URL. Any failure (file://, offline,
-    // 404) just hides the group rather than surfacing an error -- this is a bonus content tier,
-    // not a required one, and the built-in default / local folder both work fine without it.
+    // 404) just hides the group rather than surfacing an error -- Melody then runs on its offline
+    // degrade (MidiMode.randomMelody) or a local folder, so no online tier is required (#86).
     setupOnline: async function() {
         const group = document.getElementById(this.ids.onlineGroup);
         if (!group) return;
@@ -154,9 +154,9 @@ const MidiFolder = {
 
         group.style.display = '';
         if (select) {
-            // No "choose a song" placeholder -- the first entry (Hot Cross Buns) IS the default
-            // melody already loaded on entry, so it's simply the dropdown's own default
-            // selection, not a separate "Default: ..." status line to keep in sync elsewhere.
+            // No "choose a song" placeholder -- the first online entry auto-loads on entry (see
+            // below), so it's simply the dropdown's own default selection, not a separate
+            // "Default: ..." status line to keep in sync elsewhere.
             select.innerHTML = '';
             this.onlineIndex.forEach((song, i) => {
                 const opt = document.createElement('option');

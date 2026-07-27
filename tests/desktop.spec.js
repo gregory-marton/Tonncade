@@ -1407,6 +1407,20 @@ test.describe('file:// support', () => {
   });
 });
 
+// #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
+// songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
+// within a single octave so the drill is always playable.
+test('Melody: offline (no online folder) degrades to a random 10-note, one-octave sequence', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.abort());
+  await page.route('**/midi/*.mid', route => route.abort());
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.waitForTimeout(600);
+  const melody = await page.evaluate(() => MidiMode.state.melody.map(n => n.midi));
+  expect(melody.length, 'random fallback is 10 notes').toBe(10);
+  expect(Math.max(...melody) - Math.min(...melody), 'all within one octave').toBeLessThan(12);
+});
+
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
 // pieces by cell-count, so an easier game deals smaller, more-placeable pieces and a harder one
 // deals only the full four-cell tetrahexes (the historical default).

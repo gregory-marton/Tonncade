@@ -88,30 +88,17 @@ const MidiMode = {
         }
     },
 
-    // Default built-in melody: Hot Cross Buns
-    defaultMelody: [
-        { midi: 64, time: 0.0, duration: 0.4 }, // Hot
-        { midi: 62, time: 0.5, duration: 0.4 }, // cross
-        { midi: 60, time: 1.0, duration: 0.8 }, // buns
-        
-        { midi: 64, time: 2.0, duration: 0.4 }, // Hot
-        { midi: 62, time: 2.5, duration: 0.4 }, // cross
-        { midi: 60, time: 3.0, duration: 0.8 }, // buns
-        
-        { midi: 60, time: 4.0, duration: 0.2 }, // One
-        { midi: 60, time: 4.25, duration: 0.2 }, // a
-        { midi: 60, time: 4.5, duration: 0.2 }, // pen-
-        { midi: 60, time: 4.75, duration: 0.2 }, // ny
-        
-        { midi: 62, time: 5.0, duration: 0.2 }, // Two
-        { midi: 62, time: 5.25, duration: 0.2 }, // a
-        { midi: 62, time: 5.5, duration: 0.2 }, // pen-
-        { midi: 62, time: 5.75, duration: 0.2 }, // ny
-        
-        { midi: 64, time: 6.0, duration: 0.4 }, // Hot
-        { midi: 62, time: 6.5, duration: 0.4 }, // cross
-        { midi: 60, time: 7.0, duration: 0.8 }  // buns
-    ],
+    // No built-in song is bundled anymore -- the online midi/ folder (and a local folder) supply
+    // real songs. This is only the OFFLINE degrade: a random 10-note sequence within one octave
+    // (C4..B4), so the drill is always playable with no web connection or under file:// (#86).
+    randomMelody: function() {
+        const base = 60; // C4
+        const notes = [];
+        for (let i = 0; i < 10; i++) {
+            notes.push({ midi: base + Math.floor(Math.random() * 12), time: i * 0.5, duration: 0.4 });
+        }
+        return notes;
+    },
 
     init: function() {
         Render.init('tonnetz-svg');
@@ -120,9 +107,11 @@ const MidiMode = {
         this.state.bestStreak = parseInt(localStorage.getItem('tonncade_midi_best') || '0');
         this.updateStreakUI();
 
-        // Load default melody if none is loaded
+        // Offline degrade if nothing is loaded yet: a random one-octave sequence. The online
+        // midi/ folder (populated async by MidiFolder) replaces this with a real song when a
+        // connection exists; this only persists offline / under file:// (#86).
         if (this.state.melody.length === 0) {
-            this.state.melody = JSON.parse(JSON.stringify(this.defaultMelody));
+            this.state.melody = this.randomMelody();
         }
 
         // Build reverse map for rendering labels
