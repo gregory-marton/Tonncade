@@ -302,8 +302,33 @@ const Render = {
         const queueRect = (mode === 'blast' || mode === 'gravity') ? rectOf('palette') : null;
 
         if (this.isMobileLandscape()) {
-            if (statsRect) left = Math.max(left, statsRect.right - containerRect.left + GAP);
-            if (queueRect) left = Math.max(left, queueRect.right - containerRect.left + GAP);
+            // The stats/controls panel reserves clearance on the side it actually sits: a wide
+            // horizontal bar across the top (Gravity's landscape Pause/Restart/Lines strip)
+            // reserves TOP, while a tall narrow side panel reserves LEFT. Treating a top bar as a
+            // left obstacle (as this used to) reserved its full width down the whole left edge and
+            // shoved the board far to the right with the left half empty (found live via the
+            // fixture). Detect by the panel's own shape.
+            if (statsRect) {
+                if (statsRect.width >= statsRect.height) {
+                    top = Math.max(top, statsRect.bottom - containerRect.top + GAP);
+                } else {
+                    left = Math.max(left, statsRect.right - containerRect.left + GAP);
+                }
+            }
+            // The next-piece queue sits on whichever side its CSS actually places it -- Blast's
+            // landscape queue is on the left, but Gravity's is a narrow strip on the RIGHT (see
+            // css/style.css). Reserve clearance on the side it's really on: counting a right-side
+            // queue as a LEFT obstacle (as this used to, assuming Blast's layout) reported nearly
+            // the whole container width as left clearance and squeezed Gravity's board into a
+            // sliver on the right (found live via the screenshot fixture).
+            if (queueRect) {
+                const queueCenterX = (queueRect.left + queueRect.right) / 2;
+                if (queueCenterX < (containerRect.left + containerRect.right) / 2) {
+                    left = Math.max(left, queueRect.right - containerRect.left + GAP);
+                } else {
+                    right = Math.max(right, containerRect.right - queueRect.left + GAP);
+                }
+            }
             // Snake/Gravity's D-pad splits into left/right clusters in landscape -- the shared
             // wrapper (#snake-mobile-controls/#mobile-controls) spans the full width itself
             // (left:10/right:10), so the clusters have to be measured individually, not the
