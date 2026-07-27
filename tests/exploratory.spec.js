@@ -190,8 +190,14 @@ test.describe('Exploratory tests (prototype)', () => {
   // by the small single-scenario test and the full matrix below so the two can't drift apart.
   async function runRandomTaps(page, { mode, drawerOpen, width, height, rand, N, screenshot }) {
     await page.setViewportSize({ width, height });
+    // Navigate fresh for this scenario's exact size, rather than reusing the page across scenarios.
+    // A reused page fits the board while the previous scenario's layout is still reflowing to the
+    // new size (worst for the pannable modes, whose tall control stacks change the play area's
+    // height as the viewport changes), capturing a board sized to a STALE container -- the black
+    // space seen in the fixture. A fresh load lays everything out once, at the right size.
+    await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(150);
 
     const openDrawerIfNeeded = async () => {
       const isMobile = await page.evaluate(() => Render.isMobileViewport());
@@ -226,6 +232,39 @@ test.describe('Exploratory tests (prototype)', () => {
       };
       if (fns[m]) fns[m]();
     }, mode);
+
+    // Edge-reach: the essential fill metric (applies to EVERY mode). The board's rendered cells
+    // should come within ~2 cell-diameters of at least two edges of the play area -- a board
+    // floating with a wide margin all around, or reaching only one edge, is under-filling. Measured
+    // directly off the drawn cells (no random sampling), in cell-diameters so it's zoom/size
+    // independent, against #game-container (the actual play area). Reused by the assertion and the
+    // fixture flag below.
+    const edge = await page.evaluate(() => {
+      const gc = document.getElementById('game-container').getBoundingClientRect();
+      const svg = Render.svg; const svgR = svg.getBoundingClientRect();
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, n = 0;
+      svg.querySelectorAll('polygon.cell:not(.ghost)').forEach(c => {
+        const r = c.getBoundingClientRect();
+        const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+        // Only cells actually inside the SVG's rendered box count (a pannable lattice extends far
+        // past it; those off-screen cells aren't part of what fills the play area).
+        if (cx < svgR.left || cx > svgR.right || cy < svgR.top || cy > svgR.bottom) return;
+        minX = Math.min(minX, r.x); maxX = Math.max(maxX, r.x + r.width);
+        minY = Math.min(minY, r.y); maxY = Math.max(maxY, r.y + r.height);
+        n++;
+      });
+      if (!n) return { reaches: 0, margins: null };
+      // One hex diameter on screen, at the current zoom.
+      const p1 = svg.createSVGPoint(); p1.x = 0; p1.y = 0;
+      const p2 = svg.createSVGPoint(); p2.x = Render.HEX_R * 2; p2.y = 0;
+      const cellPx = Math.hypot(...(() => { const a = p1.matrixTransform(svg.getScreenCTM()), b = p2.matrixTransform(svg.getScreenCTM()); return [b.x - a.x, b.y - a.y]; })());
+      const m = {
+        left: (minX - gc.left) / cellPx, right: (gc.right - maxX) / cellPx,
+        top: (minY - gc.top) / cellPx, bottom: (gc.bottom - maxY) / cellPx,
+      };
+      const reaches = [m.left, m.right, m.top, m.bottom].filter(v => v <= 2).length;
+      return { reaches, margins: { left: +m.left.toFixed(1), right: +m.right.toFixed(1), top: +m.top.toFixed(1), bottom: +m.bottom.toFixed(1) }, cells: n };
+    });
 
     // Captured here, before any random tap has a chance to disturb the layout — a clean view of
     // this exact (mode, drawer-state, size) scenario, the same one the assertions below check.
@@ -266,6 +305,8 @@ test.describe('Exploratory tests (prototype)', () => {
       distinctControlsHit: hitLabels.size,
       controlsDiscovered: initialControls.length,
       respondedToModeSwitch: modeAfter === nextMode,
+      edgeReaches: edge.reaches,
+      edgeMargins: edge.margins,
     };
   }
 
@@ -344,17 +385,18 @@ test.describe('Exploratory tests (prototype)', () => {
               screenshot: { dir: screenshotDir, label: fileLabel },
             });
             results.push({ label, ...result });
-            const floor = drawerOpen ? 0.1 : 0.3;
             manifest.push({
               mode, drawerOpen, width, height, file: `${fileLabel}.png`,
-              // Recorded so screenshots/index.html can flag the low-Tonnetz-fill scenarios (the
-              // ones below their floor) -- these are exactly the "where can I see the fill gaps"
-              // cases (next_steps.md #76). tonnetzShare is the fraction of random taps that landed
-              // on the board (a proxy for how much of the viewport the board actually fills).
-              tonnetzShare: Number(result.tonnetzShare.toFixed(2)), floor, belowFloor: result.tonnetzShare <= floor,
+              // The board should reach within ~2 cells of at least TWO edges of the play area (see
+              // the edge-reach block in runRandomTaps). Fewer than two = the board is floating /
+              // under-filling -- flagged in screenshots/index.html. This is the essential fill
+              // metric (uniform across all modes), replacing the old noisy tonnetz-tap-share proxy.
+              edgeReaches: result.edgeReaches, edgeMargins: result.edgeMargins,
+              belowFloor: result.edgeReaches < 2,
+              tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
             });
 
-            console.log(`[${label}] ${(result.tonnetzShare * 100).toFixed(1)}% on Tonnetz, ${result.distinctControlsHit}/${result.controlsDiscovered} distinct controls touched`);
+            console.log(`[${label}] edges-reached ${result.edgeReaches}/4  margins ${JSON.stringify(result.edgeMargins)}  (${(result.tonnetzShare * 100).toFixed(1)}% taps)`);
             // Soft assertions (not hard) so a single failing scenario doesn't abort the whole
             // matrix loop -- this test doubles as the screenshots/ fixture generator (see the
             // screenshotDir block above), and a hard throw partway through would leave the fixture
@@ -363,21 +405,12 @@ test.describe('Exploratory tests (prototype)', () => {
             // strand every other mode). Soft failures still fail the test at the end, and report
             // EVERY bad scenario rather than just the first.
             expect.soft(result.respondedToModeSwitch, `[${label}] app should still respond to mode switching after ${TAPS_PER_RUN} random taps`).toBe(true);
-            // A genuinely open drawer is expected to take a real bite out of the Tonnetz's share --
-            // that's the point of having it open, not a defect -- so it gets a lower floor than the
-            // normal-play (drawer closed) case. Found live while building this matrix: the
-            // landscape drawer's CSS width is a FIXED 320px (see next_steps.md #49), so at narrow
-            // landscape widths it can eat over half the screen; 10% still catches "the Tonnetz is
-            // effectively gone", just not "the drawer is unusually wide right now".
-            //
-            // A failure here means the Tonnetz genuinely isn't getting a fair share of the
-            // available space -- confirmed live (see docs/invariants.md's INV-40) that this is a
-            // real space-filling defect (getFitView/getAspectMatchedRefBox can fit tightly on one
-            // axis while leaving the other mostly empty, when the reference box's aspect ratio
-            // doesn't match the board's own shape), not sampling noise from an unlucky size. Look
-            // at the attached failure screenshot -- don't assume it's expected and move on.
-            // (floor computed above, where it's also recorded into the manifest.)
-            expect.soft(result.tonnetzShare, `[${label}] Tonnetz should get a meaningful share of random taps (got ${(result.tonnetzShare * 100).toFixed(1)}%, floor ${floor * 100}%)`).toBeGreaterThan(floor);
+            // The essential fill invariant: the board must reach within ~2 cells of at least two
+            // edges of the play area, in every mode at every size. A board that reaches fewer than
+            // two is floating/under-filling -- the real "doesn't fill the space" defect the user
+            // flags. Soft so the loop still captures the whole fixture; look at the attached
+            // failure screenshot + the edge margins logged above.
+            expect.soft(result.edgeReaches, `[${label}] board should reach within ~2 cells of >=2 play-area edges (reached ${result.edgeReaches}; margins ${JSON.stringify(result.edgeMargins)})`).toBeGreaterThanOrEqual(2);
           }
         }
       }

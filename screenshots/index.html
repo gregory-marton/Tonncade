@@ -83,7 +83,7 @@ for the same reasoning applied elsewhere in this project).
   this page.
 </div>
 
-<div class="legend">Each caption shows the board's Tonnetz-fill share. <b>Red-framed</b> cards fell below their fill floor — the "board doesn't fill the space" cases to look at (next_steps.md #76).</div>
+<div class="legend">Each caption shows how many of the 4 play-area edges the board reaches (within ~2 cells). <b>Red-framed</b> cards reach fewer than two — the board is floating/under-filling (the "doesn't fill the space" cases).</div>
 
 <div id="groups"></div>
 
@@ -123,10 +123,12 @@ for the same reasoning applied elsewhere in this project).
       img.loading = 'lazy';
       img.alt = `${entry.mode}, drawer ${entry.drawerOpen ? 'open' : 'closed'}, ${entry.width}x${entry.height}`;
       const caption = document.createElement('figcaption');
-      const share = entry.tonnetzShare != null
-        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">${Math.round(entry.tonnetzShare * 100)}% fill${entry.belowFloor ? ' ⚠' : ''}</span>`
+      // Edge-reach: how many of the 4 play-area edges the board reaches within ~2 cells. <2 = the
+      // board is floating/under-filling (flagged). This is the essential fill metric.
+      const reach = entry.edgeReaches != null
+        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">reaches ${entry.edgeReaches}/4 edges${entry.belowFloor ? ' ⚠' : ''}</span>`
         : '';
-      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${share}`;
+      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${reach}`;
       figure.appendChild(img);
       figure.appendChild(caption);
       row.appendChild(figure);
