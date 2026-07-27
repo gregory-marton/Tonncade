@@ -123,7 +123,10 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <label for="midi-online-files" style="font-size: 12px; color: var(--dim);">More songs:</label>
                         <select id="midi-online-files" style="width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
-                    <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
+                         folder/song selectors so it routes into the drawer on mobile (see js/main.js),
+                         out of the board's way. -->
+                    <div id="midi-settings-group" class="control-group" style="margin-top: 6px;">
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <label for="midi-difficulty" style="font-size: 13px;">Difficulty:</label>
                             <select id="midi-difficulty" style="flex: 1; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;">
@@ -132,10 +135,10 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                                 <option value="hard">Hard</option>
                             </select>
                         </div>
-                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
-                            <button id="midi-play-preview" style="flex: 1;">Play Melody</button>
-                            <button id="midi-game-restart" style="flex: 1;">Restart Game</button>
-                        </div>
+                    </div>
+                    <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">
+                        <button id="midi-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
+                        <button id="midi-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
                     </div>
                     <div id="midi-stats-group" class="stats-panel" style="margin-top: 15px;">
                         <div id="midi-counts-row" style="display: flex; gap: 10px;">

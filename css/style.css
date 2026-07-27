@@ -492,7 +492,10 @@ button:hover {
    flex:1 above so an icon button shrinks to its content instead of stretching across the row. */
 .icon-btn {
     flex: 0 0 auto !important;
-    min-width: 2.2em;
+    /* Beat the global `button { width: 100% }` (css line ~388) -- without this the icon button
+       stretches to fill its row (flex-basis:auto resolves to that 100%), defeating the point. */
+    width: auto !important;
+    min-width: 2.4em;
     padding: 6px 8px;
     font-size: 16px;
     line-height: 1;

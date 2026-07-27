@@ -588,10 +588,17 @@ Fixed by giving `#midi-controls` the same `top`/`left`/`max-width` treatment (an
 the shared compact-button selectors its siblings already use), and adding `.desktop-only` to this
 breakpoint's hidden set, matching the other two breakpoints that already hide it.
 
-**Test:** `tests/desktop.spec.js` — "INV-31: Melody's controls stay a small corner HUD (not a
-wide overlay) at a landscape width under 950px" — asserts `#midi-controls`'s rendered width and
-that `#midi-keyboard-instructions` is hidden, at exactly the width class that reproduced the
-report.
+**Update (task #77 — mode-chrome declutter):** Melody's controls were later restructured to take
+even less of the board. The one-time setup (folder/song pickers, Difficulty) now routes into the
+drawer, and Play/Restart became icon-only. The always-visible Melody HUD is now the mobile dock
+(`#midi-mobile-tools`: streak readout + transport icons); `#midi-controls` itself is emptied and
+hidden on mobile (so it can't float over the board at all). The invariant's intent is unchanged —
+the always-visible controls stay a small corner HUD, never a wide overlay.
+
+**Test:** `tests/desktop.spec.js` — "INV-31: Melody's always-visible controls stay a small corner
+HUD (not a wide overlay) at a landscape width under 950px" — asserts the dock (`#midi-mobile-tools`)
+stays ≤210px wide, that `#midi-controls` is hidden (emptied into the drawer), and that
+`#midi-keyboard-instructions` is hidden, at exactly the width class that reproduced the report.
 
 ---
 

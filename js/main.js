@@ -486,14 +486,30 @@ const App = {
                     if (midiTools) midiTools.style.display = 'none';
                 } else if (this.currentMode === 'midi') {
                     if (sandboxTools) sandboxTools.style.display = 'none';
+                    // Every #midi-controls child is redistributed on mobile (stats+transport to the
+                    // always-visible dock, pickers+settings to the drawer), so the container itself
+                    // would otherwise render as an empty padded sliver over the board -- hide it.
+                    // The desktop branch restores its children and its display.
+                    const midiControlsEl = document.getElementById('midi-controls');
+                    if (midiControlsEl) midiControlsEl.style.display = 'none';
                     if (midiTools) {
                         midiTools.style.display = 'flex';
                         if (midiStats) midiTools.appendChild(midiStats);
                         if (midiActions) midiTools.appendChild(midiActions);
                     }
-                    if (midiUpload && drawerInjected) {
+                    // One-time setup + settings live in the drawer, out of the board's way: the
+                    // file/folder/online-song pickers and the Difficulty selector. Only the
+                    // transport (Play/Restart icons) and the streak stats stay in the always-visible
+                    // area (midiTools, appended above). See task #77.
+                    if (drawerInjected) {
                         drawerInjected.style.display = 'block';
-                        drawerInjected.appendChild(midiUpload);
+                        const midiFolder = document.getElementById('midi-folder-group');
+                        const midiOnline = document.getElementById('midi-online-group');
+                        const midiSettings = document.getElementById('midi-settings-group');
+                        if (midiUpload) drawerInjected.appendChild(midiUpload);
+                        if (midiFolder) drawerInjected.appendChild(midiFolder);
+                        if (midiOnline) drawerInjected.appendChild(midiOnline);
+                        if (midiSettings) drawerInjected.appendChild(midiSettings);
                     }
                     // #palette (Sandbox's carousel) isn't used in MIDI mode — return it home and
                     // hide it so it doesn't stay stranded inside a hidden sandboxTools.
@@ -533,7 +549,19 @@ const App = {
                 const midiStats = document.getElementById('midi-stats-group');
                 
                 if (midiControls) {
+                    // Undo the mobile branch's display:none (its content is back in-panel here). On
+                    // desktop the sidebar is always visible, so #midi-controls shows only when midi
+                    // is the active mode -- covers a mobile->desktop resize with no mode change.
+                    midiControls.style.display = (this.currentMode === 'midi') ? 'block' : 'none';
+                    // Restore original DOM order so the desktop sidebar panel reads top-to-bottom
+                    // as authored (upload, folder, online, settings/Difficulty, actions, stats).
+                    const midiFolder = document.getElementById('midi-folder-group');
+                    const midiOnline = document.getElementById('midi-online-group');
+                    const midiSettings = document.getElementById('midi-settings-group');
                     if (midiUpload && midiUpload.parentElement !== midiControls) midiControls.appendChild(midiUpload);
+                    if (midiFolder && midiFolder.parentElement !== midiControls) midiControls.appendChild(midiFolder);
+                    if (midiOnline && midiOnline.parentElement !== midiControls) midiControls.appendChild(midiOnline);
+                    if (midiSettings && midiSettings.parentElement !== midiControls) midiControls.appendChild(midiSettings);
                     if (midiActions && midiActions.parentElement !== midiControls) midiControls.appendChild(midiActions);
                     if (midiStats && midiStats.parentElement !== midiControls) midiControls.appendChild(midiStats);
                 }

@@ -263,7 +263,7 @@ test('stopping preview restores the note list to reflect actual game progress', 
   await page.locator('#midi-play-preview').click();
   await page.clock.fastForward(1300); // let preview scrub ahead to index 2
 
-  // Manually stop the preview (button now reads "Stop Preview")
+  // Manually stop the preview (the play button now shows the ⏹ stop icon)
   await page.locator('#midi-play-preview').click();
 
   const currentName = await page.evaluate(() => {
@@ -1306,16 +1306,22 @@ test('INV-30: leaving Blast mode stops it from repainting the board on a later r
 // max-width:767px rules -- not this landscape one -- so it kept contributing extra bulk here too.
 // ────────────────────────────────────────────────────────────────────────
 
-test('INV-31: Melody\'s controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
+test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 600 });
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
-  const midiControls = page.locator('#midi-controls');
-  await expect(midiControls).toBeVisible();
+  // The always-visible Melody controls (streak readout + the Play/Restart transport icons) live
+  // in the mobile dock; one-time setup (folder/song pickers, Difficulty) now routes to the drawer
+  // and #midi-controls itself is emptied + hidden on mobile (task #77). Guard the DOCK's width so
+  // the HUD stays compact -- the invariant's real intent, unchanged: not a wide overlay.
+  const dock = page.locator('#midi-mobile-tools');
+  await expect(dock).toBeVisible();
+  const box = await dock.boundingBox();
+  expect(box.width, 'the Melody HUD dock should stay a small corner HUD, like its Blast/Gravity/Snake siblings').toBeLessThanOrEqual(210);
 
-  const box = await midiControls.boundingBox();
-  expect(box.width, 'midi-controls should be capped to a small HUD width, like its Blast/Gravity/Snake siblings').toBeLessThanOrEqual(210);
+  // #midi-controls is emptied into the drawer on mobile -- it must not render as a wide overlay.
+  await expect(page.locator('#midi-controls')).toBeHidden();
 
   // The desktop-only keyboard instructions shouldn't contribute bulk to this compact overlay.
   await expect(page.locator('#midi-keyboard-instructions')).toBeHidden();

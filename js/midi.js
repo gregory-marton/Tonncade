@@ -673,12 +673,23 @@ const MidiMode = {
         this.positionScrubMarker(this.state.scrubDragIndex);
     },
 
+    // Icon-only transport: ▶ when stopped (click plays the preview), ⏹ while playing (click
+    // stops). Keep an English title/aria-label for accessibility and the tests; the visible label
+    // is icon-only now (removes English UI text, per the i18n bias -- see task #77/#29).
+    setPlayIcon: function(playing) {
+        const btn = document.getElementById('midi-play-preview');
+        if (!btn) return;
+        btn.textContent = playing ? '⏹' : '▶';
+        const label = playing ? 'Stop preview' : 'Play melody';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+    },
+
     playPreview: function() {
         this.cleanup();
         this.state.isPlayingPreview = true;
 
-        const playBtn = document.getElementById('midi-play-preview');
-        if (playBtn) playBtn.textContent = "Stop Preview";
+        this.setPlayIcon(true);
 
         this.setStatus("Playing full melody preview...", "info");
 
@@ -713,8 +724,7 @@ const MidiMode = {
         this.cleanupPlayback();
         this.state.isPlayingPreview = false;
 
-        const playBtn = document.getElementById('midi-play-preview');
-        if (playBtn) playBtn.textContent = "Play Melody";
+        this.setPlayIcon(false);
 
         this.setStatus("Preview stopped. Ready.", "info");
         this.updateDifficultyUI();
@@ -834,8 +844,7 @@ const MidiMode = {
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
 
-        const playBtn = document.getElementById('midi-play-preview');
-        if (playBtn) playBtn.textContent = "Play Melody";
+        this.setPlayIcon(false);
 
         // Remove any visual cell highlights
         document.querySelectorAll('.active-note').forEach(el => el.classList.remove('active-note'));
