@@ -512,18 +512,21 @@ const Render = {
 
         let { top, bottom, left, right } = this.measureChromeClearance(App.currentMode);
 
-        // Gravity's board tapers to a point at its bottom corners, so the D-pad's flat GAP-based
-        // clearance below it (measureChromeClearance) is more conservative than it needs to be --
-        // real fingertips don't land under the board's own narrow bottom corners regardless.
-        // Reclaim one hex-row's worth of that clearance for the board (not the full margin that
-        // would be safe, so a touch on the D-pad still keeps a little breathing room from the
-        // board above it). approxScale is a one-shot estimate (this mode's OWN previous fit would
+        // Gravity's board sits closer to the D-pad than the flat GAP-based clearance
+        // (measureChromeClearance) would allow: the SVG box has an empty padding band below the
+        // lowest cell (computeCellBounds pads by HEX_R*2 == HEX_H beyond the cells' own extent),
+        // and that empty band may safely overlap the D-pad. Reclaim HALF a hex-row -- not the full
+        // padding: reclaiming the whole thing lands the lowest cell's CENTER right at the box
+        // bottom, so with a full-width bottom D-pad (narrow portrait) those center points fall
+        // under the pad (INV-10). Half leaves the lowest cell ~HALF a cell clear of the pad --
+        // still noticeably closer than the flat clearance, with breathing room for a fat finger on
+        // the D-pad below. approxScale is a one-shot estimate (this mode's OWN previous fit would
         // be exact, but isn't worth the extra render pass this ties into every resize/update).
         if (App.currentMode === 'gravity' && bottom > 0) {
             const boardHeightUnits = bounds.maxY - bounds.minY;
             if (boardHeightUnits > 0) {
                 const approxScale = (containerRect.height - top - bottom) / boardHeightUnits;
-                bottom = Math.max(0, bottom - this.HEX_H * approxScale);
+                bottom = Math.max(0, bottom - this.HEX_R * approxScale);
             }
         }
 

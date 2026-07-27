@@ -1529,7 +1529,11 @@ button:hover {
 }
 #app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .control-buttons {
     display: flex;
-    flex-direction: column;
+    /* Beat the shared mobile strip's `flex-direction: row !important` and `width: max-content`
+       (css line ~657/674): in a 62px gutter column the transport stacks vertically, it doesn't
+       run in a row that would overflow the panel and shove Restart out over the board (INV-13). */
+    flex-direction: column !important;
+    width: 100% !important;
     gap: 4px;
     margin: 0;
 }
@@ -1541,7 +1545,10 @@ button:hover {
 }
 #app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stats-panel {
     display: flex;
-    flex-direction: column;
+    /* Same override as .control-buttons: the shared strip lays stats out as a wrapping ROW
+       (css line ~686); in the narrow gutter Lines/Best/Speed stack vertically instead. */
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
     gap: 2px;
     margin: 0;
 }
