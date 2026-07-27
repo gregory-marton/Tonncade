@@ -1506,6 +1506,28 @@ test.describe('Invariant tests', () => {
           .toEqual({ width: '', height: '', position: '' });
       }
     }
+
+    // Same leftover-inline hazard for a restricted mode itself, resized mobile -> desktop: its
+    // fitContentBox no-ops at desktop widths, and must clear the inline mobile fit rather than
+    // leave the board stranded at the old mobile box (found live: Snake/Blast/Gravity desktop
+    // fixture frames were tiny or blank). The SVG must fall back to filling its container.
+    for (const restricted of ['gravity', 'blast', 'snake']) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), restricted);
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => Render.svg.style.width),
+        `${restricted} should set an inline SVG width on mobile`).not.toBe('');
+      await page.setViewportSize({ width: 1757, height: 1000 });
+      await page.waitForTimeout(400); // let the mode's ResizeObserver refit at the new size
+      const fill = await page.evaluate(() => {
+        const gc = document.getElementById('game-container').getBoundingClientRect();
+        const svg = Render.svg.getBoundingClientRect();
+        return { inlineW: Render.svg.style.width, fillW: svg.width / gc.width, fillH: svg.height / gc.height };
+      });
+      expect(fill.inlineW, `${restricted} mobile->desktop should clear the inline SVG width`).toBe('');
+      expect(fill.fillW, `${restricted} mobile->desktop SVG should fill container width`).toBeGreaterThan(0.98);
+      expect(fill.fillH, `${restricted} mobile->desktop SVG should fill container height`).toBeGreaterThan(0.98);
+    }
   });
 
   // ────────────────────────────────────────────────────────────────────────

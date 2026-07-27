@@ -50,6 +50,13 @@ for the same reasoning applied elsewhere in this project).
     background: #1c1f28;
   }
   figcaption { margin-top: 4px; font-size: 12px; color: #9aa0ad; }
+  /* A scenario whose board fills too little of the viewport (tonnetz-share below its floor) --
+     the "fill gap" cases to eyeball (next_steps.md #76). Flagged with a red frame + share. */
+  figure.below-floor img { border-color: #e0555f; }
+  .share { color: #7fe0d0; }
+  .share.low { color: #e0555f; font-weight: bold; }
+  .legend { font-size: 12px; color: #9aa0ad; margin: 4px 0 16px; }
+  .legend b { color: #e0555f; }
   #empty {
     display: none;
     background: #1c1f28;
@@ -75,6 +82,8 @@ for the same reasoning applied elsewhere in this project).
   <code>npx playwright test -g "Random taps (full matrix)"</code>) to generate them, then reload
   this page.
 </div>
+
+<div class="legend">Each caption shows the board's Tonnetz-fill share. <b>Red-framed</b> cards fell below their fill floor — the "board doesn't fill the space" cases to look at (next_steps.md #76).</div>
 
 <div id="groups"></div>
 
@@ -102,16 +111,22 @@ for the same reasoning applied elsewhere in this project).
     h2.textContent = DISPLAY_NAME[mode] || mode;
     groupsEl.appendChild(h2);
 
+    // Below-floor (worst-filling) scenarios first, so the cases worth looking at lead each mode.
+    const entries = byMode[mode].slice().sort((a, b) => (b.belowFloor - a.belowFloor) || (a.tonnetzShare - b.tonnetzShare));
     const row = document.createElement('div');
     row.className = 'row';
-    byMode[mode].forEach(entry => {
+    entries.forEach(entry => {
       const figure = document.createElement('figure');
+      if (entry.belowFloor) figure.className = 'below-floor';
       const img = document.createElement('img');
       img.src = entry.file;
       img.loading = 'lazy';
       img.alt = `${entry.mode}, drawer ${entry.drawerOpen ? 'open' : 'closed'}, ${entry.width}x${entry.height}`;
       const caption = document.createElement('figcaption');
-      caption.textContent = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}`;
+      const share = entry.tonnetzShare != null
+        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">${Math.round(entry.tonnetzShare * 100)}% fill${entry.belowFloor ? ' ⚠' : ''}</span>`
+        : '';
+      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${share}`;
       figure.appendChild(img);
       figure.appendChild(caption);
       row.appendChild(figure);

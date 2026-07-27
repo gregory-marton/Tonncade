@@ -385,7 +385,24 @@ const Render = {
     // false) -- there's no mobile chrome competing for space there, and the historical fixed
     // 800x600-style fit already fills a normal desktop panel reasonably.
     fitContentBox: function(cells, padding = 0) {
-        if (!this.isMobileViewport()) return false;
+        if (!this.isMobileViewport()) {
+            // On desktop the SVG fills its container via CSS (width/height:100%). Clear any inline
+            // sizing a PRIOR mobile fit left (position:absolute + fixed width/height), which would
+            // otherwise persist and strand the board at the old mobile box after a mobile->desktop
+            // resize or a mode switch following a mobile session -- found live via the screenshot
+            // fixture (Blast/Gravity desktop frames showed the board tiny or gone). Same
+            // leftover-inline hazard panView clears for the pannable modes (INV-45).
+            if (this.svg) {
+                this.svg.style.position = '';
+                this.svg.style.left = '';
+                this.svg.style.top = '';
+                this.svg.style.right = '';
+                this.svg.style.bottom = '';
+                this.svg.style.width = '';
+                this.svg.style.height = '';
+            }
+            return false;
+        }
         if (typeof App === 'undefined') return false;
         const container = document.getElementById('game-container');
         if (!container || !this.svg) return false;

@@ -344,7 +344,15 @@ test.describe('Exploratory tests (prototype)', () => {
               screenshot: { dir: screenshotDir, label: fileLabel },
             });
             results.push({ label, ...result });
-            manifest.push({ mode, drawerOpen, width, height, file: `${fileLabel}.png` });
+            const floor = drawerOpen ? 0.1 : 0.3;
+            manifest.push({
+              mode, drawerOpen, width, height, file: `${fileLabel}.png`,
+              // Recorded so screenshots/index.html can flag the low-Tonnetz-fill scenarios (the
+              // ones below their floor) -- these are exactly the "where can I see the fill gaps"
+              // cases (next_steps.md #76). tonnetzShare is the fraction of random taps that landed
+              // on the board (a proxy for how much of the viewport the board actually fills).
+              tonnetzShare: Number(result.tonnetzShare.toFixed(2)), floor, belowFloor: result.tonnetzShare <= floor,
+            });
 
             console.log(`[${label}] ${(result.tonnetzShare * 100).toFixed(1)}% on Tonnetz, ${result.distinctControlsHit}/${result.controlsDiscovered} distinct controls touched`);
             // Soft assertions (not hard) so a single failing scenario doesn't abort the whole
@@ -368,7 +376,7 @@ test.describe('Exploratory tests (prototype)', () => {
             // axis while leaving the other mostly empty, when the reference box's aspect ratio
             // doesn't match the board's own shape), not sampling noise from an unlucky size. Look
             // at the attached failure screenshot -- don't assume it's expected and move on.
-            const floor = drawerOpen ? 0.1 : 0.3;
+            // (floor computed above, where it's also recorded into the manifest.)
             expect.soft(result.tonnetzShare, `[${label}] Tonnetz should get a meaningful share of random taps (got ${(result.tonnetzShare * 100).toFixed(1)}%, floor ${floor * 100}%)`).toBeGreaterThan(floor);
           }
         }
