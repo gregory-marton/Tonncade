@@ -274,6 +274,43 @@ const Render = {
     // {top, bottom, left, right} clearance needed from #game-container's own edges. Shared by
     // updateChromeInsets (CSS custom properties, a fallback/compat path) and fitContentBox (the
     // real fix, see INV-40) -- one measurement, two consumers.
+    // Gravity's control layout is chosen by cup-vs-viewport WIDTH, not the orientation media
+    // query (see docs/invariants.md / project memory). The cup is a tall well: the board wants
+    // height, the stats bar and transport do not. Whenever the viewport is enough wider than the
+    // cup-at-full-height to fit a control column on each side, the "sides" layout wins -- stats,
+    // queue and the split D-pad live in the left/right gutters, leaving top+bottom entirely free
+    // so the cup fills the full height and reaches BOTH those edges. Too narrow for that, and the
+    // cup instead spans full width (reaching left+right) with chrome banded on top/bottom. Sets
+    // #app[data-gravity-sides] (CSS reads it to position the controls) and this._gravitySides
+    // (measureChromeClearance reads it to pick which edges to reserve). Call before
+    // updateChromeInsets/fitContentBox so the measured control rects reflect the chosen layout.
+    updateGravityLayout: function(cells) {
+        const app = document.getElementById('app');
+        let sides = false;
+        if (app && this.isMobileViewport() && cells && cells.length) {
+            const container = document.getElementById('game-container');
+            const bounds = this.computeCellBounds(cells, 0);
+            if (container && bounds) {
+                const cr = container.getBoundingClientRect();
+                const aspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
+                if (isFinite(aspect) && aspect > 0 && cr.height > 0 && cr.width > 0) {
+                    const cupWidthAtFullHeight = cr.height * aspect;
+                    // One control column per side: a D-pad button plus a little separation. Read
+                    // the live --dpad-btn-size when set, else a sensible default.
+                    const btn = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dpad-btn-size')) || 48;
+                    const columns = 2 * (btn + 12);
+                    sides = (cr.width - cupWidthAtFullHeight) >= columns;
+                }
+            }
+        }
+        this._gravitySides = sides;
+        if (app) {
+            if (sides) app.setAttribute('data-gravity-sides', '1');
+            else app.removeAttribute('data-gravity-sides');
+        }
+        return sides;
+    },
+
     measureChromeClearance: function(mode) {
         const container = document.getElementById('game-container');
         if (!container) return { top: 0, bottom: 0, left: 0, right: 0 };
@@ -301,7 +338,13 @@ const Render = {
         // did.
         const queueRect = (mode === 'blast' || mode === 'gravity') ? rectOf('palette') : null;
 
-        if (this.isMobileLandscape()) {
+        // The "sides" layout (chrome in left/right gutters, board reaches top+bottom) applies in
+        // mobile landscape for every restricted mode, and ALSO in a wide-enough portrait for
+        // Gravity specifically (its tall cup -- see updateGravityLayout). Both funnel through this
+        // same geometry-based branch: it reads wherever the CSS actually placed each control, so
+        // it doesn't care which signal turned the sides layout on.
+        const sideLayout = this.isMobileLandscape() || (mode === 'gravity' && this._gravitySides);
+        if (sideLayout) {
             // The stats/controls panel reserves clearance on the side it actually sits: a wide
             // horizontal bar across the top (Gravity's landscape Pause/Restart/Lines strip)
             // reserves TOP, while a tall narrow side panel reserves LEFT. Treating a top bar as a
@@ -347,12 +390,12 @@ const Render = {
             }
         } else {
             if (statsRect) top = Math.max(top, statsRect.bottom - containerRect.top + GAP);
+            // Narrow (non-sides) layout: the cup spans full width to reach left+right, so nothing
+            // may sit in a side gutter -- Gravity's queue docks to the TOP band alongside the
+            // stats (top-right, like Blast's), not to the right of the board. (The side-gutter
+            // placement is the sideLayout branch above.)
             if (queueRect) {
-                if (mode === 'gravity') {
-                    right = Math.max(right, containerRect.right - queueRect.left + GAP);
-                } else {
-                    top = Math.max(top, queueRect.bottom - containerRect.top + GAP);
-                }
+                top = Math.max(top, queueRect.bottom - containerRect.top + GAP);
             }
             const dpadRect = mode === 'snake' ? rectOf('snake-mobile-controls') : (mode === 'gravity' ? rectOf('mobile-controls') : null);
             if (dpadRect) bottom = Math.max(bottom, containerRect.bottom - dpadRect.top + GAP);

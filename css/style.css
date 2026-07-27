@@ -1075,19 +1075,29 @@ button:hover {
        centering its content in that band via flex rather than the base rule's plain block flow.
        Icon-only, same reasoning as the existing landscape-only strip further below: no room for
        text labels this narrow. */
-    #app[data-mode="gravity"] #palette.floating-queue {
-        top: var(--chrome-inset-top, 90px);
-        bottom: var(--chrome-inset-bottom, 90px);
-        right: 6px;
+    /* Narrow (non-sides) portrait: the cup spans the full width to reach left+right, so the queue
+       can't sit beside it -- it docks to the TOP band, top-right, alongside the stats (top-left),
+       exactly like Blast. The sides-layout variant (queue in the right gutter) is the
+       #app[data-gravity-sides] block further below. */
+    #app[data-mode="gravity"]:not([data-gravity-sides]) #palette.floating-queue {
+        top: 10px;
+        right: 10px;
         left: auto;
-        width: 46px;
-        max-width: 46px;
-        max-height: none;
+        bottom: auto;
+        width: auto;
+        max-width: 45%;
+        max-height: 120px;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         overflow-y: auto;
-        padding: 4px;
+        padding: 4px 8px;
+    }
+
+    #app[data-mode="gravity"]:not([data-gravity-sides]) #palette.floating-queue #piece-list {
+        flex-direction: row;
+        gap: 6px;
+        flex-wrap: wrap;
     }
 
     #app[data-mode="gravity"] #palette.floating-queue h3 {
@@ -1110,6 +1120,13 @@ button:hover {
 
     #app[data-mode="gravity"] #palette.floating-queue .piece-preview {
         height: 20px;
+    }
+
+    /* Narrow (non-sides) portrait shares the top band between stats (left) and the queue (right),
+       so cap the stats strip at half-width the way Blast's already is (its default here is
+       calc(100% - 20px), which would run under the top-right queue). */
+    #app[data-mode="gravity"]:not([data-gravity-sides]) #gravity-controls {
+        max-width: 50%;
     }
 
     /* MIDI Controls all the way across top */
@@ -1435,6 +1452,126 @@ button:hover {
     .desktop-only {
         display: none !important;
     }
+}
+
+/* ============================================================================
+   Gravity "sides" layout -- driven by cup-vs-viewport WIDTH, not orientation
+   (Render.updateGravityLayout sets #app[data-gravity-sides] whenever the viewport
+   is wide enough beside the tall cup for a control column on each side). All
+   non-board chrome moves into the left/right gutters, leaving the top and bottom
+   free so the cup fills the full height and reaches BOTH those edges. Within each
+   gutter the informational material (stats on the left, next-piece queue on the
+   right) sits at the top and the D-pad controls anchor at the BOTTOM -- thumbs at
+   the low corners, info up higher. Not inside a media query: the attribute is only
+   ever set on a mobile viewport, and this must win in landscape too (higher
+   specificity than the orientation block's own Gravity rules). The board itself is
+   positioned by Render.fitContentBox's inline sizing off the left/right insets
+   measureChromeClearance returns for this layout; these rules place the chrome. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #mobile-controls {
+    position: absolute;
+    top: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    flex-direction: row;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    justify-content: space-between;
+    align-items: flex-end; /* D-pad clusters anchor to the BOTTOM of the gutters */
+    pointer-events: none;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] .gravity-pad-cluster {
+    display: flex;
+    flex-direction: column;
+    gap: var(--dpad-gap);
+    pointer-events: auto;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #mobile-controls .m-btn {
+    flex: none;
+    width: var(--dpad-btn-size);
+    height: var(--dpad-btn-size);
+    background: rgba(20, 22, 28, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #m-btn-action-2 {
+    display: flex;
+}
+
+/* Stats + transport: a narrow column at the top of the LEFT gutter (above the left
+   D-pad cluster). Icon-thin, small type -- there's no room for a wide bar here, which
+   is the whole point: it's out of the cup's vertical way. Its shape (taller than wide)
+   makes measureChromeClearance reserve it as a LEFT inset. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls {
+    position: absolute;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    left: calc(6px + env(safe-area-inset-left, 0px));
+    right: auto;
+    bottom: auto;
+    width: 62px;
+    max-width: 62px;
+    max-height: 60%;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: rgba(20, 22, 28, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    pointer-events: auto;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .control-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls button {
+    width: 100%;
+    font-size: 10px;
+    padding: 4px 2px;
+    white-space: nowrap;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stats-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stats-panel p {
+    font-size: 10px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Next-piece queue: a narrow column at the top of the RIGHT gutter (above the right
+   D-pad cluster). Its center-x sits right of the container center, so
+   measureChromeClearance reserves it as a RIGHT inset. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #palette.floating-queue {
+    top: calc(10px + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    right: calc(6px + env(safe-area-inset-right, 0px));
+    left: auto;
+    width: 50px;
+    max-width: 50px;
+    max-height: 55%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow-y: auto;
+    padding: 4px;
+}
+#app[data-gravity-sides="1"][data-mode="gravity"] #palette.floating-queue #piece-list {
+    flex-direction: column;
+    gap: 4px;
+    flex-wrap: nowrap;
 }
 
 /* Mobile Landscape Layout */

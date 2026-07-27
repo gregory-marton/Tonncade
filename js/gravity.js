@@ -459,6 +459,10 @@ const GravityMode = {
         // aspect ratio (see Render.getAspectMatchedRefBox) rather than the historical fixed 4:3
         // reference box, so it fills the element's real box instead of being letterboxed inside
         // a mismatched shape.
+        // Choose the sides-vs-top control layout from the cup's width against the viewport (not
+        // orientation) BEFORE measuring chrome, so the two chrome-measurement passes below see the
+        // controls in their chosen positions. See Render.updateGravityLayout.
+        Render.updateGravityLayout(cupCells);
         Render.updateChromeInsets();
         Render.fitContentBox(cupCells, Render.HEX_R * 2);
         const { refW, refH } = Render.getAspectMatchedRefBox();
