@@ -32,6 +32,7 @@ const BlastMode = {
         isGameOver: false,
         activePiece: null,
         rotation: 0,
+        difficulty: (typeof localStorage !== 'undefined' && localStorage.getItem('tonncade_blast_difficulty')) || 'hard',
         hoverCell: { p: 0, q: 0 },
         lastChordKey: null,     // sorted-pitch signature of the last MIDI chord played
         chordCandidateIndex: 0  // which of that chord's matching placements is currently shown
@@ -90,8 +91,26 @@ const BlastMode = {
     },
 
     randomPiece: function() {
-        const keys = Pieces.TETRAHEX_KEYS;
+        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
+    },
+
+    // Piece-size difficulty (task #39): easy=small pieces .. hard=tetrahexes only. Persisted, and
+    // reflected in the dumbbell-triplet control. Takes effect for pieces dealt from here on.
+    setDifficulty: function(diff) {
+        if (!Pieces.DIFFICULTY_KEYS[diff]) return;
+        this.state.difficulty = diff;
+        try { localStorage.setItem('tonncade_blast_difficulty', diff); } catch (e) {}
+        this.updateDifficultyUI();
+    },
+
+    // Highlight 1/2/3 of the dumbbell icons for easy/medium/hard.
+    updateDifficultyUI: function() {
+        const order = { easy: 1, medium: 2, hard: 3 };
+        const lit = order[this.state.difficulty] || 3;
+        document.querySelectorAll('#blast-difficulty .weight-icon').forEach((el, i) => {
+            el.classList.toggle('lit', i < lit);
+        });
     },
 
     refreshUI: function() {
@@ -216,6 +235,12 @@ const BlastMode = {
                 this.reset();
             };
         }
+
+        // Dumbbell-triplet difficulty picker: click the Nth weight to set easy/medium/hard.
+        document.querySelectorAll('#blast-difficulty .weight-icon').forEach(el => {
+            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        });
+        this.updateDifficultyUI();
 
         window.onmousemove = (e) => {
             if (this.state.isGameOver) return;

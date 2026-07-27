@@ -1406,3 +1406,45 @@ test.describe('file:// support', () => {
     expect(errors, `console errors when opened via file://: ${JSON.stringify(errors)}`).toEqual([]);
   });
 });
+
+// #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
+// pieces by cell-count, so an easier game deals smaller, more-placeable pieces and a harder one
+// deals only the full four-cell tetrahexes (the historical default).
+test.describe('Piece-size difficulty presets (Blast/Gravity)', () => {
+  for (const [mode, Mode] of [['blast', 'BlastMode'], ['gravity', 'GravityMode']]) {
+    test(`${mode}: difficulty controls the generated piece sizes`, async ({ page }) => {
+      await page.goto('/');
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+      const sizesFor = (M, diff) => page.evaluate(({ M, diff }) => {
+        // BlastMode/GravityMode are `const` globals, not window properties -- resolve by name.
+        const mode = M === 'BlastMode' ? BlastMode : GravityMode;
+        mode.setDifficulty(diff);
+        const sizes = new Set();
+        for (let i = 0; i < 300; i++) sizes.add(Pieces.TYPES[mode.randomPiece()].cells.length);
+        return [...sizes].sort();
+      }, { M, diff });
+
+      // Easy: only small pieces (never a full four-cell tetrahex).
+      const easy = await sizesFor(Mode, 'easy');
+      expect(Math.max(...easy), `${mode} easy should deal small pieces`).toBeLessThanOrEqual(3);
+
+      // Hard: exclusively four-cell tetrahexes (the current default game).
+      const hard = await sizesFor(Mode, 'hard');
+      expect(hard, `${mode} hard should deal only tetrahexes`).toEqual([4]);
+
+      // Medium sits between -- includes 4-cell pieces but also at least one smaller size.
+      const medium = await sizesFor(Mode, 'medium');
+      expect(medium.includes(4) && Math.min(...medium) < 4, `${mode} medium should mix sizes`).toBe(true);
+
+      // The dumbbell triplet: clicking the Nth weight sets that level and lights 1/2/3 of them.
+      for (const [diff, lit] of [['easy', 1], ['medium', 2], ['hard', 3]]) {
+        await page.click(`#${mode}-difficulty .weight-icon[data-difficulty="${diff}"]`);
+        const state = await page.evaluate((M) => (M === 'BlastMode' ? BlastMode : GravityMode).state.difficulty, Mode);
+        expect(state, `${mode} clicking ${diff} weight`).toBe(diff);
+        const litCount = await page.$$eval(`#${mode}-difficulty .weight-icon.lit`, els => els.length);
+        expect(litCount, `${mode} ${diff} should light ${lit} weights`).toBe(lit);
+      }
+    });
+  }
+});

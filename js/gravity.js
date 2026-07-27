@@ -36,7 +36,8 @@ const GravityMode = {
         q: 17,
         rotation: 0,
         dropInterval: 1000, // ms
-        timer: null
+        timer: null,
+        difficulty: (typeof localStorage !== 'undefined' && localStorage.getItem('tonncade_gravity_difficulty')) || 'hard',
     },
 
     init: function() {
@@ -127,8 +128,25 @@ const GravityMode = {
     },
 
     randomPiece: function() {
-        const keys = Pieces.TETRAHEX_KEYS;
+        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
+    },
+
+    // Piece-size difficulty (task #39): easy=small pieces .. hard=tetrahexes only. Persisted, and
+    // reflected in the dumbbell-triplet control.
+    setDifficulty: function(diff) {
+        if (!Pieces.DIFFICULTY_KEYS[diff]) return;
+        this.state.difficulty = diff;
+        try { localStorage.setItem('tonncade_gravity_difficulty', diff); } catch (e) {}
+        this.updateDifficultyUI();
+    },
+
+    updateDifficultyUI: function() {
+        const order = { easy: 1, medium: 2, hard: 3 };
+        const lit = order[this.state.difficulty] || 3;
+        document.querySelectorAll('#gravity-difficulty .weight-icon').forEach((el, i) => {
+            el.classList.toggle('lit', i < lit);
+        });
     },
 
     spawnPiece: function() {
@@ -585,6 +603,12 @@ const GravityMode = {
     },
 
     setupEvents: function() {
+        // Dumbbell-triplet difficulty picker: click the Nth weight to set easy/medium/hard.
+        document.querySelectorAll('#gravity-difficulty .weight-icon').forEach(el => {
+            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        });
+        this.updateDifficultyUI();
+
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
 

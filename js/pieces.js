@@ -125,6 +125,17 @@ const Pieces = {
     // comment above for why (GitHub issue #3).
     CAROUSEL_ORDER: ['.', '-', 'V', '|', '>', 'O', 'X', 'I', 'L', 'J', 'P', 'Q', 'C', 'S', 'Z'],
 
+    // Piece-size difficulty presets for Blast/Gravity (task #39). Smaller pieces are easier to
+    // place, so the pool a difficulty draws from is exactly a cell-count band:
+    //   easy   -> 1-3 cells (monohex, domino, the three trihexes) -- lots of placement freedom
+    //   medium -> 3-4 cells (trihexes + the tetrahexes)
+    //   hard   -> 4 cells only (the ten tetrahexes -- the historical default game)
+    DIFFICULTY_KEYS: {
+        easy: ['.', '-', 'V', '|', '>'],
+        medium: ['V', '|', '>', 'P', 'Q', 'L', 'J', 'S', 'Z', 'I', 'O', 'C', 'X'],
+        hard: ['P', 'Q', 'L', 'J', 'S', 'Z', 'I', 'O', 'C', 'X'],
+    },
+
     // Rotate 60 degrees counter-clockwise on screen (verified against Render.getScreenPos —
     // despite the name, this is NOT the visual "clockwise" direction; see docs/invariants.md).
     rotate: function(cells) {
