@@ -27,8 +27,10 @@ for the JavaScript code in this file.
 
 const SandboxMode = {
     state: {
-        viewX: -400,
-        viewY: -300,
+        // null until the first draw centers them on the origin for the current aspect-matched ref
+        // box (see Render.panView / INV-44); panning then updates them normally.
+        viewX: null,
+        viewY: null,
         zoom: 1,
         selectedPiece: null,
         rotation: 0,
@@ -268,7 +270,9 @@ const SandboxMode = {
         labels.forEach(lbl => Render.appendToLattice(lbl));
 
         this.state.zoom = Render.getResponsiveZoom();
-        Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
+        const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
+        this.state.viewX = v.viewX;
+        this.state.viewY = v.viewY;
     },
 
     renderPlacedPieces: function() {
@@ -402,10 +406,13 @@ const SandboxMode = {
                 this.state.viewX -= dx;
                 this.state.viewY -= dy;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
-                Render.updateView(this.state.viewX, this.state.viewY, this.state.zoom);
-                // Read back the clamped values so the next delta starts from where we actually are
-                this.state.viewX = Render.viewX;
-                this.state.viewY = Render.viewY;
+                // panView (not plain updateView) so the pan keeps the same aspect-matched viewBox
+                // the draw used -- a bare updateView would reset it to the fixed 4:3 box and
+                // re-letterbox mid-drag. Read back the clamped values so the next delta starts
+                // from where we actually are.
+                const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
+                this.state.viewX = v.viewX;
+                this.state.viewY = v.viewY;
             }
 
             if (this.state.selectedPiece) {

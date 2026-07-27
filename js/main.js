@@ -65,6 +65,29 @@ const App = {
             this.setupMobileControls();
         });
 
+        // Pannable modes (Sandbox/Melody/Compose) refit their aspect-matched viewBox only when
+        // redrawn, and -- unlike the restricted modes, which each run their own ResizeObserver on
+        // #game-container -- nothing else redraws them on a resize. Without this their viewBox
+        // stays matched to the size at mode entry and letterboxes after any resize (see
+        // Render.panView / INV-44). A ResizeObserver (not the synchronous window 'resize' event)
+        // for the same reason the restricted modes use one: it fires AFTER layout settles, so it
+        // measures the final container size rather than a mid-transition one (a real bug on
+        // mobile-landscape, where the drawer's own reflow lands a frame after the resize event).
+        // Scoped to the pannable modes so the restricted modes aren't refreshed on top of their
+        // own observers.
+        if (typeof ResizeObserver !== 'undefined') {
+            const gc = document.getElementById('game-container');
+            if (gc) {
+                this._panResizeObserver = new ResizeObserver(() => {
+                    if (['sandbox', 'midi', 'compose'].includes(this.currentMode)) {
+                        const refresh = this.modeRefreshFns[this.currentMode];
+                        if (refresh) refresh();
+                    }
+                });
+                this._panResizeObserver.observe(gc);
+            }
+        }
+
         // Start in Sandbox Mode
         this.setMode('sandbox', 0);
     },

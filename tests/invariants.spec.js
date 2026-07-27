@@ -178,11 +178,15 @@ test.describe('Invariant tests', () => {
     // Place a known 2-cell piece ('-') directly via state, bypassing the carousel, so the
     // expected cells are pinned by the piece definition rather than re-derived from the same
     // code path under test.
+    // Placed near the origin so the cell is on-screen (and clickable) in the default centered view
+    // -- the pannable view now centers on the origin (Render.panView / INV-44), where it used to
+    // sit off-center on mobile, which had left a cell this far out (-4,-4) inside the frame only by
+    // that old accident.
     await page.evaluate(() => {
       SandboxMode.state.selectedPiece = '-';
       SandboxMode.state.rotation = 0;
-      SandboxMode.state.hoverCell = { p: -4, q: -4 };
-      SandboxMode.placePiece(-4, -4);
+      SandboxMode.state.hoverCell = { p: -1, q: -1 };
+      SandboxMode.placePiece(-1, -1);
     });
 
     await page.evaluate(() => {
@@ -191,7 +195,7 @@ test.describe('Invariant tests', () => {
       Synth.playChord = (midis) => window.__played.push({ type: 'chord', midis: [...midis] });
     });
 
-    const placedHex = page.locator('polygon.placed-piece[data-p="-4"][data-q="-4"]');
+    const placedHex = page.locator('polygon.placed-piece[data-p="-1"][data-q="-1"]');
     await placedHex.click({ force: true });
 
     const played = await page.evaluate(() => window.__played);
@@ -199,7 +203,7 @@ test.describe('Invariant tests', () => {
     expect(played[0].type).toBe('chord');
 
     const expectedMidis = await page.evaluate(() =>
-      Pieces.getAbsoluteCells('-', -4, -4, 0).map(c => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b)
+      Pieces.getAbsoluteCells('-', -1, -1, 0).map(c => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b)
     );
     expect([...played[0].midis].sort((a, b) => a - b)).toEqual(expectedMidis);
   });
@@ -213,24 +217,26 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     // '-' is anchored at its own (0,0) local cell; its other cell is (-1,0) — a non-anchor cell.
+    // Placed near the origin so both cells are on-screen (clickable) in the default centered view
+    // (see INV-4 above / Render.panView / INV-44).
     await page.evaluate(() => {
       SandboxMode.state.selectedPiece = '-';
       SandboxMode.state.rotation = 0;
       SandboxMode.state.hoverCell = { p: 6, q: 6 }; // stale hoverCell, far from the piece
-      SandboxMode.placePiece(-4, -4); // does not touch hoverCell — it stays at the stale (6,6)
+      SandboxMode.placePiece(-1, -1); // does not touch hoverCell — it stays at the stale (6,6)
     });
 
-    // Tap the NON-anchor cell (-5, -4), not (-4, -4).
-    const nonAnchorHex = page.locator('polygon.placed-piece[data-p="-5"][data-q="-4"]');
+    // Tap the NON-anchor cell (-2, -1), not (-1, -1).
+    const nonAnchorHex = page.locator('polygon.placed-piece[data-p="-2"][data-q="-1"]');
     await nonAnchorHex.click({ force: true });
 
     const hoverAfter = await page.evaluate(() => SandboxMode.state.hoverCell);
-    expect(hoverAfter).toEqual({ p: -4, q: -4 }); // the piece's true anchor, not (-5,-4) or the stale (6,6)
+    expect(hoverAfter).toEqual({ p: -1, q: -1 }); // the piece's true anchor, not (-2,-1) or the stale (6,6)
 
     const ghostCells = await page.evaluate(() =>
       [...document.querySelectorAll('.ghost')].map(g => ({ p: parseInt(g.getAttribute('data-p')), q: parseInt(g.getAttribute('data-q')) }))
     );
-    const expectedCells = await page.evaluate(() => Pieces.getAbsoluteCells('-', -4, -4, 0));
+    const expectedCells = await page.evaluate(() => Pieces.getAbsoluteCells('-', -1, -1, 0));
     expect(ghostCells.sort((a, b) => a.p - b.p)).toEqual(expectedCells.sort((a, b) => a.p - b.p));
   });
 
@@ -556,21 +562,43 @@ test.describe('Invariant tests', () => {
         // different rotation angle), so an extreme seed value can get legitimately RE-clamped
         // to a new position under a perturbation this test isn't trying to test -- which would
         // look identical to a real corruption bug. A modest offset stays in-bounds regardless.
+        //
+        // Pan via the mode's OWN stored view + refresh (not a raw Render.updateView): the pannable
+        // modes now hold a view CENTER and fill the container with an aspect-matched viewBox (see
+        // Render.panView / INV-44), so a hardcoded 4:3/zoom-1 updateView would seed a baseline the
+        // app never actually produces -- the very next refresh would "correct" it and look like a
+        // corruption. Offsetting the stored center by a modest amount and refreshing mirrors a real
+        // pan exactly.
         await page.evaluate((m) => {
-          Render.updateView(-60, -40, 1);
           const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode }[m];
-          modeObj.state.viewX = Render.viewX;
-          modeObj.state.viewY = Render.viewY;
+          const refresh = { sandbox: () => SandboxMode.refreshLattice(), midi: () => MidiMode.refreshBoard(), compose: () => ComposeMode.refreshBoard() }[m];
+          refresh(); // ensure the view center is initialized (null -> origin) before offsetting it
+          modeObj.state.viewX -= 60;
+          modeObj.state.viewY -= 40;
+          refresh();
         }, mode);
       }
 
+      // The view CENTER in lattice units, not the viewBox top-left: the pannable modes now fill
+      // the container with an aspect-matched viewBox (Render.panView / INV-44), so the top-left
+      // legitimately shifts when the container's aspect changes (resize/device-rotate) even though
+      // the content hasn't moved -- it's the center that's held fixed. Comparing the center is the
+      // real "the view didn't jump" invariant, robust to the aspect-dependent top-left.
+      const viewCenter = () => page.evaluate(() => {
+        const vb = Render.svg.getAttribute('viewBox').split(/\s+/).map(Number);
+        return { x: vb[0] + vb[2] / 2, y: vb[1] + vb[3] / 2 };
+      });
+      const closeTo = (a, b) => Math.abs(a - b) < 1;
+
       const stateBefore = await snapshotModeState(page, mode);
-      const viewBefore = viewPersists ? await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY })) : null;
+      const viewBefore = viewPersists ? await viewCenter() : null;
 
       const checkViewOrCentering = async (label) => {
         expect(await snapshotModeState(page, mode), `[${mode}] state ${label}`).toEqual(stateBefore);
         if (viewPersists) {
-          expect(await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY })), `[${mode}] view ${label}`).toEqual(viewBefore);
+          const c = await viewCenter();
+          expect(closeTo(c.x, viewBefore.x) && closeTo(c.y, viewBefore.y),
+            `[${mode}] view center ${label}: got (${c.x.toFixed(1)}, ${c.y.toFixed(1)}), expected (${viewBefore.x.toFixed(1)}, ${viewBefore.y.toFixed(1)})`).toBe(true);
         } else if (restrictedBoard) {
           // Blast/Gravity/Snake deliberately DON'T preserve a manual pan -- they always re-fit
           // to show as much of their own fixed board as the screen allows (confirmed with the
@@ -1417,6 +1445,66 @@ test.describe('Invariant tests', () => {
 
       const { overlappingCells } = await measureBoardOcclusion(page);
       expect(overlappingCells, `[${vp.width}x${vp.height}] no cell should overlap chrome`).toBe(0);
+    }
+  });
+
+  test('INV-44: pannable modes (Sandbox/Melody/Compose) fill the game-container -- viewBox aspect matches the container, no letterbox', async ({ page }) => {
+    // A pannable board is effectively infinite, so its visible window should match the
+    // game-container's aspect ratio and fill it edge-to-edge. The old fixed 800x600 (4:3) viewBox
+    // instead letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop
+    // window (Melody at ~2:1 showed the board squished into a 4:3 center band). Restricted modes
+    // already aspect-match (INV-40); this extends the same "fill the space" property to the
+    // pannable modes.
+    const modes = ['sandbox', 'midi', 'compose'];
+    const viewports = [
+      { width: 1400, height: 600 },  // wide (2.33)
+      { width: 700, height: 1100 },  // tall (0.64)
+      { width: 950, height: 900 },   // near-square
+    ];
+    for (const mode of modes) {
+      for (const vp of viewports) {
+        await page.setViewportSize(vp);
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        await page.waitForTimeout(200);
+        const { viewAspect, containerAspect } = await page.evaluate(() => {
+          const vb = Render.svg.getAttribute('viewBox').split(/\s+/).map(Number);
+          const gc = document.getElementById('game-container').getBoundingClientRect();
+          return { viewAspect: vb[2] / vb[3], containerAspect: gc.width / gc.height };
+        });
+        // Within 5%: the viewBox maps onto the container with no letterbox band.
+        expect(
+          Math.abs(viewAspect - containerAspect) / containerAspect,
+          `[${mode} ${vp.width}x${vp.height}] viewBox aspect ${viewAspect.toFixed(2)} should match container ${containerAspect.toFixed(2)}`
+        ).toBeLessThan(0.05);
+      }
+    }
+  });
+
+  test('INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing', async ({ page }) => {
+    // On a MOBILE viewport the restricted modes (Gravity/Blast/Snake) size #tonnetz-svg with an
+    // inline width/height + position:absolute (Render.fitContentBox) fit to their own board's box.
+    // Inline styles beat the CSS `svg { width/height:100% }` AND persist even when the viewport
+    // later widens, so a pannable mode entered afterwards would render into that leftover (tiny,
+    // off-corner) box unless it clears the inline sizing (Render.panView). Found live via the
+    // screenshot fixture: play Gravity, switch to Sandbox, and the lattice stayed stuck at
+    // Gravity's board size. (At desktop widths fitContentBox no-ops, so the mobile viewport here
+    // is what actually reproduces it.)
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const restricted of ['gravity', 'blast', 'snake']) {
+      for (const pannable of ['sandbox', 'midi', 'compose']) {
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), restricted);
+        await page.waitForTimeout(300); // let the restricted ResizeObserver settle its inline fit
+        const restrictedInline = await page.evaluate(() => Render.svg.style.width);
+        expect(restrictedInline, `${restricted} should have set an inline SVG width (else the test isn't exercising the bug)`).not.toBe('');
+
+        await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), pannable);
+        await page.waitForTimeout(100);
+        const leftover = await page.evaluate(() => ({
+          width: Render.svg.style.width, height: Render.svg.style.height, position: Render.svg.style.position,
+        }));
+        expect(leftover, `[${restricted}->${pannable}] pannable mode should have cleared the restricted board's inline SVG sizing`)
+          .toEqual({ width: '', height: '', position: '' });
+      }
     }
   });
 

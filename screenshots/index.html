@@ -87,6 +87,10 @@ for the same reasoning applied elsewhere in this project).
     return;
   }
 
+  // The app's internal mode ids don't all match their UI names -- 'midi' is the mode the UI calls
+  // "Melody". Show the user-facing name here.
+  const DISPLAY_NAME = { sandbox: 'Sandbox', midi: 'Melody', compose: 'Compose', snake: 'Snake', blast: 'Blast', gravity: 'Gravity' };
+
   const byMode = {};
   manifest.forEach(entry => {
     (byMode[entry.mode] = byMode[entry.mode] || []).push(entry);
@@ -95,7 +99,7 @@ for the same reasoning applied elsewhere in this project).
   const groupsEl = document.getElementById('groups');
   Object.keys(byMode).sort().forEach(mode => {
     const h2 = document.createElement('h2');
-    h2.textContent = mode;
+    h2.textContent = DISPLAY_NAME[mode] || mode;
     groupsEl.appendChild(h2);
 
     const row = document.createElement('div');

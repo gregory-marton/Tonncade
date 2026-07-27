@@ -40,8 +40,10 @@ const ComposeMode = {
         recordStartTime: 0,
         isPlaying: false,
         playbackTimeoutIds: [],
-        viewX: -400,
-        viewY: -300,
+        // null until the first draw centers them for the current aspect-matched ref box (see
+        // Render.panView / INV-44); panning then updates them normally.
+        viewX: null,
+        viewY: null,
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
         dragCandidate: null,    // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
@@ -185,9 +187,11 @@ const ComposeMode = {
                 this.state.viewX -= dx;
                 this.state.viewY -= dy;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
-                Render.updateView(this.state.viewX, this.state.viewY, Render.zoom);
-                this.state.viewX = Render.viewX;
-                this.state.viewY = Render.viewY;
+                // panView keeps the aspect-matched viewBox the draw used (a bare updateView would
+                // reset it to the fixed 4:3 box and re-letterbox mid-drag).
+                const v = Render.panView(this.state.viewX, this.state.viewY, Render.zoom);
+                this.state.viewX = v.viewX;
+                this.state.viewY = v.viewY;
             }
         };
 
@@ -619,9 +623,9 @@ const ComposeMode = {
     refreshBoard: function() {
         const viewport = { minP: -15, maxP: 15, minQ: -15, maxQ: 15 };
         Render.drawLattice(viewport, {});
-        Render.updateView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
-        this.state.viewX = Render.viewX;
-        this.state.viewY = Render.viewY;
+        const v = Render.panView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
+        this.state.viewX = v.viewX;
+        this.state.viewY = v.viewY;
         this.renderSelectionMarkers();
     },
 

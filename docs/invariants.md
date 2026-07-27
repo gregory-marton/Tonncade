@@ -1097,6 +1097,46 @@ failing on the pre-fix flat-clearance code (~67% width at 397×537) before imple
 red-green discipline. This is a Tonnetz-space maximization on top of INV-10's no-overlap floor and
 INV-40/41's aspect/edge-reach checks -- all four still hold for Snake under the new fit.
 
+### INV-44: pannable modes fill the game-container -- viewBox aspect matches the container
+
+The restricted modes (INV-40) size themselves to their own fixed board. The **pannable** modes
+(Sandbox/Melody/Compose) have an effectively infinite, pannable lattice, so their *visible window*
+should instead match the game-container's aspect ratio and fill it edge-to-edge. They used to call
+`Render.updateView` with the historical fixed 800×600 (4:3) reference box, which `preserveAspectRatio`
+then letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop window (a wide
+Melody showed the lattice squished into a 4:3 center band). `Render.panView` (the pannable modes'
+shared view entry) now derives `refH` from the element's real aspect (`getAspectMatchedRefBox`,
+`refW` fixed at 800), so the viewBox maps onto the whole container with no letterbox.
+
+`panView` works in view-**center** coordinates, not the viewBox top-left: aspect-matching makes
+the top-left depend on `refH`, so preserving the top-left across a resize/device-rotate would slide
+the content, whereas holding the center fixed keeps it put. It also **clears any inline SVG sizing**
+a previously-active restricted mode left (see INV-45), and the pannable modes refit on container
+resize via a `ResizeObserver` in `js/main.js` (the synchronous window `resize` event fires before
+the mobile-landscape reflow settles).
+
+**Test:** `tests/invariants.spec.js`'s "INV-44: ..." asserts, for each pannable mode across wide/
+tall/near-square containers, that the viewBox aspect ratio matches the container's within 5% (no
+letterbox). INV-9/INV-12's view-persistence check was correspondingly updated to compare the view
+*center* rather than the aspect-dependent top-left. Confirmed failing on the pre-fix fixed-4:3 code
+before implementing, per red-green discipline.
+
+### INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing
+
+On a mobile viewport the restricted modes size `#tonnetz-svg` with an inline `width`/`height` +
+`position:absolute` (`fitContentBox`, INV-40) fit to their own board's box. Inline styles beat the
+`svg { width/height:100% }` CSS **and persist even when the viewport later widens**, so a pannable
+mode entered afterwards rendered into that leftover tiny, off-corner box (found live via the
+screenshot fixture: play Gravity, switch to Sandbox, and the lattice stayed stuck at Gravity's
+board size). `Render.panView` clears that inline sizing at the start of every pannable draw, so the
+board falls back to filling the container. (At desktop widths `fitContentBox` no-ops, so this only
+reproduces at mobile viewports.)
+
+**Test:** `tests/invariants.spec.js`'s "INV-45: ..." enters each restricted mode at a mobile
+viewport (confirming it set an inline SVG width), switches to each pannable mode, and asserts the
+inline `width`/`height`/`position` were cleared. Confirmed failing (inline sizing stuck) on the
+pre-fix code before implementing, per red-green discipline.
+
 ---
 
 ## Primary Elements

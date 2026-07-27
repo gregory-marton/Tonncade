@@ -951,19 +951,26 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
-  // A small, realistic offset from the -400/-300 default -- large enough to prove refreshBoard()
-  // didn't just reset to the fixed default, but well within Render.getPanBounds()'s allowed
-  // range so this test verifies persistence, not clamping (a separate, already-covered concern).
+  // A small, realistic pan offset -- large enough to prove refreshBoard() didn't just reset to the
+  // default view, but well within Render.getPanBounds()'s allowed range so this verifies
+  // persistence, not clamping (a separate, already-covered concern). The pannable view is now held
+  // as a CENTER (Render.panView / INV-44), so this sets the mode's stored center and checks the
+  // rendered view center survives the refresh, rather than the aspect-dependent viewBox top-left.
   await page.evaluate(() => {
-    MidiMode.state.viewX = -450;
-    MidiMode.state.viewY = -320;
-    Render.updateView(-450, -320, Render.zoom);
+    MidiMode.refreshBoard(); // initialize the center (null -> origin) before offsetting it
+    MidiMode.state.viewX = -60;
+    MidiMode.state.viewY = -40;
+    MidiMode.refreshBoard();
   });
 
   await page.evaluate(() => MidiMode.refreshBoard());
 
-  const view = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
-  expect(view).toEqual({ x: -450, y: -320 });
+  const center = await page.evaluate(() => {
+    const vb = Render.svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    return { x: vb[0] + vb[2] / 2, y: vb[1] + vb[3] / 2 };
+  });
+  expect(Math.abs(center.x - (-60))).toBeLessThan(1);
+  expect(Math.abs(center.y - (-40))).toBeLessThan(1);
 });
 
 // ────────────────────────────────────────────────────────────────────────

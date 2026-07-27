@@ -50,8 +50,10 @@ const MidiMode = {
         // clicked cell's note on mousedown, ALSO start tracking for a possible drag, update on
         // mousemove if dragging, stop on mouseup) is one already-proven interaction, not a new
         // one invented for this mode.
-        viewX: -400,
-        viewY: -300,
+        // null until the first draw centers them for the current aspect-matched ref box (see
+        // Render.panView / INV-44); panning then updates them normally.
+        viewX: null,
+        viewY: null,
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
 
@@ -231,10 +233,12 @@ const MidiMode = {
                 this.state.viewX -= dx;
                 this.state.viewY -= dy;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
-                Render.updateView(this.state.viewX, this.state.viewY, Render.zoom);
-                // Read back the clamped values so the next delta starts from where we actually are
-                this.state.viewX = Render.viewX;
-                this.state.viewY = Render.viewY;
+                // panView keeps the aspect-matched viewBox the draw used (a bare updateView would
+                // reset it to the fixed 4:3 box and re-letterbox mid-drag). Read back the clamped
+                // values so the next delta starts from where we actually are.
+                const v = Render.panView(this.state.viewX, this.state.viewY, Render.zoom);
+                this.state.viewX = v.viewX;
+                this.state.viewY = v.viewY;
             }
 
             if (this.state.isPlayingPreview || this.state.isPlayingSequence) return;
@@ -853,9 +857,9 @@ const MidiMode = {
         // rotating the view) would silently discard wherever the player last panned to,
         // matching a real report: rotating moved melodies off-screen with no way to pan back,
         // since panning didn't exist here at all until now.
-        Render.updateView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
-        this.state.viewX = Render.viewX;
-        this.state.viewY = Render.viewY;
+        const v = Render.panView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
+        this.state.viewX = v.viewX;
+        this.state.viewY = v.viewY;
     },
 
     // MIDI parser logic (SMF format)

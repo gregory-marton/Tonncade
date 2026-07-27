@@ -203,6 +203,30 @@ test.describe('Exploratory tests (prototype)', () => {
     };
     await openDrawerIfNeeded();
 
+    // Force this mode to re-fit to THIS scenario's exact viewport before measuring/screenshotting.
+    // Selecting an already-active mode early-returns without redrawing, and the board's own
+    // resize refit (a ResizeObserver -- see js/main.js / the restricted modes) is asynchronous, so
+    // without this a consecutive same-mode scenario would capture the board still fit to the
+    // PREVIOUS scenario's size (a letterboxed/stale frame). This makes each captured image and
+    // tonnetz-share measurement deterministically reflect the current size.
+    await page.evaluate((m) => {
+      // Recenter the pannable modes on the origin first: their view center persists across
+      // consecutive same-mode scenarios, so an earlier scenario's interactions would otherwise
+      // leave the board panned off to one side in this scenario's frame. Each captured image
+      // should show the clean default centered view (null -> origin, see Render.panView).
+      const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode }[m];
+      if (modeObj) { modeObj.state.viewX = null; modeObj.state.viewY = null; }
+      const fns = {
+        sandbox: () => SandboxMode.refreshLattice(),
+        midi: () => MidiMode.refreshBoard(),
+        compose: () => ComposeMode.refreshBoard(),
+        snake: () => SnakeMode.refreshBoard(),
+        blast: () => BlastMode.refreshUI(),
+        gravity: () => GravityMode.refreshBoard(),
+      };
+      if (fns[m]) fns[m]();
+    }, mode);
+
     // Captured here, before any random tap has a chance to disturb the layout — a clean view of
     // this exact (mode, drawer-state, size) scenario, the same one the assertions below check.
     if (screenshot) {
@@ -271,7 +295,7 @@ test.describe('Exploratory tests (prototype)', () => {
   // for height -- chosen to span real mobile devices through ordinary desktop window sizes.
   // ────────────────────────────────────────────────────────────────────────
 
-  const MATRIX_MODES = ['sandbox', 'midi', 'snake', 'blast', 'gravity'];
+  const MATRIX_MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
   const WIDTH_RANGE = [320, 1920];
   const HEIGHT_RANGE = [480, 1080];
   const SIZES_PER_SCENARIO = 5;

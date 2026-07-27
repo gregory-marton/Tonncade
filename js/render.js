@@ -683,5 +683,44 @@ const Render = {
         const rect = this.svg.getBoundingClientRect();
         if (!rect.width || !rect.height) return { refW: 800, refH: 600 };
         return { refW: 800, refH: 800 * (rect.height / rect.width) };
+    },
+
+    // The pannable modes' (Sandbox/Melody/Compose) view update. A pannable board is effectively
+    // infinite, so its visible window should match the game-container's aspect ratio and fill it
+    // edge-to-edge -- not sit inside a fixed 4:3 window letterboxed within a wider/taller container
+    // (which wasted the sides of any non-4:3 window, e.g. a wide desktop one). refW stays 800 so
+    // horizontal span and zoom magnitude are unchanged from before; only refH tracks the real
+    // aspect. See INV-44.
+    //
+    // Works in view-CENTER coordinates (lattice units), NOT the viewBox top-left, so a caller's
+    // stored pan position stays fixed on screen when the container reshapes: aspect-matching makes
+    // the top-left depend on refH, so preserving the top-left across a resize/rotate would slide
+    // the content, whereas the center is stable. The caller passes/stores the center (null/undefined
+    // the first time -> origin-centered) and the pan handlers offset it by drag deltas exactly as
+    // they used to offset the old top-left. Returns the (clamp-corrected) center as {viewX, viewY}
+    // -- named for drop-in compatibility with the inline `state.viewX = ...` the callers already do.
+    panView: function(centerX, centerY, zoom) {
+        // Clear any inline sizing a previously-active RESTRICTED mode's fitContentBox left on the
+        // SVG element (position:absolute + a fixed width/height sized to that board's own box).
+        // Inline styles beat the CSS `svg { width:100%; height:100% }`, so without this the
+        // pannable board would render into the leftover restricted-board box -- tiny and
+        // off-corner -- instead of filling the whole game-container. Found live: play Gravity/
+        // Blast/Snake, then switch to Sandbox/Melody/Compose, and the lattice was stuck at the
+        // previous board's size. Restricted modes re-set these inline every fit, so clearing them
+        // here (pannable-only) is safe.
+        this.svg.style.position = '';
+        this.svg.style.left = '';
+        this.svg.style.top = '';
+        this.svg.style.right = '';
+        this.svg.style.bottom = '';
+        this.svg.style.width = '';
+        this.svg.style.height = '';
+        const { refW, refH } = this.getAspectMatchedRefBox();
+        if (centerX === null || centerX === undefined) centerX = 0;
+        if (centerY === null || centerY === undefined) centerY = 0;
+        this.updateView(centerX - refW * zoom / 2, centerY - refH * zoom / 2, zoom, refW, refH);
+        // updateView may have clamped the top-left against the pan bounds -- re-derive the center
+        // from what it actually applied so the stored center reflects any clamp.
+        return { viewX: this.viewX + refW * zoom / 2, viewY: this.viewY + refH * zoom / 2 };
     }
 };
