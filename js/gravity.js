@@ -462,7 +462,12 @@ const GravityMode = {
         Render.updateChromeInsets();
         Render.fitContentBox(cupCells, Render.HEX_R * 2);
         const { refW, refH } = Render.getAspectMatchedRefBox();
-        const fit = Render.getFitView(cupCells, Render.HEX_R * 2, 1, refW, refH);
+        // scale 1.15 (like Snake) rather than 1: the board is a tall grid and its aspect-matched
+        // box often can't fill both axes of the container, so scale=1 left the cells noticeably
+        // shy of the box on the binding axis, wasting reclaimable space (the user's "make it bigger
+        // if there's room"). 1.15 zooms the cells to fill the box while keeping the whole cup
+        // visible (verified: no cell clipped -- INV-11/35).
+        const fit = Render.getFitView(cupCells, Render.HEX_R * 2, 1.15, refW, refH);
         Render.updateView(fit.viewX, fit.viewY, fit.zoom, refW, refH);
     },
 
