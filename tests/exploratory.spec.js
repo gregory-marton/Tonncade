@@ -290,7 +290,15 @@ test.describe('Exploratory tests (prototype)', () => {
           const x = gc.left + (c + 0.5) * (gc.width / cols), y = gc.top + (r + 0.5) * (gc.height / rows);
           const el = document.elementFromPoint(x, y);
           if (!el) { grid[r][c] = 2; continue; }
-          if (el.closest('#tonnetz-svg')) grid[r][c] = 0;
+          // Board = an ACTUAL cell (a polygon.cell, or a note label sitting on one), NOT merely
+          // "inside #tonnetz-svg": the <svg> element fills its whole container, so its empty
+          // interior -- the hexagon's black corners and any letterboxed margin around a
+          // centered board -- is between cells, not on them. Counting that interior as board (as
+          // `el.closest('#tonnetz-svg')` did) reported 0% black for a centered board with wide
+          // empty margins. Empty SVG interior now correctly falls through to black.
+          const onCell = el.closest('polygon.cell') != null;
+          const onLabel = /^(text|tspan)$/i.test(el.tagName || '') && el.closest('#tonnetz-svg') != null;
+          if (onCell || onLabel) grid[r][c] = 0;
           else if (el.closest('button, select, input, .mode-option, [id$="-controls"], [id$="-stats"], #palette, #mobile-controls, #snake-mobile-controls, #sidebar, #top-header')) grid[r][c] = 1;
           else grid[r][c] = 2;
         }
