@@ -1407,6 +1407,35 @@ test.describe('file:// support', () => {
   });
 });
 
+// #85: Life mode -- the neighbor/isotropy classifier core. Classifies the 6-cell consonant ring
+// by its dihedral-orbit arrangement (see docs/life-rules.md).
+test.describe('Life isotropy classifier', () => {
+  test('classifies named ring arrangements, rotation/reflection-invariantly, with chirality', async ({ page }) => {
+    await page.goto('/');
+    const r = (ring) => page.evaluate((ring) => Life.classifyRing(ring), ring);
+
+    expect(await r([1,1,0,0,0,0])).toMatchObject({ count: 2, name: 'ortho', symmetric: true });
+    expect(await r([1,0,1,0,0,0])).toMatchObject({ count: 2, name: 'meta', symmetric: true });
+    expect(await r([1,0,0,1,0,0])).toMatchObject({ count: 2, name: 'para', symmetric: true });
+    expect(await r([1,1,1,0,0,0])).toMatchObject({ count: 3, name: 'vicinal', symmetric: true });
+
+    // Rotation invariance: a rotated ortho is still ortho.
+    expect(await r([0,0,1,1,0,0])).toMatchObject({ name: 'ortho', symmetric: true });
+    // Reflection invariance of the class label: meta reflected is still meta.
+    expect(await r([0,0,0,1,0,1])).toMatchObject({ name: 'meta' });
+
+    // A chiral arrangement (no reflection axis): its mirror is a distinct configuration.
+    const chiral = await r([1,1,0,1,0,0]);
+    expect(chiral.count).toBe(3);
+    expect(chiral.symmetric).toBe(false);
+    expect(chiral.chiral).toBe(true);
+
+    // Empty and full are trivially symmetric.
+    expect(await r([0,0,0,0,0,0])).toMatchObject({ count: 0, symmetric: true });
+    expect(await r([1,1,1,1,1,1])).toMatchObject({ count: 6, symmetric: true });
+  });
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

@@ -159,6 +159,20 @@ Two sources (no hard-coded built-in tier — the web folder supersedes it):
 This mirrors Melody's MIDI loading (`js/midi-folder.js`) minus the built-in default. The seed
 `life/` set will include the known hex variants above (3,5/2, Callahan) plus a few tuned for sound.
 
+## Possible future extensions (not v1)
+
+The schema is meant to grow as composing for it reveals wants. Likely additions, kept out of v1
+to keep the first engine small:
+
+- **Generation-aware sound** — `sound.when` conditions on the generation clock or on a cell's
+  *age* (how many generations it has been alive), not only the born/alive/died transitions.
+- **Tonal qualities** — a sustain-pedal-like hold across generations, note release behavior,
+  envelopes.
+- **Instruments** — per-file (or per-condition) MIDI instrument / channel selection.
+
+These are noted so the v1 schema stays forward-compatible (unknown keys should be ignored, not
+rejected).
+
 ## Sources
 
 - Katherine Wu (2012), *Hex Life: Hexagonal Cellular Automata*, Wolfram Demonstrations Project.
