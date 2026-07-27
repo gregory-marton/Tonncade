@@ -83,7 +83,7 @@ for the same reasoning applied elsewhere in this project).
   this page.
 </div>
 
-<div class="legend">Each caption shows how many of the 4 play-area edges the board reaches (within ~2 cells). <b>Red-framed</b> cards reach fewer than two — the board is floating/under-filling (the "doesn't fill the space" cases).</div>
+<div class="legend">Each caption shows the largest contiguous <b>black</b> (empty) region as a % of the play area (secondary: edges the board reaches). <b>Red-framed</b> cards exceed 50% — one big empty region means the board is floating/undersized, not bisecting the space.</div>
 
 <div id="groups"></div>
 
@@ -123,12 +123,14 @@ for the same reasoning applied elsewhere in this project).
       img.loading = 'lazy';
       img.alt = `${entry.mode}, drawer ${entry.drawerOpen ? 'open' : 'closed'}, ${entry.width}x${entry.height}`;
       const caption = document.createElement('figcaption');
-      // Edge-reach: how many of the 4 play-area edges the board reaches within ~2 cells. <2 = the
-      // board is floating/under-filling (flagged). This is the essential fill metric.
-      const reach = entry.edgeReaches != null
-        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">reaches ${entry.edgeReaches}/4 edges${entry.belowFloor ? ' ⚠' : ''}</span>`
+      // Primary metric: largest contiguous black (empty) region as a fraction of the play area.
+      // >50% (flagged) = the board is floating/undersized (not bisecting the space). Edge-reach
+      // shown as secondary context.
+      const bf = entry.largestBlackFrac != null
+        ? ` — <span class="share${entry.belowFloor ? ' low' : ''}">${Math.round(entry.largestBlackFrac * 100)}% black${entry.belowFloor ? ' ⚠' : ''}</span>` +
+          (entry.edgeReaches != null ? ` <span style="color:#6b7280">(${entry.edgeReaches}/4 edges)</span>` : '')
         : '';
-      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${reach}`;
+      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}`;
       figure.appendChild(img);
       figure.appendChild(caption);
       row.appendChild(figure);

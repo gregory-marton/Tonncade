@@ -266,6 +266,55 @@ test.describe('Exploratory tests (prototype)', () => {
       return { reaches, margins: { left: +m.left.toFixed(1), right: +m.right.toFixed(1), top: +m.top.toFixed(1), bottom: +m.bottom.toFixed(1) }, cells: n };
     });
 
+    // Flood-fill of the EMPTY (black) play area (the user's metric): a well-placed board bisects the
+    // play area, so its empty space is broken into pieces and no single contiguous black region can
+    // be large; a floating/undersized board leaves ONE big black region. Sample #game-container on a
+    // ~cell-diameter grid (so sub-cell gaps between hexes don't register as empty), classify each
+    // point board / chrome / black via elementFromPoint, 4-connected flood-fill the black, and report
+    // the largest black region as a fraction of the sampled play area. Aspect-independent, and (unlike
+    // edge-reach vs the raw container) it does NOT penalise legitimate chrome -- the D-pad/stats area
+    // is "chrome", not "black", so a board that fills the space between them passes.
+    const flood = await page.evaluate(() => {
+      const gc = document.getElementById('game-container').getBoundingClientRect();
+      const svg = Render.svg;
+      const p1 = svg.createSVGPoint(); p1.x = 0; p1.y = 0;
+      const p2 = svg.createSVGPoint(); p2.x = Render.HEX_R * 2; p2.y = 0;
+      const a = p1.matrixTransform(svg.getScreenCTM()), b = p2.matrixTransform(svg.getScreenCTM());
+      const step = Math.max(12, Math.hypot(b.x - a.x, b.y - a.y)); // one cell diameter, min 12px
+      const cols = Math.max(1, Math.floor(gc.width / step)), rows = Math.max(1, Math.floor(gc.height / step));
+      // classify: 0 = board, 1 = chrome/other, 2 = black(empty)
+      const grid = [];
+      for (let r = 0; r < rows; r++) {
+        grid[r] = [];
+        for (let c = 0; c < cols; c++) {
+          const x = gc.left + (c + 0.5) * (gc.width / cols), y = gc.top + (r + 0.5) * (gc.height / rows);
+          const el = document.elementFromPoint(x, y);
+          if (!el) { grid[r][c] = 2; continue; }
+          if (el.closest('#tonnetz-svg')) grid[r][c] = 0;
+          else if (el.closest('button, select, input, .mode-option, [id$="-controls"], [id$="-stats"], #palette, #mobile-controls, #snake-mobile-controls, #sidebar, #top-header')) grid[r][c] = 1;
+          else grid[r][c] = 2;
+        }
+      }
+      // largest 4-connected component of black(2)
+      const seen = grid.map(row => row.map(() => false));
+      let largest = 0, totalBlack = 0;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        if (grid[r][c] === 2) totalBlack++;
+        if (grid[r][c] !== 2 || seen[r][c]) continue;
+        let size = 0; const stack = [[r, c]]; seen[r][c] = true;
+        while (stack.length) {
+          const [cr, cc] = stack.pop(); size++;
+          for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nr = cr + dr, nc = cc + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !seen[nr][nc] && grid[nr][nc] === 2) { seen[nr][nc] = true; stack.push([nr, nc]); }
+          }
+        }
+        largest = Math.max(largest, size);
+      }
+      const total = rows * cols;
+      return { largestBlackFrac: +(largest / total).toFixed(2), totalBlackFrac: +(totalBlack / total).toFixed(2), gridSamples: total };
+    });
+
     // Captured here, before any random tap has a chance to disturb the layout — a clean view of
     // this exact (mode, drawer-state, size) scenario, the same one the assertions below check.
     if (screenshot) {
@@ -307,6 +356,8 @@ test.describe('Exploratory tests (prototype)', () => {
       respondedToModeSwitch: modeAfter === nextMode,
       edgeReaches: edge.reaches,
       edgeMargins: edge.margins,
+      largestBlackFrac: flood.largestBlackFrac,
+      totalBlackFrac: flood.totalBlackFrac,
     };
   }
 
@@ -387,16 +438,18 @@ test.describe('Exploratory tests (prototype)', () => {
             results.push({ label, ...result });
             manifest.push({
               mode, drawerOpen, width, height, file: `${fileLabel}.png`,
-              // The board should reach within ~2 cells of at least TWO edges of the play area (see
-              // the edge-reach block in runRandomTaps). Fewer than two = the board is floating /
-              // under-filling -- flagged in screenshots/index.html. This is the essential fill
-              // metric (uniform across all modes), replacing the old noisy tonnetz-tap-share proxy.
+              // PRIMARY flag: largest contiguous black (empty) region as a fraction of the play area
+              // (the user's flood-fill metric). A well-placed board bisects the play area so no black
+              // region dominates; >50% means the board is floating/undersized. Robust to aspect and
+              // to legitimate chrome (unlike edge-reach vs the container, which mis-flags Gravity's
+              // chrome-on-two-edges case). edge-reach kept as secondary info.
+              largestBlackFrac: result.largestBlackFrac, totalBlackFrac: result.totalBlackFrac,
+              belowFloor: result.largestBlackFrac > 0.5,
               edgeReaches: result.edgeReaches, edgeMargins: result.edgeMargins,
-              belowFloor: result.edgeReaches < 2,
               tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
             });
 
-            console.log(`[${label}] edges-reached ${result.edgeReaches}/4  margins ${JSON.stringify(result.edgeMargins)}  (${(result.tonnetzShare * 100).toFixed(1)}% taps)`);
+            console.log(`[${label}] largest-black ${(result.largestBlackFrac*100).toFixed(0)}% (total ${(result.totalBlackFrac*100).toFixed(0)}%)  edges ${result.edgeReaches}/4  ${(result.tonnetzShare*100).toFixed(0)}% taps`);
             // Soft assertions (not hard) so a single failing scenario doesn't abort the whole
             // matrix loop -- this test doubles as the screenshots/ fixture generator (see the
             // screenshotDir block above), and a hard throw partway through would leave the fixture
@@ -405,12 +458,14 @@ test.describe('Exploratory tests (prototype)', () => {
             // strand every other mode). Soft failures still fail the test at the end, and report
             // EVERY bad scenario rather than just the first.
             expect.soft(result.respondedToModeSwitch, `[${label}] app should still respond to mode switching after ${TAPS_PER_RUN} random taps`).toBe(true);
-            // The essential fill invariant: the board must reach within ~2 cells of at least two
-            // edges of the play area, in every mode at every size. A board that reaches fewer than
-            // two is floating/under-filling -- the real "doesn't fill the space" defect the user
-            // flags. Soft so the loop still captures the whole fixture; look at the attached
-            // failure screenshot + the edge margins logged above.
-            expect.soft(result.edgeReaches, `[${label}] board should reach within ~2 cells of >=2 play-area edges (reached ${result.edgeReaches}; margins ${JSON.stringify(result.edgeMargins)})`).toBeGreaterThanOrEqual(2);
+            // The essential fill invariant: no single contiguous black region may cover more than
+            // half the play area. A well-placed board bisects the play area, so its empty space is
+            // broken up; one big black region means the board is floating/undersized -- the real
+            // "doesn't fill the space" defect. Robust to aspect and to legitimate chrome (unlike the
+            // edge-reach metric, which the user noted mis-flags Gravity's chrome-on-two-edges case),
+            // so it's uniform across every mode. Soft so the loop still captures the whole fixture;
+            // look at the attached failure screenshot.
+            expect.soft(result.largestBlackFrac, `[${label}] the largest empty (black) region should be <=50% of the play area (was ${(result.largestBlackFrac*100).toFixed(0)}%; the board isn't bisecting the space)`).toBeLessThanOrEqual(0.5);
           }
         }
       }
