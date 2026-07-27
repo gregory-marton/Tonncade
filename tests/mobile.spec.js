@@ -1454,8 +1454,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
 
     const result = await page.evaluate((cells) => {
+      // scale 1.15 must match GravityMode.refreshBoard's own getFitView call -- the board is
+      // scaled up to fill its box (see js/gravity.js), so a scale=1 expectation here would be
+      // pinned to the pre-scale-up value, not the actual design.
       const { refW, refH } = Render.getAspectMatchedRefBox();
-      const fit = Render.getFitView(cells, Render.HEX_R * 2, 1, refW, refH);
+      const fit = Render.getFitView(cells, Render.HEX_R * 2, 1.15, refW, refH);
       return { actualZoom: Render.zoom, fitZoom: fit.zoom };
     }, gravityCupCells());
 
