@@ -132,27 +132,38 @@ const SnakeMode = {
         this.refreshBoard();
         this.updateDirectionHighlight();
         
-        const pauseBtn = document.getElementById('snake-start-pause');
-        if (pauseBtn) pauseBtn.textContent = "Pause";
+        this.setPauseIcon(false);
 
         this.setupKeyboardEvents();
         this.startTimer();
+    },
+
+    // Icon-only transport: ⏸ while running (click pauses), ▶ while paused (click resumes) --
+    // the glyph shows the action the click performs. Keep the id and an English title/aria-label
+    // for accessibility and the tests; the visible label is now icon-only (no English UI text --
+    // see the i18n bias in task #29).
+    setPauseIcon: function(paused) {
+        const btn = document.getElementById('snake-start-pause');
+        if (!btn) return;
+        btn.textContent = paused ? '▶' : '⏸';
+        const label = paused ? 'Resume' : 'Pause';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
     },
 
     togglePause: function() {
         if (this.state.isGameOver || this.state.isFlourishing) return;
 
         this.state.isPaused = !this.state.isPaused;
-        const pauseBtn = document.getElementById('snake-start-pause');
 
         if (this.state.isPaused) {
             if (this.state.timer) {
                 clearInterval(this.state.timer);
                 this.state.timer = null;
             }
-            if (pauseBtn) pauseBtn.textContent = "Resume";
+            this.setPauseIcon(true);
         } else {
-            if (pauseBtn) pauseBtn.textContent = "Pause";
+            this.setPauseIcon(false);
             this.startTimer();
         }
     },
