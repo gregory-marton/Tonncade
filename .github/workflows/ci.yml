@@ -1,0 +1,156 @@
+name: CI
+
+# Runs the Playwright suite and publishes the standing screenshots/ fixture (and the app) to a
+# gh-pages branch that GitHub Pages serves. See docs/ci-pages.md for the one-time Pages setup.
+#
+#   main push    -> gh-pages root  (the app at /, the fixture at /screenshots/)
+#   pull_request -> gh-pages /previews/pr-<N>/  (that PR's app + fixture, comparable to main)
+#   PR closed    -> its /previews/pr-<N>/ is pruned
+#
+# Browser availability is gated in playwright.config.js, so this installs chromium + webkit and
+# runs all four device profiles (Desktop, Android, Tablet, iOS/Safari). WebKit runs headless on
+# Linux here -- it's Playwright's cross-platform build, not Safari.app.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+# Serialize writers of the single gh-pages branch so concurrent runs don't clobber each other's
+# push. Do NOT cancel in-progress -- a cancelled publish could leave gh-pages half-written.
+concurrency:
+  group: gh-pages-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # push to gh-pages
+  pull-requests: write   # comment the preview link
+
+jobs:
+  # A closed PR only needs its preview pruned -- no test run.
+  prune-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove the closed PR's preview from gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          repo_url="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          if ! git clone --depth 1 --branch gh-pages "$repo_url" ghp 2>/dev/null; then
+            echo "No gh-pages branch yet; nothing to prune."; exit 0
+          fi
+          cd ghp
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf "previews/pr-${{ github.event.number }}"
+          git add -A
+          if git diff --cached --quiet; then echo "No preview to prune."; exit 0; fi
+          git commit -m "Prune Pages preview for closed PR #${{ github.event.number }}"
+          for i in 1 2 3 4 5; do
+            git push origin gh-pages && exit 0
+            git pull --rebase origin gh-pages || true
+          done
+          echo "Failed to push prune after retries"; exit 1
+
+  test-and-publish:
+    # Runs for main pushes and for any non-closed PR event.
+    if: github.event_name == 'push' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (chromium + webkit)
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run the full suite (generates screenshots/)
+        env:
+          CI: '1'
+        run: npx playwright test
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      # Assemble the site payload: the app (repo working tree, minus dev-only dirs) plus the
+      # freshly generated screenshots/ (its *.png + manifest-*.js are gitignored but present on
+      # disk after the run). .nojekyll so Pages serves paths verbatim (no Jekyll processing).
+      - name: Assemble site payload
+        run: |
+          set -e
+          mkdir -p _payload
+          rsync -a \
+            --exclude='.git' --exclude='node_modules' --exclude='.github' \
+            --exclude='tests' --exclude='test-results' --exclude='playwright-report' \
+            --exclude='_payload' \
+            ./ _payload/
+          touch _payload/.nojekyll
+
+      - name: Publish to gh-pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          repo_url="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          # Clone the existing gh-pages, or start a clean orphan if it doesn't exist yet.
+          if git clone --depth 1 --branch gh-pages "$repo_url" ghp 2>/dev/null; then
+            :
+          else
+            git clone --depth 1 "$repo_url" ghp
+            cd ghp
+            git checkout --orphan gh-pages
+            git rm -rf . >/dev/null 2>&1 || true
+            cd ..
+          fi
+          cd ghp
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # main -> refresh root (app + /screenshots) but KEEP the /previews subtree.
+            find . -mindepth 1 -maxdepth 1 ! -name previews ! -name .git -exec rm -rf {} +
+            rsync -a ../_payload/ ./
+          else
+            # PR -> refresh only this PR's preview dir.
+            dir="previews/pr-${{ github.event.number }}"
+            rm -rf "$dir"
+            mkdir -p "$dir"
+            rsync -a ../_payload/ "$dir/"
+          fi
+
+          git add -A
+          if git diff --cached --quiet; then echo "No site changes to publish."; exit 0; fi
+          git commit -m "Publish site: ${{ github.event_name }} ${{ github.sha }}"
+          for i in 1 2 3 4 5; do
+            git push origin gh-pages && exit 0
+            git pull --rebase origin gh-pages || true
+          done
+          echo "Failed to push gh-pages after retries"; exit 1
+
+      - name: Comment the preview link on the PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          base="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/pr-${{ github.event.number }}"
+          gh pr comment "${{ github.event.number }}" --repo "${{ github.repository }}" --body \
+            "📸 **Preview for this PR** (refreshed each push):
+          - App: ${base}/
+          - Screenshot fixture (Desktop / Android / Tablet / iOS): ${base}/screenshots/
+
+          Compare against main's fixture at https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/screenshots/" \
+            || echo "Comment failed (fork PRs can't comment with the default token) -- non-fatal."
