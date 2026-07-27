@@ -16,3 +16,4 @@ replays/
 # in git), not something that should accumulate binary diffs in history on every UI tweak.
 screenshots/*.png
 screenshots/manifest.js
+screenshots/manifest-*.js

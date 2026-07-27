@@ -32,6 +32,14 @@ for the same reasoning applied elsewhere in this project).
     padding: 20px;
   }
   h1 { font-size: 20px; margin: 0 0 4px 0; }
+  .profile-head {
+    font-size: 22px;
+    margin: 44px 0 4px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #3a4050;
+    color: #7fe0d0;
+  }
+  .profile-head:first-of-type { margin-top: 12px; }
   .subhead { color: #9aa0ad; font-size: 13px; margin-bottom: 20px; }
   h2 {
     font-size: 15px;
@@ -75,7 +83,7 @@ for the same reasoning applied elsewhere in this project).
 <body>
 
 <h1>Screenshot fixture</h1>
-<div class="subhead">Every mode across the same random portrait/landscape/in-between sizes tests/exploratory.spec.js's full-matrix random-tap test already exercises.</div>
+<div class="subhead">Every mode across random portrait/landscape/in-between sizes, on four device profiles — Desktop, Android phone (Pixel 5), Tablet (Galaxy Tab), and iOS/Safari (iPhone/WebKit) — from tests/exploratory.spec.js's full-matrix random-tap test. Each profile is regenerated independently; a full <code>npx playwright test</code> run refreshes all four.</div>
 
 <div id="empty">
   No screenshots found. Run <code>npx playwright test</code> (or just the full-matrix scenario:
@@ -87,7 +95,14 @@ for the same reasoning applied elsewhere in this project).
 
 <div id="groups"></div>
 
-<script src="manifest.js" onerror="window.SCREENSHOT_MANIFEST = window.SCREENSHOT_MANIFEST || null;"></script>
+<!-- One manifest per device profile (Desktop / Android / Tablet / iOS). Each appends to the
+     shared global, so loading them all accumulates every profile that has been generated; a
+     profile whose test hasn't run just 404s harmlessly and is skipped. Slugs match
+     tests/exploratory.spec.js's profileSlug. -->
+<script src="manifest-desktop-chrome.js" onerror="void 0"></script>
+<script src="manifest-mobile-chrome.js" onerror="void 0"></script>
+<script src="manifest-tablet-chrome.js" onerror="void 0"></script>
+<script src="manifest-mobile-safari.js" onerror="void 0"></script>
 <script>
 (function() {
   const manifest = window.SCREENSHOT_MANIFEST;
@@ -100,13 +115,32 @@ for the same reasoning applied elsewhere in this project).
   // "Melody". Show the user-facing name here.
   const DISPLAY_NAME = { sandbox: 'Sandbox', midi: 'Melody', compose: 'Compose', snake: 'Snake', blast: 'Blast', gravity: 'Gravity' };
 
-  const byMode = {};
+  // Group by device profile first (Desktop / Android phone / Tablet / iOS), then by mode within
+  // each, so every profile is visible side by side rather than one clobbering the others.
+  const PROFILE_ORDER = ['Desktop', 'Android phone', 'Tablet', 'iOS (Safari)'];
+  const byProfile = {};
   manifest.forEach(entry => {
-    (byMode[entry.mode] = byMode[entry.mode] || []).push(entry);
+    const p = entry.profile || 'Other';
+    (byProfile[p] = byProfile[p] || []).push(entry);
+  });
+  const profiles = Object.keys(byProfile).sort((a, b) => {
+    const ia = PROFILE_ORDER.indexOf(a), ib = PROFILE_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
 
   const groupsEl = document.getElementById('groups');
-  Object.keys(byMode).sort().forEach(mode => {
+  profiles.forEach(profile => {
+   const profEntries = byProfile[profile];
+   const profHead = document.createElement('h1');
+   profHead.className = 'profile-head';
+   profHead.textContent = profile + ' — ' + profEntries.length + ' shots';
+   groupsEl.appendChild(profHead);
+
+   const byMode = {};
+   profEntries.forEach(entry => {
+    (byMode[entry.mode] = byMode[entry.mode] || []).push(entry);
+   });
+   Object.keys(byMode).sort().forEach(mode => {
     const h2 = document.createElement('h2');
     h2.textContent = DISPLAY_NAME[mode] || mode;
     groupsEl.appendChild(h2);
@@ -138,6 +172,7 @@ for the same reasoning applied elsewhere in this project).
       row.appendChild(figure);
     });
     groupsEl.appendChild(row);
+   });
   });
 })();
 </script>
