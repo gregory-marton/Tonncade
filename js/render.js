@@ -414,15 +414,18 @@ const Render = {
         const contentAspect = (bounds.maxX - bounds.minX) / (bounds.maxY - bounds.minY);
         if (!isFinite(contentAspect) || contentAspect <= 0) return false;
 
-        // Snake portrait: its D-pad is two narrow columns hugging the left/right edges with a wide
-        // empty center gap (unlike Gravity's full-width bottom bar), and the board is a hexagon
-        // whose left/right VERTICES -- its widest point -- sit at its vertical center. The flat
-        // top/bottom/left/right clearance model below can only reserve rectangular bands, so it
-        // shrinks the board to whatever fits ABOVE the whole D-pad row, wasting the entire center
-        // gap and most of the width. A shape-aware fit instead lets the board be nearly full width,
-        // its tapering lower flanks sliding into the gap between the two columns (the SVG box's own
-        // empty corners are what overlap the columns, never a real cell). See fitBoardShapeAware.
-        if (App.currentMode === 'snake' && !this.isMobileLandscape()) {
+        // Snake (both orientations): its D-pad clusters and stats panel sit in the CORNERS with a
+        // wide empty gap between/around them, and the board is a hexagon whose left/right VERTICES
+        // -- its widest point -- sit at its vertical center. The flat top/bottom/left/right
+        // clearance model below can only reserve rectangular bands, so it shrinks the board to
+        // whatever fits clear of the whole D-pad row/columns, wasting the corner gaps and most of
+        // the space (found live at tablet/near-square sizes too, not just portrait: the board
+        // rendered at ~half size, shoved off-center). A shape-aware fit instead lets the board be
+        // nearly as large as the space, its tapering flanks sliding into the corner gaps (the SVG
+        // box's own empty corners are what overlap the D-pad, never a real cell). fitBoardShapeAware
+        // reads the actual chrome rects, so it adapts to wherever the clusters land in either
+        // orientation. See fitBoardShapeAware.
+        if (App.currentMode === 'snake') {
             const placed = this.fitBoardShapeAware(cells, bounds, containerRect);
             if (placed) {
                 this.svg.style.position = 'absolute';
