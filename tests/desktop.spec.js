@@ -1436,6 +1436,61 @@ test.describe('Life isotropy classifier', () => {
   });
 });
 
+// #85: Life rule evaluator -- applies a parsed rule (birth/survival clauses) to a cell given its
+// neighbourhood, computing the next alive/dead state. Covers count shorthand, isotropy and
+// require/forbid clauses.
+test.describe('Life rule evaluator', () => {
+  test('evaluates count, isotropy and require/forbid clauses', async ({ page }) => {
+    await page.goto('/');
+    // Builds a neighbourhood from an explicit set of live [p,q] cells, then evaluates `rule`
+    // at the origin given it is/ isn't currently alive.
+    const next = (rule, alive, liveCells) => page.evaluate(({ rule, alive, liveCells }) => {
+      const set = new Set(liveCells.map(([p, q]) => p + ',' + q));
+      const isAlive = (p, q) => set.has(p + ',' + q);
+      const nb = Life.neighbourhood(0, 0, isAlive);
+      return Life.nextState(rule, alive, nb);
+    }, { rule, alive, liveCells });
+
+    // 3,5 / 2 : survive on 3 or 5 ring-neighbours, born on 2 (flat-list count shorthand).
+    const r352 = { survival: [3, 5], birth: [2] };
+    // Two live consonant neighbours (fifth_up (1,0), fifth_down (-1,0)) -> a dead cell is born.
+    expect(await next(r352, false, [[1, 0], [-1, 0]])).toBe(true);
+    // A live cell with only those 2 neighbours does NOT survive (2 not in {3,5}).
+    expect(await next(r352, true, [[1, 0], [-1, 0]])).toBe(false);
+    // A live cell with 3 neighbours survives.
+    expect(await next(r352, true, [[1, 0], [-1, 0], [0, 1]])).toBe(true);
+
+    // Isotropy clause: born only when the 2 live neighbours are opposite (para), not adjacent.
+    const rPara = { birth: [{ ring_count: [2], isotropy: ['para'] }], survival: [] };
+    expect(await next(rPara, false, [[1, 0], [-1, 0]])).toBe(true);           // fifth_up + fifth_down = para
+    expect(await next(rPara, false, [[1, 0], [1, -1]])).toBe(false);          // fifth_up + major_third_up = ortho
+
+    // require/forbid a named interval neighbour: born on 1 ring neighbour only if a semitone-up
+    // cell (1,-2) is also alive and no tritone-up cell (0,2) is.
+    const rReq = { birth: [{ ring_count: [1], require: ['semitone_up'], forbid: ['tritone_up'] }], survival: [] };
+    expect(await next(rReq, false, [[1, 0], [1, -2]])).toBe(true);            // 1 ring + semitone_up present
+    expect(await next(rReq, false, [[1, 0]])).toBe(false);                    // missing semitone_up
+    expect(await next(rReq, false, [[1, 0], [1, -2], [0, 2]])).toBe(false);   // tritone_up forbidden
+  });
+});
+
+// #85: Life step -- one generation. Given the live set and a rule, produce the next generation,
+// considering live cells and every cell that could be born (their neighbours).
+test('Life step advances one generation over the live set and birthable neighbours', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    // Rule: a cell is born with exactly 1 live ring-neighbour; survives with 1 or 2.
+    const rule = { birth: [1], survival: [1, 2] };
+    const live = new Set(['0,0']);
+    const next = Life.step(live, rule);
+    return [...next].sort();
+  });
+  // (0,0) has 0 ring-neighbours -> dies. Each of its 6 ring neighbours has exactly (0,0) as a
+  // single live ring-neighbour -> born. So the next generation is exactly the 6 consonant cells.
+  expect(result.length).toBe(6);
+  expect(result).toEqual(['-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0'].sort());
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.
