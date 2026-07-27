@@ -371,10 +371,12 @@ const GravityMode = {
         if (this.state.linesCleared > best) {
             localStorage.setItem('tonncade_gravity_best', this.state.linesCleared.toString());
         }
+        const bestVal = Math.max(best, this.state.linesCleared);
         const bestEl = document.getElementById('gravity-best-count');
         if (bestEl) {
-            bestEl.textContent = Math.max(best, this.state.linesCleared);
+            bestEl.textContent = bestVal;
         }
+        Render.setStatBar('gravity-lines-fill', this.state.linesCleared, bestVal);
 
         const speedEl = document.getElementById('gravity-speed-level');
         if (speedEl) speedEl.textContent = (1000 / this.state.dropInterval).toFixed(1) + 'x';

@@ -274,6 +274,16 @@ const Render = {
     // {top, bottom, left, right} clearance needed from #game-container's own edges. Shared by
     // updateChromeInsets (CSS custom properties, a fallback/compat path) and fitContentBox (the
     // real fix, see INV-40) -- one measurement, two consumers.
+    // Set a compact "current vs best" stat bar-graph's fill (see .stat-bar in css/style.css):
+    // the fill width is current/best, so a full bar == a new personal best. Shared by
+    // Blast/Gravity/Snake (task #79). best is passed already max'd with current by the caller.
+    setStatBar: function(fillId, current, best) {
+        const fill = document.getElementById(fillId);
+        if (!fill) return;
+        const denom = Math.max(best, current, 0);
+        fill.style.width = denom > 0 ? `${Math.min(100, 100 * current / denom)}%` : '0%';
+    },
+
     // Gravity's control layout is chosen by cup-vs-viewport WIDTH, not the orientation media
     // query (see docs/invariants.md / project memory). The cup is a tall well: the board wants
     // height, the stats bar and transport do not. Whenever the viewport is enough wider than the

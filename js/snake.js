@@ -505,6 +505,7 @@ const SnakeMode = {
         if (scoreEl) {
             scoreEl.textContent = this.state.score;
         }
+        Render.setStatBar('snake-score-fill', this.state.score, Math.max(this.state.bestScore, this.state.score));
     },
 
     updateStreakUI: function() {
@@ -512,6 +513,7 @@ const SnakeMode = {
         if (bestEl) {
             bestEl.textContent = this.state.bestScore;
         }
+        Render.setStatBar('snake-score-fill', this.state.score, Math.max(this.state.bestScore, this.state.score));
     },
 
     // Continuously highlights whichever D-pad arrow matches state.nextDirection, so the

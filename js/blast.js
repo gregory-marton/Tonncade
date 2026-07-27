@@ -110,10 +110,13 @@ const BlastMode = {
         if (this.state.linesCleared > best) {
             localStorage.setItem('tonncade_blast_best', this.state.linesCleared.toString());
         }
+        const bestVal = Math.max(best, this.state.linesCleared);
         const bestEl = document.getElementById('blast-best-count');
         if (bestEl) {
-            bestEl.textContent = Math.max(best, this.state.linesCleared);
+            bestEl.textContent = bestVal;
         }
+        // Bar-graph fill: lines cleared as a fraction of the best (full bar == a new record).
+        Render.setStatBar('blast-lines-fill', this.state.linesCleared, bestVal);
 
         this.refreshBoard();
         this.updateGhost();

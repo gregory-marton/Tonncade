@@ -80,8 +80,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="blast-reset" class="icon-btn" title="New game" aria-label="New game">↻</button>
                     </div>
                     <div class="stats-panel">
-                        <p>Lines: <span id="lines-count">0</span></p>
-                        <p>Best: <span id="blast-best-count">0</span></p>
+                        <div class="stat-bar" role="img" aria-label="Lines cleared as a fraction of your best">
+                            <div class="stat-bar-fill" id="blast-lines-fill"></div>
+                            <span class="stat-bar-num"><span id="lines-count">0</span></span>
+                            <span class="stat-bar-best">/<span id="blast-best-count">0</span></span>
+                        </div>
                     </div>
                 </div>
 
@@ -92,8 +95,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="gravity-reset">Restart</button>
                     </div>
                     <div class="stats-panel">
-                        <p>Lines: <span id="gravity-lines-count">0</span></p>
-                        <p>Best: <span id="gravity-best-count">0</span></p>
+                        <div class="stat-bar" role="img" aria-label="Lines cleared as a fraction of your best">
+                            <div class="stat-bar-fill" id="gravity-lines-fill"></div>
+                            <span class="stat-bar-num"><span id="gravity-lines-count">0</span></span>
+                            <span class="stat-bar-best">/<span id="gravity-best-count">0</span></span>
+                        </div>
                         <p>Speed: <span id="gravity-speed-level">1.0x</span></p>
                     </div>
                 </div>
@@ -252,8 +258,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="snake-reset" class="icon-btn" title="Restart" aria-label="Restart">↻</button>
                     </div>
                     <div class="stats-panel">
-                        <p>Score: <span id="snake-score">0</span></p>
-                        <p>Best: <span id="snake-best-score">0</span></p>
+                        <div class="stat-bar" role="img" aria-label="Score as a fraction of your best">
+                            <div class="stat-bar-fill" id="snake-score-fill"></div>
+                            <span class="stat-bar-num"><span id="snake-score">0</span></span>
+                            <span class="stat-bar-best">/<span id="snake-best-score">0</span></span>
+                        </div>
                     </div>
                     <div id="snake-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
                         <p style="margin: 0 0 5px 0;"><strong>Keyboard Steering (surrounds G):</strong></p>
