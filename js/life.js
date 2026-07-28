@@ -684,6 +684,26 @@ const LifeMode = {
         if (gen) gen.textContent = this.state.generation;
     },
 
+    // ---- Cross-mode copy/paste (App.copy/App.paste; see js/main.js, docs/invariants.md INV-47) ----
+    // Life uses the standard mapping, so its (p,q) are already canonical. Copy flattens state away
+    // (just positions); paste makes every cell state 1 (the user can then tap-cycle states).
+    copyCells: function() {
+        return [...this.state.live.keys()].map((k) => {
+            const parts = k.split(',');
+            return { p: +parts[0], q: +parts[1] };
+        });
+    },
+    pasteClipboard: function(cells) {
+        const midis = [];
+        cells.forEach((c) => {
+            this.state.live.set(c.p + ',' + c.q, 1);
+            midis.push(Tonnetz.getMidi(c.p, c.q));
+        });
+        this.paintLive();
+        this.updateControls();
+        if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
     cleanup: function() { this.stop(); },
 };
 

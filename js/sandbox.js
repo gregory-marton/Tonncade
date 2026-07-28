@@ -35,6 +35,7 @@ const SandboxMode = {
         selectedPiece: null,
         rotation: 0,
         placedPieces: [], // { type, p, q, rotation }
+        placedCells: [],  // { p, q } -- individual cells pasted in (not carousel pieces); #copy/paste
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
         hoverCell: { p: 0, q: 0 },
@@ -264,7 +265,8 @@ const SandboxMode = {
         };
         Render.drawLattice(viewport, {});
         this.renderPlacedPieces();
-        
+        this.renderPlacedCells();
+
         // Re-append note and keyboard labels to the end of the SVG so they render on top of placed pieces
         const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
         labels.forEach(lbl => Render.appendToLattice(lbl));
@@ -296,6 +298,45 @@ const SandboxMode = {
                 Render.appendToLattice(hex);
             });
         });
+    },
+
+    // Individual pasted cells (see App copy/paste). Rendered as filled accent hexes, distinct from
+    // carousel-placed pieces.
+    renderPlacedCells: function() {
+        this.state.placedCells.forEach((c) => {
+            const hex = Render.createHex(c.p, c.q, {
+                fill: 'var(--accent)',
+                stroke: 'white',
+                strokeWidth: 2,
+                className: 'placed-cell',
+                data: { placed: true, p: c.p, q: c.q },
+            });
+            Render.appendToLattice(hex);
+        });
+    },
+
+    // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
+    // Sandbox uses the standard mapping, so its (p,q) are canonical. Copy = every placed piece's
+    // cells plus any pasted cells. Paste = add each cell to placedCells and redraw.
+    copyCells: function() {
+        const cells = [];
+        this.state.placedPieces.forEach((piece) => {
+            Pieces.getAbsoluteCells(piece.type, piece.p, piece.q, piece.rotation)
+                .forEach((c) => cells.push({ p: c.p, q: c.q }));
+        });
+        this.state.placedCells.forEach((c) => cells.push({ p: c.p, q: c.q }));
+        return cells;
+    },
+    pasteClipboard: function(cells) {
+        const have = new Set(this.state.placedCells.map((c) => c.p + ',' + c.q));
+        const midis = [];
+        cells.forEach((c) => {
+            const key = c.p + ',' + c.q;
+            if (!have.has(key)) { this.state.placedCells.push({ p: c.p, q: c.q }); have.add(key); }
+            midis.push(Tonnetz.getMidi(c.p, c.q));
+        });
+        this.refreshLattice();
+        if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
     setupEvents: function() {

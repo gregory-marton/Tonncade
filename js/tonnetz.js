@@ -83,6 +83,23 @@ const Tonnetz = {
         return Math.ceil(this.midiFromFrequency(this.HEARING_MIN_HZ));   // 16
     },
 
+    // Gravity <-> canonical coordinate transforms (for cross-mode copy/paste).
+    //
+    // Gravity's pitch mapping (23 - 3p + 4q) is EXACTLY the standard Tonnetz (60 + 7p + 3q) rotated
+    // 120 degrees -- an integer lattice automorphism (the same interval set {3,4,7} per hex step,
+    // reassigned to different directions). So there is one canonical coordinate system (standard),
+    // and Gravity's coords convert to/from it by a fixed affine integer transform that PRESERVES
+    // PITCH. Cross-mode copy/paste stores canonical (p,q) and lets Gravity translate at its edge;
+    // pitch is then preserved automatically, with no frequency search and no same-pitch collisions.
+    //
+    // Derived from getMidi_standard(canonical) === getMidi_gravity(p,q); verified by test.
+    gravityToCanonical: function(p, q) {
+        return { p: q - 4, q: -p - q - 3 };
+    },
+    canonicalToGravity: function(p, q) {
+        return { p: -p - q - 7, q: p + 4 };
+    },
+
     // Neighbors in 6 directions
     getNeighbors: function(p, q) {
         return [

@@ -1789,6 +1789,58 @@ test('Gravity board sits an octave lower', async ({ page }) => {
   }
 });
 
+// Cross-mode copy/paste stores CANONICAL (standard-mapping) coordinates; Gravity's mapping is the
+// standard Tonnetz rotated 120deg, so its cells convert to/from canonical by a fixed affine integer
+// transform that must PRESERVE PITCH and round-trip to identity. This is what makes pitch-perfect
+// paste to/from Gravity work with no frequency search.
+test('Tonnetz gravity<->canonical transforms preserve pitch and round-trip', async ({ page }) => {
+  await page.goto('/');
+  const bad = await page.evaluate(() => {
+    const gravityPitch = (p, q) => { App.currentMode = 'gravity'; return Tonnetz.getMidi(p, q); };
+    const standardPitch = (p, q) => { App.currentMode = 'sandbox'; return Tonnetz.getMidi(p, q); };
+    const problems = [];
+    for (let p = -8; p <= 8; p++) {
+      for (let q = -8; q <= 8; q++) {
+        const canon = Tonnetz.gravityToCanonical(p, q);
+        const gP = gravityPitch(p, q);
+        const sP = standardPitch(canon.p, canon.q);
+        if (sP !== gP) problems.push(`pitch (${p},${q}): gravity ${gP} vs canonical ${sP}`);
+        const back = Tonnetz.canonicalToGravity(canon.p, canon.q);
+        if (back.p !== p || back.q !== q) problems.push(`roundtrip (${p},${q}) -> (${back.p},${back.q})`);
+      }
+    }
+    App.currentMode = 'sandbox';
+    return problems.slice(0, 5);
+  });
+  expect(bad).toEqual([]);
+});
+
+// Cross-mode copy/paste driving scenario: build cells in Sandbox, copy, switch to Life, paste.
+// Same mapping (both standard) => the exact same cells and pitches land in Life.
+test('Copy/paste: Sandbox cells paste into Life at the same pitches', async ({ page }) => {
+  await page.goto('/');
+  const clip = await page.evaluate(() => {
+    SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 1, q: 0 }, { p: 0, q: 1 }];
+    SandboxMode.refreshLattice();
+    App.copy();
+    document.querySelector('.mode-option[data-mode="life"]').click();
+    return App.clipboard.map((c) => c.p + ',' + c.q).sort();
+  });
+  expect(clip).toEqual(['0,0', '0,1', '1,0']); // copied Sandbox's placed cells (canonical coords)
+
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  const res = await page.evaluate(() => {
+    LifeMode.clear();
+    App.paste();
+    const liveKeys = [...LifeMode.state.live.keys()].sort();
+    const livePitches = liveKeys.map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b);
+    const clipPitches = App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
+    return { liveKeys, livePitches, clipPitches };
+  });
+  expect(res.liveKeys).toEqual(['0,0', '0,1', '1,0']); // pasted into Life at the same cells
+  expect(res.livePitches).toEqual(res.clipPitches);     // and the same pitches (true-pitch preserved)
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

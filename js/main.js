@@ -28,6 +28,78 @@ for the JavaScript code in this file.
 const App = {
     currentMode: '',
 
+    // Cross-mode clipboard: a flat list of CANONICAL (standard-mapping) cells {p,q}. Copy/paste
+    // preserves true pitch (INV-46) across every mode; each mode translates canonical coords to/from
+    // its own at its edge (Gravity via Tonnetz.gravity<->canonical, the rest identity). See
+    // docs/invariants.md INV-47.
+    clipboard: [],
+
+    // The mode module for the current mode, for routing copy/paste (and future cross-mode ops).
+    modeModule: function() {
+        return ({
+            sandbox: typeof SandboxMode !== 'undefined' ? SandboxMode : null,
+            midi: typeof MidiMode !== 'undefined' ? MidiMode : null,
+            compose: typeof ComposeMode !== 'undefined' ? ComposeMode : null,
+            snake: typeof SnakeMode !== 'undefined' ? SnakeMode : null,
+            blast: typeof BlastMode !== 'undefined' ? BlastMode : null,
+            gravity: typeof GravityMode !== 'undefined' ? GravityMode : null,
+            life: typeof LifeMode !== 'undefined' ? LifeMode : null,
+        })[this.currentMode] || null;
+    },
+
+    // Copy every placed cell of the current mode into the clipboard, as canonical coords.
+    copy: function() {
+        const m = this.modeModule();
+        if (!m || typeof m.copyCells !== 'function') return;
+        const cells = m.copyCells() || [];
+        // De-dup identical canonical cells so repeated placements don't pile up.
+        const seen = new Set();
+        this.clipboard = cells.filter((c) => {
+            const k = c.p + ',' + c.q;
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+        });
+        this.flashClipboardButton('copy-btn');
+    },
+
+    // Paste the clipboard into the current mode (each mode applies its own placement rules).
+    paste: function() {
+        const m = this.modeModule();
+        if (!m || typeof m.pasteClipboard !== 'function' || !this.clipboard.length) return;
+        m.pasteClipboard(this.clipboard);
+        this.flashClipboardButton('paste-btn');
+    },
+
+    flashClipboardButton: function(id) {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.style.transform = 'scale(1.35)';
+        btn.style.opacity = '1';
+        setTimeout(() => { btn.style.transform = ''; btn.style.opacity = ''; }, 180);
+    },
+
+    // Ctrl/Cmd+C / Ctrl/Cmd+V (desktop) + the header copy/paste buttons (touch). The keyboard path
+    // steps aside when the user is editing text or has a real text selection, so normal text
+    // copy/paste still works; otherwise it copies/pastes Tonnetz cells.
+    setupClipboard: function() {
+        const editable = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+            el.tagName === 'SELECT' || el.isContentEditable);
+        document.addEventListener('keydown', (e) => {
+            if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+            const k = e.key.toLowerCase();
+            if (k !== 'c' && k !== 'v') return;
+            if (editable(e.target)) return;
+            if (k === 'c' && String(window.getSelection())) return; // real text selection -> let it copy
+            e.preventDefault();
+            if (k === 'c') this.copy(); else this.paste();
+        });
+        const copyBtn = document.getElementById('copy-btn');
+        const pasteBtn = document.getElementById('paste-btn');
+        if (copyBtn) copyBtn.onclick = () => this.copy();
+        if (pasteBtn) pasteBtn.onclick = () => this.paste();
+    },
+
     init: function() {
         if (typeof Replay !== 'undefined') Replay.init();
 
@@ -60,6 +132,7 @@ const App = {
         this.updateVersionTag();
         this.setupMidiInput();
         this.setupRotateView();
+        this.setupClipboard();
 
         window.addEventListener('resize', () => {
             this.setupMobileControls();
