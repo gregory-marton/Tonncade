@@ -561,11 +561,17 @@ const LifeMode = {
         }
     },
 
+    // Tap a cell to cycle it through its states: empty -> 1 -> 2 -> ... -> (states-1) -> empty.
+    // For a 2-state automaton that's the familiar alive/dead toggle; for a multi-state one it's the
+    // only way to hand-place cells in states beyond 1. Each newly-nonzero tap sounds the cell's own
+    // pitch (the pitch invariant) as composing feedback.
     toggleCell: function(p, q) {
         const key = p + ',' + q;
-        if (this.state.live.has(key)) this.state.live.delete(key);
+        const states = this.state.multi ? this.state.multi.states : 2;
+        const next = ((this.state.live.get(key) || 0) + 1) % states;
+        if (next === 0) this.state.live.delete(key);
         else {
-            this.state.live.set(key, 1);
+            this.state.live.set(key, next);
             Synth.playNote(Tonnetz.getMidi(p, q), 0, 0.3); // audible feedback while composing
         }
         this.paintLive();

@@ -1695,6 +1695,32 @@ test('Life: off-board cells keep living but fall silent (#13)', async ({ page })
   expect(out.played).not.toContain(out.offMidi); // the off-board (16,0) makes no sound at all
 });
 
+// #85: In a multi-state automaton, tapping a cell must be able to reach every state -- it cycles
+// empty -> 1 -> 2 -> ... -> (states-1) -> empty. (A 2-state automaton stays a plain alive/dead
+// toggle.) Without this, only state 1 could ever be placed by hand.
+test('Life: tapping a cell cycles it through all states (#85)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const out = await page.evaluate(async () => {
+    await LifeMode.loadAutomatonFile('beehive.yaml'); // 3-state
+    LifeMode.clear();
+    const s = () => LifeMode.state.live.get('5,5') || 0;
+    const multiSeq = [s()];
+    for (let i = 0; i < 4; i++) { LifeMode.toggleCell(5, 5); multiSeq.push(s()); }
+
+    await LifeMode.loadAutomatonFile('3-5-2.yaml'); // 2-state
+    LifeMode.clear();
+    const t = () => LifeMode.state.live.get('6,6') || 0;
+    const twoSeq = [t()];
+    for (let i = 0; i < 3; i++) { LifeMode.toggleCell(6, 6); twoSeq.push(t()); }
+    return { multiSeq, twoSeq };
+  });
+  expect(out.multiSeq).toEqual([0, 1, 2, 0, 1]); // empty->1->2->empty (mod 3)->1
+  expect(out.twoSeq).toEqual([0, 1, 0, 1]);      // 2-state remains a plain toggle
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.
