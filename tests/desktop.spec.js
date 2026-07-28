@@ -1894,6 +1894,27 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   expect(res.size).toBe(2);           // original pile cell + one pasted cell
 });
 
+// Sandbox draws inaudible cells (outside human hearing) in dull gray so a pasted large Life game
+// is inspectable and the way back to the audible band stays visible.
+test('Sandbox: inaudible cells render gray, audible cells stay normal', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    const poly = (p, q) => Render.svg.querySelector(`polygon.cell:not(.ghost)[data-p="${p}"][data-q="${q}"]`);
+    const gray = poly(20, 0);  // getMidi 200 -- inaudible, was clipped entirely before
+    const heard = poly(0, 0);  // getMidi 60 -- audible
+    return {
+      audible200: Tonnetz.isAudible(200), audible60: Tonnetz.isAudible(60),
+      grayDrawn: !!gray, grayFill: gray && gray.getAttribute('fill'),
+      heardFill: heard && heard.getAttribute('fill'),
+    };
+  });
+  expect(out.audible200).toBe(false);
+  expect(out.audible60).toBe(true);
+  expect(out.grayDrawn).toBe(true);            // inaudible cell is now drawn (reachable)...
+  expect(out.grayFill).toBe('#34373f');        // ...in dull gray
+  expect(out.heardFill).not.toBe('#34373f');   // audible cells keep their normal fill
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

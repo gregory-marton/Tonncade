@@ -1182,6 +1182,26 @@ a retune wasn't worth it — the top was judged fine and, at most, the bottom co
 someday. So this is a known, accepted characteristic, not an open task. This invariant is what
 surfaced it.
 
+### INV-47: copy/paste preserves true pitch across modes
+
+Cross-mode copy/paste (Ctrl/Cmd+C/V, or the header ⧉/📋 buttons) moves cells between modes and
+must **preserve their true pitch** — the corollary of INV-46 for material that travels. The
+clipboard stores plain **canonical** (standard-mapping) coordinates: every mode is either the
+standard Tonnetz (`60+7p+3q`) or Gravity, and Gravity's mapping is exactly the standard Tonnetz
+rotated 120° (`Tonnetz.gravityToCanonical`/`canonicalToGravity`, an exact pitch-preserving integer
+transform). So a pasted cell reproduces the copied pitch in the target mode's mapping — identically
+for the five standard modes, and via the rotation for Gravity — with **no frequency search and no
+same-pitch collisions** (coordinates keep distinct same-pitch cells distinct, which pitch alone
+could not). Each mode then applies its own placement rules (Gravity: in-cup, non-overlapping; Snake:
+in-bounds food; etc.), so some cells may be dropped — but any cell that IS placed carries its exact
+original pitch. Rotation/translation are deliberately not offered here (paste into Compose for
+those). Melody, a fixed practice drill, doesn't participate.
+
+**Tests:** `tests/desktop.spec.js` — the gravity↔canonical transform (pitch + round-trip),
+Sandbox→Life (same-mapping, exact cells + pitches), Gravity→Sandbox (cross-mapping, pitches
+preserved), and paste-into-Gravity honoring cup/overlap. `tests/invariants.spec.js` — "INV-47"
+asserts a copied set's pitch multiset survives a copy → switch mode → paste.
+
 ---
 
 ## Primary Elements

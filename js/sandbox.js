@@ -259,11 +259,15 @@ const SandboxMode = {
 
     refreshLattice: function() {
         this.hidePlacedTooltip();
+        // A generous box so inaudible cells (drawn dull gray, see grayInaudible) are reachable by
+        // panning -- for inspecting pasted large Life games and finding the way back to the audible
+        // band. Very-far cells beyond the box are a known limit (view-relative redraw is a later
+        // refinement).
         const viewport = {
-            minP: -15, maxP: 15,
-            minQ: -15, maxQ: 15
+            minP: -22, maxP: 22,
+            minQ: -22, maxQ: 22
         };
-        Render.drawLattice(viewport, {});
+        Render.drawLattice(viewport, { grayInaudible: true });
         this.renderPlacedPieces();
         this.renderPlacedCells();
 

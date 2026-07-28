@@ -1761,4 +1761,29 @@ test.describe('Invariant tests', () => {
         .toBeCloseTo(r.expected, 3);
     }
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-47: cross-mode copy/paste preserves true pitch.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-47: copy/paste carries a cell set\'s pitch multiset across a mode switch', async ({ page }) => {
+    // Copy a set of cells in Sandbox, switch modes, paste, and assert the pasted cells carry the
+    // exact same multiset of pitches -- the corollary of INV-46 for material that travels.
+    const copiedPitches = await page.evaluate(() => {
+      SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 2, q: -1 }, { p: -1, q: 3 }];
+      SandboxMode.refreshLattice();
+      App.copy();
+      document.querySelector('.mode-option[data-mode="life"]').click();
+      return App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
+    });
+    await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+    const pastedPitches = await page.evaluate(() => {
+      LifeMode.clear();
+      App.paste();
+      return [...LifeMode.state.live.keys()]
+        .map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); })
+        .sort((a, b) => a - b);
+    });
+    expect(pastedPitches).toEqual(copiedPitches);
+  });
 });

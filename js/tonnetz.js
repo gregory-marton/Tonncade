@@ -82,6 +82,9 @@ const Tonnetz = {
     audibleMinMidi: function() {
         return Math.ceil(this.midiFromFrequency(this.HEARING_MIN_HZ));   // 16
     },
+    isAudible: function(midi) {
+        return midi >= this.audibleMinMidi() && midi <= this.audibleMaxMidi();
+    },
 
     // Gravity <-> canonical coordinate transforms (for cross-mode copy/paste).
     //

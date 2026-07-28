@@ -200,13 +200,22 @@ const Render = {
         for (let p = viewport.minP; p <= viewport.maxP; p++) {
             for (let q = viewport.minQ; q <= viewport.maxQ; q++) {
                 const midi = Tonnetz.getMidi(p, q);
-                if (!options.isSnake && !options.isGravity && (midi < 0 || midi > audibleCeiling)) continue;
+                // With grayInaudible (Sandbox inspection view) INAUDIBLE cells are still drawn --
+                // in dull gray, so a large pasted Life game can be inspected off the audible band
+                // and the way back to hearing stays visible. Otherwise, pannable modes clip to the
+                // audible range (0..audibleCeiling).
+                const audible = Tonnetz.isAudible(midi);
+                if (!options.isSnake && !options.isGravity && !options.grayInaudible &&
+                    (midi < 0 || midi > audibleCeiling)) continue;
 
                 // For Blast Mode, dim cells outside the radius
                 let fill = '#1c1f28';
                 let opacity = 1;
                 if (options.isBlast && !Board.isInBounds(p, q)) {
                     opacity = 0.2;
+                }
+                if (options.grayInaudible && !audible) {
+                    fill = '#34373f'; // dull gray -- outside human hearing, will not sound
                 }
                 if (options.isGravity) {
                     const col = p + Math.floor(q / 2);
@@ -227,7 +236,9 @@ const Render = {
                 hex.style.opacity = opacity;
                 group.appendChild(hex);
 
-                if (opacity > 0.5) {
+                // Inaudible gray cells get no note label (they have no sounding pitch to name);
+                // audible cells label as usual.
+                if (opacity > 0.5 && (audible || !options.grayInaudible)) {
                     const label = this.createLabel(p, q, Tonnetz.getNoteName(midi));
                     group.appendChild(label);
 
