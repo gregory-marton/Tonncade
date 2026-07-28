@@ -24,12 +24,16 @@ Unlike a plain hex grid, the Tonnetz makes **non-adjacent** intervals musically 
 whole tone, a semitone), so the rule vocabulary reaches past the six touching cells.
 
 The lattice is mathematically **unbounded** — `(p, q)` is well-defined arbitrarily far out — so a
-cell that steps off the visible Tonnetz **keeps living and evolving** (and can be saved that way);
-it just falls **silent**. A cell sounds only its own current `getMidi(p,q)`, and only within the
-visible/audible range; it must never re-sound a stale note from a position it has since left. That
-is the pitch invariant applied to motion, and it's what issue #13 was really about — a glider that
-left the board kept sounding its *last on-board* note. (A far outer `HARD_BOUNDS` caps where cells
-may live, purely so an explosive rule can't grow without limit and freeze the tab.)
+cell that steps off the drawn Tonnetz **keeps living and evolving** (and can be saved that way). It
+also keeps **sounding**: a real cell that's doing something sounds its own current `getMidi(p,q)`
+wherever it is, on- or off-screen. The founding invariant is that *real active cells sound*, not
+that *only on-screen ones do* — it's fine to hear a glider recede off the edge. What must never
+happen is a **stale** note: a cell re-sounding a pitch from a position it has since left. Because we
+always sound the cell's *current* position, that can't happen. Issue #13 was really caused by the
+old octave-**fold** (see INV-46): it dragged a receding glider's far, should-be-inaudible pitches
+back into the audible range, so the glider seemed to drone on. With true pitch, a far cell simply
+sounds its own (eventually inaudible) frequency and fades naturally. (A far outer `HARD_BOUNDS`
+caps where cells may live, purely so an explosive rule can't grow without limit and freeze the tab.)
 
 ### The consonant ring — the 6 adjacent hexes
 

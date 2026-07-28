@@ -516,20 +516,18 @@ const LifeMode = {
         return this.state.sound;
     },
 
-    // The drawn/visible Tonnetz -- and the range a cell must be in to SOUND. A cell OUTSIDE these
-    // bounds keeps living and evolving (the Tonnetz is mathematically unbounded, and cells far out
-    // are still well-defined and saveable) but falls SILENT: nothing outside the visible/audible
-    // range may sound (issue #13). (Extending the drawn range toward full human hearing is a
-    // separate enhancement; these are today's drawn bounds.)
+    // The drawn extent of the Tonnetz (what refreshLattice renders). This is NOT a sound gate: a
+    // cell sounds wherever it is, on- or off-screen, as long as it's a real cell doing something
+    // (INV-46 + #13). Off-screen cells keep living, sound their own true pitch, and are saveable;
+    // this bound only governs what's drawn.
     BOUNDS: { minP: -15, maxP: 15, minQ: -15, maxQ: 15 },
 
     // A far outer safety cap on where cells may LIVE. The math goes on forever, but a running
     // automaton needs some hard bound so an explosive rule can't grow without limit and freeze the
-    // tab. Set well beyond the visible bounds so off-screen gliders travel (and return) freely and
-    // saved files may specify cells far outside the visible Tonnetz.
+    // tab. Set well beyond the drawn bounds so off-screen gliders travel (and return) freely and
+    // saved files may specify cells far outside the drawn Tonnetz.
     HARD_BOUNDS: { minP: -64, maxP: 64, minQ: -64, maxQ: 64 },
 
-    inBounds: function(key) { return this._within(key, this.BOUNDS); },          // visible / audible
     inHardBounds: function(key) { return this._within(key, this.HARD_BOUNDS); }, // living cap
     _within: function(key, b) {
         const parts = key.split(',');
@@ -608,10 +606,14 @@ const LifeMode = {
         }
         if (this.state.sound && this.state.sound.when === 'born') {
             for (const [key, st] of after) {
-                // A cell sounds its OWN current pitch getMidi(p,q), and ONLY within the visible/
-                // audible bounds (#13). Off-board it lives on but stays silent -- it must never
-                // re-sound a stale note from a position it has since left (the pitch invariant).
-                if (before.get(key) !== st && this.inBounds(key)) { // newly this state, and audible
+                // Sound every cell that ENTERS a state -- even off-screen: it's a real cell doing
+                // something, and the founding invariant is that real active cells sound, not that
+                // only on-screen ones do (#13). We always use the cell's CURRENT position, so a
+                // moving pattern never re-sounds a stale note from a cell it has left; and far
+                // cells sound their own true (effectively-inaudible) pitch rather than being folded
+                // into an audible drone -- the actual bug behind #13, fixed by INV-46, not by
+                // silencing off-screen cells.
+                if (before.get(key) !== st) { // newly this state
                     const parts = key.split(',');
                     const spec = this.soundFor(st);
                     Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, this._durationOf(spec), this._peakOf(spec));

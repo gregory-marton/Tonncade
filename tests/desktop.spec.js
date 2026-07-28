@@ -1663,12 +1663,12 @@ test("Life mode: Grem's Theme One loads and oscillates with period 12", async ({
   expect(out.maxSize).toBe(8);   // ... and an 8-cell swell -- bounded, never runs away
 });
 
-// #13: A cell off the visible Tonnetz keeps LIVING (the lattice is mathematically unbounded) but
-// stays SILENT -- it must never re-sound a stale note from a position it has left (the pitch
-// invariant: a cell sounds only its own current getMidi, and only within the audible/visible
-// range). We seed two cells at the +p edge whose births are one ON-board cell (14,1) and one
-// OFF-board cell (16,0): both stay alive, but only the on-board one sounds, at its own pitch.
-test('Life: off-board cells keep living but fall silent (#13)', async ({ page }) => {
+// #13: A real cell doing something sounds its OWN current pitch, wherever it is -- on- OR
+// off-screen. The founding invariant is "real active cells sound," not "only on-screen ones do";
+// a moving pattern must never re-sound a stale note from a cell it has left. We seed two cells at
+// the +p edge whose births are one ON-board (14,1) and one OFF-board (16,0) cell: both stay alive
+// AND both sound, each at its own getMidi -- and nothing else sounds (no stale/phantom pitch).
+test('Life: off-board cells keep living and sound their own pitch, never a stale one (#13)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
   await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
@@ -1685,14 +1685,14 @@ test('Life: off-board cells keep living but fall silent (#13)', async ({ page })
     Synth.playNote = orig;
     return {
       keys: [...LifeMode.state.live.keys()].sort(),
-      played,
-      onMidi: Tonnetz.getMidi(14, 1),
-      offMidi: Tonnetz.getMidi(16, 0),
+      played: played.slice().sort((a, b) => a - b),
+      // The pitches of exactly the cells born this generation -- what may sound, nothing else.
+      bornPitches: [Tonnetz.getMidi(14, 1), Tonnetz.getMidi(16, 0)].sort((a, b) => a - b),
     };
   });
-  expect(out.keys).toEqual(['14,1', '16,0']); // BOTH births live on -- off-board is not killed
-  expect(out.played).toEqual([out.onMidi]);   // only the on-board (14,1) sounds, at its own pitch
-  expect(out.played).not.toContain(out.offMidi); // the off-board (16,0) makes no sound at all
+  expect(out.keys).toEqual(['14,1', '16,0']);        // both births live on
+  expect(out.played).toEqual(out.bornPitches);       // both sound, each at its OWN current pitch,
+                                                     // off-screen (16,0) included -- and nothing else
 });
 
 // #85: In a multi-state automaton, tapping a cell must be able to reach every state -- it cycles

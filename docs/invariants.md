@@ -1163,9 +1163,11 @@ Consequences that follow directly:
   invariant was codified.)
 - **The lattice reaches human hearing.** Pannable modes draw out to the top of hearing
   (`Tonnetz.audibleMaxMidi()` ≈ MIDI 135 ≈ 20 kHz), not the old MIDI-protocol ceiling of 127.
-- **Motion doesn't smear pitch.** A moving pattern (e.g. a Life glider) never re-sounds a note
-  from a cell it has left; each cell sounds its own current pitch or, off its board, nothing
-  (see Life #13).
+- **The only sounds are real cells doing something — anywhere.** A sound comes only from a real
+  cell/piece actively acting on the Tonnetz, but *not* only from on-screen ones: it's fine to hear
+  an off-viewport glider recede. What's forbidden is a **phantom or stale** note — a cell sounding
+  a pitch from a position it has left. Since a cell always sounds its own *current* `getMidi`, a
+  moving pattern never smears pitch (see Life #13).
 
 **Test:** `tests/invariants.spec.js` — "INV-46: the synth sounds each note at its own true
 getFrequency(midi), never octave-shifted" sweeps a range of MIDI values (including the extremes the
