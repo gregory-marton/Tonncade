@@ -1663,6 +1663,38 @@ test("Life mode: Grem's Theme One loads and oscillates with period 12", async ({
   expect(out.maxSize).toBe(8);   // ... and an 8-cell swell -- bounded, never runs away
 });
 
+// #13: A cell off the visible Tonnetz keeps LIVING (the lattice is mathematically unbounded) but
+// stays SILENT -- it must never re-sound a stale note from a position it has left (the pitch
+// invariant: a cell sounds only its own current getMidi, and only within the audible/visible
+// range). We seed two cells at the +p edge whose births are one ON-board cell (14,1) and one
+// OFF-board cell (16,0): both stay alive, but only the on-board one sounds, at its own pitch.
+test('Life: off-board cells keep living but fall silent (#13)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const out = await page.evaluate(() => {
+    LifeMode.state.rule = { survival: [3, 5], birth: [2] }; // 3,5/2 (already loaded)
+    LifeMode.state.multi = null;
+    LifeMode.state.sound = { when: 'born', duration: 0.4 };
+    LifeMode.state.live = new Map([['15,0', 1], ['15,1', 1]]); // straddle the +p=15 edge
+    const played = [];
+    const orig = Synth.playNote;
+    Synth.playNote = (midi) => { played.push(midi); };
+    LifeMode.stepOnce();
+    Synth.playNote = orig;
+    return {
+      keys: [...LifeMode.state.live.keys()].sort(),
+      played,
+      onMidi: Tonnetz.getMidi(14, 1),
+      offMidi: Tonnetz.getMidi(16, 0),
+    };
+  });
+  expect(out.keys).toEqual(['14,1', '16,0']); // BOTH births live on -- off-board is not killed
+  expect(out.played).toEqual([out.onMidi]);   // only the on-board (14,1) sounds, at its own pitch
+  expect(out.played).not.toContain(out.offMidi); // the off-board (16,0) makes no sound at all
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

@@ -516,8 +516,29 @@ const LifeMode = {
         return this.state.sound;
     },
 
+    // The drawn/visible Tonnetz -- and the range a cell must be in to SOUND. A cell OUTSIDE these
+    // bounds keeps living and evolving (the Tonnetz is mathematically unbounded, and cells far out
+    // are still well-defined and saveable) but falls SILENT: nothing outside the visible/audible
+    // range may sound (issue #13). (Extending the drawn range toward full human hearing is a
+    // separate enhancement; these are today's drawn bounds.)
+    BOUNDS: { minP: -15, maxP: 15, minQ: -15, maxQ: 15 },
+
+    // A far outer safety cap on where cells may LIVE. The math goes on forever, but a running
+    // automaton needs some hard bound so an explosive rule can't grow without limit and freeze the
+    // tab. Set well beyond the visible bounds so off-screen gliders travel (and return) freely and
+    // saved files may specify cells far outside the visible Tonnetz.
+    HARD_BOUNDS: { minP: -64, maxP: 64, minQ: -64, maxQ: 64 },
+
+    inBounds: function(key) { return this._within(key, this.BOUNDS); },          // visible / audible
+    inHardBounds: function(key) { return this._within(key, this.HARD_BOUNDS); }, // living cap
+    _within: function(key, b) {
+        const parts = key.split(',');
+        const p = +parts[0], q = +parts[1];
+        return p >= b.minP && p <= b.maxP && q >= b.minQ && q <= b.maxQ;
+    },
+
     refreshLattice: function() {
-        Render.drawLattice({ minP: -15, maxP: 15, minQ: -15, maxQ: 15 }, {});
+        Render.drawLattice(this.BOUNDS, {});
         this.state.zoom = Render.getResponsiveZoom();
         const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
@@ -566,9 +587,17 @@ const LifeMode = {
         const after = this.state.multi
             ? Life.stepStates(before, this.state.multi.table, this.state.multi.order)
             : this._step2(before);
+        // The Tonnetz is unbounded, so off-screen cells keep living and evolving -- only drop cells
+        // past the far HARD_BOUNDS so an explosive rule can't grow without limit (#13).
+        for (const key of [...after.keys()]) {
+            if (!this.inHardBounds(key)) after.delete(key);
+        }
         if (this.state.sound && this.state.sound.when === 'born') {
             for (const [key, st] of after) {
-                if (before.get(key) !== st) { // newly this state (born, or changed state)
+                // A cell sounds its OWN current pitch getMidi(p,q), and ONLY within the visible/
+                // audible bounds (#13). Off-board it lives on but stays silent -- it must never
+                // re-sound a stale note from a position it has since left (the pitch invariant).
+                if (before.get(key) !== st && this.inBounds(key)) { // newly this state, and audible
                     const parts = key.split(',');
                     const spec = this.soundFor(st);
                     Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, this._durationOf(spec));

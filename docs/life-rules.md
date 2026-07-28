@@ -23,6 +23,14 @@ A cell is a lattice position `(p, q)`. Its pitch is `getMidi(p,q) = 60 + 7·p + 
 Unlike a plain hex grid, the Tonnetz makes **non-adjacent** intervals musically meaningful (a
 whole tone, a semitone), so the rule vocabulary reaches past the six touching cells.
 
+The lattice is mathematically **unbounded** — `(p, q)` is well-defined arbitrarily far out — so a
+cell that steps off the visible Tonnetz **keeps living and evolving** (and can be saved that way);
+it just falls **silent**. A cell sounds only its own current `getMidi(p,q)`, and only within the
+visible/audible range; it must never re-sound a stale note from a position it has since left. That
+is the pitch invariant applied to motion, and it's what issue #13 was really about — a glider that
+left the board kept sounding its *last on-board* note. (A far outer `HARD_BOUNDS` caps where cells
+may live, purely so an explosive rule can't grow without limit and freeze the tab.)
+
 ### The consonant ring — the 6 adjacent hexes
 
 These are always the "ring" used for `count` and `isotropy`. In cyclic order around the hexagon:
