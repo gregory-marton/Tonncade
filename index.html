@@ -241,16 +241,12 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             <label><input type="checkbox" id="compose-metronome"> Metronome</label>
                         </div>
                     </div>
-                    <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
-                            <button id="compose-record" style="flex: 1;">Record</button>
-                            <button id="compose-play" style="flex: 1;">Play</button>
-                        </div>
-                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%;">
-                            <button id="compose-undo" style="flex: 1;">Undo</button>
-                            <button id="compose-clear" style="flex: 1;">Clear</button>
-                        </div>
-                        <button id="compose-save" style="width: 100%;">Save</button>
+                    <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px;">
+                        <button id="compose-record" class="icon-btn" title="Record" aria-label="Record">⏺</button>
+                        <button id="compose-play" class="icon-btn" title="Play" aria-label="Play">▶</button>
+                        <button id="compose-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
+                        <button id="compose-clear" class="icon-btn" title="Clear" aria-label="Clear">✕</button>
+                        <button id="compose-save" class="icon-btn" title="Save" aria-label="Save">💾</button>
                     </div>
                     <!-- Shown only once at least one note is selected (see ComposeMode.updateEditControls).
                          Selection: shift-tap a note on the board to add/remove it; a plain tap on an
@@ -258,11 +254,19 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                          selected inserts a new note right after it. -->
                     <div id="compose-edit-group" class="control-group" style="margin-top: 10px; display: none;">
                         <p id="compose-selection-label" style="font-size: 13px; color: var(--accent); margin: 0 0 6px 0;"></p>
-                        <button id="compose-delete" style="width: 100%;">Delete Selected</button>
-                        <div style="display: flex; gap: 8px; flex-direction: row; width: 100%; margin-top: 8px;">
-                            <button id="compose-rotate-ccw" style="flex: 1;">Rotate ↺</button>
-                            <button id="compose-rotate-cw" style="flex: 1;">Rotate ↻</button>
+                        <div class="control-buttons">
+                            <button id="compose-delete" class="icon-btn" title="Delete selected" aria-label="Delete selected">🗑</button>
+                            <button id="compose-rotate-ccw" class="icon-btn" title="Rotate selection counter-clockwise" aria-label="Rotate counter-clockwise">↺</button>
+                            <button id="compose-rotate-cw" class="icon-btn" title="Rotate selection clockwise" aria-label="Rotate clockwise">↻</button>
+                            <!-- #82: copy/paste a SELECTED subset of notes as a new group, distinct from
+                                 the header's cross-mode copy/paste (App.copy/paste) -- that transfers the
+                                 WHOLE piece's footprint to another mode; this duplicates just the current
+                                 selection, in-place in Compose, as a new group appended at the playhead. -->
+                            <button id="compose-copy-selected" class="icon-btn" title="Copy selected notes" aria-label="Copy selected notes">⧉</button>
                         </div>
+                    </div>
+                    <div id="compose-paste-group" class="control-buttons" style="margin-top: 8px; display: none;">
+                        <button id="compose-paste-selected" class="icon-btn" title="Paste copied notes as a new group" aria-label="Paste copied notes as a new group">⎘</button>
                     </div>
                     <div id="compose-stats-group" class="stats-panel" style="margin-top: 15px;">
                         <div style="display: flex; gap: 10px;">

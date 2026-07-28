@@ -1197,6 +1197,11 @@ in-bounds food; etc.), so some cells may be dropped — but any cell that IS pla
 original pitch. Rotation/translation are deliberately not offered here (paste into Compose for
 those). Melody, a fixed practice drill, doesn't participate.
 
+(This is distinct from Compose's own `copySelected`/`pasteGroup`, #82's in-mode "duplicate the
+selected notes as a new group": that's a same-mode operation on a *subset* of notes with their
+relative timing preserved, using the header's cross-mode clipboard only by convention of naming,
+not by sharing `App.clipboard` itself.)
+
 **Tests:** `tests/desktop.spec.js` — the gravity↔canonical transform (pitch + round-trip),
 Sandbox→Life (same-mapping, exact cells + pitches), Gravity→Sandbox (cross-mapping, pitches
 preserved), and paste-into-Gravity honoring cup/overlap. `tests/invariants.spec.js` — "INV-47"

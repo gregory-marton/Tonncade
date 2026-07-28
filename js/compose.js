@@ -36,6 +36,11 @@ const ComposeMode = {
     state: {
         notes: [],              // { midi, p, q, time, duration }
         selectedIndices: [],    // indices into notes currently selected for editing
+        groupClipboard: [],     // {midi, p, q, relTime, duration} for the last COPIED selection --
+                                 // an in-Compose duplicate-a-phrase buffer, distinct from the
+                                 // header's cross-mode App.clipboard (which transfers the WHOLE
+                                 // piece's cell footprint to another mode; this duplicates just the
+                                 // current selection, in-place, as a new group -- see #82).
         isRecording: false,
         recordStartTime: 0,
         isPlaying: false,
@@ -141,6 +146,11 @@ const ComposeMode = {
         if (deleteBtn) deleteBtn.onclick = () => this.deleteSelected();
         if (rotateCWBtn) rotateCWBtn.onclick = () => this.rotateSelection(1);
         if (rotateCCWBtn) rotateCCWBtn.onclick = () => this.rotateSelection(-1);
+
+        const copySelectedBtn = document.getElementById('compose-copy-selected');
+        const pasteSelectedBtn = document.getElementById('compose-paste-selected');
+        if (copySelectedBtn) copySelectedBtn.onclick = () => this.copySelected();
+        if (pasteSelectedBtn) pasteSelectedBtn.onclick = () => this.pasteGroup();
 
         if (fileInput) {
             fileInput.onchange = (e) => {
@@ -438,6 +448,41 @@ const ComposeMode = {
 
         const label = document.getElementById('compose-selection-label');
         if (label) label.textContent = count === 0 ? '' : `Selected: ${count} note${count === 1 ? '' : 's'}`;
+
+        // Paste is available whenever there's something copied, independent of the current
+        // selection (you copy a phrase, click elsewhere/deselect, then paste it back in).
+        const pasteGroup = document.getElementById('compose-paste-group');
+        if (pasteGroup) pasteGroup.style.display = this.state.groupClipboard.length > 0 ? 'flex' : 'none';
+    },
+
+    // #82: copy the CURRENTLY SELECTED notes into an in-Compose group-clipboard, preserving their
+    // relative timing and (p,q) shape -- an in-place "duplicate this phrase" buffer, distinct from
+    // the header's cross-mode App.clipboard (whole-piece transfer to another mode).
+    copySelected: function() {
+        if (this.state.selectedIndices.length === 0) return;
+        const notes = this.state.selectedIndices.map(i => this.state.notes[i]).sort((a, b) => a.time - b.time);
+        const t0 = notes[0].time;
+        this.state.groupClipboard = notes.map(n => ({ midi: n.midi, p: n.p, q: n.q, relTime: n.time - t0, duration: n.duration }));
+        this.updateEditControls();
+    },
+
+    // Pastes the group-clipboard as a NEW group of notes, appended at the playhead (the current end
+    // of the piece -- same convention as the cross-mode paste, App.paste's Compose target) with
+    // their relative timing preserved. The new notes become the selection, so they can be
+    // immediately dragged/rotated/nudged into place.
+    pasteGroup: function() {
+        if (this.state.groupClipboard.length === 0) return;
+        const playhead = this.state.notes.reduce((t, n) => Math.max(t, n.time + n.duration), 0);
+        const newIndices = [];
+        this.state.groupClipboard.forEach(c => {
+            newIndices.push(this.state.notes.length);
+            this.state.notes.push({ midi: c.midi, p: c.p, q: c.q, time: playhead + c.relTime, duration: c.duration });
+        });
+        this.state.selectedIndices = newIndices;
+        this.updateStats();
+        this.refreshBoard();
+        this.updateEditControls();
+        Synth.playChord(this.state.groupClipboard.map(c => c.midi), false, 0.12, 0.9); // soft confirmation
     },
 
     startRecording: function() {
@@ -445,7 +490,7 @@ const ComposeMode = {
         this.state.isRecording = true;
         this.state.recordStartTime = performance.now();
         const btn = document.getElementById('compose-record');
-        if (btn) btn.textContent = 'Stop Recording';
+        if (btn) { btn.textContent = '⏹'; btn.title = 'Stop recording'; btn.setAttribute('aria-label', 'Stop recording'); }
         this.setStatus('Recording... tap cells to add notes.');
         this.startMetronome();
     },
@@ -464,7 +509,7 @@ const ComposeMode = {
         // visual layout needs a redraw from it.
         if (this.state.quantizeEnabled) this.quantizeNotes();
         const btn = document.getElementById('compose-record');
-        if (btn) btn.textContent = 'Record';
+        if (btn) { btn.textContent = '⏺'; btn.title = 'Record'; btn.setAttribute('aria-label', 'Record'); }
         this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
     },
 
@@ -504,7 +549,7 @@ const ComposeMode = {
         this.stopRecording();
         this.state.isPlaying = true;
         const playBtn = document.getElementById('compose-play');
-        if (playBtn) playBtn.textContent = 'Stop';
+        if (playBtn) { playBtn.textContent = '⏹'; playBtn.title = 'Stop'; playBtn.setAttribute('aria-label', 'Stop'); }
         this.setStatus('Playing...');
 
         this.state.notes.forEach(note => {
@@ -526,7 +571,7 @@ const ComposeMode = {
         this.state.playbackTimeoutIds = [];
         this.state.isPlaying = false;
         const playBtn = document.getElementById('compose-play');
-        if (playBtn) playBtn.textContent = 'Play';
+        if (playBtn) { playBtn.textContent = '▶'; playBtn.title = 'Play'; playBtn.setAttribute('aria-label', 'Play'); }
         this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
     },
 

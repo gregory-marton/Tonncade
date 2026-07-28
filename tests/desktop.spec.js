@@ -527,7 +527,7 @@ test('Compose: tapping cells while recording appends notes with the tapped cell\
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
 
   await page.locator('#compose-record').click();
-  await expect(page.locator('#compose-record')).toHaveText('Stop Recording');
+  await expect(page.locator('#compose-record')).toHaveAttribute('title', 'Stop recording');
 
   const cellA = page.locator('polygon.cell:not(.ghost)[data-p="2"][data-q="1"]');
   const cellB = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="3"]');
@@ -812,6 +812,48 @@ test('Compose: Rotate CW rotates the selection around the first-selected note, r
   // Pieces.rotate([{p:1,q:0}]) => {p:-0, q:1+0} = {p:0,q:1} -- js/pieces.js's own rotation math.
   expect(result.rotated).toEqual({ p: 0, q: 1 });
   expect(result.midiMatches).toBe(true);
+});
+
+// #82: copy/paste a SELECTED subset of notes as a new group, appended at the playhead with their
+// relative timing/shape preserved -- an in-Compose "duplicate this phrase" buffer, distinct from
+// the header's cross-mode App.clipboard (whole-piece transfer). Paste stays available (and
+// re-usable) after the original selection is gone, and selects the new group afterward.
+test('Compose: copy/paste a selected group duplicates it as a new group at the playhead', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: Tonnetz.getMidi(0, 0), p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: Tonnetz.getMidi(1, 0), p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [0, 1];
+    ComposeMode.updateEditControls();
+  });
+
+  await expect(page.locator('#compose-paste-group')).toBeHidden(); // nothing copied yet
+  await page.locator('#compose-copy-selected').click();
+  await expect(page.locator('#compose-paste-group')).toBeVisible(); // now pasteable
+
+  // Deselect (simulating the user clicking elsewhere) -- paste must still work without a selection.
+  await page.evaluate(() => { ComposeMode.state.selectedIndices = []; ComposeMode.updateEditControls(); });
+  await page.locator('#compose-paste-selected').click();
+
+  const result = await page.evaluate(() => {
+    const notes = ComposeMode.state.notes;
+    return {
+      count: notes.length,
+      pasted: notes.slice(2).map(n => ({ p: n.p, q: n.q, time: n.time, duration: n.duration })),
+      selected: ComposeMode.state.selectedIndices.slice(),
+    };
+  });
+  expect(result.count).toBe(4); // original 2 + the pasted 2
+  // Playhead = end of the original pair (0.5 + 0.4 = 0.9); relative timing (0, +0.5) preserved.
+  expect(result.pasted).toEqual([
+    { p: 0, q: 0, time: 0.9, duration: 0.4 },
+    { p: 1, q: 0, time: 1.4, duration: 0.4 },
+  ]);
+  expect(result.selected).toEqual([2, 3]); // the new group becomes the selection
 });
 
 // ────────────────────────────────────────────────────────────────────────
