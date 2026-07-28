@@ -17,3 +17,6 @@ replays/
 screenshots/*.png
 screenshots/manifest.js
 screenshots/manifest-*.js
+
+# Reference papers kept locally -- NOT redistributable (copyright); never commit.
+papers/
