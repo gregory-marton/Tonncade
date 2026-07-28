@@ -562,17 +562,19 @@ button:hover {
     font-size: 9px;
 }
 
-/* Piece-size difficulty as a triplet of hand-barbell (dumbbell) icons -- 1/2/3 lit for
-   easy/medium/hard (task #39). Language-agnostic and tiny; click the Nth to set that level. */
+/* Piece-size difficulty as a row of VERTICAL hand-barbell (dumbbell) icons -- 1/2/3 lit for
+   easy/medium/hard (task #39). Language-agnostic; click the Nth to set that level. Vertical
+   orientation (rather than the original horizontal dumbbell) packs narrower per icon, so the row
+   stays compact and a 4th+ level is just one more narrow column -- no layout change needed. */
 .difficulty-weights {
     display: flex;
-    gap: 1px;
+    gap: 2px;
     align-items: center;
 }
 .difficulty-weights .weight-icon {
     flex: 0 0 auto !important;
     width: auto !important;
-    padding: 1px;
+    padding: 0 1px;
     background: none;
     border: none;
     cursor: pointer;
@@ -586,8 +588,8 @@ button:hover {
     opacity: 1;
 }
 .difficulty-weights .dumbbell {
-    width: 17px;
-    height: 17px;
+    width: 12px;
+    height: 18px;
     display: block;
 }
 
