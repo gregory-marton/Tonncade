@@ -259,15 +259,7 @@ const SandboxMode = {
 
     refreshLattice: function() {
         this.hidePlacedTooltip();
-        // A generous box so inaudible cells (drawn dull gray, see grayInaudible) are reachable by
-        // panning -- for inspecting pasted large Life games and finding the way back to the audible
-        // band. Very-far cells beyond the box are a known limit (view-relative redraw is a later
-        // refinement).
-        const viewport = {
-            minP: -22, maxP: 22,
-            minQ: -22, maxQ: 22
-        };
-        Render.drawLattice(viewport, { grayInaudible: true });
+        Render.drawLattice(this._contentViewport(), { grayInaudible: true });
         this.renderPlacedPieces();
         this.renderPlacedCells();
 
@@ -302,6 +294,29 @@ const SandboxMode = {
                 Render.appendToLattice(hex);
             });
         });
+    },
+
+    // The drawn lattice box. A generous default band (so inaudible cells, drawn dull gray via
+    // grayInaudible, are reachable by panning), GROWN to cover any pasted content (+margin) so a
+    // large pasted Life game is inspectable and pannable. Capped so an extreme paste can't explode
+    // the cell count (cells beyond the cap remain a known limit -- view-relative redraw is a later
+    // refinement).
+    CONTENT_MARGIN: 6,
+    CONTENT_CAP: 64,
+    _contentViewport: function() {
+        let minP = -22, maxP = 22, minQ = -22, maxQ = 22;
+        const grow = (p, q) => {
+            minP = Math.min(minP, p - this.CONTENT_MARGIN); maxP = Math.max(maxP, p + this.CONTENT_MARGIN);
+            minQ = Math.min(minQ, q - this.CONTENT_MARGIN); maxQ = Math.max(maxQ, q + this.CONTENT_MARGIN);
+        };
+        this.state.placedCells.forEach((c) => grow(c.p, c.q));
+        this.state.placedPieces.forEach((pc) =>
+            Pieces.getAbsoluteCells(pc.type, pc.p, pc.q, pc.rotation).forEach((c) => grow(c.p, c.q)));
+        const cap = this.CONTENT_CAP;
+        return {
+            minP: Math.max(-cap, minP), maxP: Math.min(cap, maxP),
+            minQ: Math.max(-cap, minQ), maxQ: Math.min(cap, maxQ),
+        };
     },
 
     // Individual pasted cells (see App copy/paste). Rendered as filled accent hexes, distinct from

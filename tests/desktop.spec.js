@@ -1912,6 +1912,23 @@ test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async 
   expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10
 });
 
+// Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),
+// so it's reachable by panning -- not clipped to the fixed default band. Capped for performance.
+test('Sandbox: the gray lattice box grows to reach pasted far cells', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    const empty = SandboxMode._contentViewport();
+    SandboxMode.state.placedCells = [{ p: 40, q: 0 }];
+    const grown = SandboxMode._contentViewport();
+    SandboxMode.state.placedCells = [{ p: 500, q: 0 }]; // absurdly far -> clamped by the cap
+    const capped = SandboxMode._contentViewport();
+    return { empty, grown, capped };
+  });
+  expect(out.empty.maxP).toBe(22);                 // default reachable band, no content
+  expect(out.grown.maxP).toBeGreaterThanOrEqual(40); // grows to include the far pasted cell
+  expect(out.capped.maxP).toBeLessThanOrEqual(64);   // but stays bounded (perf cap)
+});
+
 // Sandbox draws inaudible cells (outside human hearing) in dull gray so a pasted large Life game
 // is inspectable and the way back to the audible band stays visible.
 test('Sandbox: inaudible cells render gray, audible cells stay normal', async ({ page }) => {
