@@ -1562,6 +1562,39 @@ test('Life mode loads the 3,5/2 YAML automaton, renders it, and steps', async ({
   expect(errors).toEqual([]);
 });
 
+// #85: Life multi-state engine -- Wuensche's 3-state "beehive" rule (via Adamatzky et al. 2006).
+// Its glider (state-1 head + four state-2 tail) must translate under Life.stepStates.
+test('Life multi-state (beehive) rule glides its known glider', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    const M = [
+      [0, 1, 2, 1, 2, 0, 0], [0, 2, 2, 2, 1, 1], [0, 0, 2, 2, 0],
+      [0, 2, 2, 0], [0, 0, 2], [2, 0], [0],
+    ];
+    const cells = [[1, 1, 2], [2, 1, 2], [0, 2, 1], [0, 3, 2], [1, 3, 2]];
+    const norm = (m) => {
+      let mp = Infinity, mq = Infinity;
+      for (const k of m.keys()) { const [p, q] = k.split(',').map(Number); mp = Math.min(mp, p); mq = Math.min(mq, q); }
+      const c = [...m.entries()].map(([k, s]) => { const [p, q] = k.split(',').map(Number); return (p - mp) + ',' + (q - mq) + '=' + s; }).sort().join(';');
+      return { c, mp, mq };
+    };
+    const run = (order) => {
+      let live = new Map(cells.map(([p, q, s]) => [p + ',' + q, s]));
+      const start = norm(live);
+      live = Life.stepStates(live, M, order);
+      const cur = norm(live);
+      return { same: cur.c === start.c, shift: [cur.mp - start.mp, cur.mq - start.mq], size: live.size };
+    };
+    return { o21: run('21'), o12: run('12') };
+  });
+  // The correct index order reproduces the 5-cell glider translated by one cell each step.
+  expect(out.o21.same).toBe(true);
+  expect(out.o21.size).toBe(5);
+  expect(out.o21.shift).toEqual([-1, 0]);
+  // The other order does not (it blows up), which is how we resolved the paper's ambiguous index.
+  expect(out.o12.same).toBe(false);
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

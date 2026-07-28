@@ -191,6 +191,37 @@ const Life = {
         return next;
     },
 
+    // ---- Multi-state automata (e.g. Wuensche's 3-state "beehive" rule) -------------------------
+    // A cell has a state 0..N-1 (0 = empty). Its next state is looked up in a transition table by
+    // the COUNTS of its 6 ring-neighbours in each nonzero state (the cell's own state is ignored).
+    // For a 3-state rule the table is a matrix indexed by (count of state 2, count of state 1) --
+    // but sources differ on that index order, so `order` selects it ('21' = table[c2][c1], '12' =
+    // table[c1][c2]). Board is a Map "p,q" -> state (>=1); absent = state 0.
+
+    stepStates: function(stateMap, table, order) {
+        const stateAt = (p, q) => stateMap.get(p + ',' + q) || 0;
+        const candidates = new Set();
+        for (const key of stateMap.keys()) {
+            candidates.add(key);
+            const parts = key.split(','); const p = +parts[0], q = +parts[1];
+            for (const d of this.RING) candidates.add((p + d.dp) + ',' + (q + d.dq));
+        }
+        const next = new Map();
+        for (const key of candidates) {
+            const parts = key.split(','); const p = +parts[0], q = +parts[1];
+            let c1 = 0, c2 = 0;
+            for (const d of this.RING) {
+                const s = stateAt(p + d.dp, q + d.dq);
+                if (s === 1) c1++; else if (s === 2) c2++;
+            }
+            const row = (order === '12') ? table[c1] : table[c2];
+            const col = (order === '12') ? c2 : c1;
+            const ns = (row && col < row.length) ? row[col] : 0;
+            if (ns > 0) next.set(key, ns);
+        }
+        return next;
+    },
+
     // ---- YAML loading -------------------------------------------------------------------------
     // A deliberately small YAML SUBSET parser for automaton files (docs/life-rules.md): block
     // mappings (indent-based), block sequences (`- ...`), flow collections (`[...]` / `{...}`),
