@@ -584,6 +584,14 @@ const LifeMode = {
         return (typeof spec.duration === 'number') ? spec.duration : 0.4;
     },
 
+    // The Synth peak (volume) for a sound spec's `velocity` (0..127). Velocity 80 maps to the
+    // Synth's own default peak (0.16); higher/lower scales proportionally, clamped to a sane range.
+    // This is how a state may sound at a different VOLUME while keeping the same pitch (invariant).
+    _peakOf: function(spec) {
+        const v = (spec && typeof spec.velocity === 'number') ? spec.velocity : 80;
+        return Math.max(0.02, Math.min(0.32, 0.16 * (v / 80)));
+    },
+
     // Advance one generation. Sound every cell that ENTERS a (nonzero) state this generation --
     // for 2-state that's births; for multi-state that's each head/tail transition. The pitch is
     // ALWAYS the cell's own getMidi(p,q) (project invariant); only timbre/velocity/decay vary by
@@ -606,7 +614,7 @@ const LifeMode = {
                 if (before.get(key) !== st && this.inBounds(key)) { // newly this state, and audible
                     const parts = key.split(',');
                     const spec = this.soundFor(st);
-                    Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, this._durationOf(spec));
+                    Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, this._durationOf(spec), this._peakOf(spec));
                 }
             }
         }

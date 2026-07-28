@@ -1721,6 +1721,37 @@ test('Life: tapping a cell cycles it through all states (#85)', async ({ page })
   expect(out.twoSeq).toEqual([0, 1, 0, 1]);      // 2-state remains a plain toggle
 });
 
+// #85: a state's `velocity` must actually change how LOUD its cells sound (the pitch invariant
+// permits volume to vary by state -- only pitch may not). beehive.yaml gives state 1 velocity 95
+// and state 2 velocity 55, so a step must play head (state 1) cells louder than tail (state 2)
+// cells, at the same pitches. Before this was wired, peak volume was constant and this failed.
+test('Life multi-state: per-state velocity varies volume, not pitch (#85)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const out = await page.evaluate(async () => {
+    await LifeMode.loadAutomatonFile('beehive.yaml');
+    const unit = {
+      louderThanSofter: LifeMode._peakOf(LifeMode.soundFor(1)) > LifeMode._peakOf(LifeMode.soundFor(2)),
+      softerPositive: LifeMode._peakOf(LifeMode.soundFor(2)) > 0,
+      defaultPeak: LifeMode._peakOf({}),
+    };
+    const plays = [];
+    const orig = Synth.playNote;
+    Synth.playNote = (midi, t0, dur, peak) => { plays.push({ midi, peak }); };
+    LifeMode.stepOnce();
+    Synth.playNote = orig;
+    const peaks = plays.map((p) => p.peak);
+    return { unit, distinctPeaks: [...new Set(peaks)].length, allPeaksDefined: peaks.every((p) => typeof p === 'number') };
+  });
+  expect(out.unit.louderThanSofter).toBe(true);          // state 1 (v95) louder than state 2 (v55)
+  expect(out.unit.softerPositive).toBe(true);
+  expect(out.unit.defaultPeak).toBeCloseTo(0.16, 5);     // no velocity -> the Synth default peak
+  expect(out.allPeaksDefined).toBe(true);                // stepOnce forwards an explicit peak ...
+  expect(out.distinctPeaks).toBeGreaterThanOrEqual(2);   // ... and head vs tail come out different
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.
