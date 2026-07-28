@@ -473,6 +473,8 @@ const LifeMode = {
         this.state.live = after;
         this.state.generation++;
         this.paintLive();
+        // Nothing left alive -- stop the clock rather than tick a dead board forever.
+        if (after.size === 0) this.stop();
         this.updateControls();
     },
 
