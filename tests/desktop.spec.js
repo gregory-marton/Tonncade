@@ -1595,6 +1595,74 @@ test('Life multi-state (beehive) rule glides its known glider', async ({ page })
   expect(out.o12.same).toBe(false);
 });
 
+// #85: Life mode multi-state end-to-end -- loads life/beehive.yaml through the real YAML pipeline
+// (states/order/transition/per-state sounds/[p,q,state] cells) into LifeMode, and confirms the
+// mode runs a genuine multi-state generation (the parsed glider translates, keeping 5 cells).
+test('Life mode loads the beehive multi-state YAML and steps its glider', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const loaded = await page.evaluate(async () => {
+    await LifeMode.loadAutomatonFile('beehive.yaml');
+    const s = LifeMode.state;
+    const snapshot = () => [...s.live.entries()].map(([k, st]) => k + '=' + st).sort().join(';');
+    const before = snapshot();
+    const beforeStates = [...s.live.values()].sort();
+    LifeMode.stepOnce();
+    const after = snapshot();
+    return {
+      multi: !!s.multi,
+      order: s.multi && s.multi.order,
+      rows: s.multi && s.multi.table.length,
+      sounds: s.sounds && Object.keys(s.sounds).sort().join(','),
+      size: s.live.size,
+      hasTail: beforeStates.includes(2), // seed carries state-2 tail cells
+      moved: before !== after,           // the glider is not static
+      stillFive: s.live.size === 5,      // period-1 glider preserves cell count
+    };
+  });
+  expect(loaded.multi).toBe(true);
+  expect(loaded.order).toBe('21');
+  expect(loaded.rows).toBe(7);
+  expect(loaded.sounds).toBe('1,2');
+  expect(loaded.hasTail).toBe(true);
+  expect(loaded.moved).toBe(true);
+  expect(loaded.stillFive).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+// #85: "Grem's Theme One" -- a period-12 five-cell oscillator under 3,5/2, found while exploring
+// Life mode and saved as life/grems-theme-one.yaml. This pins both the transcription (its exact
+// cells) and the discovery (that it really is a period-12 oscillator), loaded through the real
+// YAML pipeline so a bad edit to the file or the parser is caught.
+test("Life mode: Grem's Theme One loads and oscillates with period 12", async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const out = await page.evaluate(async () => {
+    await LifeMode.loadAutomatonFile('grems-theme-one.yaml');
+    const snap = () => [...LifeMode.state.live.keys()].sort().join(';');
+    const start = snap();
+    const startSize = LifeMode.state.live.size;
+    let period = -1, minSize = startSize, maxSize = startSize;
+    for (let g = 1; g <= 24; g++) {
+      LifeMode.stepOnce();
+      minSize = Math.min(minSize, LifeMode.state.live.size);
+      maxSize = Math.max(maxSize, LifeMode.state.live.size);
+      if (snap() === start && period === -1) { period = g; break; }
+    }
+    return { startSize, period, minSize, maxSize };
+  });
+  expect(out.startSize).toBe(5);
+  expect(out.period).toBe(12);   // returns exactly to its start after 12 generations
+  expect(out.minSize).toBe(5);   // breathes between a 5-cell rest (every other gen) ...
+  expect(out.maxSize).toBe(8);   // ... and an 8-cell swell -- bounded, never runs away
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

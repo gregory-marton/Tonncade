@@ -2,5 +2,13 @@
   {
     "name": "3,5 / 2",
     "file": "3-5-2.yaml"
+  },
+  {
+    "name": "Grem's Theme One",
+    "file": "grems-theme-one.yaml"
+  },
+  {
+    "name": "Beehive",
+    "file": "beehive.yaml"
   }
 ]

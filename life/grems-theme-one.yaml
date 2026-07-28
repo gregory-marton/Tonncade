@@ -1,0 +1,24 @@
+# Grem's Theme One — a period-12 oscillator under the 3,5/2 rule, found by Grem while exploring
+# Life mode. Five cells (E B F F# G) that cycle back to their exact start every 12 generations,
+# breathing between a 5-cell rest and an 8-cell swell (sizes 5,6,5,8,… per generation) — a longer,
+# more melodic loop than 3,5/2's common period-2 pairs.
+# It's really a ROTOR: it rotates 120° about its centre every 4 generations, so it only returns to
+# the identical configuration after a full turn (three 120° steps = 12 gens). The period is a
+# multiple of the rotation's order (3), which — being a lattice rotation — always divides 6.
+# Verified to oscillate with period 12 (and as a 120°/4-gen rotor) by simulation of js/life.js.
+#
+# See docs/life-rules.md for the full rule language.
+name: "Grem's Theme One"
+description: "A period-12 five-cell oscillator under 3,5/2 — found while exploring Life mode."
+rule:
+  survival: [3, 5]
+  birth: [2]
+sound: { when: born, duration: 0.4 }
+initial:
+  cells:
+    - [1, -1]   # E
+    - [2, -1]   # B
+    - [-1, 0]   # F
+    - [0, -2]   # F#
+    - [4, -3]   # G
+tempo: 180

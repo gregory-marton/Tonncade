@@ -386,10 +386,12 @@ const Life = {
 // ============================================================================================
 const LifeMode = {
     state: {
-        live: new Set(),          // "p,q" keys of currently-live cells
-        initial: [],              // seed cell keys, for reset
+        live: new Map(),          // "p,q" -> state (>=1); absent = dead/empty (state 0)
+        initial: [],              // [key, state] seed pairs, for reset
         rule: { survival: [], birth: [] },
+        multi: null,              // multi-state config {states, table, order} or null for 2-state
         sound: { when: 'born', duration: 0.4, velocity: 80 },
+        sounds: null,             // per-state sound specs {state -> spec} (multi-state); null = use `sound`
         tempo: 180,               // generations per minute
         running: false,
         timer: null,
@@ -467,17 +469,51 @@ const LifeMode = {
     },
 
     // Adopt a parsed automaton object (from Life.parseYaml or the default). Sound defaults to
-    // on-birth when the file omits `sound` (see docs/life-rules.md).
+    // on-birth when the file omits `sound` (see docs/life-rules.md). Two flavours:
+    //   * 2-state (birth/survival rule): `rule`, cells [[p,q],...] all seeded to state 1.
+    //   * multi-state (transition table, e.g. beehive): `states`/`transition`/`order`, cells
+    //     [[p,q,state],...]. Optional per-state `sounds` (a list of {state, velocity, duration}).
     loadAutomaton: function(a) {
         this.stop();
         this.state.rule = a.rule || { survival: [], birth: [] };
         this.state.sound = a.sound || { when: 'born', duration: 0.4, velocity: 80 };
         this.state.tempo = a.tempo || 180;
+        const isMulti = (a.states && a.states > 2) || Array.isArray(a.transition);
+        if (isMulti) {
+            this.state.multi = {
+                states: a.states || (a.transition ? a.transition.length + 1 : 3),
+                table: a.transition || [],
+                order: String(a.order || '21'),
+            };
+            this.state.sounds = this._parseSounds(a.sounds);
+        } else {
+            this.state.multi = null;
+            this.state.sounds = null;
+        }
         const cells = (a.initial && a.initial.cells) || [];
-        this.state.initial = cells.map((c) => c[0] + ',' + c[1]);
-        this.state.live = new Set(this.state.initial);
+        // Each seed is [p, q] (2-state -> state 1) or [p, q, state] (multi-state).
+        this.state.initial = cells.map((c) => [c[0] + ',' + c[1], c.length > 2 ? c[2] : 1]);
+        this.state.live = new Map(this.state.initial);
         this.state.generation = 0;
         if (Render.svg) { this.refreshLattice(); this.updateControls(); }
+    },
+
+    // Normalise a `sounds:` list into a {state -> spec} lookup. Absent -> null (fall back to `sound`).
+    _parseSounds: function(list) {
+        if (!Array.isArray(list) || !list.length) return null;
+        const out = {};
+        list.forEach((s, i) => {
+            const st = (s && s.state != null) ? Number(s.state) : (i + 1);
+            out[st] = s || {};
+        });
+        return out;
+    },
+
+    // The sound spec that applies to a cell entering `state` this generation: its per-state entry
+    // if the file gave one, otherwise the automaton-wide `sound`.
+    soundFor: function(state) {
+        if (this.state.sounds && this.state.sounds[state]) return this.state.sounds[state];
+        return this.state.sound;
     },
 
     refreshLattice: function() {
@@ -489,14 +525,18 @@ const LifeMode = {
         this.paintLive();
     },
 
-    // Colour the live cells (a .life-alive class; see css/style.css). Clears prior colouring first.
+    // Colour the live cells: .life-alive plus .life-s{state} so each state gets a distinct hue
+    // (see injectStateStyles / css/style.css). Clears prior colouring first.
     paintLive: function() {
         if (!Render.svg) return;
-        Render.svg.querySelectorAll('polygon.cell.life-alive').forEach((p) => p.classList.remove('life-alive'));
-        for (const key of this.state.live) {
+        Render.svg.querySelectorAll('polygon.cell.life-alive').forEach((p) => {
+            p.classList.remove('life-alive');
+            for (let s = 1; s <= 6; s++) p.classList.remove('life-s' + s);
+        });
+        for (const [key, st] of this.state.live) {
             const parts = key.split(',');
             const poly = Render.svg.querySelector(`polygon.cell:not(.ghost)[data-p="${parts[0]}"][data-q="${parts[1]}"]`);
-            if (poly) poly.classList.add('life-alive');
+            if (poly) { poly.classList.add('life-alive'); poly.classList.add('life-s' + st); }
         }
     },
 
@@ -504,24 +544,34 @@ const LifeMode = {
         const key = p + ',' + q;
         if (this.state.live.has(key)) this.state.live.delete(key);
         else {
-            this.state.live.add(key);
+            this.state.live.set(key, 1);
             Synth.playNote(Tonnetz.getMidi(p, q), 0, 0.3); // audible feedback while composing
         }
         this.paintLive();
     },
 
-    // Advance one generation and sound newly-born cells (the default sound spec).
+    // The concrete note duration for a sound spec, resolving the 'generation' keyword against tempo.
+    _durationOf: function(spec) {
+        if (!spec) return 0.4;
+        if (spec.duration === 'generation') return 60 / this.state.tempo;
+        return (typeof spec.duration === 'number') ? spec.duration : 0.4;
+    },
+
+    // Advance one generation. Sound every cell that ENTERS a (nonzero) state this generation --
+    // for 2-state that's births; for multi-state that's each head/tail transition. The pitch is
+    // ALWAYS the cell's own getMidi(p,q) (project invariant); only timbre/velocity/decay vary by
+    // state via the per-state sound spec.
     stepOnce: function() {
         const before = this.state.live;
-        const after = Life.step(before, this.state.rule);
+        const after = this.state.multi
+            ? Life.stepStates(before, this.state.multi.table, this.state.multi.order)
+            : this._step2(before);
         if (this.state.sound && this.state.sound.when === 'born') {
-            const dur = this.state.sound.duration === 'generation'
-                ? (60 / this.state.tempo)
-                : (typeof this.state.sound.duration === 'number' ? this.state.sound.duration : 0.4);
-            for (const key of after) {
-                if (!before.has(key)) {
+            for (const [key, st] of after) {
+                if (before.get(key) !== st) { // newly this state (born, or changed state)
                     const parts = key.split(',');
-                    Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, dur);
+                    const spec = this.soundFor(st);
+                    Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, this._durationOf(spec));
                 }
             }
         }
@@ -531,6 +581,14 @@ const LifeMode = {
         // Nothing left alive -- stop the clock rather than tick a dead board forever.
         if (after.size === 0) this.stop();
         this.updateControls();
+    },
+
+    // One 2-state generation, keeping the board as a Map (all live cells are state 1).
+    _step2: function(before) {
+        const afterSet = Life.step(new Set(before.keys()), this.state.rule);
+        const m = new Map();
+        for (const k of afterSet) m.set(k, 1);
+        return m;
     },
 
     play: function() {
@@ -545,8 +603,8 @@ const LifeMode = {
         this.updateControls();
     },
     togglePlay: function() { this.state.running ? this.stop() : this.play(); },
-    clear: function() { this.stop(); this.state.live = new Set(); this.state.generation = 0; this.paintLive(); this.updateControls(); },
-    reset: function() { this.stop(); this.state.live = new Set(this.state.initial); this.state.generation = 0; this.paintLive(); this.updateControls(); },
+    clear: function() { this.stop(); this.state.live = new Map(); this.state.generation = 0; this.paintLive(); this.updateControls(); },
+    reset: function() { this.stop(); this.state.live = new Map(this.state.initial); this.state.generation = 0; this.paintLive(); this.updateControls(); },
 
     setupEvents: function() {
         const svg = Render.svg;

@@ -204,11 +204,16 @@ svg {
     fill: #2a2e3a;
 }
 
-/* Life mode: a live cell. Filled in the accent so a running automaton reads clearly. */
+/* Life mode: a live cell. Filled in the accent so a running automaton reads clearly. In
+   multi-state automata (e.g. the beehive rule) each state gets a distinct hue so head (state 1)
+   and tail (state 2) read apart -- but every cell still SOUNDS its own getMidi(p,q) pitch (the
+   Tonnetz pitch invariant); the colour only tracks state, never pitch. */
 .cell.life-alive {
     fill: var(--accent);
     fill-opacity: 0.85;
 }
+.cell.life-s2 { fill: #e0a33a; fill-opacity: 0.85; } /* tail: warm amber */
+.cell.life-s3 { fill: #c65b7c; fill-opacity: 0.85; } /* third state: rose */
 
 .note-label {
     fill: var(--text);

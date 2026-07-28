@@ -150,6 +150,45 @@ initial:
   cells: [[0,0], [1,0], [-1,0]]
 ```
 
+## Multi-state automata (transition tables)
+
+Some interesting hexagonal rules use **more than two states** — a cell is 0 (empty), 1, 2, … —
+and decide a cell's next state not from a birth/survival rule but from a **transition table**
+indexed by how many of its 6 consonant neighbours are in each nonzero state. The bundled
+**beehive** rule (`life/beehive.yaml`) is a 3-state example with a small gliding pattern.
+
+Such a file uses `states`, `transition`, and `order` instead of `rule`:
+
+```yaml
+states: 3            # number of states (0 = empty, then 1..states-1)
+order: "21"          # table index order: "21" = transition[count2][count1], "12" = the reverse
+transition:          # a ragged matrix; entry = the cell's next state
+  - [0, 1, 2, 1, 2, 0, 0]
+  - [0, 2, 2, 2, 1, 1]
+  - [0, 0, 2, 2, 0]
+  - [0, 2, 2, 0]
+  - [0, 0, 2]
+  - [2, 0]
+  - [0]
+sounds:              # OPTIONAL per-state sound specs; each cell still sounds its own getMidi(p,q)
+  - { state: 1, velocity: 95, duration: 0.35 }   # head: bright and short
+  - { state: 2, velocity: 55, duration: 0.7 }    # tail: softer and longer
+initial:
+  cells:             # [p, q, state] — the third entry is the seed state (defaults to 1 if omitted)
+    - [1, 1, 2]
+    - [0, 2, 1]
+```
+
+**The pitch invariant still holds**: a multi-state cell always sounds `getMidi(p, q)` for its own
+`(p,q)`. State (head vs tail) may change **timbre, velocity, and decay** via `sounds`, but **never
+the pitch** — the Tonnetz position *is* the pitch, everywhere in the app. A cell sounds whenever it
+**enters** a new nonzero state (so a glider's head and tail each speak as they advance), using that
+state's `sounds` entry, or the file-wide `sound` if none is given.
+
+Sources for `order` sometimes disagree on the index convention, so `order` selects it explicitly;
+the bundled beehive file's `"21"` was verified by simulating its published glider (see
+`tests/desktop.spec.js`).
+
 ## Where automata load from
 
 Two sources (no hard-coded built-in tier — the web folder supersedes it):
@@ -182,3 +221,6 @@ rejected).
 - Wolfram, hexagonal CA notes (content.wolfram.com … 15-3-4.pdf).
 - *Complex dynamics in a hexagonal cellular automaton* (ResearchGate 224255458).
 - Golly — golly.sourceforge.io.
+- Adamatzky, Wuensche & De Lacy Costello (2006), *Glider-based computing in reaction-diffusion
+  hexagonal cellular automata*, Chaos, Solitons & Fractals 27, 287–295 — the 3-state "beehive"
+  rule and its glider (`life/beehive.yaml`), cross-referenced with Wuensche's DDLab work.
