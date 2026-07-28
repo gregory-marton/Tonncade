@@ -40,6 +40,7 @@ const MidiMode = {
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
+        currentStreak: 0,      // Current streak (drives the stat bar-graph vs bestStreak)
         bestStreak: 0,         // Longest streak achieved
         difficulty: 'easy',    // 'easy', 'medium', 'hard'
         hoverCell: { p: 0, q: 0 }, // Keyboard navigation hover cell
@@ -365,32 +366,38 @@ const MidiMode = {
     },
 
     updateStreak: function(streak) {
+        this.state.currentStreak = streak;
         const currentStreakEl = document.getElementById('midi-current-streak');
         if (currentStreakEl) {
             currentStreakEl.textContent = streak;
         }
-
         if (streak > this.state.bestStreak) {
             this.state.bestStreak = streak;
             localStorage.setItem('tonncade_midi_best', streak.toString());
-            this.updateStreakUI();
         }
+        this.updateStreakUI();
     },
 
+    // Current/longest streak as a bar-graph (same pattern as Blast/Gravity/Snake, #79) -- the bar
+    // fills toward your best, with the current and best counts beside it.
     updateStreakUI: function() {
         const bestStreakEl = document.getElementById('midi-best-streak');
         if (bestStreakEl) {
             bestStreakEl.textContent = this.state.bestStreak;
         }
+        Render.setStatBar('midi-streak-fill', this.state.currentStreak, this.state.bestStreak);
     },
 
     updateDifficultyUI: function(overrideIndex) {
         const listEl = document.getElementById('midi-note-list');
         const diff = this.state.difficulty;
 
-        // Clear old glows
+        // Clear old glows (past, generic future, and the three coloured upcoming glows)
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
+        for (let r = 0; r < 3; r++) {
+            document.querySelectorAll('.glow-next-' + r).forEach(el => el.classList.remove('glow-next-' + r));
+        }
 
         if (!listEl) return;
 
@@ -431,21 +438,28 @@ const MidiMode = {
             polygons.forEach(p => p.classList.add('glow-past'));
         }
 
-        // Add current/future notes
+        // Add current/future notes. The next THREE to play each get their own colour, mirrored on
+        // the Tonnetz by glow-next-0/1/2 (see css/style.css), so the upcoming notes read as linked
+        // between board and timeline. No frequency here -- it isn't useful on the timeline, and the
+        // octave-qualified names already disambiguate pitch (INV-25).
+        const UPCOMING_COLORS = ['var(--accent)', '#e6b23c', '#d16a8f']; // next, 2nd, 3rd
         if (diff === 'easy') {
             for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
                 const midi = melody[i].midi;
                 const name = qualifiedName(midi);
-                if (i === current) {
-                    const hz = Math.round(Tonnetz.getFrequency(midi));
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="current" style="color: var(--accent); font-size: 1.1em; font-weight: 900;">${name}</span><span style="opacity: 0.6; font-weight: normal; font-size: 0.85em;"> (${hz}Hz)</span>` });
+                const rank = i - current; // 0 = next, 1 = 2nd, 2 = 3rd, 3+ = further out
+                const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
+                if (rank <= 2) {
+                    const color = UPCOMING_COLORS[rank];
+                    const size = rank === 0 ? '1.1em' : '1em';
+                    const weight = rank === 0 ? '900' : '700';
+                    const role = rank === 0 ? 'current' : 'future';
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="${role}" data-upcoming="${rank}" style="color: ${color}; font-size: ${size}; font-weight: ${weight};">${name}</span>` });
+                    polygons.forEach(p => p.classList.add('glow-next-' + rank));
                 } else {
                     displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.8;">${name}</span>` });
+                    polygons.forEach(p => p.classList.add('glow-future'));
                 }
-
-                // Add future glow
-                const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
-                polygons.forEach(p => p.classList.add('glow-future'));
             }
         }
 

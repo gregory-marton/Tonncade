@@ -1700,21 +1700,21 @@ test.describe('Invariant tests', () => {
     expect(afterCorrect, 'the exact target pitch must still count as correct').toBe(1);
   });
 
-  test('INV-25: Melody\'s current-target readout shows an octave-qualified note name and its exact frequency', async ({ page }) => {
+  test('INV-25: Melody\'s current-target readout shows an octave-qualified note name', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
     await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
 
-    const { expectedText, targetMidi } = await page.evaluate(() => {
+    const name = await page.evaluate(() => {
       const midi = MidiMode.state.melody[MidiMode.state.userIndex].midi;
-      const name = `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
-      const hz = Math.round(Tonnetz.getFrequency(midi));
-      return { expectedText: `${name} (${hz}Hz)`, targetMidi: midi };
+      return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`; // octave-qualified, e.g. "E4"
     });
 
     const currentSpan = page.locator('#midi-note-list [data-note-role="current"]');
     await expect(currentSpan).toBeVisible();
+    const currentText = (await currentSpan.textContent()).trim();
+    expect(currentText, `the current note should read "${name}"`).toBe(name); // qualified name...
     const listText = (await page.locator('#midi-note-list').textContent()).replace(/\s+/g, ' ');
-    expect(listText, `expected "${expectedText}" somewhere in "${listText}"`).toContain(expectedText);
+    expect(listText, 'the timeline no longer shows a frequency').not.toMatch(/\d+Hz/); // ...and no Hz
   });
 
   // ────────────────────────────────────────────────────────────────────────

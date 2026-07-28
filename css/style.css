@@ -1455,6 +1455,22 @@ button:hover {
         filter: drop-shadow(0 0 6px rgba(255, 200, 100, 0.4));
     }
 
+    /* The next three notes to play (see js/midi.js updateDifficultyUI), each a distinct colour
+       that matches its token in the timeline note-list, so the upcoming notes read as linked
+       between the Tonnetz and the timeline. */
+    polygon.glow-next-0 {
+        fill: rgba(90, 230, 140, 0.32) !important;
+        filter: drop-shadow(0 0 6px rgba(90, 230, 140, 0.5));
+    }
+    polygon.glow-next-1 {
+        fill: rgba(230, 178, 60, 0.32) !important;
+        filter: drop-shadow(0 0 6px rgba(230, 178, 60, 0.5));
+    }
+    polygon.glow-next-2 {
+        fill: rgba(209, 106, 143, 0.32) !important;
+        filter: drop-shadow(0 0 6px rgba(209, 106, 143, 0.5));
+    }
+
     #mobile-controls .m-btn {
         flex: 1;
         height: var(--dpad-btn-size);

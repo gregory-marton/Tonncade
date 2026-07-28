@@ -1976,6 +1976,34 @@ test('Snake: head note sounds its true pitch, not a clamped one', async ({ page 
   expect(out.played).not.toContain(108);     // ...not the old clamped value
 });
 
+// #92: Melody's next three notes each get a distinct colour in the timeline, mirrored by
+// glow-next-0/1/2 on the matching Tonnetz cells -- linking board and timeline. No frequency shown.
+test('Melody: the next three notes are tri-coloured in the timeline and on the Tonnetz', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+  const out = await page.evaluate(() => {
+    MidiMode.state.difficulty = 'easy';
+    MidiMode.state.userIndex = 0;
+    MidiMode.updateDifficultyUI();
+    const tokens = [...document.querySelectorAll('#midi-note-list .note-token[data-upcoming]')];
+    return {
+      upcomingRanks: tokens.map((t) => t.getAttribute('data-upcoming')),
+      tokenColors: tokens.map((t) => t.style.color),
+      glow0: document.querySelectorAll('polygon.glow-next-0').length,
+      glow1: document.querySelectorAll('polygon.glow-next-1').length,
+      glow2: document.querySelectorAll('polygon.glow-next-2').length,
+      hasHz: /\d+Hz/.test(document.getElementById('midi-note-list').textContent),
+    };
+  });
+  expect(out.upcomingRanks).toEqual(['0', '1', '2']);            // the next three, ranked
+  expect(new Set(out.tokenColors).size).toBe(3);                // three distinct token colours
+  expect(out.glow0).toBeGreaterThan(0);                         // each rank glows on the board...
+  expect(out.glow1).toBeGreaterThan(0);
+  expect(out.glow2).toBeGreaterThan(0);
+  expect(out.hasHz).toBe(false);                                // ...and no frequency in the timeline
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

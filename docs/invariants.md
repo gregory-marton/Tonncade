@@ -356,17 +356,17 @@ keyboard with several octaves of physical keys) puts more than one cell with the
 bare note-name letter within easy reach, and the letter alone doesn't say which one is meant.
 
 Fixed at the legibility layer rather than by relaxing the match: `MidiMode.updateDifficultyUI`'s
-current-target readout (`#midi-note-list`) now shows an octave-qualified name (e.g. "E4", not
-just "E") for every displayed note, and the current target specifically also shows its exact
-frequency (e.g. "E4 (330Hz)") via the new `Tonnetz.getFrequency(midi)` (standard, unclamped
-MIDI-to-Hz — deliberately not the same value `Synth.playNote` actually plays back for an extreme
-note outside piano range, since that gets octave-wrapped for audibility first; see that
-function's own comment). `js/synth.js` was refactored to call the same shared function for its
-own (clamped-input) frequency, rather than keeping a second copy of the formula.
+current-target readout (`#midi-note-list`) shows an **octave-qualified name** (e.g. "E4", not just
+"E") for every displayed note — that octave qualification is what resolves the "wrong E," since it
+says exactly which cell/pitch is meant. (Updated 2026-07-28: the timeline no longer shows the note's
+frequency — it isn't useful there, and the octave-qualified name already disambiguates. The next
+three notes to play are each shown in a distinct colour that matches the Tonnetz's glow on the
+corresponding cells, linking board and timeline. `Tonnetz.getFrequency` remains for other readouts,
+e.g. Sandbox's tap-and-hold, INV-24.)
 
 **Test:** `tests/invariants.spec.js` — "INV-25: Melody mode rejects a different-octave note with
 the same name, and accepts the exact pitch" and "INV-25: Melody's current-target readout shows
-an octave-qualified note name and its exact frequency"; `tests/run_tests.js` — "Tonnetz.
+an octave-qualified note name"; `tests/run_tests.js` — "Tonnetz.
 getFrequency tests" (pure MIDI-to-Hz correctness, independent of any UI).
 
 ---

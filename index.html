@@ -168,9 +168,10 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="midi-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
                     </div>
                     <div id="midi-stats-group" class="stats-panel" style="margin-top: 15px;">
-                        <div id="midi-counts-row" style="display: flex; gap: 10px;">
-                            <p>Current Streak: <span id="midi-current-streak">0</span></p>
-                            <p>Longest Streak: <span id="midi-best-streak">0</span></p>
+                        <div class="stat-bar" role="img" aria-label="Current streak as a fraction of your best">
+                            <div class="stat-bar-fill" id="midi-streak-fill"></div>
+                            <span class="stat-bar-num"><span id="midi-current-streak">0</span></span>
+                            <span class="stat-bar-best">/<span id="midi-best-streak">0</span></span>
                         </div>
                         <p id="midi-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
                         <!-- #46 low-hanging fruit: lets a player replay from any note already
