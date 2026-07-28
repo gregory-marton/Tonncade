@@ -1915,6 +1915,32 @@ test('Sandbox: inaudible cells render gray, audible cells stay normal', async ({
   expect(out.heardFill).not.toBe('#34373f');   // audible cells keep their normal fill
 });
 
+// INV-46 (Snake): the head note sounds the cell's OWN pitch. Snake's board reaches MIDI >108 at its
+// edges, and it used to clamp head notes into [21,108] -- a wrong pitch. It must play getMidi.
+test('Snake: head note sounds its true pitch, not a clamped one', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="snake"]').click();
+    App.currentMode = 'snake';
+    // Head just left of (7,0) = MIDI 109 (>108); stepping right lands the head there.
+    SnakeMode.state.snake = [{ p: 6, q: 0 }, { p: 5, q: 0 }, { p: 4, q: 0 }];
+    SnakeMode.state.direction = { p: 1, q: 0 };
+    SnakeMode.state.nextDirection = { p: 1, q: 0 };
+    SnakeMode.state.isPaused = false; SnakeMode.state.isGameOver = false; SnakeMode.state.isFlourishing = false;
+    SnakeMode.state.gem = { p: -3, q: 0 };      // elsewhere, so no eat/flourish
+    SnakeMode.state.extraGems = [];
+    const played = [];
+    const orig = Synth.playNote;
+    Synth.playNote = (m) => played.push(m);
+    SnakeMode.tick();
+    Synth.playNote = orig;
+    return { played, trueMidi: Tonnetz.getMidi(7, 0) };
+  });
+  expect(out.trueMidi).toBe(109);
+  expect(out.played).toContain(109);         // plays the head's own pitch...
+  expect(out.played).not.toContain(108);     // ...not the old clamped value
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

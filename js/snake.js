@@ -205,10 +205,9 @@ const SnakeMode = {
         // Move head forward
         this.state.snake.unshift(newHead);
 
-        // Sound the head note (clamp to standard 88-key piano range for audibility)
-        const midi = Tonnetz.getMidi(newHead.p, newHead.q);
-        const playableMidi = Math.max(21, Math.min(108, midi));
-        Synth.playNote(playableMidi, 0, 0.35, 0.16);
+        // Sound the head note at its OWN pitch (INV-46) -- no octave clamp. Snake's board reaches
+        // MIDI >108 at its edges; the old clamp into [21,108] played a different pitch there.
+        Synth.playNote(Tonnetz.getMidi(newHead.p, newHead.q), 0, 0.35, 0.16);
         this.highlightSegment(newHead.p, newHead.q, 300);
 
         // Check food collision -- the main gem, or any pasted extra gem
