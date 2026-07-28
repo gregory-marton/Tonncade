@@ -60,6 +60,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <div class="mode-option" data-mode="snake">Snake</div>
                         <div class="mode-option" data-mode="blast">Blast</div>
                         <div class="mode-option" data-mode="gravity">Gravity</div>
+                        <div class="mode-option" data-mode="life">Life</div>
                     </div>
                 </div>
                 <div id="drawer-injected-tools" style="display: none; padding: 10px; border-top: 1px solid var(--border);"></div>
@@ -282,6 +283,19 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <p style="margin: 2px 0;"><strong>H</strong>: Right (▶)</p>
                         <p style="margin: 2px 0;"><strong>V</strong>: Down-Left (↙)</p>
                         <p style="margin: 2px 0;"><strong>B</strong>: Down-Right (↘)</p>
+                    </div>
+                </div>
+
+                <!-- Life Mode Controls -->
+                <div id="life-controls" style="display: none;">
+                    <div class="control-buttons">
+                        <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button>
+                        <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button>
+                        <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↺</button>
+                        <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button>
+                    </div>
+                    <div class="stats-panel">
+                        <p title="Generation">gen <span id="life-generation">0</span></p>
                     </div>
                 </div>
 

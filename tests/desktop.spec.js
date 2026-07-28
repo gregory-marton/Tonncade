@@ -1532,6 +1532,36 @@ test('Life parses block-sequence-of-maps rule clauses', async ({ page }) => {
   expect(parsed.rule.survival).toEqual([]);
 });
 
+// #85: Life mode end-to-end -- loads the 3,5/2 automaton from life/3-5-2.yaml (the YAML pipeline),
+// renders its live cells on the lattice, and steps generations.
+test('Life mode loads the 3,5/2 YAML automaton, renders it, and steps', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const init = await page.evaluate(() => ({
+    mode: App.currentMode,
+    name: LifeMode.state.rule && JSON.stringify(LifeMode.state.rule),
+    live: LifeMode.state.live.size,
+    painted: document.querySelectorAll('#tonnetz-svg polygon.cell.life-alive').length,
+    controls: ['life-play-pause', 'life-step', 'life-reset', 'life-clear', 'life-generation'].every((id) => !!document.getElementById(id)),
+    paletteHidden: getComputedStyle(document.getElementById('palette')).display === 'none',
+  }));
+  expect(init.mode).toBe('life');
+  expect(init.name).toBe(JSON.stringify({ survival: [3, 5], birth: [2] })); // parsed from the YAML
+  expect(init.live).toBe(7);
+  expect(init.painted).toBe(7);
+  expect(init.controls).toBe(true);
+  expect(init.paletteHidden).toBe(true);
+
+  const stepped = await page.evaluate(() => { LifeMode.stepOnce(); return { gen: LifeMode.state.generation, live: LifeMode.state.live.size }; });
+  expect(stepped.gen).toBe(1);
+  expect(stepped.live).toBeGreaterThan(0);
+  expect(errors).toEqual([]);
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

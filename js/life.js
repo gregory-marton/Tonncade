@@ -348,6 +348,183 @@ const Life = {
     },
 };
 
+// ============================================================================================
+// LifeMode -- the playable mode: load an automaton (rule + initial state + sound spec), draw its
+// live cells on the pannable Tonnetz lattice, step generations on a clock, and sound each cell as
+// the automaton's sound spec dictates (default: on birth, at its own getMidi(p,q) pitch).
+// ============================================================================================
+const LifeMode = {
+    state: {
+        live: new Set(),          // "p,q" keys of currently-live cells
+        initial: [],              // seed cell keys, for reset
+        rule: { survival: [], birth: [] },
+        sound: { when: 'born', duration: 0.4, velocity: 80 },
+        tempo: 180,               // generations per minute
+        running: false,
+        timer: null,
+        generation: 0,
+        viewX: null, viewY: null, zoom: 1,
+    },
+
+    // The first automaton, used until one is loaded from the life/ folder or a local file. Also
+    // the seed shipped as life/3-5-2.yaml -- 3,5/2 (survive on 3 or 5, born on 2), the classic
+    // hexagonal variant the user wanted to hear first.
+    DEFAULT_AUTOMATON: {
+        name: '3,5 / 2',
+        rule: { survival: [3, 5], birth: [2] },
+        sound: { when: 'born', duration: 0.4, velocity: 80 },
+        initial: { cells: [[0, 0], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]] },
+        tempo: 180,
+    },
+
+    init: function() {
+        Render.init('tonnetz-svg');
+        // Life doesn't use Sandbox's piece carousel or chord guide -- hide them so they don't
+        // linger in the sidebar from a previous Sandbox session.
+        const palette = document.getElementById('palette');
+        if (palette) { palette.style.display = 'none'; palette.classList.remove('floating-queue'); }
+        const guide = document.getElementById('sandbox-guide');
+        if (guide) guide.style.display = 'none';
+        if (this.state.live.size === 0 && this.state.initial.length === 0) {
+            this.loadAutomaton(this.DEFAULT_AUTOMATON);
+        }
+        this.refreshLattice();
+        this.setupEvents();
+        this.updateControls();
+        this.loadOnlineFolder();
+    },
+
+    // Load an automaton from the online life/ folder (a relative fetch, like Melody's midi/ --
+    // works on any http(s) host, simply absent under file:// or offline, where the built-in
+    // DEFAULT_AUTOMATON already loaded above stands in). Two sources, no built-in default tier.
+    loadOnlineFolder: async function() {
+        if (this._loadedOnline) return;
+        try {
+            const res = await fetch('./life/index.json');
+            if (!res.ok) return;
+            const index = await res.json();
+            if (!Array.isArray(index) || !index.length) return;
+            const yres = await fetch('./life/' + index[0].file);
+            if (!yres.ok) return;
+            this.loadAutomaton(Life.parseYaml(await yres.text()));
+            this._loadedOnline = true;
+        } catch (e) { /* offline / file:// -- keep the built-in default */ }
+    },
+
+    // Adopt a parsed automaton object (from Life.parseYaml or the default). Sound defaults to
+    // on-birth when the file omits `sound` (see docs/life-rules.md).
+    loadAutomaton: function(a) {
+        this.stop();
+        this.state.rule = a.rule || { survival: [], birth: [] };
+        this.state.sound = a.sound || { when: 'born', duration: 0.4, velocity: 80 };
+        this.state.tempo = a.tempo || 180;
+        const cells = (a.initial && a.initial.cells) || [];
+        this.state.initial = cells.map((c) => c[0] + ',' + c[1]);
+        this.state.live = new Set(this.state.initial);
+        this.state.generation = 0;
+        if (Render.svg) { this.refreshLattice(); this.updateControls(); }
+    },
+
+    refreshLattice: function() {
+        Render.drawLattice({ minP: -15, maxP: 15, minQ: -15, maxQ: 15 }, {});
+        this.state.zoom = Render.getResponsiveZoom();
+        const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
+        this.state.viewX = v.viewX;
+        this.state.viewY = v.viewY;
+        this.paintLive();
+    },
+
+    // Colour the live cells (a .life-alive class; see css/style.css). Clears prior colouring first.
+    paintLive: function() {
+        if (!Render.svg) return;
+        Render.svg.querySelectorAll('polygon.cell.life-alive').forEach((p) => p.classList.remove('life-alive'));
+        for (const key of this.state.live) {
+            const parts = key.split(',');
+            const poly = Render.svg.querySelector(`polygon.cell:not(.ghost)[data-p="${parts[0]}"][data-q="${parts[1]}"]`);
+            if (poly) poly.classList.add('life-alive');
+        }
+    },
+
+    toggleCell: function(p, q) {
+        const key = p + ',' + q;
+        if (this.state.live.has(key)) this.state.live.delete(key);
+        else {
+            this.state.live.add(key);
+            Synth.playNote(Tonnetz.getMidi(p, q), 0, 0.3); // audible feedback while composing
+        }
+        this.paintLive();
+    },
+
+    // Advance one generation and sound newly-born cells (the default sound spec).
+    stepOnce: function() {
+        const before = this.state.live;
+        const after = Life.step(before, this.state.rule);
+        if (this.state.sound && this.state.sound.when === 'born') {
+            const dur = this.state.sound.duration === 'generation'
+                ? (60 / this.state.tempo)
+                : (typeof this.state.sound.duration === 'number' ? this.state.sound.duration : 0.4);
+            for (const key of after) {
+                if (!before.has(key)) {
+                    const parts = key.split(',');
+                    Synth.playNote(Tonnetz.getMidi(+parts[0], +parts[1]), 0, dur);
+                }
+            }
+        }
+        this.state.live = after;
+        this.state.generation++;
+        this.paintLive();
+        this.updateControls();
+    },
+
+    play: function() {
+        if (this.state.running) return;
+        this.state.running = true;
+        this.state.timer = setInterval(() => this.stepOnce(), 60000 / this.state.tempo);
+        this.updateControls();
+    },
+    stop: function() {
+        this.state.running = false;
+        if (this.state.timer) { clearInterval(this.state.timer); this.state.timer = null; }
+        this.updateControls();
+    },
+    togglePlay: function() { this.state.running ? this.stop() : this.play(); },
+    clear: function() { this.stop(); this.state.live = new Set(); this.state.generation = 0; this.paintLive(); this.updateControls(); },
+    reset: function() { this.stop(); this.state.live = new Set(this.state.initial); this.state.generation = 0; this.paintLive(); this.updateControls(); },
+
+    setupEvents: function() {
+        const svg = Render.svg;
+        if (svg && !this._tapBound) {
+            // Tap a cell to toggle it alive/dead. (Panning is a later refinement -- the automaton
+            // evolves around the origin, which the centred view already shows.)
+            let down = null;
+            svg.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+            svg.addEventListener('pointerup', (e) => {
+                if (!down) return;
+                const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+                if (moved <= 6 && e.target && e.target.hasAttribute && e.target.hasAttribute('data-p')) {
+                    this.toggleCell(parseInt(e.target.getAttribute('data-p')), parseInt(e.target.getAttribute('data-q')));
+                }
+                down = null;
+            });
+            this._tapBound = true;
+        }
+        const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = () => fn.call(this); };
+        bind('life-play-pause', this.togglePlay);
+        bind('life-step', this.stepOnce);
+        bind('life-clear', this.clear);
+        bind('life-reset', this.reset);
+    },
+
+    updateControls: function() {
+        const pp = document.getElementById('life-play-pause');
+        if (pp) { pp.textContent = this.state.running ? '⏸' : '▶'; pp.title = this.state.running ? 'Pause' : 'Play'; }
+        const gen = document.getElementById('life-generation');
+        if (gen) gen.textContent = this.state.generation;
+    },
+
+    cleanup: function() { this.stop(); },
+};
+
 if (typeof module !== 'undefined') {
     module.exports = Life;
 }

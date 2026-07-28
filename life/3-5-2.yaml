@@ -1,0 +1,19 @@
+# 3,5/2 — a classic hexagonal Life variant, in survival/birth notation:
+# survive on 3 or 5 live consonant neighbours, born on 2.
+# See docs/life-rules.md for the full rule language.
+name: "3,5 / 2"
+description: "Survive on 3 or 5 neighbours; born on 2. A well-known hexagonal Life."
+rule:
+  survival: [3, 5]
+  birth: [2]
+sound: { when: born, duration: 0.4 }
+initial:
+  cells:
+    - [0, 0]
+    - [1, 0]
+    - [1, -1]
+    - [0, -1]
+    - [-1, 0]
+    - [-1, 1]
+    - [0, 1]
+tempo: 180

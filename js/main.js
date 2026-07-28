@@ -151,6 +151,10 @@ const App = {
             ComposeMode.cleanup();
         }
 
+        if (typeof LifeMode !== 'undefined' && LifeMode.cleanup) {
+            LifeMode.cleanup();
+        }
+
         this.currentMode = mode;
         document.getElementById('app').setAttribute('data-mode', mode);
 
@@ -238,6 +242,9 @@ const App = {
         if (document.getElementById('compose-controls')) {
             document.getElementById('compose-controls').style.display = 'none';
         }
+        if (document.getElementById('life-controls')) {
+            document.getElementById('life-controls').style.display = 'none';
+        }
         document.getElementById('placement-controls').style.display = 'none';
         const hexNavControls = document.getElementById('hex-nav-controls');
         if (hexNavControls) hexNavControls.style.display = 'none';
@@ -279,6 +286,9 @@ const App = {
         } else if (mode === 'compose') {
             document.getElementById('compose-controls').style.display = 'block';
             ComposeMode.init();
+        } else if (mode === 'life') {
+            document.getElementById('life-controls').style.display = 'block';
+            LifeMode.init();
         }
         
         this.setupMobileControls();

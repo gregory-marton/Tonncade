@@ -121,6 +121,7 @@ loadScript('gravity.js');
 loadScript('midi.js');
 loadScript('compose.js');
 loadScript('snake.js');
+loadScript('life.js');
 loadScript('main.js');
 
 const App = vm.runInContext("App", context);
