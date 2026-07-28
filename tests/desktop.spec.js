@@ -2004,6 +2004,31 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
   expect(out.hasHz).toBe(false);                                // ...and no frequency in the timeline
 });
 
+// #94: a URL hash deep-links to a mode, and clicking a mode updates the URL so links are shareable
+// and discoverable. Melody's URL name is the friendly "melody" (its data-mode is "midi").
+test('URL routing: hash deep-links to a mode and the URL updates on click', async ({ page }) => {
+  // A shared deep-link opens that mode on load...
+  await page.goto('/#gravity');
+  await expect.poll(() => page.evaluate(() => typeof App !== 'undefined' && App.currentMode), { timeout: 5000 }).toBe('gravity');
+
+  // ...and clicking a mode reflects it in the address bar (discoverable to copy).
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  expect(await page.evaluate(() => App.currentMode)).toBe('compose');
+  expect(await page.evaluate(() => location.hash)).toBe('#compose');
+
+  // More deep-links (fresh loads): the friendly "melody" alias -> midi mode, an unknown hash ->
+  // sandbox, and a normal one. (about:blank between forces a real reload -- goto to a hash-only
+  // change on the same path wouldn't re-init.)
+  // An unknown hash falls back to sandbox and NORMALIZES the bar to #sandbox (it reflects the
+  // actual mode). Known ones keep their friendly name.
+  for (const [url, mode, hash] of [['/#melody', 'midi', '#melody'], ['/#nonsense', 'sandbox', '#sandbox'], ['/#blast', 'blast', '#blast']]) {
+    await page.goto('about:blank');
+    await page.goto(url);
+    await expect.poll(() => page.evaluate(() => App.currentMode), { timeout: 5000 }).toBe(mode);
+    expect(await page.evaluate(() => location.hash)).toBe(hash);
+  }
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

@@ -161,8 +161,31 @@ const App = {
             }
         }
 
-        // Start in Sandbox Mode
-        this.setMode('sandbox', 0);
+        // Open the mode named in the URL hash (shareable deep-link, e.g. #gravity), defaulting to
+        // Sandbox. Also re-route when the hash changes (back/forward or an edited URL).
+        this._applyHashRoute();
+        window.addEventListener('hashchange', () => this._applyHashRoute());
+    },
+
+    // URL <-> mode names. Only Melody differs: its data-mode is 'midi' but the friendly URL is
+    // '#melody'. Everything else uses its own name.
+    MODE_URL_NAMES: { midi: 'melody' },
+    _modeToUrl: function(mode) { return this.MODE_URL_NAMES[mode] || mode; },
+    _urlToMode: function(name) {
+        for (const m in this.MODE_URL_NAMES) if (this.MODE_URL_NAMES[m] === name) return m;
+        return name;
+    },
+
+    // Route to whatever mode the current hash names (stripping an optional leading slash), or
+    // Sandbox if it names nothing valid. history.replaceState (in setMode) doesn't fire hashchange,
+    // so this never loops.
+    _applyHashRoute: function() {
+        const name = (location.hash || '').replace(/^#\/?/, '').toLowerCase();
+        const mode = this._urlToMode(name);
+        const options = [...document.querySelectorAll('.mode-option')];
+        const idx = options.findIndex((o) => o.getAttribute('data-mode') === mode);
+        if (idx >= 0) this.setMode(mode, idx);
+        else this.setMode('sandbox', options.findIndex((o) => o.getAttribute('data-mode') === 'sandbox'));
     },
 
     setMode: function(mode, idx) {
@@ -229,6 +252,13 @@ const App = {
         }
 
         this.currentMode = mode;
+
+        // Reflect the mode in the address bar so the deep-link is shareable and discoverable
+        // (replaceState doesn't fire hashchange, so no re-route loop). Skip if unchanged.
+        if (typeof history !== 'undefined' && history.replaceState) {
+            const want = '#' + this._modeToUrl(mode);
+            if (location.hash !== want) history.replaceState(null, '', want);
+        }
         document.getElementById('app').setAttribute('data-mode', mode);
 
         // Gravity's "down" is fixed in its own falling-piece logic (see Render.getEffectiveRotation),
