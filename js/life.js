@@ -398,17 +398,41 @@ const LifeMode = {
     // works on any http(s) host, simply absent under file:// or offline, where the built-in
     // DEFAULT_AUTOMATON already loaded above stands in). Two sources, no built-in default tier.
     loadOnlineFolder: async function() {
-        if (this._loadedOnline) return;
         try {
             const res = await fetch('./life/index.json');
             if (!res.ok) return;
             const index = await res.json();
             if (!Array.isArray(index) || !index.length) return;
-            const yres = await fetch('./life/' + index[0].file);
+            this.onlineIndex = index;
+            this.populateSelector();
+            if (!this._loadedOnline) {
+                await this.loadAutomatonFile(index[0].file);
+                this._loadedOnline = true;
+            }
+        } catch (e) { /* offline / file:// -- keep the built-in default */ }
+    },
+
+    // Fill the automaton <select> from the online index (the file-picker for the bundled automata).
+    populateSelector: function() {
+        const sel = document.getElementById('life-automaton');
+        if (!sel || !this.onlineIndex) return;
+        sel.innerHTML = '';
+        this.onlineIndex.forEach((a) => {
+            const opt = document.createElement('option');
+            opt.value = a.file;
+            opt.textContent = a.name;
+            sel.appendChild(opt);
+        });
+        const group = document.getElementById('life-automaton-group');
+        if (group) group.style.display = '';
+    },
+
+    loadAutomatonFile: async function(file) {
+        try {
+            const yres = await fetch('./life/' + file);
             if (!yres.ok) return;
             this.loadAutomaton(Life.parseYaml(await yres.text()));
-            this._loadedOnline = true;
-        } catch (e) { /* offline / file:// -- keep the built-in default */ }
+        } catch (e) { /* ignore -- keep whatever is loaded */ }
     },
 
     // Adopt a parsed automaton object (from Life.parseYaml or the default). Sound defaults to
@@ -515,6 +539,8 @@ const LifeMode = {
         bind('life-step', this.stepOnce);
         bind('life-clear', this.clear);
         bind('life-reset', this.reset);
+        const sel = document.getElementById('life-automaton');
+        if (sel) sel.onchange = () => this.loadAutomatonFile(sel.value);
     },
 
     updateControls: function() {
