@@ -69,27 +69,26 @@ const Synth = {
     playNote: function(midi, t0 = 0, dur = 0.8, peak = 0.16, isHarmonic = false) {
         this.init();
         
-        let playableMidi = midi;
-        if (!isHarmonic) {
-            while (playableMidi < 21) playableMidi += 12;
-            while (playableMidi > 108) playableMidi -= 12;
-        }
-
+        // THE FOUNDING INVARIANT (INV-46): a note sounds its OWN pitch, always. We do NOT octave-
+        // fold into a "comfortable" range -- that would be a different pitch. We command the note's
+        // true frequency across the whole range of human hearing (and beyond); a device simply
+        // reproduces what it can. (This used to fold everything into MIDI 21-108.)
         const now = this.ctx.currentTime;
         const startTime = now + t0;
 
-        // Progressive volume scaling for low notes:
+        // Progressive volume scaling for low notes -- a loudness aid (not a pitch change), keyed
+        // off the note's true register:
         let notePeak = peak;
-        if (!isHarmonic && playableMidi < 60) {
-            const octavesBelow = (60 - playableMidi) / 12;
+        if (!isHarmonic && midi < 60) {
+            const octavesBelow = (60 - midi) / 12;
             notePeak = peak * (1.0 + octavesBelow * 0.6); // Up to 2.8x volume boost
         }
-        
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        
+
         osc.type = 'triangle';
-        osc.frequency.value = Tonnetz.getFrequency(playableMidi);
+        osc.frequency.value = Tonnetz.getFrequency(midi);
         
         gain.gain.setValueAtTime(0.0001, startTime);
         gain.gain.linearRampToValueAtTime(notePeak, startTime + 0.012);
@@ -101,9 +100,11 @@ const Synth = {
         osc.start(startTime);
         osc.stop(startTime + dur + 0.05);
 
-        // Psychoacoustic bass enhancement: add a subtle higher-octave harmonic for low notes
-        if (!isHarmonic && playableMidi < 50) {
-            this.playNote(playableMidi + 12, t0, dur, notePeak * 0.4, true);
+        // Psychoacoustic bass enhancement: add a subtle higher-octave harmonic for low notes.
+        // This is a timbral overtone (played as an explicit harmonic, isHarmonic=true) reinforcing
+        // the true fundamental above -- not a substitute for it, so the note's pitch is unchanged.
+        if (!isHarmonic && midi < 50) {
+            this.playNote(midi + 12, t0, dur, notePeak * 0.4, true);
         }
     },
 

@@ -1144,6 +1144,40 @@ viewport (confirming it set an inline SVG width), switches to each pannable mode
 inline `width`/`height`/`position` were cleared. Confirmed failing (inline sizing stuck) on the
 pre-fix code before implementing, per red-green discipline.
 
+### INV-46: a cell always sounds its own pitch — the founding invariant
+
+This is the founding invariant of the whole project. A cell at `(p, q)` sounds **exactly**
+`Tonnetz.getFrequency(getMidi(p, q))` — its own pitch — *everywhere, always, in every mode*. What
+may vary per context (mode, cell state, event) is timbre/instrument, volume, and attack/decay/
+duration. What may **never** vary is the **pitch**. The Tonnetz position *is* the pitch; that
+mapping is inviolable. There is no per-mode exception: the restricted modes (Snake/Blast/Gravity)
+aren't a different rule, they're simply *restricted* to fewer cells, each of which still sounds its
+own pitch.
+
+Consequences that follow directly:
+- **No octave-folding.** The synth must never shift a note into a "comfortable" register to make
+  it audible — that plays a *different pitch*. It commands the note's true frequency across the
+  whole range of human hearing and beyond; whether a given device can reproduce an extreme
+  frequency is the device's business, not a license to change the note. (`js/synth.js` used to
+  fold everything into MIDI 21–108; that was a long-standing violation, removed when this
+  invariant was codified.)
+- **The lattice reaches human hearing.** Pannable modes draw out to the top of hearing
+  (`Tonnetz.audibleMaxMidi()` ≈ MIDI 135 ≈ 20 kHz), not the old MIDI-protocol ceiling of 127.
+- **Motion doesn't smear pitch.** A moving pattern (e.g. a Life glider) never re-sounds a note
+  from a cell it has left; each cell sounds its own current pitch or, off its board, nothing
+  (see Life #13).
+
+**Test:** `tests/invariants.spec.js` — "INV-46: the synth sounds each note at its own true
+getFrequency(midi), never octave-shifted" sweeps a range of MIDI values (including the extremes the
+old fold used to relocate) and asserts the synth commands exactly `getFrequency(midi)` for each.
+The lattice-reach half is covered in `tests/desktop.spec.js` ("Tonnetz draws cells up to the top of
+human hearing").
+
+**Known open tension:** Gravity's board tuning (`35 − 3p + 4q`) spans ~130 semitones (MIDI 23–153),
+so with the fold gone its top rows are genuinely ultrasonic and go unheard — its board is *not* yet
+centered on comfortable hearing the way the other restricted modes are. Re-centering/retuning
+Gravity's board so its cells stay audible is tracked separately; this invariant is what surfaced it.
+
 ---
 
 ## Primary Elements

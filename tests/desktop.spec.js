@@ -1752,6 +1752,28 @@ test('Life multi-state: per-state velocity varies volume, not pitch (#85)', asyn
   expect(out.distinctPeaks).toBeGreaterThanOrEqual(2);   // ... and head vs tail come out different
 });
 
+// Human-hearing range: the pannable lattice draws cells up to the top of human hearing
+// (Tonnetz.audibleMaxMidi ~= MIDI 135, ~20 kHz), not the old MIDI-protocol ceiling of 127
+// (~12.5 kHz). A cell above hearing (MIDI 138) is still not drawn.
+test('Tonnetz draws cells up to the top of human hearing (past the old MIDI-127 cap)', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    // (10,0)->130, (9,4)->135 (top of hearing), (12,-2)->138 (above hearing).
+    Render.drawLattice({ minP: 8, maxP: 12, minQ: -2, maxQ: 4 }, {});
+    const drawn = (p, q) => !!Render.svg.querySelector(`polygon.cell:not(.ghost)[data-p="${p}"][data-q="${q}"]`);
+    return {
+      ceiling: Tonnetz.audibleMaxMidi(),
+      midi130: drawn(10, 0),  // ~5.3 kHz, was clipped by the old 127 cap
+      midi135: drawn(9, 4),   // ~19.9 kHz, the top audible cell
+      midi138: drawn(12, -2), // ~21 kHz, above hearing -> not drawn
+    };
+  });
+  expect(out.ceiling).toBe(135);
+  expect(out.midi130).toBe(true);  // now reachable (was not, under the 127 cap)
+  expect(out.midi135).toBe(true);  // drawn right up to the top of hearing
+  expect(out.midi138).toBe(false); // but not beyond it
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

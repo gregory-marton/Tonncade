@@ -63,6 +63,23 @@ const Tonnetz = {
         return 440 * Math.pow(2, (midi - 69) / 12);
     },
 
+    // The range of human hearing, ~20 Hz to ~20 kHz. In MIDI terms (inverse of getFrequency) that
+    // is ~15.5 to ~135.1, so MIDI 135 (~19.9 kHz) is the highest fully-audible integer note and
+    // MIDI 16 (~20.6 Hz) the lowest. The pannable lattice is drawn out to the TOP of hearing --
+    // replacing the old MIDI-protocol ceiling of 127 (~12.5 kHz), which stopped ~7.5 semitones
+    // short of it. (The math is defined far beyond hearing; this is just how far we draw.)
+    HEARING_MIN_HZ: 20,
+    HEARING_MAX_HZ: 20000,
+    midiFromFrequency: function(hz) {
+        return 69 + 12 * Math.log2(hz / 440);
+    },
+    audibleMaxMidi: function() {
+        return Math.floor(this.midiFromFrequency(this.HEARING_MAX_HZ)); // 135
+    },
+    audibleMinMidi: function() {
+        return Math.ceil(this.midiFromFrequency(this.HEARING_MIN_HZ));   // 16
+    },
+
     // Neighbors in 6 directions
     getNeighbors: function(p, q) {
         return [

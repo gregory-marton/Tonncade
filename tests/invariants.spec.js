@@ -1716,4 +1716,49 @@ test.describe('Invariant tests', () => {
     const listText = (await page.locator('#midi-note-list').textContent()).replace(/\s+/g, ' ');
     expect(listText, `expected "${expectedText}" somewhere in "${listText}"`).toContain(expectedText);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-46: THE FOUNDING INVARIANT -- a cell always sounds its own pitch.
+  // ────────────────────────────────────────────────────────────────────────
+
+  test('INV-46: the synth sounds each note at its own true getFrequency(midi), never octave-shifted', async ({ page }) => {
+    // The founding invariant of the whole project: a cell at (p,q) sounds exactly
+    // getFrequency(getMidi(p,q)) -- its own pitch, everywhere, always. Timbre/volume/decay may
+    // vary; PITCH may not. The synth must therefore command a note's true frequency and never
+    // fold it into a "comfortable" octave (which is a different pitch). Whether a device can
+    // reproduce an extreme frequency is the device's business -- we still command the true one.
+    const results = await page.evaluate(() => {
+      // A fake AudioContext that records exactly the frequency our code assigns to each
+      // oscillator (a real AudioParam would clamp above Nyquist -- a device limit -- masking
+      // what WE commanded; here we capture the raw commanded value).
+      const created = [];
+      const fakeOsc = () => ({
+        type: '', frequency: { value: 0, setValueAtTime() {} },
+        connect() {}, start() {}, stop() {},
+      });
+      const fakeGain = () => ({
+        gain: { setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect() {},
+      });
+      Synth.ctx = {
+        currentTime: 0, sampleRate: 44100,
+        createOscillator() { const o = fakeOsc(); created.push(o); return o; },
+        createGain: fakeGain,
+      };
+      Synth.master = {};
+
+      const midis = [0, 15, 21, 60, 69, 108, 127, 130, 135];
+      return midis.map((m) => {
+        created.length = 0;
+        Synth.playNote(m);
+        // The FIRST oscillator created in the call is the note's fundamental (any later ones are
+        // quiet harmonic reinforcement for low notes).
+        return { midi: m, commanded: created[0].frequency.value, expected: Tonnetz.getFrequency(m) };
+      });
+    });
+    for (const r of results) {
+      expect(r.commanded, `MIDI ${r.midi} must sound at its own ${r.expected.toFixed(2)}Hz, not a folded pitch`)
+        .toBeCloseTo(r.expected, 3);
+    }
+  });
 });

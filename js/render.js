@@ -193,11 +193,14 @@ const Render = {
         const rotationDeg = this.getEffectiveRotation();
         if (rotationDeg !== 0) group.setAttribute('transform', `rotate(${rotationDeg})`);
 
-        // Render range
+        // Render range. Pannable modes draw the lattice out to the top of human hearing
+        // (Tonnetz.audibleMaxMidi ~= MIDI 135, ~20 kHz) instead of the old MIDI-protocol ceiling of
+        // 127 (~12.5 kHz) -- the restricted modes (Snake/Gravity) draw their own fixed boards.
+        const audibleCeiling = Tonnetz.audibleMaxMidi();
         for (let p = viewport.minP; p <= viewport.maxP; p++) {
             for (let q = viewport.minQ; q <= viewport.maxQ; q++) {
                 const midi = Tonnetz.getMidi(p, q);
-                if (!options.isSnake && !options.isGravity && (midi < 0 || midi > 127)) continue;
+                if (!options.isSnake && !options.isGravity && (midi < 0 || midi > audibleCeiling)) continue;
 
                 // For Blast Mode, dim cells outside the radius
                 let fill = '#1c1f28';
