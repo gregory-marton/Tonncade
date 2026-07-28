@@ -1173,10 +1173,12 @@ old fold used to relocate) and asserts the synth commands exactly `getFrequency(
 The lattice-reach half is covered in `tests/desktop.spec.js` ("Tonnetz draws cells up to the top of
 human hearing").
 
-**Known open tension:** Gravity's board tuning (`35 − 3p + 4q`) spans ~130 semitones (MIDI 23–153),
-so with the fold gone its top rows are genuinely ultrasonic and go unheard — its board is *not* yet
-centered on comfortable hearing the way the other restricted modes are. Re-centering/retuning
-Gravity's board so its cells stay audible is tracked separately; this invariant is what surfaced it.
+**Accepted trade-off:** Gravity's board tuning (`35 − 3p + 4q`) spans ~130 semitones (MIDI 23–153),
+so with the fold gone its top rows are genuinely ultrasonic and go unheard, and its low end is
+comparatively high. On review (2026-07-28) the honest-pitch result sounded good enough in play that
+a retune wasn't worth it — the top was judged fine and, at most, the bottom could drop an octave
+someday. So this is a known, accepted characteristic, not an open task. This invariant is what
+surfaced it.
 
 ---
 
