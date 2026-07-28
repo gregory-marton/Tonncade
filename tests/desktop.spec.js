@@ -2029,6 +2029,32 @@ test('URL routing: hash deep-links to a mode and the URL updates on click', asyn
   }
 });
 
+// #94 surfaced a real bug: Blast and Gravity never called Render.init themselves -- they relied on
+// Sandbox (always the first mode entered, pre-#94) having already set Render.svg. A deep-link
+// straight to Blast/Gravity (no prior mode) crashed drawLattice (Render.svg undefined) and left the
+// difficulty control (and everything else) never wired up. Every mode's init must be self-
+// sufficient: reachable as the FIRST mode of a session, not just via a click from another mode.
+test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly', async ({ page }) => {
+  for (const mode of ['blast', 'gravity', 'snake', 'compose', 'midi', 'life']) {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('about:blank');
+    await page.goto('/#' + mode);
+    await expect.poll(() => page.evaluate(() => App.currentMode), { timeout: 5000 }).toBe(mode);
+    // The lattice actually rendered (not just currentMode flipped)...
+    const cellCount = await page.locator('#tonnetz-svg polygon.cell').count();
+    expect(cellCount, `${mode}: lattice should render`).toBeGreaterThan(0);
+    // ...and, for Blast/Gravity, the difficulty control lit up correctly (proof
+    // setupEvents/updateDifficultyUI ran, not just that currentMode flipped).
+    if (mode === 'blast' || mode === 'gravity') {
+      const lit = await page.locator(`#${mode}-difficulty .weight-icon.lit`).count();
+      expect(lit, `${mode}: default 'hard' difficulty should light all 3 weights`).toBe(3);
+    }
+    expect(errors, `${mode}: no page errors`).toEqual([]);
+    page.removeAllListeners('pageerror');
+  }
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

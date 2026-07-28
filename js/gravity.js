@@ -41,6 +41,12 @@ const GravityMode = {
     },
 
     init: function() {
+        // Every mode's init must be self-sufficient -- reachable as the FIRST mode of a session
+        // (e.g. a #94 deep-link straight here), not only via a click from a mode that already ran
+        // Render.init. This used to be missing, relying on Sandbox always running first; a direct
+        // deep-link to Gravity crashed drawLattice (Render.svg undefined). Init is idempotent.
+        Render.init('tonnetz-svg');
+
         const pauseBtn = document.getElementById('gravity-start-pause');
         const resetBtn = document.getElementById('gravity-reset');
         

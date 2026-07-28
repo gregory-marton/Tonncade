@@ -39,6 +39,12 @@ const BlastMode = {
     },
 
     init: function() {
+        // Every mode's init must be self-sufficient -- reachable as the FIRST mode of a session
+        // (e.g. a #94 deep-link straight here), not only via a click from a mode that already ran
+        // Render.init. This used to be missing, relying on Sandbox always running first; a direct
+        // deep-link to Blast crashed drawLattice (Render.svg undefined). Init is idempotent.
+        Render.init('tonnetz-svg');
+
         // #tonnetz-svg's on-screen box can still be settling the first time refreshBoard() runs
         // here (mobile layout uses `100dvh`, which Chromium can take an extra tick to resolve to
         // its final value) -- refreshBoard()'s aspect-matched fit (see
