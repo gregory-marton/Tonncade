@@ -39,7 +39,10 @@ const Tonnetz = {
     // Resultant (nw-se): +4 (Major Third)  [ (p+1, q-1) -> 7-3=4 ]
     getMidi: function(p, q) {
         if (typeof App !== 'undefined' && App.currentMode === 'gravity') {
-            return 35 + (p * -3) + (q * 4);
+            // Base 23 (not 35) puts Gravity's board an octave lower, so its pile end sits in deep-
+            // but-audible bass now that true pitch is played (INV-46). Same interval geometry
+            // (fifths down p, major thirds up q), just an octave down.
+            return 23 + (p * -3) + (q * 4);
         }
         return 60 + (p * 7) + (q * 3);
     },

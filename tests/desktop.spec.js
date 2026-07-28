@@ -1774,6 +1774,21 @@ test('Tonnetz draws cells up to the top of human hearing (past the old MIDI-127 
   expect(out.midi138).toBe(false); // but not beyond it
 });
 
+// Gravity's board register was dropped an octave (its pile end sits in low-but-audible bass now
+// that true pitch is played -- see INV-46). Its tuning is otherwise unchanged: every cell is
+// exactly 12 semitones below the old 35-based mapping.
+test('Gravity board sits an octave lower', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    App.currentMode = 'gravity';
+    const cells = [[-8, 17], [4, 0], [-5, 0], [0, 10]]; // spawn, pile-bottom corners, a mid cell
+    return cells.map(([p, q]) => ({ p, q, got: Tonnetz.getMidi(p, q), oldBase: 35 - 3 * p + 4 * q }));
+  });
+  for (const c of out) {
+    expect(c.got, `gravity (${c.p},${c.q}) should be an octave below the old mapping`).toBe(c.oldBase - 12);
+  }
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.
