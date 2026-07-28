@@ -1873,16 +1873,17 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
     Board.cells.clear();
-    Board.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell
-    // canonical cells whose gravity images are: empty in-cup (0,6), overlapping (0,0), out-of-cup (12,0)
+    Board.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell (on the floor)
+    // Gravity images: empty in-cup floor cell (3,0), overlapping (0,0), out-of-cup (12,0). Floor
+    // cells so settling doesn't move them -- this test isolates the cup/overlap rules.
     App.clipboard = [
-      Tonnetz.gravityToCanonical(0, 6),
+      Tonnetz.gravityToCanonical(3, 0),
       Tonnetz.gravityToCanonical(0, 0),
       Tonnetz.gravityToCanonical(12, 0),
     ];
     App.paste();
     return {
-      hasValid: Board.cells.has('0,6'),
+      hasValid: Board.cells.has('3,0'),
       hasOccupied: Board.cells.has('0,0'),
       hasOut: Board.cells.has('12,0'),
       size: Board.cells.size,
@@ -1892,6 +1893,23 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   expect(res.hasOccupied).toBe(true); // overlap left as-is
   expect(res.hasOut).toBe(false);     // out-of-cup ignored
   expect(res.size).toBe(2);           // original pile cell + one pasted cell
+});
+
+// Pasted mid-air cells fall to rest after a paste (the user's "then they can fall"). A single
+// pasted cell high in an empty column settles to the floor (q=0), staying one cell.
+test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    Board.cells.clear();
+    App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air
+    App.paste();
+    const qs = [...Board.cells.keys()].map((k) => +k.split(',')[1]);
+    return { size: Board.cells.size, minQ: Math.min(...qs) };
+  });
+  expect(res.size).toBe(1); // the one pasted cell
+  expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10
 });
 
 // Sandbox draws inaudible cells (outside human hearing) in dull gray so a pasted large Life game

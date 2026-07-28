@@ -378,9 +378,7 @@ const GravityMode = {
     // canonical coords via Tonnetz.gravity<->canonical (pitch-preserving). Copy = the pile. Paste =
     // send each canonical cell to its gravity cell and place it iff that cell is in the cup and
     // empty -- so cells outside the cup or overlapping the pile are ignored (per the user's rules).
-    // Pasted cells may hang in the air; like a locked piece they sit where placed. (Auto-settling
-    // floaters is a follow-up: per-cell getDown tears structures apart -- see dropRowsAbove / #6 --
-    // so it needs the component-wise drop, out of scope here.)
+    // Pasted cells may land in the air; settleFloatingCells then drops them to rest.
     copyCells: function() {
         return [...Board.cells.keys()].map((k) => {
             const parts = k.split(',');
@@ -399,8 +397,64 @@ const GravityMode = {
         });
         if (!placed.length) return;
         Board.fillCells(placed, 'paste', '#6fae9b');
+        this.settleFloatingCells(); // "then they can fall"
         this.refreshBoard();
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
+    // The connected components of the whole board (cells sharing hex edges), as arrays of
+    // {p, q, val}. Same grouping dropRowsAbove uses, factored out.
+    _boardComponents: function() {
+        const byKey = new Map();
+        Board.cells.forEach((val, key) => {
+            const [p, q] = key.split(',').map(Number);
+            byKey.set(key, { p, q, val, key });
+        });
+        const visited = new Set();
+        const components = [];
+        for (const start of byKey.values()) {
+            if (visited.has(start.key)) continue;
+            const component = [];
+            const stack = [start];
+            visited.add(start.key);
+            while (stack.length) {
+                const cur = stack.pop();
+                component.push(cur);
+                for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
+                    const nk = `${n.p},${n.q}`;
+                    if (byKey.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push(byKey.get(nk)); }
+                }
+            }
+            components.push(component);
+        }
+        return components;
+    },
+
+    // Drop every floating connected component to rest (used after a paste). Each component falls as
+    // a RIGID mass -- translated by one cell's getDown offset per step (a uniform translation
+    // preserves shape; moving cells individually by their own getDown would shear the mass, #6).
+    // A component rests when a step would take any of its cells out of the cup or onto a cell that
+    // isn't its own. Iterates until nothing moves (guarded against runaway).
+    settleFloatingCells: function() {
+        let moved = true, guard = 0;
+        while (moved && guard++ < 2000) {
+            moved = false;
+            for (const comp of this._boardComponents()) {
+                const ref = comp[0];
+                const down = this.getDown(ref.p, ref.q);
+                const dp = down.p - ref.p, dq = down.q - ref.q;
+                const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
+                const canFall = comp.every((c) => {
+                    const nk = (c.p + dp) + ',' + (c.q + dq);
+                    return Board.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !Board.cells.has(nk));
+                });
+                if (!canFall) continue;
+                const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: Board.cells.get(c.p + ',' + c.q) }));
+                comp.forEach((c) => Board.cells.delete(c.p + ',' + c.q));
+                moves.forEach((m) => Board.cells.set(m.nk, m.val));
+                moved = true;
+            }
+        }
     },
 
     refreshUI: function() {
