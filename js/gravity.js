@@ -373,6 +373,36 @@ const GravityMode = {
         Synth.playChord(midis, true, peak, dur);
     },
 
+    // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
+    // Gravity's mapping is the standard Tonnetz rotated 120deg, so its board cells convert to/from
+    // canonical coords via Tonnetz.gravity<->canonical (pitch-preserving). Copy = the pile. Paste =
+    // send each canonical cell to its gravity cell and place it iff that cell is in the cup and
+    // empty -- so cells outside the cup or overlapping the pile are ignored (per the user's rules).
+    // Pasted cells may hang in the air; like a locked piece they sit where placed. (Auto-settling
+    // floaters is a follow-up: per-cell getDown tears structures apart -- see dropRowsAbove / #6 --
+    // so it needs the component-wise drop, out of scope here.)
+    copyCells: function() {
+        return [...Board.cells.keys()].map((k) => {
+            const parts = k.split(',');
+            return Tonnetz.gravityToCanonical(+parts[0], +parts[1]);
+        });
+    },
+    pasteClipboard: function(cells) {
+        const placed = [];
+        const midis = [];
+        cells.forEach((c) => {
+            const g = Tonnetz.canonicalToGravity(c.p, c.q);
+            if (Board.isCellEmpty(g.p, g.q)) {
+                placed.push({ p: g.p, q: g.q });
+                midis.push(Tonnetz.getMidi(g.p, g.q));
+            }
+        });
+        if (!placed.length) return;
+        Board.fillCells(placed, 'paste', '#6fae9b');
+        this.refreshBoard();
+        Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
     refreshUI: function() {
         this.renderNextQueue();
 

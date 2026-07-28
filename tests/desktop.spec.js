@@ -1841,6 +1841,59 @@ test('Copy/paste: Sandbox cells paste into Life at the same pitches', async ({ p
   expect(res.livePitches).toEqual(res.clipPitches);     // and the same pitches (true-pitch preserved)
 });
 
+// Cross-mapping copy/paste: Gravity's pile copied and pasted into Sandbox must keep its true
+// pitches, even though Gravity's coordinate labels differ (the 120deg rotation is bridged via
+// canonical coords). Geometry rotates; pitch does not.
+test('Copy/paste: Gravity pile pastes into Sandbox preserving true pitch', async ({ page }) => {
+  await page.goto('/');
+  const gPitches = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    Board.cells.clear();
+    const gcells = [{ p: 0, q: 0 }, { p: -1, q: 2 }, { p: 1, q: 4 }];
+    Board.fillCells(gcells, 'x', '#fff');
+    App.copy();
+    return gcells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); // gravity pitches
+  });
+  const sPitches = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="sandbox"]').click();
+    App.currentMode = 'sandbox';
+    SandboxMode.state.placedCells = [];
+    App.paste();
+    return SandboxMode.state.placedCells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
+  });
+  expect(sPitches).toEqual(gPitches); // same pitches after the cross-mapping remap
+});
+
+// Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are
+// ignored; the rest are placed (even mid-air, per the user's rules).
+test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    Board.cells.clear();
+    Board.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell
+    // canonical cells whose gravity images are: empty in-cup (0,6), overlapping (0,0), out-of-cup (12,0)
+    App.clipboard = [
+      Tonnetz.gravityToCanonical(0, 6),
+      Tonnetz.gravityToCanonical(0, 0),
+      Tonnetz.gravityToCanonical(12, 0),
+    ];
+    App.paste();
+    return {
+      hasValid: Board.cells.has('0,6'),
+      hasOccupied: Board.cells.has('0,0'),
+      hasOut: Board.cells.has('12,0'),
+      size: Board.cells.size,
+    };
+  });
+  expect(res.hasValid).toBe(true);    // in-cup empty cell placed
+  expect(res.hasOccupied).toBe(true); // overlap left as-is
+  expect(res.hasOut).toBe(false);     // out-of-cup ignored
+  expect(res.size).toBe(2);           // original pile cell + one pasted cell
+});
+
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
 // songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
 // within a single octave so the drill is always playable.

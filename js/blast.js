@@ -79,6 +79,30 @@ const BlastMode = {
         }
     },
 
+    // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
+    // Blast uses the standard mapping, so its board cells are already canonical. Copy = the locked
+    // cells. Paste = place each canonical cell that lands in-bounds and empty; ignore the rest.
+    copyCells: function() {
+        return [...Board.cells.keys()].map((k) => {
+            const parts = k.split(',');
+            return { p: +parts[0], q: +parts[1] };
+        });
+    },
+    pasteClipboard: function(cells) {
+        const placed = [];
+        const midis = [];
+        cells.forEach((c) => {
+            if (Board.isCellEmpty(c.p, c.q)) {
+                placed.push({ p: c.p, q: c.q });
+                midis.push(Tonnetz.getMidi(c.p, c.q));
+            }
+        });
+        if (!placed.length) return;
+        Board.fillCells(placed, 'paste', '#6fae9b');
+        this.refreshBoard();
+        Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
     reset: function() {
         Board.cells.clear();
         this.state.linesCleared = 0;

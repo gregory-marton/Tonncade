@@ -31,6 +31,7 @@ const SnakeMode = {
         direction: { p: 1, q: 0 }, // Current heading vector
         nextDirection: { p: 1, q: 0 }, // Direction to apply on next tick
         gem: null,             // Position of the food gem { p, q }
+        extraGems: [],         // Extra food cells pasted in (see App copy/paste) { p, q }
         score: 0,              // Current score
         bestScore: 0,          // High score for snake mode
         isGameOver: false,
@@ -121,6 +122,7 @@ const SnakeMode = {
         ];
         this.state.direction = { p: 1, q: 0 };
         this.state.nextDirection = { p: 1, q: 0 };
+        this.state.extraGems = [];
         this.state.score = 0;
         this.state.isGameOver = false;
         this.state.isPaused = false;
@@ -209,7 +211,8 @@ const SnakeMode = {
         Synth.playNote(playableMidi, 0, 0.35, 0.16);
         this.highlightSegment(newHead.p, newHead.q, 300);
 
-        // Check food collision
+        // Check food collision -- the main gem, or any pasted extra gem
+        const extraIdx = this.state.extraGems.findIndex(g => g.p === newHead.p && g.q === newHead.q);
         if (newHead.p === this.state.gem.p && newHead.q === this.state.gem.q) {
             // Eat gem! Grow (don't pop tail)
             this.state.score++;
@@ -218,6 +221,13 @@ const SnakeMode = {
             this.spawnGem();
 
             // Increase speed slightly
+            this.state.speed = Math.max(250, 700 - this.state.score * 6);
+        } else if (extraIdx >= 0) {
+            // Eat a pasted gem: same reward, but it's consumed (not respawned).
+            this.state.score++;
+            this.updateScore(this.state.score);
+            this.playFlourish();
+            this.state.extraGems.splice(extraIdx, 1);
             this.state.speed = Math.max(250, 700 - this.state.score * 6);
         } else {
             // Standard step: pop tail
@@ -426,6 +436,29 @@ const SnakeMode = {
         };
     },
 
+    // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
+    // Snake uses the standard mapping, so its cells are already canonical. Copy = the snake body.
+    // Paste = drop each in-bounds canonical cell (not on the snake, not already food) in as an extra
+    // food gem -- silly but fun (the user's call).
+    copyCells: function() {
+        return this.state.snake.map((s) => ({ p: s.p, q: s.q }));
+    },
+    pasteClipboard: function(cells) {
+        const onSnake = (p, q) => this.state.snake.some((s) => s.p === p && s.q === q);
+        const isFood = (p, q) => (this.state.gem && this.state.gem.p === p && this.state.gem.q === q) ||
+            this.state.extraGems.some((g) => g.p === p && g.q === q);
+        const midis = [];
+        cells.forEach((c) => {
+            if (this.isInBounds(c.p, c.q) && !onSnake(c.p, c.q) && !isFood(c.p, c.q)) {
+                this.state.extraGems.push({ p: c.p, q: c.q });
+                midis.push(Tonnetz.getMidi(c.p, c.q));
+            }
+        });
+        if (!midis.length) return;
+        this.refreshBoard();
+        Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
     refreshBoard: function() {
         // Draw standard radius 7 hex lattice (viewport -8 to 8)
         const viewport = { minP: -8, maxP: 8, minQ: -8, maxQ: 8 };
@@ -448,6 +481,17 @@ const SnakeMode = {
             label.setAttribute('class', 'note-label gem-label');
             Render.appendToLattice(label);
         }
+
+        // Draw pasted extra gems (same look as the main gem)
+        this.state.extraGems.forEach((g) => {
+            const hex = Render.createHex(g.p, g.q, {
+                fill: '#ff9c4b', stroke: '#ffffff', strokeWidth: 2, className: 'snake-gem',
+            });
+            Render.appendToLattice(hex);
+            const label = Render.createLabel(g.p, g.q, Tonnetz.getNoteName(Tonnetz.getMidi(g.p, g.q)));
+            label.setAttribute('class', 'note-label gem-label');
+            Render.appendToLattice(label);
+        });
 
         // Draw Snake body (backwards from tail to head, so head lays on top)
         for (let i = this.state.snake.length - 1; i >= 0; i--) {

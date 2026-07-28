@@ -646,6 +646,26 @@ const ComposeMode = {
         });
     },
 
+    // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
+    // Compose uses the standard mapping, so its notes' (p,q) are already canonical. Copy = the
+    // spatial footprint of the piece (each note's cell). Paste = drop the cells in as one chord at
+    // the playhead -- Compose has no scrub marker yet (#73), so the playhead is the end of the
+    // current piece; every pasted cell shares that time (a simultaneous chord).
+    copyCells: function() {
+        return this.state.notes.map((n) => ({ p: n.p, q: n.q }));
+    },
+    pasteClipboard: function(cells) {
+        const playhead = this.state.notes.reduce((t, n) => Math.max(t, n.time + n.duration), 0);
+        const midis = [];
+        cells.forEach((c) => {
+            const midi = Tonnetz.getMidi(c.p, c.q);
+            this.state.notes.push({ midi, p: c.p, q: c.q, time: playhead, duration: this.DEFAULT_DURATION });
+            midis.push(midi);
+        });
+        this.refreshBoard();
+        if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
     cleanup: function() {
         this.stopPlayback();
         this.stopRecording();
