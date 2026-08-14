@@ -45,10 +45,12 @@ const ComposeMode = {
         recordStartTime: 0,
         isPlaying: false,
         playbackTimeoutIds: [],
-        // null until the first draw centers them for the current aspect-matched ref box (see
-        // Render.panView / INV-44); panning then updates them normally.
+        // null until the first draw: viewX/viewY center for the current aspect-matched ref box
+        // (see Render.panView / INV-44), zoom picks the responsive default. All three then persist
+        // across redraws (panning, or wheel/pinch zoom -- see main.js's applyZoomDelta).
         viewX: null,
         viewY: null,
+        zoom: null,
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
         dragCandidate: null,    // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
@@ -666,9 +668,14 @@ const ComposeMode = {
     },
 
     refreshBoard: function() {
-        const viewport = { minP: -15, maxP: 15, minQ: -15, maxQ: 15 };
+        // -26..26: wide enough that zooming out to Render.MAX_ZOOM never reveals blank space past
+        // the drawn edge (matches Sandbox/Life/Melody).
+        const viewport = { minP: -26, maxP: 26, minQ: -26, maxQ: 26 };
         Render.drawLattice(viewport, {});
-        const v = Render.panView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
+        // zoom is null until the first draw, then persists across redraws -- a redraw must never
+        // silently reset a zoom the player set via wheel/pinch back to the responsive default.
+        this.state.zoom = this.state.zoom || Render.getResponsiveZoom();
+        const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
         this.renderSelectionMarkers();

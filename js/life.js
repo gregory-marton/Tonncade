@@ -396,7 +396,10 @@ const LifeMode = {
         running: false,
         timer: null,
         generation: 0,
-        viewX: null, viewY: null, zoom: 1,
+        // null until the first draw: viewX/viewY center on the origin (see Render.panView / INV-44);
+        // zoom picks the responsive default. Once the player zooms (wheel/pinch, see main.js's
+        // applyZoomDelta) it must persist across redraws, not reset to a fixed value.
+        viewX: null, viewY: null, zoom: null,
     },
 
     // The first automaton, used until one is loaded from the life/ folder or a local file. Also
@@ -530,8 +533,9 @@ const LifeMode = {
     // The drawn extent of the Tonnetz (what refreshLattice renders). This is NOT a sound gate: a
     // cell sounds wherever it is, on- or off-screen, as long as it's a real cell doing something
     // (INV-46 + #13). Off-screen cells keep living, sound their own true pitch, and are saveable;
-    // this bound only governs what's drawn.
-    BOUNDS: { minP: -15, maxP: 15, minQ: -15, maxQ: 15 },
+    // this bound only governs what's drawn. Wide enough that zooming out to Render.MAX_ZOOM never
+    // reveals blank space past the drawn edge (matches Sandbox's own -26..26 default viewport).
+    BOUNDS: { minP: -26, maxP: 26, minQ: -26, maxQ: 26 },
 
     // A far outer safety cap on where cells may LIVE. The math goes on forever, but a running
     // automaton needs some hard bound so an explosive rule can't grow without limit and freeze the
@@ -548,7 +552,7 @@ const LifeMode = {
 
     refreshLattice: function() {
         Render.drawLattice(this.BOUNDS, {});
-        this.state.zoom = Render.getResponsiveZoom();
+        this.state.zoom = this.state.zoom || Render.getResponsiveZoom();
         const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;

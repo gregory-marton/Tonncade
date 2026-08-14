@@ -33,6 +33,19 @@ const Render = {
     HEX_W: Math.sqrt(3) * 30, // width
     HEX_H: 2 * 30 * 0.75, // height (vertical spacing for staggered rows)
 
+    // The single source of truth for "restricted" (fixed/fit-to-its-own-board, no free pan or
+    // zoom) vs. every other mode (a free-pan Tonnetz view, ordinary panning/zoom apply). Referenced
+    // by getPanBounds below and by main.js's zoom gestures -- neither hand-maintains its own
+    // mode list, so the two can't drift apart the way an inline allowlist per call site would.
+    RESTRICTED_MODES: ['blast', 'gravity', 'snake'],
+
+    // Zoom range for non-restricted modes' own in-app zoom (wheel/pinch -- see main.js's
+    // applyZoomDelta). MAX_ZOOM is chosen so the full audible range (Tonnetz.audibleMinMidi()..
+    // audibleMaxMidi()) fits the viewport at once, matching Sandbox's own drawn content bounds
+    // (see sandbox.js's _contentViewport). MIN_ZOOM allows a modest zoom-in past the default.
+    MIN_ZOOM: 0.5,
+    MAX_ZOOM: 3.5,
+
     init: function(svgId) {
         this.svg = document.getElementById(svgId);
         const stored = parseInt(localStorage.getItem('tonncade_rotation_deg') || '0', 10);
@@ -687,19 +700,24 @@ const Render = {
         return this.isMobileViewport() ? baseZoom / 1.5 : baseZoom;
     },
 
-    // Screen-space bounding box of every playable (MIDI 0-127) hex for the current mode,
-    // padded by one hex-width of slack. Only Sandbox/Blast/MIDI modes allow free panning;
-    // other modes return null and are left unclamped.
+    // Screen-space bounding box of every audible hex for the current mode, padded by one
+    // hex-width of slack. Every non-restricted mode (see RESTRICTED_MODES) allows free panning;
+    // restricted modes return null and are left unclamped (their own fit-to-board view never
+    // calls panView anyway). Uses the true audible range (Tonnetz.audibleMinMidi()..
+    // audibleMaxMidi(), ~16..135), not the MIDI-protocol range (0..127) -- the latter cuts off
+    // audible pitches above 127 (up to ~20kHz) that drawLattice already renders and MAX_ZOOM is
+    // meant to reveal all of.
     getPanBounds: function() {
         if (typeof App === 'undefined') return null;
         const mode = App.currentMode;
-        if (mode !== 'sandbox' && mode !== 'blast' && mode !== 'midi' && mode !== 'compose') return null;
+        if (this.RESTRICTED_MODES.includes(mode)) return null;
 
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (let p = -15; p <= 15; p++) {
-            for (let q = -15; q <= 15; q++) {
+        const audibleMin = Tonnetz.audibleMinMidi(), audibleMax = Tonnetz.audibleMaxMidi();
+        for (let p = -26; p <= 26; p++) {
+            for (let q = -26; q <= 26; q++) {
                 const midi = Tonnetz.getMidi(p, q);
-                if (midi < 0 || midi > 127) continue;
+                if (midi < audibleMin || midi > audibleMax) continue;
                 const pos = this.getRotatedScreenPos(p, q);
                 minX = Math.min(minX, pos.x - this.HEX_R);
                 maxX = Math.max(maxX, pos.x + this.HEX_R);

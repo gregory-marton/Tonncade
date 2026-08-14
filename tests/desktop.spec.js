@@ -1238,12 +1238,13 @@ test('clicking the active queue item does not place when the ghost position is i
   expect(placedAfter).toBe(placedBefore);
 });
 
-// Render.getPanBounds() (js/render.js) only returns real bounds for Sandbox/Blast/Melody
-// ('midi') — the three modes with a free-panning, unrestricted Tonnetz. Exercise all three,
-// not just Sandbox, so a future mode added to (or accidentally dropped from) that allowlist
-// gets caught here instead of only being noticed by whichever mode someone happens to test by
-// hand.
-for (const mode of ['sandbox', 'blast', 'midi']) {
+// Render.getPanBounds() (js/render.js) only returns real bounds for non-restricted modes (see
+// Render.RESTRICTED_MODES) -- Sandbox, Melody ('midi'), Compose, and Life, each with a
+// free-panning, unrestricted Tonnetz. Blast/Gravity/Snake fit their own fixed board instead and
+// are covered by the "unclamped in restricted modes" test below. Exercise all four non-restricted
+// modes, not just Sandbox, so a future mode added to (or accidentally dropped from) that set gets
+// caught here instead of only being noticed by whichever mode someone happens to test by hand.
+for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
   test(`panning cannot scroll far past the edge of the audible tonnetz (${mode})`, async ({ page }) => {
     await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
@@ -1264,6 +1265,68 @@ for (const mode of ['sandbox', 'blast', 'midi']) {
     expect(result.afterPositive.y).toBeCloseTo(result.bounds.maxY - 600, 0);
   });
 }
+
+// Reported live: could zoom in (via the browser's own page zoom) but not out far enough to see
+// the whole audible range -- most browsers floor page zoom around 25-33%. Fix: an in-app zoom
+// (App.applyZoomDelta), driven by wheel/ctrl+wheel (trackpad pinch)/touch pinch, independent of
+// the browser's own zoom and not subject to its floor. Scroll-wheel here; touch pinch is covered
+// in tests/mobile.spec.js.
+for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
+  test(`Scroll-wheel zoom works in ${mode} and persists across a redraw`, async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+    const before = await page.evaluate(() => App.modeModule().state.zoom || Render.getResponsiveZoom());
+    const container = page.locator('#game-container');
+    await container.hover();
+    await page.mouse.wheel(0, 400); // scroll down -- zooms OUT (larger zoom value, more world visible)
+    const afterOut = await page.evaluate(() => App.modeModule().state.zoom);
+    expect(afterOut).toBeGreaterThan(before);
+
+    await page.mouse.wheel(0, -800); // scroll up past the start -- zooms IN
+    const afterIn = await page.evaluate(() => App.modeModule().state.zoom);
+    expect(afterIn).toBeLessThan(afterOut);
+
+    // A redraw unrelated to zoom (e.g. Render.drawLattice via any refresh) must not silently
+    // reset the player's own zoom back to the responsive default.
+    const persisted = await page.evaluate((m) => {
+      const obj = App.modeModule();
+      if (m === 'sandbox' || m === 'life') obj.refreshLattice();
+      else obj.refreshBoard();
+      return obj.state.zoom;
+    }, mode);
+    expect(persisted).toBe(afterIn);
+  });
+}
+
+test('Scroll-wheel zoom clamps to Render.MIN_ZOOM/MAX_ZOOM and never exceeds them', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  const container = page.locator('#game-container');
+  await container.hover();
+
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 400); // scroll out far past any sane limit
+  const maxed = await page.evaluate(() => SandboxMode.state.zoom);
+  expect(maxed).toBeCloseTo(await page.evaluate(() => Render.MAX_ZOOM), 5);
+
+  for (let i = 0; i < 80; i++) await page.mouse.wheel(0, -400); // scroll in far past any sane limit
+  const minned = await page.evaluate(() => SandboxMode.state.zoom);
+  expect(minned).toBeCloseTo(await page.evaluate(() => Render.MIN_ZOOM), 5);
+});
+
+test('Scroll-wheel zoom has no effect in restricted (fixed-board) modes', async ({ page }) => {
+  await page.goto('/');
+  for (const mode of ['blast', 'gravity', 'snake']) {
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    const before = await page.evaluate(() => Render.zoom);
+    const container = page.locator('#game-container');
+    await container.hover();
+    await page.mouse.wheel(0, 400);
+    const after = await page.evaluate(() => Render.zoom);
+    expect(after, `${mode} should be unaffected by wheel input`).toBe(before);
+  }
+});
 
 // ────────────────────────────────────────────────────────────────────────
 // Issue #9: real report from a ChromeOS play session -- after finishing a Gravity game and
@@ -2186,7 +2249,7 @@ test('Sandbox: the gray lattice box grows to reach pasted far cells', async ({ p
     const capped = SandboxMode._contentViewport();
     return { empty, grown, capped };
   });
-  expect(out.empty.maxP).toBe(22);                 // default reachable band, no content
+  expect(out.empty.maxP).toBe(26);                 // default reachable band, no content
   expect(out.grown.maxP).toBeGreaterThanOrEqual(40); // grows to include the far pasted cell
   expect(out.capped.maxP).toBeLessThanOrEqual(64);   // but stays bounded (perf cap)
 });

@@ -28,10 +28,12 @@ for the JavaScript code in this file.
 const SandboxMode = {
     state: {
         // null until the first draw centers them on the origin for the current aspect-matched ref
-        // box (see Render.panView / INV-44); panning then updates them normally.
+        // box (see Render.panView / INV-44); panning then updates them normally. zoom is null
+        // until the first draw picks the responsive default, same reasoning -- once the player
+        // zooms (wheel/pinch, see main.js's applyZoomDelta) it must persist, not reset to 1.
         viewX: null,
         viewY: null,
-        zoom: 1,
+        zoom: null,
         selectedPiece: null,
         rotation: 0,
         placedPieces: [], // { type, p, q, rotation }
@@ -267,7 +269,10 @@ const SandboxMode = {
         const labels = Array.from(Render.svg.querySelectorAll('.note-label, .qwerty-label'));
         labels.forEach(lbl => Render.appendToLattice(lbl));
 
-        this.state.zoom = Render.getResponsiveZoom();
+        // Only fall back to the responsive default the FIRST time (null) -- once the player has
+        // zoomed (wheel/pinch, see main.js's applyZoomDelta), later redraws (piece placement, pan,
+        // resize) must keep it, not silently reset it back to default every time.
+        this.state.zoom = this.state.zoom || Render.getResponsiveZoom();
         const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
@@ -304,7 +309,9 @@ const SandboxMode = {
     CONTENT_MARGIN: 6,
     CONTENT_CAP: 64,
     _contentViewport: function() {
-        let minP = -22, maxP = 22, minQ = -22, maxQ = 22;
+        // -26..26: wide enough that zooming out to Render.MAX_ZOOM never reveals blank space past
+        // the drawn edge (see Render.getPanBounds, which scans the same range).
+        let minP = -26, maxP = 26, minQ = -26, maxQ = 26;
         const grow = (p, q) => {
             minP = Math.min(minP, p - this.CONTENT_MARGIN); maxP = Math.max(maxP, p + this.CONTENT_MARGIN);
             minQ = Math.min(minQ, q - this.CONTENT_MARGIN); maxQ = Math.max(maxQ, q + this.CONTENT_MARGIN);

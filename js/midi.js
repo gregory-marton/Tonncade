@@ -51,10 +51,12 @@ const MidiMode = {
         // clicked cell's note on mousedown, ALSO start tracking for a possible drag, update on
         // mousemove if dragging, stop on mouseup) is one already-proven interaction, not a new
         // one invented for this mode.
-        // null until the first draw centers them for the current aspect-matched ref box (see
-        // Render.panView / INV-44); panning then updates them normally.
+        // null until the first draw: viewX/viewY center for the current aspect-matched ref box
+        // (see Render.panView / INV-44), zoom picks the responsive default. All three then persist
+        // across redraws (panning, or wheel/pinch zoom -- see main.js's applyZoomDelta).
         viewX: null,
         viewY: null,
+        zoom: null,
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
 
@@ -858,18 +860,22 @@ const MidiMode = {
     },
 
     refreshBoard: function() {
-        // Render the full Sandbox Tonnetz layout
+        // Render the full Sandbox Tonnetz layout. -26..26: wide enough that zooming out to
+        // Render.MAX_ZOOM never reveals blank space past the drawn edge (matches Sandbox/Life).
         const viewport = {
-            minP: -15, maxP: 15,
-            minQ: -15, maxQ: 15
+            minP: -26, maxP: 26,
+            minQ: -26, maxQ: 26
         };
         Render.drawLattice(viewport, {});
         // Reads back the player's own pan position (see setupKeyboardEvents/state.viewX/viewY),
         // not a fixed default -- otherwise every redraw (resetGame, loading a new melody,
         // rotating the view) would silently discard wherever the player last panned to,
         // matching a real report: rotating moved melodies off-screen with no way to pan back,
-        // since panning didn't exist here at all until now.
-        const v = Render.panView(this.state.viewX, this.state.viewY, Render.getResponsiveZoom());
+        // since panning didn't exist here at all until now. Same reasoning for zoom (null until
+        // the first draw, then persisted -- see main.js's applyZoomDelta): a redraw must never
+        // silently reset a zoom the player set via wheel/pinch back to the responsive default.
+        this.state.zoom = this.state.zoom || Render.getResponsiveZoom();
+        const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
     },

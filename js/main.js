@@ -79,6 +79,52 @@ const App = {
         setTimeout(() => { btn.style.transform = ''; btn.style.opacity = ''; }, 180);
     },
 
+    // Zoomable is exactly pannable: every non-restricted mode has its own free-pan Tonnetz view
+    // and gets in-app zoom too (wheel, ctrl+wheel/trackpad pinch, and touch pinch -- see
+    // setupZoomGestures/setupTouchGestures). Restricted-board modes (Render.RESTRICTED_MODES --
+    // Blast/Gravity/Snake) fit their own fixed board to the screen and silently ignore zoom input
+    // entirely -- there's nothing to zoom, by design. Deliberately the SAME predicate
+    // Render.getPanBounds uses, not a separately-maintained list, so the two can't drift apart.
+    isZoomableMode: function() {
+        return typeof Render !== 'undefined' && !Render.RESTRICTED_MODES.includes(this.currentMode);
+    },
+
+    // Multiplies the current mode's zoom by `factor` (>1 zooms out, <1 zooms in -- matches
+    // Render.updateView's convention where a LARGER zoom means a larger viewBox, i.e. more world
+    // visible), clamped to Render.MIN_ZOOM/MAX_ZOOM, then re-pans at the same center so the view
+    // doesn't jump. A no-op in a restricted mode.
+    applyZoomDelta: function(factor) {
+        if (!this.isZoomableMode()) return;
+        const m = this.modeModule();
+        if (!m || !m.state) return;
+        const current = m.state.zoom || Render.getResponsiveZoom();
+        const next = Math.min(Render.MAX_ZOOM, Math.max(Render.MIN_ZOOM, current * factor));
+        if (next === current) return;
+        m.state.zoom = next;
+        const v = Render.panView(m.state.viewX, m.state.viewY, next);
+        m.state.viewX = v.viewX;
+        m.state.viewY = v.viewY;
+    },
+
+    // Desktop scroll-wheel zoom. Trackpad pinch and Ctrl+scroll both arrive here as native `wheel`
+    // events (browsers synthesize them that way) -- listening for plain wheel too, not just
+    // ctrlKey ones, covers a physical scroll-wheel mouse as well, per the reported request.
+    // preventDefault only inside an eligible mode, so page/browser zoom and scroll are only ever
+    // intercepted where this actually does something -- restricted modes silently fall through to
+    // whatever the browser would otherwise do (matches the reported "should silently have no
+    // effect").
+    setupZoomGestures: function() {
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        container.addEventListener('wheel', (e) => {
+            if (!this.isZoomableMode()) return;
+            e.preventDefault();
+            // A small exponential step per event: smooth under a trackpad's continuous stream of
+            // small deltas, and still a sensible single step from one physical wheel notch.
+            this.applyZoomDelta(Math.exp(e.deltaY * 0.001));
+        }, { passive: false });
+    },
+
     // Ctrl/Cmd+C / Ctrl/Cmd+V (desktop) + the header copy/paste buttons (touch). The keyboard path
     // steps aside when the user is editing text or has a real text selection, so normal text
     // copy/paste still works; otherwise it copies/pastes Tonnetz cells.
@@ -129,6 +175,7 @@ const App = {
         
         this.setupMobileControls();
         this.setupTouchGestures();
+        this.setupZoomGestures();
         this.updateVersionTag();
         this.setupMidiInput();
         this.setupRotateView();
@@ -708,6 +755,7 @@ const App = {
         let isDragging = false;
         let twoFingerStartCenter = null;
         let twoFingerStartView = null;
+        let lastPinchDistance = null; // updated every touchmove -- see the shared 2-finger handler
 
         // Compose-only: was the touched cell (at touchstart) an already-selected note? If so, a
         // drag-past-threshold is a note-drag (translateSelection at touchend) rather than
@@ -734,6 +782,8 @@ const App = {
         const getAngle = (t1, t2) => {
             return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * 180 / Math.PI;
         };
+
+        const getDistance = (t1, t2) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 
         const getCellFromTouch = (touch) => {
             const element = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -950,6 +1000,7 @@ const App = {
                     x: Render.viewX,
                     y: Render.viewY
                 };
+                lastPinchDistance = getDistance(e.touches[0], e.touches[1]);
                 e.preventDefault(); // Stop viewport scaling/panning while twisting
             }
         }, { passive: false });
@@ -998,6 +1049,7 @@ const App = {
                     y: (e.touches[0].clientY + e.touches[1].clientY) / 2
                 };
                 twoFingerStartView = { x: Render.viewX, y: Render.viewY };
+                lastPinchDistance = getDistance(e.touches[0], e.touches[1]);
                 e.preventDefault();
                 return;
             }
@@ -1059,7 +1111,7 @@ const App = {
                     }
                 }
             } else if (e.touches.length === 2) {
-                e.preventDefault(); // Block double-finger zooming gestures
+                e.preventDefault(); // We handle zoom ourselves below -- block the browser's native pinch-zoom
                 const currentAngle = getAngle(e.touches[0], e.touches[1]);
                 let diff = currentAngle - lastAngle;
 
@@ -1089,7 +1141,19 @@ const App = {
                     lastAngle = currentAngle;
                 }
                 
-                // 2. Panning drag logic
+                // 2. Pinch zoom: fingers spreading apart (currentDistance > lastPinchDistance)
+                // zooms IN; pinching closer zooms out. Applied against the distance since the
+                // LAST move event (not the gesture start), matching how the wheel handler applies
+                // a small step per event -- smooth and continuous rather than one big jump.
+                if (lastPinchDistance) {
+                    const currentDistance = getDistance(e.touches[0], e.touches[1]);
+                    if (currentDistance > 0) {
+                        this.applyZoomDelta(lastPinchDistance / currentDistance);
+                        lastPinchDistance = currentDistance;
+                    }
+                }
+
+                // 3. Panning drag logic
                 if (twoFingerStartCenter && twoFingerStartView) {
                     const currentCenter = {
                         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
@@ -1097,8 +1161,9 @@ const App = {
                     };
                     const dx = currentCenter.x - twoFingerStartCenter.x;
                     const dy = currentCenter.y - twoFingerStartCenter.y;
-                    
-                    // Multiply delta by zoom since zoom scales coordinates
+
+                    // Multiply delta by zoom since zoom scales coordinates. Render.zoom reflects
+                    // step 2's pinch-zoom, if any just happened this same move event.
                     const newViewX = twoFingerStartView.x - dx * Render.zoom;
                     const newViewY = twoFingerStartView.y - dy * Render.zoom;
 
@@ -1107,16 +1172,16 @@ const App = {
                     // Keep the mode's own persisted view state in sync with the (possibly
                     // clamped) result -- otherwise the next refreshBoard() (resetGame, loading a
                     // new melody, the rotate-view button) would read the stale pre-drag value and
-                    // silently discard wherever the player just panned to.
-                    if (this.currentMode === 'sandbox') {
-                        SandboxMode.state.viewX = Render.viewX;
-                        SandboxMode.state.viewY = Render.viewY;
-                    } else if (this.currentMode === 'midi') {
-                        MidiMode.state.viewX = Render.viewX;
-                        MidiMode.state.viewY = Render.viewY;
-                    } else if (this.currentMode === 'compose') {
-                        ComposeMode.state.viewX = Render.viewX;
-                        ComposeMode.state.viewY = Render.viewY;
+                    // silently discard wherever the player just panned to. Every zoomable mode is
+                    // pannable (and vice versa -- see isZoomableMode), so this is exactly the same
+                    // set of modes, driven off the mode object rather than a separately-listed
+                    // if/else chain.
+                    if (this.isZoomableMode()) {
+                        const m = this.modeModule();
+                        if (m && m.state) {
+                            m.state.viewX = Render.viewX;
+                            m.state.viewY = Render.viewY;
+                        }
                     }
                 }
             }

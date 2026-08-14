@@ -2227,4 +2227,33 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(result.length).toBe(2);
     expect(new Set(result.map(n => n.time)).size).toBe(1);
   });
+
+  // Reported live: could zoom in (browser page zoom) but not out far enough to see the whole
+  // audible range -- most browsers floor page zoom around 25-33%. Touch pinch is the natural
+  // trigger on a touchscreen, so it must drive the app's own in-app zoom directly (not rely on
+  // the browser's native pinch-zoom, which is explicitly blocked here to make room for pan/twist).
+  test('Sandbox: touch pinch zooms the view in and out', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await installMultiTouchDispatcher(page);
+    const before = await page.evaluate(() => SandboxMode.state.zoom || Render.getResponsiveZoom());
+
+    // Pinch OUT (fingers spreading apart) zooms IN -- smaller zoom value, per Render.updateView's
+    // convention (see main.js's applyZoomDelta).
+    const start = [{ id: 1, x: 300, y: 400 }, { id: 2, x: 340, y: 400 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), start);
+    const spread = [{ id: 1, x: 200, y: 400 }, { id: 2, x: 440, y: 400 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), spread);
+    const afterOut = await page.evaluate(() => SandboxMode.state.zoom);
+    expect(afterOut).toBeLessThan(before);
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), spread);
+
+    // Pinch IN (fingers coming together) zooms OUT -- larger zoom value.
+    const start2 = [{ id: 3, x: 200, y: 400 }, { id: 4, x: 440, y: 400 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchstart', pts), start2);
+    const pinch = [{ id: 3, x: 300, y: 400 }, { id: 4, x: 340, y: 400 }];
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchmove', pts), pinch);
+    const afterIn = await page.evaluate(() => SandboxMode.state.zoom);
+    expect(afterIn).toBeGreaterThan(afterOut);
+    await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), pinch);
+  });
 });
