@@ -32,11 +32,11 @@ function assert(cond, msg) {
 
 // Load each gun YAML
 const gunFiles = [
-    'ortho-gun-alpha.yaml',
-    'ortho-gun-epsilon.yaml',
-    'ortho-gun-zeta.yaml',
-    'ortho-gun-eta.yaml',
-    'ortho-gun-kappa.yaml',
+    'ortho-glider-alpha.yaml',
+    'ortho-glider-epsilon.yaml',
+    'ortho-glider-zeta.yaml',
+    'ortho-glider-eta.yaml',
+    'ortho-glider-kappa.yaml',
 ];
 
 const lifeDir = path.join(__dirname, '..', 'life');

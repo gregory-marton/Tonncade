@@ -1,8 +1,8 @@
-# Beehive Gun — a flyer gun under the 3-state Beehive rule.
-# Discovered by computational search (life_helpers/beehive_gun.js).
+# Beehive Glider Burst — a flyer glider burst under the 3-state Beehive rule.
+# Discovered by computational search (life_helpers/beehive_glider burst.js).
 # See docs/life-rules.md for the full rule language.
-name: "Beehive Gun"
-description: "A gun pattern in the 3-state Beehive rule that continuously emits gliders."
+name: "Beehive Glider Burst"
+description: "A glider burst pattern in the 3-state Beehive rule that continuously emits gliders."
 states: 3
 order: "21"
 transition:

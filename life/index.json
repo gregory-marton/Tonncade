@@ -12,27 +12,27 @@
     "file": "beehive.yaml"
   },
   {
-    "name": "Ortho Gun Alpha",
-    "file": "ortho-gun-alpha.yaml"
+    "name": "Ortho Glider Alpha",
+    "file": "ortho-glider-alpha.yaml"
   },
   {
-    "name": "Ortho Gun Epsilon",
-    "file": "ortho-gun-epsilon.yaml"
+    "name": "Ortho Glider Epsilon",
+    "file": "ortho-glider-epsilon.yaml"
   },
   {
-    "name": "Ortho Gun Zeta",
-    "file": "ortho-gun-zeta.yaml"
+    "name": "Ortho Glider Zeta",
+    "file": "ortho-glider-zeta.yaml"
   },
   {
-    "name": "Ortho Gun Eta",
-    "file": "ortho-gun-eta.yaml"
+    "name": "Ortho Glider Eta",
+    "file": "ortho-glider-eta.yaml"
   },
   {
-    "name": "Ortho Gun Kappa",
-    "file": "ortho-gun-kappa.yaml"
+    "name": "Ortho Glider Kappa",
+    "file": "ortho-glider-kappa.yaml"
   },
   {
-    "name": "Beehive Gun",
-    "file": "beehive-gun.yaml"
+    "name": "Beehive Glider Burst",
+    "file": "beehive-glider-burst.yaml"
   }
 ]
