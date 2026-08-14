@@ -424,22 +424,29 @@ const LifeMode = {
         this.refreshLattice();
         this.setupEvents();
         this.updateControls();
-        this.loadOnlineFolder();
+        // Invalidate any fetch left in flight from a previous Life visit: #tonnetz-svg is shared
+        // across all modes, so a stale callback landing after the player has moved on would
+        // repaint whatever mode is now showing (#15, #16).
+        this._activeToken = (this._activeToken || 0) + 1;
+        this.loadOnlineFolder(this._activeToken);
     },
 
     // Load an automaton from the online life/ folder (a relative fetch, like Melody's midi/ --
     // works on any http(s) host, simply absent under file:// or offline, where the built-in
     // DEFAULT_AUTOMATON already loaded above stands in). Two sources, no built-in default tier.
-    loadOnlineFolder: async function() {
+    // `token` pins this call to the Life visit that started it; if the player has since left (or
+    // re-entered) Life mode, `_activeToken` has moved on and the stale result is dropped (#15, #16).
+    loadOnlineFolder: async function(token) {
         try {
             const res = await fetch('./life/index.json');
-            if (!res.ok) return;
+            if (!res.ok || token !== this._activeToken) return;
             const index = await res.json();
+            if (token !== this._activeToken) return;
             if (!Array.isArray(index) || !index.length) return;
             this.onlineIndex = index;
             this.populateSelector();
             if (!this._loadedOnline) {
-                await this.loadAutomatonFile(index[0].file);
+                await this.loadAutomatonFile(index[0].file, token);
                 this._loadedOnline = true;
             }
         } catch (e) { /* offline / file:// -- keep the built-in default */ }
@@ -460,11 +467,15 @@ const LifeMode = {
         if (group) group.style.display = '';
     },
 
-    loadAutomatonFile: async function(file) {
+    // `token` is only passed by loadOnlineFolder's initial-load path; the manual <select> handler
+    // calls this with no token, so it's always applied (the player is actively in Life mode then).
+    loadAutomatonFile: async function(file, token) {
         try {
             const yres = await fetch('./life/' + file);
             if (!yres.ok) return;
-            this.loadAutomaton(Life.parseYaml(await yres.text()));
+            const text = await yres.text();
+            if (token !== undefined && token !== this._activeToken) return;
+            this.loadAutomaton(Life.parseYaml(text));
         } catch (e) { /* ignore -- keep whatever is loaded */ }
     },
 
@@ -653,20 +664,27 @@ const LifeMode = {
 
     setupEvents: function() {
         const svg = Render.svg;
-        if (svg && !this._tapBound) {
+        if (svg) {
             // Tap a cell to toggle it alive/dead. (Panning is a later refinement -- the automaton
-            // evolves around the origin, which the centred view already shows.)
+            // evolves around the origin, which the centred view already shows.) Bound fresh on
+            // every init and torn down in cleanup() (#15/#16): `Render.svg` is the ONE <svg> every
+            // mode shares, so a listener added via addEventListener -- unlike the `.onmousedown =`
+            // property other modes use, which the next mode's own assignment naturally overwrites
+            // -- survives both drawLattice's `innerHTML = ''` and a mode switch. Left unremoved, it
+            // kept firing on taps made in whatever mode came next, toggling Life's own (now
+            // invisible) cells from underneath the player.
             let down = null;
-            svg.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
-            svg.addEventListener('pointerup', (e) => {
+            this._onPointerDown = (e) => { down = { x: e.clientX, y: e.clientY }; };
+            this._onPointerUp = (e) => {
                 if (!down) return;
                 const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
                 if (moved <= 6 && e.target && e.target.hasAttribute && e.target.hasAttribute('data-p')) {
                     this.toggleCell(parseInt(e.target.getAttribute('data-p')), parseInt(e.target.getAttribute('data-q')));
                 }
                 down = null;
-            });
-            this._tapBound = true;
+            };
+            svg.addEventListener('pointerdown', this._onPointerDown);
+            svg.addEventListener('pointerup', this._onPointerUp);
         }
         const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = () => fn.call(this); };
         bind('life-play-pause', this.togglePlay);
@@ -704,7 +722,16 @@ const LifeMode = {
         if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
-    cleanup: function() { this.stop(); },
+    cleanup: function() {
+        this.stop();
+        this._activeToken = (this._activeToken || 0) + 1;
+        if (Render.svg && this._onPointerDown) {
+            Render.svg.removeEventListener('pointerdown', this._onPointerDown);
+            Render.svg.removeEventListener('pointerup', this._onPointerUp);
+            this._onPointerDown = null;
+            this._onPointerUp = null;
+        }
+    },
 };
 
 if (typeof module !== 'undefined') {
