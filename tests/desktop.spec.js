@@ -1883,6 +1883,27 @@ test('Tonnetz gravity<->canonical transforms preserve pitch and round-trip', asy
   expect(bad).toEqual([]);
 });
 
+// Reported live: pasting into Compose looked like a no-op ("nothing pastes"). Compose has no
+// persistent per-note marker at rest (only a momentary highlight while recording, or a selection
+// ring once tapped), and unlike every other note-adding path, pasteClipboard used to skip both the
+// momentary highlight AND updateStats() -- so a successful paste (state.notes really did grow) was
+// visually and numerically indistinguishable from nothing having happened.
+test('Copy/paste: pasting into Compose updates the visible note count', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  await page.evaluate(() => {
+    SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 1, q: 0 }];
+    SandboxMode.refreshLattice();
+    App.copy();
+  });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const before = await page.locator('#compose-note-count').textContent();
+  await page.evaluate(() => App.paste());
+  const after = await page.locator('#compose-note-count').textContent();
+  expect(before).toBe('0');
+  expect(after).toBe('2'); // both pasted cells landed as notes, and the count reflects it
+});
+
 // Cross-mode copy/paste driving scenario: build cells in Sandbox, copy, switch to Life, paste.
 // Same mapping (both standard) => the exact same cells and pitches land in Life.
 test('Copy/paste: Sandbox cells paste into Life at the same pitches', async ({ page }) => {
@@ -1931,6 +1952,53 @@ test('Copy/paste: Gravity pile pastes into Sandbox preserving true pitch', async
     return SandboxMode.state.placedCells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
   });
   expect(sPitches).toEqual(gPitches); // same pitches after the cross-mapping remap
+});
+
+// Reported live: copying Sandbox cells and pasting into Gravity via the REAL header buttons (not
+// App.copy()/App.paste() called directly, which the other copy/paste tests here use) landed
+// wrong. This drives the exact real workflow -- place in Sandbox, click #copy-btn, switch to
+// Gravity via the mode slider, click #paste-btn -- and checks both the resulting board state and
+// what's actually painted on screen.
+test('Copy/paste into Gravity via the real header buttons places the copied cells correctly', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  // Chosen (via Tonnetz.canonicalToGravity) to all land safely inside the cup's -5..4 columns --
+  // a cluster nearer the Sandbox origin, e.g. (0,0),(1,0),(0,1), mostly maps OUTSIDE the cup under
+  // this rotation, which is correct/expected (INV-47: cells landing out of bounds are dropped),
+  // not a bug -- this test is about the ones that DO land, not about testing that boundary.
+  const canonicalCells = await page.evaluate(() => {
+    SandboxMode.state.placedCells = [{ p: 0, q: -4 }, { p: 1, q: -4 }, { p: 0, q: -3 }];
+    SandboxMode.refreshLattice();
+    return SandboxMode.state.placedCells.map((c) => `${c.p},${c.q}`).sort();
+  });
+  await page.locator('#copy-btn').click();
+  // Capture the clipboard's TRUE pitches while still in Sandbox (the standard mapping) -- Tonnetz
+  // .getMidi is mode-dependent (INV-46/47: canonical coords are pitch-mapping-agnostic, but
+  // getMidi itself isn't), so computing this AFTER switching to Gravity would wrongly apply
+  // Gravity's own formula to plain canonical coordinates.
+  const clipboard = await page.evaluate(() => App.clipboard.map((c) => `${c.p},${c.q}`).sort());
+  expect(clipboard).toEqual(canonicalCells); // sanity: copy actually captured Sandbox's cells
+  const clipPitches = await page.evaluate(() => App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b));
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+  // Stub out settling for this check: these 3 cells land unconnected and mid-air (q=4/5, not
+  // resting on the floor), so settleFloatingCells legitimately drops each one further -- that's
+  // separately covered by "pasted mid-air cells settle to the floor" below. Isolating paste's OWN
+  // placement from that later physics step is what actually tests paste's correctness (the
+  // pre-settle position must carry the exact copied pitch, per INV-47) without the assertion
+  // being confounded by an intentional, expected pitch change from falling.
+  await page.evaluate(() => { GravityMode.settleFloatingCells = () => {}; });
+  await page.locator('#paste-btn').click();
+
+  const res = await page.evaluate(() => ({
+    boardSize: GravityBoard.cells.size,
+    painted: document.querySelectorAll('#tonnetz-svg polygon.placed-piece').length,
+  }));
+  expect(res.boardSize).toBe(3); // all 3 cells landed (nothing occupied/out-of-cup to block them)
+  expect(res.painted).toBe(3);   // and are actually drawn, not just in the data model
+  const pitches = await page.evaluate(() =>
+    [...GravityBoard.cells.keys()].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b));
+  expect(pitches).toEqual(clipPitches); // exact true pitch preserved, pre-settle
 });
 
 // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are

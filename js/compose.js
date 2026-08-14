@@ -708,6 +708,13 @@ const ComposeMode = {
             midis.push(midi);
         });
         this.refreshBoard();
+        // Compose has no persistent per-note marker at rest (only a momentary flash while
+        // recording, or a selection ring once explicitly tapped) -- every OTHER note-adding path
+        // (recordTouch etc.) flashes its cell via Render.highlightByMidi so the player sees
+        // something landed; paste skipped both that AND updateStats(), so a successful paste
+        // looked identical to a no-op (reported live: "nothing pastes").
+        midis.forEach((m) => Render.highlightByMidi(m, 250));
+        this.updateStats();
         if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
