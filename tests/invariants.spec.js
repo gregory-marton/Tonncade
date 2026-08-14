@@ -309,6 +309,30 @@ test.describe('Invariant tests', () => {
     await expect(cell).toHaveClass(/active-note/);
   });
 
+  // With a real (multi-cell) piece selected, MIDI input means something different from the note
+  // tool above: hover the piece's ghost (anchor at the nearest cell for the played pitch) and
+  // sound it -- a live audition of where it would land -- but never place it. A keyboard has no
+  // unambiguous "place" gesture of its own, so committing stays with the existing keyboard/touch
+  // controls untouched.
+  test('INV-23: live MIDI hardware note-on hovers a selected piece\'s ghost without placing it', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+    await connectFakeMidiDevice(page);
+
+    const placedBefore = await page.evaluate(() => SandboxMode.state.placedPieces.length);
+    const targetMidi = await page.evaluate(() => Tonnetz.getMidi(3, 3));
+    await sendFakeNoteOn(page, targetMidi);
+
+    const after = await page.evaluate(() => ({
+      hoverCell: SandboxMode.state.hoverCell,
+      placed: SandboxMode.state.placedPieces.length,
+      ghostCount: document.querySelectorAll('#tonnetz-svg polygon.ghost').length,
+    }));
+    expect(after.hoverCell).toEqual({ p: 3, q: 3 }); // ghost anchored exactly where that pitch is
+    expect(after.placed).toBe(placedBefore);         // never placed -- still just a preview
+    expect(after.ghostCount).toBeGreaterThan(0);      // and the ghost is actually shown
+  });
+
   test('INV-23: live MIDI hardware note-on advances Melody mode\'s practice sequence like a tap', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
     await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
@@ -323,14 +347,14 @@ test.describe('Invariant tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
-  // Issue #11: extending live MIDI hardware input to Gravity/Snake/Blast, per the report's own
-  // detailed spec for each mode. Generalized from 3 separately hand-written tests (each with its
-  // own copy of the connect-device/switch-mode boilerplate -- flagged as a gap on the GitHub
-  // issue itself) into one shared MIDI_ROUTING_CHECKS config plus a single loop: a future mode
-  // gaining MIDI support means adding one entry here, not a new bespoke test. Each mode's own
-  // routing logic is still genuinely different -- the issue's own spec maps MIDI differently per
-  // mode (move/rotate for Gravity, turn-toward-closest-pitch for Snake, chord-to-placement for
-  // Blast) -- so each entry supplies its own check; only the harness is shared.
+  // Issue #11: extending live MIDI hardware input to Gravity/Snake/Blast (per the report's own
+  // detailed spec for each mode), and beyond it to Life (added later, once Life itself existed --
+  // toggle the cell nearest the view center for the played pitch). Generalized from separately
+  // hand-written tests (each with its own copy of the connect-device/switch-mode boilerplate --
+  // flagged as a gap on the GitHub issue itself) into one shared MIDI_ROUTING_CHECKS config plus a
+  // single loop: a future mode gaining MIDI support means adding one entry here, not a new bespoke
+  // test. Each mode's own routing logic is still genuinely different -- so each entry supplies its
+  // own check; only the harness is shared.
   // ────────────────────────────────────────────────────────────────────────
 
   const MIDI_ROUTING_CHECKS = {
@@ -376,9 +400,25 @@ test.describe('Invariant tests', () => {
       });
       expect(result, 'Blast\'s ghost should move to a placement reproducing the played chord').toEqual(chord.slice().sort((a, b) => a - b));
     },
+    life: async (page) => {
+      await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      // The exact target the app itself computes (nearest matching cell to the view center) --
+      // then confirm playing that pitch actually toggles that specific cell.
+      const before = await page.evaluate(() => {
+        const W = Render.HEX_W, H = 45;
+        const qNear = Math.round(-(LifeMode.state.viewY || 0) / H);
+        const pNear = Math.round(((LifeMode.state.viewX || 0) - qNear * (W / 2)) / W);
+        const target = Tonnetz.nearestCoordFor(60, { p: pNear, q: qNear });
+        const key = `${target.p},${target.q}`;
+        return { key, hadLive: LifeMode.state.live.has(key) };
+      });
+      await sendFakeNoteOn(page, 60);
+      const hasLive = await page.evaluate((key) => LifeMode.state.live.has(key), before.key);
+      expect(hasLive, 'MIDI note 60 should toggle the cell nearest the view center for that pitch').toBe(!before.hadLive);
+    },
   };
 
-  test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast, each per its own spec', async ({ page }) => {
+  test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast/Life, each per its own spec', async ({ page }) => {
     await connectFakeMidiDevice(page); // hardware connection is session-level, not per-mode
     for (const mode of Object.keys(MIDI_ROUTING_CHECKS)) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);

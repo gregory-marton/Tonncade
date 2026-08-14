@@ -528,12 +528,25 @@ const SandboxMode = {
     },
 
     // Plays a note by MIDI pitch alone, with no (p, q) known -- for an input source that isn't a
-    // board tap (live MIDI hardware input, see js/midi-input.js). Always just plays the note,
-    // regardless of whatever piece-placement state is active: unlike a tapped hex (which is
-    // ambiguous between pickup/place/play depending on state), a physical key press has only one
-    // meaning. Highlights every rendered cell sharing that pitch (a no-op if none are currently
-    // on screen) -- a Tonnetz places the same note at multiple lattice positions by design.
+    // board tap (live MIDI hardware input, see js/midi-input.js). Two cases (#11):
+    //   * The note tool (no piece selected): always just plays the note. Unlike a tapped hex
+    //     (ambiguous between pickup/place/play depending on state), a physical key press has only
+    //     one meaning here. Highlights every rendered cell sharing that pitch (a no-op if none are
+    //     currently on screen) -- a Tonnetz places the same note at multiple lattice positions by
+    //     design.
+    //   * A real piece selected: hover its ghost with its ANCHOR at the nearest matching cell for
+    //     this pitch (Tonnetz.nearestCoordFor, seeded from the current hoverCell so consecutive
+    //     notes move it incrementally rather than jumping) and sound it -- updateGhost already
+    //     does, per INV-14. A live audition of where it would land, never a placement: a keyboard
+    //     has no unambiguous "place" gesture of its own (each MIDI device is different), so this
+    //     leaves the actual commit to the existing keyboard/touch controls, exactly as they are.
     playNoteByMidi: function(midi) {
+        if (this.state.selectedPiece) {
+            const { p, q } = Tonnetz.nearestCoordFor(midi, this.state.hoverCell);
+            this.state.hoverCell = { p, q };
+            this.updateGhost();
+            return;
+        }
         Render.highlightByMidi(midi, 250);
         Synth.playNote(midi);
     },

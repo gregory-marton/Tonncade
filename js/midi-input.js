@@ -105,6 +105,8 @@ const MidiInput = {
             SnakeMode.handleMidiNote(midi);
         } else if (App.currentMode === 'blast' && typeof BlastMode !== 'undefined') {
             this.bufferChordNote(midi);
+        } else if (App.currentMode === 'life' && typeof LifeMode !== 'undefined') {
+            LifeMode.handleMidiNote(midi);
         }
     },
 

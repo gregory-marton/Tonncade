@@ -1989,6 +1989,48 @@ test('Life: Save As refuses an empty board with a clear message, instead of writ
   expect(alertMessage).toMatch(/nothing to save/i);
 });
 
+// Reported live: Life had no way to OPEN a local automaton file at all -- only the online
+// dropdown (the bundled life/ folder), unlike Melody/Compose which both have their own upload
+// input alongside their online dropdown. Mirrors that exact pattern (a real File, real
+// FileReader), not a direct API call, so this exercises the actual upload wiring.
+test('Life: opening a local automaton file loads its rule and cells', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const yaml = [
+    'name: "Test Upload"',
+    'rule:',
+    '  survival: [2, 3]',
+    '  birth: [3]',
+    'sound: { when: born, duration: 0.4 }',
+    'initial:',
+    '  cells:',
+    '    - [5, 5]',
+    '    - [6, 5]',
+    'tempo: 120',
+  ].join('\n');
+
+  await page.locator('#life-file-input').setInputFiles({
+    name: 'my-glider.yaml',
+    mimeType: 'text/yaml',
+    buffer: Buffer.from(yaml),
+  });
+  // Wait on something the DEFAULT automaton can never produce (cell (5,5) isn't in its seed),
+  // not just "some rule got set" -- the default's own rule also happens to have survival.length
+  // === 2, which would make that condition trivially true without ever confirming the upload.
+  await page.waitForFunction(() => LifeMode.state.live.has('5,5'), { timeout: 5000 });
+
+  const result = await page.evaluate(() => ({
+    rule: LifeMode.state.rule,
+    live: [...LifeMode.state.live.keys()].sort(),
+    filename: document.getElementById('life-filename').textContent,
+  }));
+  expect(result.rule).toEqual({ survival: [2, 3], birth: [3] });
+  expect(result.live).toEqual(['5,5', '6,5']);
+  expect(result.filename).toBe('my-glider.yaml');
+});
+
 // #85: a state's `velocity` must actually change how LOUD its cells sound (the pitch invariant
 // permits volume to vary by state -- only pitch may not). beehive.yaml gives state 1 velocity 95
 // and state 2 velocity 55, so a step must play head (state 1) cells louder than tail (state 2)

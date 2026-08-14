@@ -590,6 +590,19 @@ const LifeMode = {
         this.paintLive();
     },
 
+    // Issue #11: a live MIDI keyboard should have SOME effect in every mode. Life's own action is
+    // toggling a specific cell, and a pitch exists at multiple (p,q) on the infinite Tonnetz (see
+    // Tonnetz.nearestCoordFor), so this toggles whichever one is nearest the current view center --
+    // "the one you're probably looking at" -- the same cell pressing that key would mean if you
+    // tapped what's on screen. toggleCell already sounds the result, so nothing further to do here.
+    handleMidiNote: function(midi) {
+        const W = Render.HEX_W, H = 45; // H matches getScreenPos's own fixed row-height constant
+        const qNear = Math.round(-(this.state.viewY || 0) / H);
+        const pNear = Math.round(((this.state.viewX || 0) - qNear * (W / 2)) / W);
+        const { p, q } = Tonnetz.nearestCoordFor(midi, { p: pNear, q: qNear });
+        this.toggleCell(p, q);
+    },
+
     // The concrete note duration for a sound spec, resolving the 'generation' keyword against tempo.
     _durationOf: function(spec) {
         if (!spec) return 0.4;
@@ -799,6 +812,29 @@ const LifeMode = {
         bind('life-save', this.save);
         const sel = document.getElementById('life-automaton');
         if (sel) sel.onchange = () => this.loadAutomatonFile(sel.value);
+
+        // Open a LOCAL automaton file -- e.g. one previously written by Save As, or shared by
+        // someone else -- distinct from the online dropdown above (the bundled life/ folder).
+        // Mirrors Melody/Compose's own upload input exactly (same pattern, different file type:
+        // YAML text here via readAsText, not an arrayBuffer).
+        const fileInput = document.getElementById('life-file-input');
+        if (fileInput) {
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        this.loadAutomaton(Life.parseYaml(event.target.result));
+                        const filenameEl = document.getElementById('life-filename');
+                        if (filenameEl) filenameEl.textContent = file.name;
+                    } catch (err) {
+                        alert(`Could not read "${file.name}" as a Life automaton: ${err.message}`);
+                    }
+                };
+                reader.readAsText(file);
+            };
+        }
     },
 
     updateControls: function() {

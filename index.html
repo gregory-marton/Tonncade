@@ -306,6 +306,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <div id="life-automaton-group" class="control-group" style="display: none; margin-bottom: 8px;">
                         <select id="life-automaton" aria-label="Automaton" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
                     </div>
+                    <div id="life-upload-group" class="control-group">
+                        <label for="life-file-input" class="custom-file-upload">
+                            Open Automaton File
+                        </label>
+                        <input id="life-file-input" type="file" accept=".yaml,.yml" style="display: none;" />
+                        <span id="life-filename"></span>
+                    </div>
                     <div class="control-buttons">
                         <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button>
                         <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button>
