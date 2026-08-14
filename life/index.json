@@ -22,5 +22,13 @@
   {
     "name": "Ortho Gun Zeta",
     "file": "ortho-gun-zeta.yaml"
+  },
+  {
+    "name": "Ortho Gun Eta",
+    "file": "ortho-gun-eta.yaml"
+  },
+  {
+    "name": "Ortho Gun Kappa",
+    "file": "ortho-gun-kappa.yaml"
   }
 ]
