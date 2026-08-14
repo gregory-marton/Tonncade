@@ -1,0 +1,33 @@
+# Beehive Gun — a flyer gun under the 3-state Beehive rule.
+# Discovered by computational search (life_helpers/beehive_gun.js).
+# See docs/life-rules.md for the full rule language.
+name: "Beehive Gun"
+description: "A gun pattern in the 3-state Beehive rule that continuously emits gliders."
+states: 3
+order: "21"
+transition:
+  - [0, 1, 2, 1, 2, 0, 0]
+  - [0, 2, 2, 2, 1, 1]
+  - [0, 0, 2, 2, 0]
+  - [0, 2, 2, 0]
+  - [0, 0, 2]
+  - [2, 0]
+  - [0]
+sound: { when: born, duration: 0.4 }
+sounds:
+  - { state: 1, velocity: 95, duration: 0.35 }
+  - { state: 2, velocity: 55, duration: 0.7 }
+initial:
+  cells:
+    - [0, 0, 1]
+    - [1, 0, 1]
+    - [1, -1, 2]
+    - [0, -1, 2]
+    - [2, -1, 2]
+    - [-1, 1, 2]
+    - [2, 0, 1]
+    - [1, -2, 1]
+    - [-2, 1, 1]
+    - [0, 1, 2]
+    - [-1, 2, 1]
+tempo: 180
