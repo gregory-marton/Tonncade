@@ -8,6 +8,19 @@ Built in pure vanilla JavaScript, HTML5 SVG, and Web Audio API, the game runs co
 
 ---
 
+## Running Locally
+
+*   **Just play:** open `index.html` directly in a browser (`file://` URL) — no server required.
+*   **With a local server** (needed to test the service worker, or to match what the test suite uses):
+    ```
+    npx http-server -p 8001 -c-1
+    ```
+    then visit `http://localhost:8001`. This is the same command `playwright.config.js` runs automatically for `npm test`.
+
+Plain `file://` is fine for everyday play, but the service worker (offline/PWA support, registered in `js/main.js`) only registers over `http(s)://` — browsers block `navigator.serviceWorker.register()` under `file://`. It fails silently, so offline install just won't work until you serve over HTTP.
+
+---
+
 ## Core Concept
 Euler's Tonnetz organizes notes by harmonic relationships rather than scalar steps. In this pointy-top hexagonal representation:
 *   **Horizontal Axis ($p$):** Perfect Fifths (+7 semitones)
