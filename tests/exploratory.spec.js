@@ -111,6 +111,23 @@ const GATE_REASON_SCRIPT = `
 
 test.describe('Exploratory tests (prototype)', () => {
   test.beforeEach(async ({ page }) => {
+    // These tests fire hundreds of real taps across every mode (gravity, snake, blast, ...),
+    // each triggering a real Synth note -- audible, overlapping, cutting each other off.
+    // Chromium gets --mute-audio from Playwright automatically; WebKit (the Mobile Safari
+    // project) has no such flag, so it was the one actually reaching real speakers. Muting at
+    // the Web Audio graph itself (never actually connecting an oscillator to the destination)
+    // is what stays silent on every browser, Chromium's own mute or not, and doesn't touch
+    // .frequency/.type/etc, so tests that inspect a created oscillator's own properties (see
+    // INV-46) are unaffected -- only whether sound reaches real speakers changes.
+    await page.addInitScript(() => {
+      const proto = (window.AudioContext || window.webkitAudioContext).prototype;
+      const realCreateOscillator = proto.createOscillator;
+      proto.createOscillator = function(...args) {
+        const osc = realCreateOscillator.apply(this, args);
+        osc.connect = () => {};
+        return osc;
+      };
+    });
     await page.goto('/');
     await page.waitForLoadState('networkidle');
   });

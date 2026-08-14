@@ -44,6 +44,21 @@ test.describe('Story tests', () => {
     page.on('pageerror', err => { throw err; });
     // Game Over fires a real alert() -- accept it so the test doesn't hang waiting on a dialog.
     page.on('dialog', async d => { await d.accept(); });
+    // A full real play session fires real Synth notes throughout. Chromium gets --mute-audio
+    // from Playwright automatically; WebKit has no such flag and was reaching real speakers.
+    // Muting at the Web Audio graph (never connecting an oscillator to the destination) stays
+    // silent on every browser and doesn't touch .frequency/.type/etc, unlike addInitScript-set
+    // Math.random seeding elsewhere in this file (see the file header) -- this isn't that; it's
+    // AudioContext.prototype, which Replay.init() never touches.
+    await page.addInitScript(() => {
+      const proto = (window.AudioContext || window.webkitAudioContext).prototype;
+      const realCreateOscillator = proto.createOscillator;
+      proto.createOscillator = function(...args) {
+        const osc = realCreateOscillator.apply(this, args);
+        osc.connect = () => {};
+        return osc;
+      };
+    });
   });
 
   test('Blast story: a real captured session plays through deterministically', async ({ page }) => {
