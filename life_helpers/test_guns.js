@@ -15,6 +15,8 @@
 
 const path = require('path');
 const fs = require('fs');
+global.FileFolder = { create: () => ({ on: () => {} }) };
+global.AudioFolder = { create: () => ({ on: () => {} }) };
 const Life = require(path.join(__dirname, '..', 'js', 'life.js'));
 const {
     key, parseKey, setFrom, pairsFrom,

@@ -1000,3 +1000,203 @@ Now let's run these new tests — expecting red for blast/gravity/snake and gree
 ### 2026-08-14T01:09:53.454Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 → Bash: npx playwright test -g "INV-48" 2>&1 | tail -150
+
+
+### 2026-08-14T01:48:23.548Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:48:30.983Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:48:31.008Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated. All occurrences were successfully replaced. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:48:39.412Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/run_tests.js
+
+
+### 2026-08-14T01:48:39.437Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 135 // TDD Gravity Mode cup dimensions test case 136 console.log("Running Gravity Mode cup dimensions (10x20 visible, 10x15 playable) test..."); 137 App.currentMode = 'gravity'; 138 const Board = vm.runInContext("Board", context); 139 140 Board.cells.clear(); 141 142 // Fill row q = 14 (15th row, top playable row) 143 const rowQ = 14; 144 for (let col = -5; col <= 4; col++) { 145 const p = col - Math.floor(rowQ / 2); 146 Board.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' }); 147 } 148 const fullLines = Board.findFullLines(); 149 if (fullLines.length !== 1) { 150 console.error(`FAIL: 15th row (q = ${rowQ}) not detected! Length was: ${fullLines.length}`); 151 process.exit(1); 152 } 153 if (fullLines[0].length !== 10) { 154 console.error(`FAIL: Row width was not 10 cells! Width was: ${fullLines[0].length}`); 155 process.exit(1); 156 } 157 158 // Fill row q = 15 (16th row - spawn/buffer zone) 159 Board.cells.clear(); 160 const bufferQ = 15; 161 for (let col = -5; col <= 4; col++) { 162 const p = col - Math.floor(bufferQ / 2); 163 Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' }); 164 } 165 const fullLinesBuffer = Board.findFullLines(); 166 if (fullLinesBuffer.length !== 0) { 167 console.error(`FAIL: Row in spawn zone (q = ${bufferQ}) was incorrectly detected as clearable!`); 168 process.exit(1); 169 } 170 171 Board.cells.clear(); 172 console.log("PASS: Gravity Mode cup is correctly 10x20 visible, 10x15 playable!"); 173 174 // Test Tonnetz Isomorphism
+
+
+### 2026-08-14T01:48:48.607Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:48:48.672Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:48:50.950Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the 852-983 block (toe-hold overhang + dropRowsAbove shape-preservation tests):
+
+
+### 2026-08-14T01:48:51.493Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:48:51.501Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 852 853 // BUG (reported live): a piece sliding toward the Gravity cup's left/right wall should be 854 // able to overhang as far as it likes, as long as it keeps at least one hex ("a toe-hold") 855 // on the actual playable columns (-5..4). Previously checkActivePlacement required EVERY 856 // cell to be within a fixed window only one column wider than the cup (-6..5), so any 857 // piece longer than 2 cells could only ever overhang by exactly one column, well short of 858 // "down to a single hex on the grid." 859 console.log("Running Gravity single-hex-toehold overhang test..."); 860 App.currentMode = 'gravity'; 861 Board.cells.clear(); 862 863 // I piece "laying flat" (rotation 0): local cells (-1,0),(0,0),(1,0),(2,0), i.e. 4 cells in 864 // a row. At q=10 (even, so floor(10/2)=5), col = p + 5. 865 // Anchor p=0 -> cols 4,5,6,7: only the leftmost cell (col 4) is on-grid, the other three 866 // hang off the RIGHT edge (col > 4). This should be a legal position (one toe-hold cell). 8 …[6553 chars elided]… rd.cells.size; // 10 (row) + 8 (above) = 18 971 Board.clearCells(fullRow); // exactly what GravityMode.processClears itself calls 972 GravityMode.dropRowsAbove(0); 973 const sizeAfter = Board.cells.size; 974 975 if (sizeAfter !== sizeBefore - fullRow.length) { 976 console.error(`FAIL: conservation of hexes violated! ${sizeBefore} cells before, cleared a ${fullRow.length}-wide row, expected ${sizeBefore - fullRow.length} after, got ${sizeAfter} -- some cell was silently lost (or duplicated) during the cascade.`); 977 process.exit(1); 978 } 979 if (sizeAfter !== aboveCells.length) { 980 console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...Board.cells.keys()])}`); 981 process.exit(1); 982 } 983 984 Board.cells.clear(); 985 console.log("PASS: clearing a line and cascading the board above it conserves exactly (before - row width) cells, even across multiple disconnected structures!"); 986
+
+
+### 2026-08-14T01:48:53.807Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This entire block (853–986) is exclusively Gravity-context. I'll replace `Board.` with `GravityBoard.` throughout it.
+
+
+### 2026-08-14T01:49:06.095Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:06.131Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:14.881Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:14.917Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:18.094Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:18.121Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:31.077Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:31.114Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:32.930Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the remaining block around line 1023–1090 (overhang debris + checkGameOver):
+
+
+### 2026-08-14T01:49:33.700Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:33.722Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1000 if (a < 0) a += 360; 1001 return a; 1002 }; 1003 const angleBefore = clockAngle(1, 0); // due east, 90 degrees clockwise from 12 1004 const afterRotate = PiecesObj.rotate([{ p: 1, q: 0 }])[0]; 1005 const afterRotateCCW = PiecesObj.rotateCCW([{ p: 1, q: 0 }])[0]; 1006 const angleAfterRotate = clockAngle(afterRotate.p, afterRotate.q); 1007 const angleAfterRotateCCW = clockAngle(afterRotateCCW.p, afterRotateCCW.q); 1008 // A 60-degree step; mod 360 so e.g. 90 -> 30 (CCW) doesn't get confused with 90 -> 390. 1009 const stepCCW = ((angleBefore - angleAfterRotate) % 360 + 360) % 360; 1010 const stepCW = ((angleAfterRotateCCW - angleBefore) % 360 + 360) % 360; 1011 if (stepCCW !== 60) { 1012 console.error(`[REDACTED_SECRET]`); 1013 process.exit(1); 1014 } 1015 if (stepCW !== 60) { 1016 console.error(`[REDACTED_SECRET]` …[3465 chars elided]…  for (let col = -14; col <= 13; col++) { 1071 const p = col - Math.floor(q / 2); 1072 const key = `${p},${q}`; 1073 if (footprint.has(key)) continue; 1074 Board.cells.set(key, { type: 'X', color: '#ffffff' }); 1075 } 1076 } 1077 1078 if (Board.checkGameOver('L')) { 1079 console.error("FAIL: checkGameOver('L') should be false -- a legal far-left-overhang placement exists (anchor col -7), outside the old -6..5 scan range!"); 1080 process.exit(1); 1081 } 1082 1083 Board.cells.clear(); 1084 console.log("PASS: checkGameOver's anchor-column scan reaches far enough to find legal far-overhang placements!"); 1085 1086 // Replay: an always-on capped log of recent input, so a player can report a bug post-hoc 1087 // (via the console, or the report-bug link) without having had anything pre-armed. Eviction 1088 // is amortized (see Replay.trimToCapacity): the log is allowed to grow up to 2x MAX_EVENTS 1089 // before a single bulk trim brings it back down to exactly MAX_EVENTS, rather than paying an
+
+
+### 2026-08-14T01:49:44.814Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:49:44.845Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:54.865Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:49:54.923Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:49:58.084Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify no more stray gravity-context `Board.` refs remain, and double-check the MIDI routing block at line ~533 (still correctly Blast-only for `BoardObj`).
+
+
+### 2026-08-14T01:49:58.420Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "\bBoard\.\|BoardObj\|GravityBoard" tests/run_tests.js
+
+
+### 2026-08-14T01:49:58.537Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 139: const GravityBoard = vm.runInContext("GravityBoard", context); 141: GravityBoard.cells.clear(); 147: GravityBoard.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' }); 149: const fullLines = GravityBoard.findFullLines(); 160: GravityBoard.cells.clear(); 164: GravityBoard.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' }); 166: const fullLinesBuffer = GravityBoard.findFullLines(); 172: GravityBoard.cells.clear(); 534: const BoardObj = vm.runInContext("Board", context); 596: BoardObj.cells.clear(); 861: GravityBoard.cells.clear(); 867: if (!GravityBoard.checkActivePlacement('I', 0, 10, 0)) { 874: if (!GravityBoard.checkActivePlacement('I', -12, 10, 0)) { 881: if (GravityBoard.checkActivePlacement('I', -13, 10, 0)) { 888: if (GravityBoard.checkActivePlacement('I', 0, -1, 0)) { 893: GravityBoard.cells.clear(); 909: GravityBoard.cells.clear(); 914: GravityBoard.cells.set('0,4', { type: 'X', color: '#ffffff' }); 915: GravityBoard.cells.set('[REDACTED_PRIVATE_INFO]', { type: 'X', color: '# …[550 chars elided]… h(key => GravityBoard.cells.set(key, { type: 'X', color: '#ffffff' })); 970: const sizeBefore = GravityBoard.cells.size; // 10 (row) + 8 (above) = 18 971: GravityBoard.clearCells(fullRow); // exactly what GravityMode.processClears itself calls 973: const sizeAfter = GravityBoard.cells.size; 980: console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...GravityBoard.cells.keys()])}`); 984: GravityBoard.cells.clear(); 1024: // But once locked, those overhanging cells get written into GravityBoard.cells exactly like 1033: GravityBoard.cells.clear(); 1037: GravityBoard.cells.set('0,10', { type: 'X', color: '#ffffff' }); 1042: if (GravityBoard.checkActivePlacement('I', -1, 10, 0)) { 1047: GravityBoard.cells.clear(); 1063: GravityBoard.cells.clear(); 1074: GravityBoard.cells.set(key, { type: 'X', color: '#ffffff' }); 1078: if (GravityBoard.checkGameOver('L')) { 1083: GravityBoard.cells.clear();
+
+
+### 2026-08-14T01:50:01.086Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's verify `GravityBoard` isn't scoped only within that inner `try` block variable declaration in a way that's inaccessible later (JS `const` inside a block is scoped to that block/function). Let's check the overall brace structure to confirm it's one continuous `try` block.
+
+
+### 2026-08-14T01:50:01.807Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "^try\|^} catch\|^})()" tests/run_tests.js | head -10
+
+
+### 2026-08-14T01:50:01.918Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 131:try { 1371:} catch (err) {
+
+
+### 2026-08-14T01:50:04.654Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — one continuous `try` block, so `GravityBoard` declared at line 139 is in scope throughout. Now let's fix gravity.js's comment reference and check `render.js`'s `isInBounds` usage for Blast is unaffected, then remove the unconditional `reset()` calls in Blast/Gravity/Snake `init()`.
+
+
+### 2026-08-14T01:50:05.543Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T01:50:05.571Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 78 this.setupEvents(); 79 }, 80 81 // Real report (issue #9): the "done" Gravity board stayed on screen after switching to 82 // another mode. Root cause was that nothing ever called this -- [REDACTED_SECRET]'s setMode only 83 // ever cleared state.timer inline, leaving the ResizeObserver above watching Render.svg (the 84 // one <svg> every mode shares) forever. Since its callback unconditionally repaints Gravity's 85 // own viewport + GravityBoard.cells, any LATER layout reflow -- e.g. switching to a mode whose 86 // sidebar content is a different size -- fired it again and overwrote the new mode's board 87 // with Gravity's stale one. Nulling both the timer and the observer here, matching every 88 // other mode's own cleanup(), is what actually stops it for good. 89 cleanup: function() { 90 if (this.state.timer) { 91 clearInterval(this.state.timer); 92 this.state.timer = null; 93 } 94 if (this._resizeObserver) { 95 this._resizeObserver.disconnect(); 96 this._resizeObserver = null; 97 }
+
+
+### 2026-08-14T01:50:08.666Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Comment auto-updated fine. Now let's remove the unconditional `reset()` from `init()` in Blast, Gravity, and Snake — replacing with "only reset if there's no existing game" logic, and rely on `cleanup()` (already correct) to pause.
+
+
+### 2026-08-14T01:50:08.997Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T01:50:09.040Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 43 init: function() { 44 // Every mode's init must be self-sufficient -- reachable as the FIRST mode of a session 45 // (e.g. a #94 deep-link straight here), not only via a click from a mode that already ran 46 // Render.init. This used to be missing, relying on Sandbox always running first; a direct 47 // deep-link to Gravity crashed drawLattice (Render.svg undefined). Init is idempotent. 48 Render.init('tonnetz-svg'); 49 50 const pauseBtn = [REDACTED_PRIVATE_INFO]; 51 const resetBtn = [REDACTED_PRIVATE_INFO]; 52 53 if (pauseBtn) pauseBtn.onclick = () => this.togglePause(); 54 if (resetBtn) resetBtn.onclick = () => this.reset(); 55 56 // #tonnetz-svg's on-screen box can still be settling the first time refreshBoard() runs 57 // here (mobile layout uses `100dvh`, which Chromium can take an extra tick to resolve to 58 // its final value) -- refreshBoard()'s aspect-matched fit (see 59 // Render.getAspectMatchedRefBox) would otherwise permanently fi …[232 chars elided]… f the specific cause. 63 // 64 // Observes #game-container, not Render.svg itself (INV-40): fitContentBox sizes Render.svg 65 // FROM #game-container's own box, so #game-container is the real upstream signal. Watching 66 // Render.svg directly missed real changes whenever fitContentBox's OWN output size 67 // happened to be insensitive to the exact container width (a common case: this board's 68 // shape is often height-bound, so its fitted size doesn't change even though its centered 69 // X-offset should) -- found live via the mobile drawer's open/close animation leaving the 70 // board offset stuck mid-transition, never settling back to its pre-open position. 71 if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) { 72 this._resizeObserver = new ResizeObserver(() => this.refreshBoard()); 73 const container = document.getElementById('game-container'); 74 this._resizeObserver.observe(container || Render.svg); 75 } 76 77 this.reset(); 78 this.setupEvents();
+
+
+### 2026-08-14T01:50:17.476Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:50:17.539Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)

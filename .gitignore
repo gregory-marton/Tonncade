@@ -20,3 +20,4 @@ screenshots/manifest-*.js
 
 # Reference papers kept locally -- NOT redistributable (copyright); never commit.
 papers/
+.dev_log_redactor_state.json
