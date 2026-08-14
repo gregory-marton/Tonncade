@@ -61,14 +61,77 @@ const App = {
             return true;
         });
         this.flashClipboardButton('copy-btn');
+        // Also write to the REAL system clipboard, fire-and-forget -- copy's own synchronous
+        // behavior (and every existing caller of it) is unaffected either way. Without this,
+        // App.clipboard is just this one tab's own JS memory: invisible to a second Tonncade
+        // window/tab, so a copy there could never be pasted here. Falls back to the in-memory
+        // clipboard alone if the Clipboard API is unavailable or permission is denied (e.g. an
+        // insecure context) -- same-tab copy/paste keeps working regardless.
+        if (this.clipboard.length && typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(this._formatClipboardText(this.clipboard)).catch(() => {});
+        }
+    },
+
+    // A short marker identifying OUR clipboard payload among whatever else might be on the
+    // system clipboard (plain text from anywhere else, or a previous unrelated copy).
+    CLIPBOARD_MARKER: 'TONNCADE_CELLS_V1',
+
+    // Renders a copied cell set as clipboard TEXT: a human-readable line of note names (so
+    // pasting into a text editor/chat/etc. shows something legible as music, per the request),
+    // followed by the exact machine-readable payload a paste back into Tonncade parses. Note
+    // names alone can't round-trip losslessly -- the Tonnetz places the same pitch at many
+    // different (p,q) positions (that's the whole point of it), so reconstructing a copied
+    // SHAPE (not just its pitch classes) needs the true canonical coordinates, not just names.
+    _formatClipboardText: function(cells) {
+        const names = cells.map((c) => {
+            const midi = Tonnetz.getMidi(c.p, c.q);
+            return Tonnetz.getNoteName(midi) + Tonnetz.getOctave(midi);
+        });
+        const payload = JSON.stringify({ [this.CLIPBOARD_MARKER]: 1, cells });
+        return `${names.join(' ')}\n${payload}`;
+    },
+
+    // The inverse of _formatClipboardText: finds our JSON payload among the clipboard text (which
+    // may carry other content around it, or be entirely unrelated) and returns its cells, or null
+    // if this text isn't ours.
+    _parseClipboardText: function(text) {
+        if (typeof text !== 'string') return null;
+        for (const line of text.split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('{')) continue;
+            try {
+                const obj = JSON.parse(trimmed);
+                if (obj && obj[this.CLIPBOARD_MARKER] && Array.isArray(obj.cells)) return obj.cells;
+            } catch (e) { /* not JSON, or not ours -- keep looking */ }
+        }
+        return null;
     },
 
     // Paste the clipboard into the current mode (each mode applies its own placement rules).
+    // Reads App.clipboard -- this tab's own in-memory copy -- directly and synchronously; see
+    // pasteFromClipboardOrOS for the real Paste button/Ctrl+V entry point, which first tries to
+    // refresh App.clipboard from the real OS clipboard (so paste can pull from a DIFFERENT
+    // Tonncade window/tab), then calls this.
     paste: function() {
         const m = this.modeModule();
         if (!m || typeof m.pasteClipboard !== 'function' || !this.clipboard.length) return;
         m.pasteClipboard(this.clipboard);
         this.flashClipboardButton('paste-btn');
+    },
+
+    // The real Paste button/Ctrl+V entry point: try the real OS clipboard first (so a copy in
+    // ANOTHER Tonncade window/tab can be pasted here), falling back to whatever's already in
+    // App.clipboard (this tab's own last copy) if the Clipboard API is unavailable, permission is
+    // denied, or the OS clipboard doesn't currently hold Tonncade data.
+    pasteFromClipboardOrOS: async function() {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+            try {
+                const text = await navigator.clipboard.readText();
+                const parsed = this._parseClipboardText(text);
+                if (parsed && parsed.length) this.clipboard = parsed;
+            } catch (e) { /* permission denied/unavailable -- fall back to App.clipboard as-is */ }
+        }
+        this.paste();
     },
 
     flashClipboardButton: function(id) {
@@ -138,12 +201,12 @@ const App = {
             if (editable(e.target)) return;
             if (k === 'c' && String(window.getSelection())) return; // real text selection -> let it copy
             e.preventDefault();
-            if (k === 'c') this.copy(); else this.paste();
+            if (k === 'c') this.copy(); else this.pasteFromClipboardOrOS();
         });
         const copyBtn = document.getElementById('copy-btn');
         const pasteBtn = document.getElementById('paste-btn');
         if (copyBtn) copyBtn.onclick = () => this.copy();
-        if (pasteBtn) pasteBtn.onclick = () => this.paste();
+        if (pasteBtn) pasteBtn.onclick = () => this.pasteFromClipboardOrOS();
     },
 
     init: function() {

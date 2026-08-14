@@ -1973,6 +1973,46 @@ test('Tonnetz gravity<->canonical transforms preserve pitch and round-trip', asy
   expect(bad).toEqual([]);
 });
 
+// Reported live: App.clipboard is just this one tab's own JS memory, so copying in one Tonncade
+// window/tab could never be pasted in a DIFFERENT one -- App.copy()/paste() alone have no way to
+// reach across windows. Fixed by also writing to the real OS clipboard (navigator.clipboard) on
+// copy, and having the real Paste entry point (App.pasteFromClipboardOrOS, bound to the button/
+// Ctrl+V -- see setupClipboard) read it back first. Simulated here by clearing App.clipboard
+// between copy and paste (standing in for "a different window/tab, with its own empty in-memory
+// clipboard") and confirming the OS clipboard alone is enough to recover the exact cells.
+test('Copy/paste: copy also writes the real OS clipboard, and paste recovers from it alone (cross-window)', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  const canonicalCells = await page.evaluate(() => {
+    SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 1, q: 0 }];
+    SandboxMode.refreshLattice();
+    App.copy();
+    return SandboxMode.state.placedCells.map((c) => `${c.p},${c.q}`).sort();
+  });
+
+  // The clipboard TEXT itself: a legible line of note names (per the request -- pasting into a
+  // text editor/chat/etc. should read as recognizable music), plus the exact machine payload.
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  const [noteLine, payloadLine] = clipboardText.split('\n');
+  expect(noteLine.trim()).toBe('C4 G4'); // (0,0) and (1,0) canonical -- C4, then a fifth up
+  expect(JSON.parse(payloadLine)).toEqual({ TONNCADE_CELLS_V1: 1, cells: [{ p: 0, q: 0 }, { p: 1, q: 0 }] });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.evaluate(() => {
+    App.clipboard = []; // stand in for a separate window/tab's own empty in-memory clipboard
+    LifeMode.clear();
+  });
+  await page.locator('#paste-btn').click();
+  // pasteFromClipboardOrOS is async (it awaits navigator.clipboard.readText()) -- give its
+  // microtask a beat to resolve and apply before reading the result back.
+  await page.waitForFunction(() => LifeMode.state.live.size > 0, { timeout: 2000 });
+
+  const pastedKeys = await page.evaluate(() => [...LifeMode.state.live.keys()].sort());
+  expect(pastedKeys).toEqual(canonicalCells);
+});
+
 // Reported live: pasting into Compose looked like a no-op ("nothing pastes"). Compose has no
 // persistent per-note marker at rest (only a momentary highlight while recording, or a selection
 // ring once tapped), and unlike every other note-adding path, pasteClipboard used to skip both the
@@ -2072,6 +2112,9 @@ test('Copy/paste into Gravity via the real header buttons places the copied cell
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
   await page.locator('#paste-btn').click();
+  // The Paste button is now App.pasteFromClipboardOrOS (async: it awaits
+  // navigator.clipboard.readText() first) -- give it a beat to actually apply before checking.
+  await page.waitForFunction(() => GravityBoard.cells.size > 0, { timeout: 2000 });
 
   // Paste itself never settles (that's a separate per-tick physics step -- see "pasted mid-air
   // cells settle only once ticks resume" below), so these land exactly at their raw,
@@ -2234,6 +2277,9 @@ test('Gravity: pasting the exact missing note into a near-complete row clears it
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
   await page.locator('#paste-btn').click();
+  // The Paste button is now App.pasteFromClipboardOrOS (async: it awaits
+  // navigator.clipboard.readText() first) -- give it a beat to actually apply before checking.
+  await page.waitForFunction((before) => GravityBoard.cells.size > before, setup.sizeBefore, { timeout: 2000 });
   const afterPaste = await page.evaluate(() => ({
     size: GravityBoard.cells.size,
     rowStillFull: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4].every((col) => GravityBoard.cells.has(`${col},0`)),
