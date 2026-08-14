@@ -70,7 +70,12 @@ const BlastMode = {
             this._resizeObserver.observe(container || Render.svg);
         }
 
-        this.reset();
+        // A mode switch pauses -- it never resets (INV-48/#15/#16's sibling for Blast/Gravity).
+        // Only the very first entry (no piece has ever been dealt) or the player's own Reset
+        // button starts a fresh game; returning to Blast mid-game just repaints exactly where it
+        // was left.
+        if (!this.state.activePiece) this.reset();
+        else this.refreshUI();
         this.setupEvents();
     },
 

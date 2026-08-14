@@ -136,16 +136,17 @@ try {
     console.log("Running Gravity Mode cup dimensions (10x20 visible, 10x15 playable) test...");
     App.currentMode = 'gravity';
     const Board = vm.runInContext("Board", context);
+    const GravityBoard = vm.runInContext("GravityBoard", context);
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
 
     // Fill row q = 14 (15th row, top playable row)
     const rowQ = 14;
     for (let col = -5; col <= 4; col++) {
         const p = col - Math.floor(rowQ / 2);
-        Board.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' });
+        GravityBoard.cells.set(`${p},${rowQ}`, { type: 'I', color: '#ffffff' });
     }
-    const fullLines = Board.findFullLines();
+    const fullLines = GravityBoard.findFullLines();
     if (fullLines.length !== 1) {
         console.error(`FAIL: 15th row (q = ${rowQ}) not detected! Length was: ${fullLines.length}`);
         process.exit(1);
@@ -156,19 +157,19 @@ try {
     }
 
     // Fill row q = 15 (16th row - spawn/buffer zone)
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     const bufferQ = 15;
     for (let col = -5; col <= 4; col++) {
         const p = col - Math.floor(bufferQ / 2);
-        Board.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
+        GravityBoard.cells.set(`${p},${bufferQ}`, { type: 'I', color: '#ffffff' });
     }
-    const fullLinesBuffer = Board.findFullLines();
+    const fullLinesBuffer = GravityBoard.findFullLines();
     if (fullLinesBuffer.length !== 0) {
         console.error(`FAIL: Row in spawn zone (q = ${bufferQ}) was incorrectly detected as clearable!`);
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: Gravity Mode cup is correctly 10x20 visible, 10x15 playable!");
 
     // Test Tonnetz Isomorphism
@@ -857,39 +858,39 @@ try {
     // "down to a single hex on the grid."
     console.log("Running Gravity single-hex-toehold overhang test...");
     App.currentMode = 'gravity';
-    Board.cells.clear();
+    GravityBoard.cells.clear();
 
     // I piece "laying flat" (rotation 0): local cells (-1,0),(0,0),(1,0),(2,0), i.e. 4 cells in
     // a row. At q=10 (even, so floor(10/2)=5), col = p + 5.
     // Anchor p=0 -> cols 4,5,6,7: only the leftmost cell (col 4) is on-grid, the other three
     // hang off the RIGHT edge (col > 4). This should be a legal position (one toe-hold cell).
-    if (!Board.checkActivePlacement('I', 0, 10, 0)) {
+    if (!GravityBoard.checkActivePlacement('I', 0, 10, 0)) {
         console.error("FAIL: a piece with exactly one hex on the grid (hanging 3 off the right edge) should be a legal position!");
         process.exit(1);
     }
 
     // Anchor p=-12 -> cols -8,-7,-6,-5: only the rightmost cell (col -5) is on-grid, the other
     // three hang off the LEFT edge. Also legal (one toe-hold cell, other side).
-    if (!Board.checkActivePlacement('I', -12, 10, 0)) {
+    if (!GravityBoard.checkActivePlacement('I', -12, 10, 0)) {
         console.error("FAIL: a piece with exactly one hex on the grid (hanging 3 off the left edge) should be a legal position!");
         process.exit(1);
     }
 
     // Anchor p=-13 -> cols -9,-8,-7,-6: ALL four cells off-grid, zero toe-hold. Must be illegal
     // — a piece can't float entirely off the playable columns.
-    if (Board.checkActivePlacement('I', -13, 10, 0)) {
+    if (GravityBoard.checkActivePlacement('I', -13, 10, 0)) {
         console.error("FAIL: a piece with NO hex on the grid (fully off the left edge) should be illegal (no toe-hold)!");
         process.exit(1);
     }
 
     // The floor (q < 0) must stay a hard limit regardless of toe-hold elsewhere: a piece can't
     // dip below q=0 even if the rest of it has plenty of room on-grid.
-    if (Board.checkActivePlacement('I', 0, -1, 0)) {
+    if (GravityBoard.checkActivePlacement('I', 0, -1, 0)) {
         console.error("FAIL: a piece with any cell below the floor (q < 0) should always be illegal, toe-hold or not!");
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: Gravity pieces can overhang the side walls down to a single toe-hold hex, and the floor stays solid!");
 
     // Real bug (GitHub issue #6, "floating piece"): dropRowsAbove(qClear) shifted every cell
@@ -905,22 +906,22 @@ try {
     // Replay.wrapSynth and scripts/replay-to-gif.js's sound verification).
     console.log("Running Gravity dropRowsAbove shape-preservation test...");
     const GravityMode = vm.runInContext("GravityMode", context);
-    Board.cells.clear();
+    GravityBoard.cells.clear();
 
     // Two cells connected via the "+Min3" hex direction (offset (-1,+1) -- see
     // Tonnetz.getNeighbors), straddling an even/odd row boundary (q=4 even, q=5 odd), well
     // above the row about to be cleared (q=0).
-    Board.cells.set('0,4', { type: 'X', color: '#ffffff' });
-    Board.cells.set('-1,5', { type: 'X', color: '#ffffff' });
-    const originalKeys = new Set(Board.cells.keys());
+    GravityBoard.cells.set('0,4', { type: 'X', color: '#ffffff' });
+    GravityBoard.cells.set('-1,5', { type: 'X', color: '#ffffff' });
+    const originalKeys = new Set(GravityBoard.cells.keys());
 
     GravityMode.dropRowsAbove(0);
 
-    if (Board.cells.size !== 2) {
-        console.error(`FAIL: dropRowsAbove should move both cells, not lose or duplicate any -- got ${Board.cells.size} cells: ${JSON.stringify([...Board.cells.keys()])}`);
+    if (GravityBoard.cells.size !== 2) {
+        console.error(`FAIL: dropRowsAbove should move both cells, not lose or duplicate any -- got ${GravityBoard.cells.size} cells: ${JSON.stringify([...GravityBoard.cells.keys()])}`);
         process.exit(1);
     }
-    const movedKeys = [...Board.cells.keys()].map(k => k.split(',').map(Number));
+    const movedKeys = [...GravityBoard.cells.keys()].map(k => k.split(',').map(Number));
     // Both cells should have moved DOWN by exactly one row (q decreased by 1) each.
     const originalQs = [...originalKeys].map(k => Number(k.split(',')[1])).sort();
     const movedQs = movedKeys.map(([p, q]) => q).sort();
@@ -940,7 +941,7 @@ try {
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: Gravity's dropRowsAbove shifts connected structures as a single rigid body, never tearing them apart!");
 
     // Conservation of hexes: clearing a line and cascading everything above it down must never
@@ -952,35 +953,35 @@ try {
     // its own consistent-but-different delta, landing on the same target cell and overwriting
     // (silently losing) one of them, something a single-component test can't exercise at all.
     console.log("Running Gravity clear+cascade conservation-of-hexes test...");
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     // A full row at q=0 (Gravity's cup is a constant 10 columns wide, col -5..4).
     const fullRow = [];
     for (let col = -5; col <= 4; col++) {
         const p = col; // floor(0/2) = 0
-        Board.cells.set(`${p},0`, { type: 'X', color: '#ffffff' });
+        GravityBoard.cells.set(`${p},0`, { type: 'X', color: '#ffffff' });
         fullRow.push({ p, q: 0 });
     }
     // Four separate disconnected structures above the clear line, spanning a mix of even/odd
     // rows and both "same-column" and diagonal connections -- deliberately busy, the way a real
     // mid-game board looks, not a single tidy piece.
     const aboveCells = ['-4,3', '-4,4', '-1,4', '-2,5', '2,3', '2,4', '3,3', '0,8'];
-    aboveCells.forEach(key => Board.cells.set(key, { type: 'X', color: '#ffffff' }));
+    aboveCells.forEach(key => GravityBoard.cells.set(key, { type: 'X', color: '#ffffff' }));
 
-    const sizeBefore = Board.cells.size; // 10 (row) + 8 (above) = 18
-    Board.clearCells(fullRow); // exactly what GravityMode.processClears itself calls
+    const sizeBefore = GravityBoard.cells.size; // 10 (row) + 8 (above) = 18
+    GravityBoard.clearCells(fullRow); // exactly what GravityMode.processClears itself calls
     GravityMode.dropRowsAbove(0);
-    const sizeAfter = Board.cells.size;
+    const sizeAfter = GravityBoard.cells.size;
 
     if (sizeAfter !== sizeBefore - fullRow.length) {
         console.error(`FAIL: conservation of hexes violated! ${sizeBefore} cells before, cleared a ${fullRow.length}-wide row, expected ${sizeBefore - fullRow.length} after, got ${sizeAfter} -- some cell was silently lost (or duplicated) during the cascade.`);
         process.exit(1);
     }
     if (sizeAfter !== aboveCells.length) {
-        console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...Board.cells.keys()])}`);
+        console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...GravityBoard.cells.keys()])}`);
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: clearing a line and cascading the board above it conserves exactly (before - row width) cells, even across multiple disconnected structures!");
 
     // INVARIANT (see docs/invariants.md): rotation direction is a shared foundation used by
@@ -1020,8 +1021,8 @@ try {
     // BUG (reported live, twice, via real play -- a horizontal I piece, then an L piece, each
     // visibly overlapping an existing piece): a piece is allowed to lock while overhanging past
     // the true playable columns (-5..4) -- that's the intentional toe-hold rule tested above.
-    // But once locked, those overhanging cells get written into Board.cells exactly like any
-    // other cell (fillCells doesn't bounds-check), and findFullLines only ever scans cols
+    // But once locked, those overhanging cells get written into GravityBoard.cells exactly like
+    // any other cell (fillCells doesn't bounds-check), and findFullLines only ever scans cols
     // -5..4, so that off-grid debris is never part of a clearable line and never gets removed
     // -- it persists forever. checkActivePlacement's toe-hold loop skips collision checking
     // entirely for any cell outside -5..4 ("nothing out there to collide with" -- true only
@@ -1029,21 +1030,21 @@ try {
     // of that leftover debris.
     console.log("Running Gravity overhang-debris collision test...");
     App.currentMode = 'gravity';
-    Board.cells.clear();
+    GravityBoard.cells.clear();
 
     // Simulate leftover debris from an earlier overhanging lock: one off-grid cell at col 5,
     // one column past the right wall (col 4).
-    Board.cells.set('0,10', { type: 'X', color: '#ffffff' });
+    GravityBoard.cells.set('0,10', { type: 'X', color: '#ffffff' });
 
     // A fresh I piece laying flat, anchor p=-1,q=10: cells land at cols 3,4,5,6 -- two genuine
     // on-grid toe-hold cells (3 and 4, both empty) plus a cell at col 5 landing exactly on the
     // debris placed above.
-    if (Board.checkActivePlacement('I', -1, 10, 0)) {
+    if (GravityBoard.checkActivePlacement('I', -1, 10, 0)) {
         console.error("FAIL: a piece overlapping leftover off-grid overhang debris should be illegal, even though the debris itself sits off-grid!");
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: Gravity pieces can no longer lock on top of leftover off-grid overhang debris!");
 
     // BUG (flagged live): checkGameOver's gravity-mode anchor scan only tries anchor columns
@@ -1059,7 +1060,7 @@ try {
     // inside -6..5 for this placement (verified empirically), so it isolates the range gap.
     console.log("Running Gravity checkGameOver overhang-anchor range test...");
     App.currentMode = 'gravity';
-    Board.cells.clear();
+    GravityBoard.cells.clear();
 
     // 'L' rotation 0 at anchor p=-7, q=1 occupies (-8,2),(-7,1),(-6,0),(-5,0) -- only (-5,0) is
     // on-grid (col -5, the toe-hold). Fill every other cell in a wide margin around the cup
@@ -1070,16 +1071,16 @@ try {
             const p = col - Math.floor(q / 2);
             const key = `${p},${q}`;
             if (footprint.has(key)) continue;
-            Board.cells.set(key, { type: 'X', color: '#ffffff' });
+            GravityBoard.cells.set(key, { type: 'X', color: '#ffffff' });
         }
     }
 
-    if (Board.checkGameOver('L')) {
+    if (GravityBoard.checkGameOver('L')) {
         console.error("FAIL: checkGameOver('L') should be false -- a legal far-left-overhang placement exists (anchor col -7), outside the old -6..5 scan range!");
         process.exit(1);
     }
 
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     console.log("PASS: checkGameOver's anchor-column scan reaches far enough to find legal far-overhang placements!");
 
     // Replay: an always-on capped log of recent input, so a player can report a bug post-hoc

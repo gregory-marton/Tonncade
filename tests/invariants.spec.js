@@ -527,7 +527,7 @@ test.describe('Invariant tests', () => {
       switch (m) {
         case 'snake': return { score: SnakeMode.state.score, snake: SnakeMode.state.snake };
         case 'blast': return { linesCleared: BlastMode.state.linesCleared, boardCells: Array.from(Board.cells.keys()).sort() };
-        case 'gravity': return { linesCleared: GravityMode.state.linesCleared, boardCells: Array.from(Board.cells.keys()).sort() };
+        case 'gravity': return { linesCleared: GravityMode.state.linesCleared, boardCells: Array.from(GravityBoard.cells.keys()).sort() };
         case 'sandbox': return { placedPieces: SandboxMode.state.placedPieces };
         // userIndex/startIndex are deliberately excluded here -- a pan gesture in Melody also
         // plays whatever note is under the initial click (by design, see INV-5), which can
@@ -1786,4 +1786,127 @@ test.describe('Invariant tests', () => {
     });
     expect(pastedPitches).toEqual(copiedPitches);
   });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-48: mode state is independent, and switching modes pauses it -- never
+  // discards or advances it.
+  // ────────────────────────────────────────────────────────────────────────
+  //
+  // A black-box "fingerprint" of a mode's visible state: every meaningfully-classed painted cell
+  // on the shared #tonnetz-svg (placed pieces, live Life cells, the Snake body/gem, Gravity's
+  // falling piece, Compose's selection rings), plus THIS mode's own on-screen counter/score text
+  // (scoped to just this mode -- another mode's counter legitimately changes while you're away
+  // interacting with it, and that must not register as a violation here). Built entirely from the
+  // DOM a player actually sees -- never from a mode's internal `state` object, and identifying
+  // each painted cell by its drawn geometry (`points`/`cx,cy`) rather than `data-p`/`data-q`,
+  // since not every overlay hex sets those (Render.createHex only adds `data-*` when the caller
+  // passes an explicit `data` option, which Snake's body/gem and Gravity's falling piece don't) --
+  // so the test keeps working across internal refactors and genuinely proves what the player would
+  // observe, not just what happens to be in memory or how a given mode happens to render it.
+  const COUNTER_ID_FOR_MODE = {
+    blast: 'lines-count', gravity: 'gravity-lines-count', snake: 'snake-score',
+    life: 'life-generation', compose: 'compose-note-count', sandbox: null,
+  };
+  const paintedFingerprint = async (page, mode) => page.evaluate((counterId) => {
+    const MEANINGFUL_CLASSES = [
+      'placed-piece', 'placed-cell', 'life-alive', 'snake-body', 'snake-head', 'snake-gem',
+      'active-piece', 'compose-selected-note',
+    ];
+    const cells = [...document.querySelectorAll('#tonnetz-svg polygon, #tonnetz-svg circle')]
+      .filter((el) => MEANINGFUL_CLASSES.some((c) => el.classList.contains(c)))
+      .map((el) => `${[...el.classList].sort().join('.')}|${el.getAttribute('points') || (el.getAttribute('cx') + ',' + el.getAttribute('cy'))}`)
+      .sort();
+    const counterEl = counterId && document.getElementById(counterId);
+    const counter = counterEl ? counterEl.textContent : null;
+    return { cells, counter };
+  }, COUNTER_ID_FOR_MODE[mode]);
+
+  const switchTo = (page, mode) => page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+  // Each mutate() is a genuine UI interaction (a click, a keypress, or -- for Snake, whose board
+  // advances on its own -- simply letting time pass), never a direct call into a mode's internal
+  // API. It must leave the mode's fingerprint different from its own baseline; the test asserts
+  // that itself, so a mutate() that silently stops doing anything (e.g. a piece that no longer
+  // fits) would be caught rather than passing vacuously.
+  const STATEFUL_MODES = [
+    { mode: 'sandbox', mutate: async (page) => {
+      // A plain board tap never places a NEW piece on touch devices (sandbox.js's handleAction
+      // deliberately excludes that case -- touch relies on the carousel's own place-wedge,
+      // a drag, or swipe-down instead). The wedge places at the default hoverCell (0,0).
+      const item = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
+      await item.click({ force: true });
+      await item.locator('.place-wedge').click({ force: true });
+    } },
+    { mode: 'blast', mutate: async (page) => {
+      // Blast's hoverCell already defaults to (0,0), so a single click there is already a
+      // "second click of the already-hovered cell" and places immediately.
+      await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').first().click();
+    } },
+    { mode: 'gravity', mutate: async (page) => {
+      await page.keyboard.press('ArrowLeft'); // shifts the falling piece one column
+    } },
+    { mode: 'snake', mutate: async (page) => {
+      await page.waitForTimeout(900); // longer than the 700ms default tick -- the snake advances on its own
+    } },
+    { mode: 'life', mutate: async (page) => {
+      await page.locator('#life-step').click();
+    } },
+    { mode: 'compose', mutate: async (page) => {
+      await page.locator('#compose-record').click();
+      await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').click();
+      await page.locator('#compose-record').click();
+    } },
+  ];
+
+  for (let i = 0; i < STATEFUL_MODES.length; i++) {
+    const { mode, mutate } = STATEFUL_MODES[i];
+    // Paired with the NEXT mode in the list (wrapping around) rather than every possible pair --
+    // round-robin still puts every mode through both roles (the one switched away from, and the
+    // one switched to) across the full suite, at 1/5th the runtime of a full pairwise sweep.
+    // sandbox->blast->gravity->snake->life->compose->(sandbox) deliberately puts the two modes
+    // known to have shared a single global Board (Blast, Gravity) back-to-back.
+    const other = STATEFUL_MODES[(i + 1) % STATEFUL_MODES.length];
+
+    test(`INV-48: ${mode}'s state survives a switch to ${other.mode} and back untouched`, async ({ page }) => {
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.goto('/');
+
+      await switchTo(page, mode);
+      if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      const baseline = await paintedFingerprint(page, mode);
+
+      await mutate(page);
+      const mutated = await paintedFingerprint(page, mode);
+      expect(mutated, `${mode}'s own mutate() should have changed its fingerprint`).not.toEqual(baseline);
+
+      // Switch away, mutate the OTHER mode too (proves the first mode's data can't leak into or
+      // get overwritten by the second). Snapshot it IMMEDIATELY and switch on -- a real-time mode
+      // like Snake legitimately keeps advancing for as long as it stays the active/displayed
+      // mode, so the fingerprint used for later comparison has to be taken before any further
+      // real time elapses while it's still on screen, not after.
+      await switchTo(page, other.mode);
+      if (other.mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      await other.mutate(page);
+      const otherMutated = await paintedFingerprint(page, other.mode);
+
+      // Back on the original mode: give real time for anything still running in the background (a
+      // timer, an in-flight fetch) to misbehave if it were going to, THEN check. The fingerprint
+      // must be EXACTLY what mutate() left it as -- not reset to a fresh start, not advanced by
+      // whatever ticked while away, and not bled into by the other mode's own mutation.
+      await switchTo(page, mode);
+      await page.waitForTimeout(1200);
+      const resumed = await paintedFingerprint(page, mode);
+      expect(resumed, `${mode}'s state must resume exactly as left, not reset or advanced while away`).toEqual(mutated);
+
+      // And the other mode's own state must likewise be untouched by switching back through it --
+      // it was hidden (and its own timer, if any, paused) for the whole 1200ms above, so its
+      // fingerprint on return must be identical to the moment we left it.
+      await switchTo(page, other.mode);
+      const otherResumed = await paintedFingerprint(page, other.mode);
+      expect(otherResumed, `${other.mode}'s state must be independent of ${mode}'s -- no shared board/object`).toEqual(otherMutated);
+
+      expect(errors).toEqual([]);
+    });
+  }
 });

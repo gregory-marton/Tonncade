@@ -74,7 +74,12 @@ const GravityMode = {
             this._resizeObserver.observe(container || Render.svg);
         }
 
-        this.reset();
+        // A mode switch pauses -- it never resets (INV-48/#15/#16's sibling for Blast/Gravity).
+        // Only the very first entry (no piece has ever spawned) or the player's own Reset button
+        // starts a fresh game; returning to Gravity mid-game just repaints exactly where it was
+        // left, still paused (cleanup() already stopped the timer on the way out).
+        if (!this.state.activePiece) this.reset();
+        else this.refreshUI();
         this.setupEvents();
     },
 
@@ -82,14 +87,20 @@ const GravityMode = {
     // another mode. Root cause was that nothing ever called this -- js/main.js's setMode only
     // ever cleared state.timer inline, leaving the ResizeObserver above watching Render.svg (the
     // one <svg> every mode shares) forever. Since its callback unconditionally repaints Gravity's
-    // own viewport + Board.cells, any LATER layout reflow -- e.g. switching to a mode whose
+    // own viewport + GravityBoard.cells, any LATER layout reflow -- e.g. switching to a mode whose
     // sidebar content is a different size -- fired it again and overwrote the new mode's board
     // with Gravity's stale one. Nulling both the timer and the observer here, matching every
     // other mode's own cleanup(), is what actually stops it for good.
     cleanup: function() {
+        // Leaving mid-game pauses (INV-48) -- reflect that in isPaused/the button label too, so
+        // returning shows an accurate "Resume" rather than a "Pause" that would actually start it
+        // from a dead stop.
         if (this.state.timer) {
             clearInterval(this.state.timer);
             this.state.timer = null;
+            this.state.isPaused = true;
+            const pauseBtn = document.getElementById('gravity-start-pause');
+            if (pauseBtn) pauseBtn.textContent = 'Resume';
         }
         if (this._resizeObserver) {
             this._resizeObserver.disconnect();
@@ -98,7 +109,7 @@ const GravityMode = {
     },
 
     reset: function() {
-        Board.cells.clear();
+        GravityBoard.cells.clear();
         this.state.linesCleared = 0;
         this.state.isGameOver = false;
         this.state.isPaused = false;
@@ -166,7 +177,7 @@ const GravityMode = {
         this.state.rotation = 0;
 
         // Check if spawn position is blocked (using active placement with wider bounds)
-        if (!Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, this.state.rotation)) {
+        if (!GravityBoard.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, this.state.rotation)) {
             this.state.isGameOver = true;
             if (this.state.timer) clearInterval(this.state.timer);
             setTimeout(() => alert("Game Over! Lines cleared: " + this.state.linesCleared), 100);
@@ -193,7 +204,7 @@ const GravityMode = {
         const down = this.getDown(this.state.p, this.state.q);
         
         // 1. Try to move straight down
-        if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
             this.state.p = down.p;
             this.state.q = down.q;
             this.playActivePieceSound(0.06, 0.3); // tick sound
@@ -209,7 +220,7 @@ const GravityMode = {
                 slidePos = { p: this.state.p, q: this.state.q - 1 };
             }
 
-            if (Board.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
+            if (GravityBoard.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
                 this.state.p = slidePos.p;
                 this.state.q = slidePos.q;
                 this.playActivePieceSound(0.06, 0.3);
@@ -223,7 +234,7 @@ const GravityMode = {
 
     lockActivePiece: function() {
         const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
-        Board.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
+        GravityBoard.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
 
         // Solid placement chord
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
@@ -239,7 +250,7 @@ const GravityMode = {
     },
 
     processClears: function() {
-        let lines = Board.findFullLines();
+        let lines = GravityBoard.findFullLines();
         let clearedCount = 0;
         
         while (lines.length > 0) {
@@ -250,7 +261,7 @@ const GravityMode = {
             lines.forEach(line => {
                 const qClear = line[0].q;
                 line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
-                Board.clearCells(line);
+                GravityBoard.clearCells(line);
                 this.state.linesCleared++;
                 clearedCount++;
                 
@@ -262,7 +273,7 @@ const GravityMode = {
             Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5);
 
             // Re-evaluate if dropping completed new lines
-            lines = Board.findFullLines();
+            lines = GravityBoard.findFullLines();
         }
 
         if (clearedCount > 0) {
@@ -294,7 +305,7 @@ const GravityMode = {
     // offset within the component by construction, so its shape can never be sheared.
     dropRowsAbove: function(qClear) {
         const cellsAbove = [];
-        Board.cells.forEach((val, key) => {
+        GravityBoard.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
             if (q > qClear) cellsAbove.push({ p, q, val, key });
         });
@@ -326,7 +337,7 @@ const GravityMode = {
         // Delete every old position first, across all components, before inserting any new
         // one -- otherwise one component's insert could land on and overwrite another
         // component's not-yet-relocated old cell.
-        cellsAbove.forEach(c => Board.cells.delete(c.key));
+        cellsAbove.forEach(c => GravityBoard.cells.delete(c.key));
 
         for (const component of components) {
             const ref = component[0];
@@ -334,7 +345,7 @@ const GravityMode = {
             const dp = down.p - ref.p;
             const dq = down.q - ref.q;
             component.forEach(c => {
-                Board.cells.set(`${c.p + dp},${c.q + dq}`, c.val);
+                GravityBoard.cells.set(`${c.p + dp},${c.q + dq}`, c.val);
             });
         }
     },
@@ -347,7 +358,7 @@ const GravityMode = {
         // Simulate falling path with sliding rules to find landing spot
         while (moved) {
             const down = this.getDown(p, q);
-            if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+            if (GravityBoard.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
                 p = down.p;
                 q = down.q;
             } else {
@@ -358,7 +369,7 @@ const GravityMode = {
                     slidePos = { p: p, q: q - 1 };
                 }
 
-                if (Board.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
+                if (GravityBoard.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
                     p = slidePos.p;
                     q = slidePos.q;
                 } else {
@@ -386,7 +397,7 @@ const GravityMode = {
     // empty -- so cells outside the cup or overlapping the pile are ignored (per the user's rules).
     // Pasted cells may land in the air; settleFloatingCells then drops them to rest.
     copyCells: function() {
-        return [...Board.cells.keys()].map((k) => {
+        return [...GravityBoard.cells.keys()].map((k) => {
             const parts = k.split(',');
             return Tonnetz.gravityToCanonical(+parts[0], +parts[1]);
         });
@@ -396,13 +407,13 @@ const GravityMode = {
         const midis = [];
         cells.forEach((c) => {
             const g = Tonnetz.canonicalToGravity(c.p, c.q);
-            if (Board.isCellEmpty(g.p, g.q)) {
+            if (GravityBoard.isCellEmpty(g.p, g.q)) {
                 placed.push({ p: g.p, q: g.q });
                 midis.push(Tonnetz.getMidi(g.p, g.q));
             }
         });
         if (!placed.length) return;
-        Board.fillCells(placed, 'paste', '#6fae9b');
+        GravityBoard.fillCells(placed, 'paste', '#6fae9b');
         this.settleFloatingCells(); // "then they can fall"
         this.refreshBoard();
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
@@ -412,7 +423,7 @@ const GravityMode = {
     // {p, q, val}. Same grouping dropRowsAbove uses, factored out.
     _boardComponents: function() {
         const byKey = new Map();
-        Board.cells.forEach((val, key) => {
+        GravityBoard.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
             byKey.set(key, { p, q, val, key });
         });
@@ -452,12 +463,12 @@ const GravityMode = {
                 const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
                 const canFall = comp.every((c) => {
                     const nk = (c.p + dp) + ',' + (c.q + dq);
-                    return Board.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !Board.cells.has(nk));
+                    return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
                 });
                 if (!canFall) continue;
-                const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: Board.cells.get(c.p + ',' + c.q) }));
-                comp.forEach((c) => Board.cells.delete(c.p + ',' + c.q));
-                moves.forEach((m) => Board.cells.set(m.nk, m.val));
+                const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
+                comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q));
+                moves.forEach((m) => GravityBoard.cells.set(m.nk, m.val));
                 moved = true;
             }
         }
@@ -518,7 +529,7 @@ const GravityMode = {
         Render.drawLattice(viewport, { isGravity: true });
 
         // Render settled cells from Board
-        Board.cells.forEach((val, key) => {
+        GravityBoard.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
             if (q < 20) {
                 const hex = Render.createHex(p, q, {
@@ -596,7 +607,7 @@ const GravityMode = {
         let moved = true;
         while (moved) {
             const down = this.getDown(ghostP, ghostQ);
-            if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+            if (GravityBoard.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
                 ghostP = down.p;
                 ghostQ = down.q;
             } else {
@@ -607,7 +618,7 @@ const GravityMode = {
                     slidePos = { p: ghostP, q: ghostQ - 1 };
                 }
 
-                if (Board.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
+                if (GravityBoard.checkActivePlacement(this.state.activePiece, slidePos.p, slidePos.q, this.state.rotation)) {
                     ghostP = slidePos.p;
                     ghostQ = slidePos.q;
                 } else {
@@ -636,7 +647,7 @@ const GravityMode = {
     // instead of duplicating it.
     moveLeft: function() {
         if (this.state.isPaused || this.state.isGameOver) return;
-        if (Board.checkActivePlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, this.state.p - 1, this.state.q, this.state.rotation)) {
             this.state.p -= 1;
             this.playActivePieceSound(0.06, 0.3);
             this.refreshUI();
@@ -645,7 +656,7 @@ const GravityMode = {
 
     moveRight: function() {
         if (this.state.isPaused || this.state.isGameOver) return;
-        if (Board.checkActivePlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, this.state.p + 1, this.state.q, this.state.rotation)) {
             this.state.p += 1;
             this.playActivePieceSound(0.06, 0.3);
             this.refreshUI();
@@ -655,7 +666,7 @@ const GravityMode = {
     softDrop: function() {
         if (this.state.isPaused || this.state.isGameOver) return;
         const down = this.getDown(this.state.p, this.state.q);
-        if (Board.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
             this.state.p = down.p;
             this.state.q = down.q;
             this.playActivePieceSound(0.06, 0.3);
@@ -666,7 +677,7 @@ const GravityMode = {
     rotateCW: function() {
         if (this.state.isPaused || this.state.isGameOver) return;
         const nextRot = (this.state.rotation + 1) % 6;
-        if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
             this.state.rotation = nextRot;
             this.playActivePieceSound(0.08, 0.4);
             this.refreshUI();
@@ -676,7 +687,7 @@ const GravityMode = {
     rotateCCW: function() {
         if (this.state.isPaused || this.state.isGameOver) return;
         const nextRot = (this.state.rotation + 5) % 6;
-        if (Board.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
+        if (GravityBoard.checkActivePlacement(this.state.activePiece, this.state.p, this.state.q, nextRot)) {
             this.state.rotation = nextRot;
             this.playActivePieceSound(0.08, 0.4);
             this.refreshUI();

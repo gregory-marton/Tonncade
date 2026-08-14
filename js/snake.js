@@ -51,7 +51,19 @@ const SnakeMode = {
         this.updateStreakUI();
 
         this.setupDOMEvents();
-        this.reset();
+        // A mode switch pauses -- it never resets (INV-48/#15/#16's sibling for Blast/Gravity).
+        // Only the very first entry (no snake has ever spawned) or the player's own Reset button
+        // starts a fresh game; returning to Snake mid-game just rebinds input and repaints exactly
+        // where it was left (cleanup() already stopped the timer and marked it paused).
+        if (this.state.snake.length === 0) {
+            this.reset();
+        } else {
+            this.setupKeyboardEvents();
+            this.updateScoreUI();
+            this.refreshBoard();
+            this.updateDirectionHighlight();
+            this.setPauseIcon(this.state.isPaused);
+        }
 
         // Same ResizeObserver pattern as Gravity (INV-30)/Blast: without this, refreshBoard()'s
         // aspect-matched fit is only ever computed against whatever size the SVG happened to be
@@ -74,9 +86,14 @@ const SnakeMode = {
     },
 
     cleanup: function() {
+        // Leaving mid-game pauses (INV-48) -- reflect that in isPaused/the icon too, so
+        // returning shows an accurate "Resume" rather than a "Pause" that would actually start it
+        // from a dead stop.
         if (this.state.timer) {
             clearInterval(this.state.timer);
             this.state.timer = null;
+            this.state.isPaused = true;
+            this.setPauseIcon(true);
         }
         this.state.flourishTimeouts.forEach(tId => clearTimeout(tId));
         this.state.flourishTimeouts = [];

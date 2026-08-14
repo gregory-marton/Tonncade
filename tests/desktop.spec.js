@@ -1676,6 +1676,32 @@ test('Life mode loads the beehive multi-state YAML and steps its glider', async 
   expect(errors).toEqual([]);
 });
 
+// #15/#16: Life's online-folder fetch (index.json, then the first automaton file) is in flight
+// on entry. If the player leaves Life for another mode before it resolves, the stale callback
+// used to still land -- repainting the *shared* #tonnetz-svg with Life's lattice/live cells on
+// top of whatever the new mode had drawn, non-deterministically (timing-dependent). Regression:
+// switch to Life then immediately away, before the fetch can resolve, and confirm the eventual
+// resolution is a no-op against the now-current mode.
+test('Life: switching away before its online fetch resolves does not repaint the shared canvas (#15, #16)', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="life"]').click();
+    document.querySelector('.mode-option[data-mode="blast"]').click();
+  });
+  // The stale fetch is correctly dropped once fixed, so it never flips _loadedOnline -- just give
+  // it time to resolve (it's a same-host fetch) rather than waiting on that flag.
+  await page.waitForTimeout(1000);
+  const after = await page.evaluate(() => ({
+    mode: App.currentMode,
+    painted: document.querySelectorAll('#tonnetz-svg polygon.cell.life-alive').length,
+  }));
+  expect(after.mode).toBe('blast');
+  expect(after.painted).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 // #85: "Grem's Theme One" -- a period-12 five-cell oscillator under 3,5/2, found while exploring
 // Life mode and saved as life/grems-theme-one.yaml. This pins both the transcription (its exact
 // cells) and the discovery (that it really is a period-12 oscillator), loaded through the real
@@ -1891,9 +1917,9 @@ test('Copy/paste: Gravity pile pastes into Sandbox preserving true pitch', async
   const gPitches = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     const gcells = [{ p: 0, q: 0 }, { p: -1, q: 2 }, { p: 1, q: 4 }];
-    Board.fillCells(gcells, 'x', '#fff');
+    GravityBoard.fillCells(gcells, 'x', '#fff');
     App.copy();
     return gcells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); // gravity pitches
   });
@@ -1914,8 +1940,8 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   const res = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
-    Board.cells.clear();
-    Board.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell (on the floor)
+    GravityBoard.cells.clear();
+    GravityBoard.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell (on the floor)
     // Gravity images: empty in-cup floor cell (3,0), overlapping (0,0), out-of-cup (12,0). Floor
     // cells so settling doesn't move them -- this test isolates the cup/overlap rules.
     App.clipboard = [
@@ -1925,10 +1951,10 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
     ];
     App.paste();
     return {
-      hasValid: Board.cells.has('3,0'),
-      hasOccupied: Board.cells.has('0,0'),
-      hasOut: Board.cells.has('12,0'),
-      size: Board.cells.size,
+      hasValid: GravityBoard.cells.has('3,0'),
+      hasOccupied: GravityBoard.cells.has('0,0'),
+      hasOut: GravityBoard.cells.has('12,0'),
+      size: GravityBoard.cells.size,
     };
   });
   expect(res.hasValid).toBe(true);    // in-cup empty cell placed
@@ -1944,11 +1970,11 @@ test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async 
   const res = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
-    Board.cells.clear();
+    GravityBoard.cells.clear();
     App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air
     App.paste();
-    const qs = [...Board.cells.keys()].map((k) => +k.split(',')[1]);
-    return { size: Board.cells.size, minQ: Math.min(...qs) };
+    const qs = [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]);
+    return { size: GravityBoard.cells.size, minQ: Math.min(...qs) };
   });
   expect(res.size).toBe(1); // the one pasted cell
   expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10

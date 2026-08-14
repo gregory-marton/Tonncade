@@ -1209,6 +1209,46 @@ asserts a copied set's pitch multiset survives a copy → switch mode → paste.
 
 ---
 
+### INV-48: mode state is independent, and switching modes pauses it — never discards or advances it
+
+Every mode owns its own state. Switching the mode selector away from a mode and back must leave
+that mode's state **exactly** as it was left — not reset to a fresh start, not advanced by
+anything that would have happened had it kept running, and not overwritten by whatever the player
+did in another mode meanwhile. Concretely:
+
+- **No shared mutable state between modes.** A Map, array, or object holding one mode's game
+  state must never be the same object another mode reads or writes — not even two modes that
+  happen to look similar (Blast's radius-5 hex board and Gravity's cup board are visually and
+  mechanically distinct games and must never share one `Board.cells`, however that state ends up
+  represented internally).
+- **A mode switch pauses; it never auto-resumes.** Any timer/interval driving a mode forward
+  (Gravity's drop tick, Snake's move tick, Life's generation tick) stops on `cleanup()` and stays
+  stopped until the player explicitly restarts it after returning (a Play/Pause button, etc.) — it
+  never keeps ticking while the mode is offscreen, and never silently resumes just because the
+  player switched back.
+- **A mode switch never resets.** `init()` must not discard prior progress just because the mode
+  is being entered (again) — only the mode's own explicit action (a New Game/Reset/Clear button,
+  or genuinely the first-ever entry with no prior state) may do that.
+
+This is the corollary of INV-47 for state that does *not* travel: INV-47 governs the one
+sanctioned, opt-in way to move material between modes (copy/paste); INV-48 governs everything
+else, which must never move between modes at all, on pain of exactly the bugs this codifies
+(#15, #16 — Life's board momentarily overwriting whatever mode the player had switched to,
+traced to a stale online-automaton fetch repainting the shared `#tonnetz-svg` after the player
+had already left Life; and Blast/Gravity's shared `Board.cells`, which silently let each
+overwrite the other's board and reset progress on every re-entry).
+
+**Test:** `tests/invariants.spec.js` — "INV-48: ... survives a switch to ... and back untouched",
+once per stateful mode (Sandbox, Blast, Gravity, Snake, Life, Compose — Melody is a fixed
+practice drill and doesn't hold placed/scored state, matching its exemption from INV-47). Each
+mutates the mode via a real UI interaction, switches to the next mode round-robin and mutates
+that one too (proving no leakage either direction), waits past any relevant timer interval, then
+switches back and asserts the mode's black-box fingerprint — every meaningfully-classed painted
+cell on the shared canvas plus every mode's own score/counter text, read from the DOM rather than
+from internal `state` objects — is unchanged from right after its own mutation.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
