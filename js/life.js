@@ -379,6 +379,20 @@ const Life = {
     },
 };
 
+// Life's own file source (js/file-folder.js): the bundled life/ folder plus a local folder --
+// the SAME shared remembered folder Melody/Compose use (js/midi-folder.js's MidiFolder), just
+// filtered down to .yaml. Auto-loads the first bundled automaton on first visit (Life's own
+// long-standing behavior, unlike Melody's reselectable "Random" default).
+const LifeFolder = FileFolder.create({
+    onlineIndexUrl: './life/index.json',
+    bundledPathPrefix: './life/',
+    extensionPattern: /\.ya?ml$/i,
+    readAs: 'text',
+    mimeType: 'text/yaml',
+    loadMethod: 'loadAutomatonFromText',
+    autoLoadFirstBundled: true,
+});
+
 // ============================================================================================
 // LifeMode -- the playable mode: load an automaton (rule + initial state + sound spec), draw its
 // live cells on the pannable Tonnetz lattice, step generations on a clock, and sound each cell as
@@ -427,59 +441,28 @@ const LifeMode = {
         this.refreshLattice();
         this.setupEvents();
         this.updateControls();
-        // Invalidate any fetch left in flight from a previous Life visit: #tonnetz-svg is shared
-        // across all modes, so a stale callback landing after the player has moved on would
-        // repaint whatever mode is now showing (#15, #16).
-        this._activeToken = (this._activeToken || 0) + 1;
-        this.loadOnlineFolder(this._activeToken);
+        if (typeof LifeFolder !== 'undefined') {
+            LifeFolder.setup(this, {
+                sourceSelect: 'life-source',
+                sourceStatus: 'life-source-status',
+                uploadGroup: 'life-upload-group',
+            });
+        }
     },
 
-    // Load an automaton from the online life/ folder (a relative fetch, like Melody's midi/ --
-    // works on any http(s) host, simply absent under file:// or offline, where the built-in
-    // DEFAULT_AUTOMATON already loaded above stands in). Two sources, no built-in default tier.
-    // `token` pins this call to the Life visit that started it; if the player has since left (or
-    // re-entered) Life mode, `_activeToken` has moved on and the stale result is dropped (#15, #16).
-    loadOnlineFolder: async function(token) {
+    // FileFolder's load contract (js/file-folder.js) for a text-based source: parse and adopt an
+    // automaton loaded from the bundled life/ folder, the shared local folder, or a plain local
+    // upload (see setupEvents' #life-file-input handler below, which calls this too). `filename` is
+    // only used for the upload-fallback's status span -- FileFolder's own dropdown already reflects
+    // bundled/folder selections.
+    loadAutomatonFromText: function(text, filename) {
         try {
-            const res = await fetch('./life/index.json');
-            if (!res.ok || token !== this._activeToken) return;
-            const index = await res.json();
-            if (token !== this._activeToken) return;
-            if (!Array.isArray(index) || !index.length) return;
-            this.onlineIndex = index;
-            this.populateSelector();
-            if (!this._loadedOnline) {
-                await this.loadAutomatonFile(index[0].file, token);
-                this._loadedOnline = true;
-            }
-        } catch (e) { /* offline / file:// -- keep the built-in default */ }
-    },
-
-    // Fill the automaton <select> from the online index (the file-picker for the bundled automata).
-    populateSelector: function() {
-        const sel = document.getElementById('life-automaton');
-        if (!sel || !this.onlineIndex) return;
-        sel.innerHTML = '';
-        this.onlineIndex.forEach((a) => {
-            const opt = document.createElement('option');
-            opt.value = a.file;
-            opt.textContent = a.name;
-            sel.appendChild(opt);
-        });
-        const group = document.getElementById('life-automaton-group');
-        if (group) group.style.display = '';
-    },
-
-    // `token` is only passed by loadOnlineFolder's initial-load path; the manual <select> handler
-    // calls this with no token, so it's always applied (the player is actively in Life mode then).
-    loadAutomatonFile: async function(file, token) {
-        try {
-            const yres = await fetch('./life/' + file);
-            if (!yres.ok) return;
-            const text = await yres.text();
-            if (token !== undefined && token !== this._activeToken) return;
             this.loadAutomaton(Life.parseYaml(text));
-        } catch (e) { /* ignore -- keep whatever is loaded */ }
+            const filenameEl = document.getElementById('life-filename');
+            if (filenameEl) filenameEl.textContent = filename || '';
+        } catch (err) {
+            alert(`Could not read "${filename}" as a Life automaton: ${err.message}`);
+        }
     },
 
     // Adopt a parsed automaton object (from Life.parseYaml or the default). Sound defaults to
@@ -725,10 +708,9 @@ const LifeMode = {
     },
 
     // "Save As": persist the current automaton to a life/ YAML file -- same icon-button pattern
-    // as Compose's own Save (js/compose.js), and the same remembered-folder-with-download-
-    // fallback UX MidiFolder gives Melody/Compose, kept as Life's own separate remembered folder
-    // (a Life automaton isn't a MIDI file -- "your MIDI folder" and "your Life folder" are
-    // different places a player would keep these).
+    // as Compose's own Save (js/compose.js), same remembered-folder-with-download-fallback UX,
+    // via LifeFolder (js/file-folder.js) -- the same shared local folder Melody/Compose use,
+    // filtered down to .yaml.
     save: async function() {
         if (this.state.live.size === 0) {
             alert('Nothing to save yet -- place or evolve some cells first.');
@@ -739,22 +721,11 @@ const LifeMode = {
         const filename = /\.ya?ml$/i.test(name) ? name : `${name}.yaml`;
         const text = this.toYaml(filename.replace(/\.ya?ml$/i, ''));
 
-        if (!this._folderHandle && typeof window !== 'undefined' && window.showDirectoryPicker) {
-            try { this._folderHandle = await window.showDirectoryPicker(); }
-            catch (e) { /* user cancelled the picker -- fall through to a plain download below */ }
+        if (typeof LifeFolder !== 'undefined') {
+            await LifeFolder.saveFileAs(filename, text); // downloads as a plain blob if no folder is set
+            return;
         }
-        if (this._folderHandle) {
-            try {
-                const fileHandle = await this._folderHandle.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(text);
-                await writable.close();
-                return;
-            } catch (err) {
-                console.warn('Could not save into the remembered Life folder, falling back to a download:', err);
-            }
-        }
-        // Plain <a download> fallback -- always works regardless of browser/permission state.
+        // LifeFolder itself missing entirely (shouldn't happen outside tests) -- last-resort download.
         const blob = new Blob([text], { type: 'text/yaml' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -810,28 +781,19 @@ const LifeMode = {
         bind('life-clear', this.clear);
         bind('life-reset', this.reset);
         bind('life-save', this.save);
-        const sel = document.getElementById('life-automaton');
-        if (sel) sel.onchange = () => this.loadAutomatonFile(sel.value);
 
         // Open a LOCAL automaton file -- e.g. one previously written by Save As, or shared by
-        // someone else -- distinct from the online dropdown above (the bundled life/ folder).
-        // Mirrors Melody/Compose's own upload input exactly (same pattern, different file type:
-        // YAML text here via readAsText, not an arrayBuffer).
+        // someone else -- distinct from the dropdown above (bundled/remembered-folder tiers,
+        // js/file-folder.js). Mirrors Melody/Compose's own upload input exactly (same pattern,
+        // different file type: YAML text here via readAsText, not an arrayBuffer). Only shown at
+        // all when the folder tier isn't available (see LifeFolder.setup).
         const fileInput = document.getElementById('life-file-input');
         if (fileInput) {
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        this.loadAutomaton(Life.parseYaml(event.target.result));
-                        const filenameEl = document.getElementById('life-filename');
-                        if (filenameEl) filenameEl.textContent = file.name;
-                    } catch (err) {
-                        alert(`Could not read "${file.name}" as a Life automaton: ${err.message}`);
-                    }
-                };
+                reader.onload = (event) => this.loadAutomatonFromText(event.target.result, file.name);
                 reader.readAsText(file);
             };
         }
@@ -866,7 +828,6 @@ const LifeMode = {
 
     cleanup: function() {
         this.stop();
-        this._activeToken = (this._activeToken || 0) + 1;
         if (Render.svg && this._onPointerDown) {
             Render.svg.removeEventListener('pointerdown', this._onPointerDown);
             Render.svg.removeEventListener('pointermove', this._onPointerMove);

@@ -121,6 +121,7 @@ loadScript('gravity.js');
 loadScript('midi.js');
 loadScript('compose.js');
 loadScript('snake.js');
+loadScript('file-folder.js'); // life.js's LifeFolder = FileFolder.create(...) needs this loaded first
 loadScript('life.js');
 loadScript('main.js');
 

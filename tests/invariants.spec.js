@@ -401,7 +401,7 @@ test.describe('Invariant tests', () => {
       expect(result, 'Blast\'s ghost should move to a placement reproducing the played chord').toEqual(chord.slice().sort((a, b) => a - b));
     },
     life: async (page) => {
-      await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       // The exact target the app itself computes (nearest matching cell to the view center) --
       // then confirm playing that pitch actually toggles that specific cell.
       const before = await page.evaluate(() => {
@@ -606,7 +606,7 @@ test.describe('Invariant tests', () => {
       await page.evaluate(() => Render.setRotation(0));
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       if (mode === 'midi') await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
-      if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       await setupModeState(page, mode);
 
       const pannable = PANNABLE_MODES.has(mode);
@@ -1835,7 +1835,7 @@ test.describe('Invariant tests', () => {
       document.querySelector('.mode-option[data-mode="life"]').click();
       return App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b);
     });
-    await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
     const pastedPitches = await page.evaluate(() => {
       LifeMode.clear();
       App.paste();
@@ -1932,7 +1932,7 @@ test.describe('Invariant tests', () => {
       await page.goto('/');
 
       await switchTo(page, mode);
-      if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       const baseline = await paintedFingerprint(page, mode);
 
       await mutate(page);
@@ -1945,7 +1945,7 @@ test.describe('Invariant tests', () => {
       // mode, so the fingerprint used for later comparison has to be taken before any further
       // real time elapses while it's still on screen, not after.
       await switchTo(page, other.mode);
-      if (other.mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+      if (other.mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       await other.mutate(page);
       const otherMutated = await paintedFingerprint(page, other.mode);
 

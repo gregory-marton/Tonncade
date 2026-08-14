@@ -103,6 +103,17 @@ const MidiMode = {
         return notes;
     },
 
+    // The "Random" entry in #midi-source (js/file-folder.js's FileFolder contract: `hasRandom`
+    // modes need a `loadDefault()` the dropdown can call to explicitly re-roll it, not just the
+    // implicit one-time fallback `init()` sets below).
+    loadDefault: function() {
+        this.state.melody = this.randomMelody();
+        const filenameSpan = document.getElementById('midi-filename');
+        if (filenameSpan) filenameSpan.textContent = '';
+        this.resetGame();
+        this.refreshBoard();
+    },
+
     init: function() {
         Render.init('tonnetz-svg');
         
@@ -176,7 +187,13 @@ const MidiMode = {
             };
         }
 
-        if (typeof MidiFolder !== 'undefined') MidiFolder.setup(this);
+        if (typeof MidiFolder !== 'undefined') {
+            MidiFolder.setup(this, {
+                sourceSelect: 'midi-source',
+                sourceStatus: 'midi-source-status',
+                uploadGroup: 'midi-upload-group',
+            }, { hasRandom: true });
+        }
     },
 
     // Parses a Standard MIDI File already read into memory and loads it as the active melody --

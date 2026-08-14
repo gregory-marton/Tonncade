@@ -127,28 +127,22 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 
                 <!-- MIDI Mode Controls & Stats -->
                 <div id="midi-controls" style="display: none;">
+                    <!-- One dropdown: Random (Melody's own offline-degrade, reselectable), then
+                         bundled songs OR -- once a local folder is chosen -- that folder's own
+                         listing, then a trailing "Choose/Change/Reconnect Folder" action item.
+                         js/file-folder.js (via js/midi-folder.js's MidiFolder) builds this. -->
+                    <div id="midi-source-group" class="control-group">
+                        <select id="midi-source" aria-label="Song source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
+                        <span id="midi-source-status" style="font-size: 11px; color: var(--dim);"></span>
+                    </div>
+                    <!-- Fallback for browsers without the File System Access API (Safari/Firefox) --
+                         js/midi-folder.js hides this once the folder tier above is available. -->
                     <div id="midi-upload-group" class="control-group">
                         <label for="midi-file-input" class="custom-file-upload">
                             Upload MIDI File
                         </label>
                         <input id="midi-file-input" type="file" accept=".mid,.midi" style="display: none;" />
                         <span id="midi-filename"></span>
-                    </div>
-                    <!-- Chrome-only progressive enhancement (File System Access API) --
-                         js/midi-folder.js shows this instead of #midi-upload-group above when
-                         supported, so a folder of songs can be set once and browsed via a
-                         dropdown instead of re-picking a single file every time. -->
-                    <div id="midi-folder-group" class="control-group" style="display: none;">
-                        <button type="button" id="midi-choose-folder-btn">Choose MIDI Folder</button>
-                        <span id="midi-folder-status"></span>
-                        <select id="midi-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
-                    </div>
-                    <!-- Read-only online song folder (task #27) -- a plain relative fetch, works
-                         in every browser (no File System Access requirement), gracefully absent
-                         under file:// or offline (js/midi-folder.js hides this group then). -->
-                    <div id="midi-online-group" class="control-group" style="display: none; margin-top: 6px;">
-                        <label for="midi-online-files" style="font-size: 12px; color: var(--dim);">More songs:</label>
-                        <select id="midi-online-files" style="width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
                     <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
                          folder/song selectors so it routes into the drawer on mobile (see js/main.js),
@@ -197,25 +191,18 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 
                 <!-- Compose Mode Controls & Stats -->
                 <div id="compose-controls" style="display: none;">
+                    <!-- Shares Melody's exact remembered folder (js/midi-folder.js's MidiFolder) --
+                         both work with .mid files. Same one-dropdown layout as Melody's, just with
+                         no "Random" entry (Compose has no starting-content concept). -->
+                    <div id="compose-source-group" class="control-group">
+                        <select id="compose-source" aria-label="MIDI source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
+                        <span id="compose-source-status" style="font-size: 11px; color: var(--dim);"></span>
+                    </div>
                     <div id="compose-upload-group" class="control-group">
                         <label for="compose-file-input" class="custom-file-upload">
                             Load MIDI to Edit
                         </label>
                         <input id="compose-file-input" type="file" accept=".mid,.midi" style="display: none;" />
-                    </div>
-                    <!-- Shares Melody's exact remembered folder (js/midi-folder.js) -- both work
-                         with .mid files, so there's no reason for a separate directory the way
-                         Life mode's YAML files will need one. -->
-                    <div id="compose-folder-group" class="control-group" style="display: none;">
-                        <button type="button" id="compose-choose-folder-btn">Choose MIDI Folder</button>
-                        <span id="compose-folder-status"></span>
-                        <select id="compose-folder-files" style="display: none; margin-top: 6px; width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
-                    </div>
-                    <!-- Same read-only online song folder as Melody (task #27) -- see
-                         #midi-online-group's own comment. -->
-                    <div id="compose-online-group" class="control-group" style="display: none; margin-top: 6px;">
-                        <label for="compose-online-files" style="font-size: 12px; color: var(--dim);">Load a bundled song:</label>
-                        <select id="compose-online-files" style="width: 100%; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;"></select>
                     </div>
                     <!-- Recording-session tempo/subdivision (task #52) -- a rough free-tapped
                          recording is cheap to redo, so quantizing is opt-in (Quantize checkbox),
@@ -303,8 +290,12 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 
                 <!-- Life Mode Controls -->
                 <div id="life-controls" style="display: none;">
-                    <div id="life-automaton-group" class="control-group" style="display: none; margin-bottom: 8px;">
-                        <select id="life-automaton" aria-label="Automaton" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
+                    <!-- Same shared FileFolder mechanism as Melody/Compose (js/file-folder.js),
+                         its own instance (LifeFolder, .yaml not .mid) -- but the same remembered
+                         local folder, since a player may as well keep both kinds of file together. -->
+                    <div id="life-source-group" class="control-group" style="margin-bottom: 8px;">
+                        <select id="life-source" aria-label="Automaton source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
+                        <span id="life-source-status" style="font-size: 11px; color: var(--dim);"></span>
                     </div>
                     <div id="life-upload-group" class="control-group">
                         <label for="life-file-input" class="custom-file-upload">
@@ -430,6 +421,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/blast.js"></script>
     <script src="js/gravity.js"></script>
     <script src="js/midi.js"></script>
+    <script src="js/file-folder.js"></script>
     <script src="js/midi-folder.js"></script>
     <script src="js/midi-input.js"></script>
     <script src="js/compose.js"></script>

@@ -164,18 +164,15 @@ const ComposeMode = {
             };
         }
 
-        // Shares Melody's exact remembered folder (both work with .mid files, unlike Life's
-        // separate YAML folder) -- see js/midi-folder.js's `ids` parameter, which is what lets
-        // the same MidiFolder singleton serve two different modes' own DOM elements.
+        // Shares Melody's exact remembered folder (both work with .mid files) -- see
+        // js/file-folder.js's `ids` parameter, which is what lets the same MidiFolder instance
+        // serve two different modes' own DOM elements. No `hasRandom`: Compose has no starting-
+        // content concept the way Melody's offline-degrade does.
         if (typeof MidiFolder !== 'undefined') {
             MidiFolder.setup(this, {
+                sourceSelect: 'compose-source',
+                sourceStatus: 'compose-source-status',
                 uploadGroup: 'compose-upload-group',
-                folderGroup: 'compose-folder-group',
-                chooseBtn: 'compose-choose-folder-btn',
-                filesSelect: 'compose-folder-files',
-                folderStatus: 'compose-folder-status',
-                onlineGroup: 'compose-online-group',
-                onlineSelect: 'compose-online-files',
             });
         }
     },

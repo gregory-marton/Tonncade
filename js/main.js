@@ -361,6 +361,19 @@ const App = {
             LifeMode.cleanup();
         }
 
+        // Invalidate whichever FileFolder instance (js/file-folder.js) the OUTGOING mode actually
+        // owns, so a bundled/folder load still in flight for it never lands after the player has
+        // moved elsewhere (#15, #16, generalized from Life-only). Scoped to this.currentMode (the
+        // mode we're actually leaving) rather than each mode's own cleanup() -- several modes'
+        // cleanup() is reused internally too (e.g. MidiMode.resetGame() calls it on normal entry,
+        // not just on exit), so invalidating from there fires far more often than "really left."
+        if ((this.currentMode === 'midi' || this.currentMode === 'compose') && typeof MidiFolder !== 'undefined') {
+            MidiFolder.invalidate();
+        }
+        if (this.currentMode === 'life' && typeof LifeFolder !== 'undefined') {
+            LifeFolder.invalidate();
+        }
+
         this.currentMode = mode;
 
         // Reflect the mode in the address bar so the deep-link is shareable and discoverable

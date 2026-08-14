@@ -279,14 +279,16 @@ test('stopping preview restores the note list to reflect actual game progress', 
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// MidiFolder (js/midi-folder.js, task #27): local MIDI folder source, replacing the plain
-// upload picker on browsers that support the File System Access API. window.showDirectoryPicker
-// is mocked with a fake directory handle (real handles are structured-cloneable into IndexedDB
-// specifically so they survive a real user's picker choice -- a fake JS object with methods is
-// NOT structured-cloneable, so these tests exercise MidiFolder's own logic/wiring directly
-// rather than round-tripping through real IndexedDB). MidiMode.parseMIDI is stubbed too, since
-// what's under test here is folder browsing, not Standard MIDI File decoding (which has no
-// coverage of its own yet, tracked separately -- not something to conflate with this feature).
+// MidiFolder (js/midi-folder.js -> js/file-folder.js's FileFolder, task #27 + the one-dropdown
+// reorg): local MIDI folder source, folded into the single #midi-source select alongside "Random"
+// and the bundled online tier, on browsers that support the File System Access API.
+// window.showDirectoryPicker is mocked with a fake directory handle (real handles are
+// structured-cloneable into IndexedDB specifically so they survive a real user's picker choice --
+// a fake JS object with methods is NOT structured-cloneable, so these tests exercise
+// FileFolder's own logic/wiring directly rather than round-tripping through real IndexedDB).
+// MidiMode.parseMIDI is stubbed too, since what's under test here is folder browsing, not
+// Standard MIDI File decoding (which has no coverage of its own yet, tracked separately -- not
+// something to conflate with this feature).
 // ────────────────────────────────────────────────────────────────────────
 
 // Each fake file's "bytes" are just a one-byte tag identifying which fake file it is; the
@@ -296,7 +298,7 @@ const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.
   // Real FileSystemDirectoryHandles are structured-cloneable (by design, so they survive an
   // IndexedDB round-trip) -- a fake JS object with methods is NOT, so saveHandle would throw a
   // real DataCloneError against a fake handle. Stubbed out here since these tests exercise
-  // MidiFolder's own browsing/restore logic, not real IndexedDB persistence.
+  // FileFolder's own browsing/restore logic, not real IndexedDB persistence.
   MidiFolder.saveHandle = async () => {};
   window.__parseMIDICalls = [];
   MidiMode.parseMIDI = (buf) => {
@@ -315,9 +317,19 @@ const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.
     values: async function* () { for (const e of entries) yield e; },
     queryPermission: async () => permission,
     requestPermission: async () => 'granted',
+    // Default: nothing bundled already exists in this fake folder (chooseFolder's
+    // copyDefaultsInto checks this before writing); tests that care about the copy-in behavior
+    // itself override this after installFakeMidiFolder runs.
+    getFileHandle: async () => { throw new Error('not found'); },
   };
   window.showDirectoryPicker = async () => window.__fakeFolderHandle;
 }, { files, permission });
+
+// The dropdown's local-folder entries have value "local:N"; helper to read them back as names.
+const sourceLocalOptionNames = (page, selectId) => page.evaluate((id) =>
+  Array.from(document.getElementById(id).options)
+    .filter(o => o.value.startsWith('local:'))
+    .map(o => o.textContent), selectId);
 
 test('MidiFolder: choosing a folder lists only .mid/.midi files (sorted) and auto-loads the first', async ({ page }) => {
   await page.goto('/');
@@ -330,14 +342,11 @@ test('MidiFolder: choosing a folder lists only .mid/.midi files (sorted) and aut
   });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
-  await page.locator('#midi-choose-folder-btn').click();
-  await page.waitForFunction(() => document.getElementById('midi-folder-files').options.length > 0);
+  await page.locator('#midi-source').selectOption('choose-folder');
+  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 61);
 
-  const optionNames = await page.evaluate(() =>
-    Array.from(document.getElementById('midi-folder-files').options).map(o => o.textContent)
-  );
   // Sorted alphabetically, and readme.txt excluded entirely.
-  expect(optionNames).toEqual(['Apple', 'Zebra']);
+  expect(await sourceLocalOptionNames(page, 'midi-source')).toEqual(['Apple', 'Zebra']);
 
   // The first file in SORTED order (Apple, tag 1) auto-loads, not upload order (Zebra was listed
   // first in the fake folder above).
@@ -352,11 +361,10 @@ test('MidiFolder: selecting a different dropdown entry loads that file instead',
   });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
-  await page.locator('#midi-choose-folder-btn').click();
-  await page.waitForFunction(() => document.getElementById('midi-folder-files').options.length > 0);
-  expect(await page.evaluate(() => MidiMode.state.melody[0].midi)).toBe(60); // Apple auto-loaded
+  await page.locator('#midi-source').selectOption('choose-folder');
+  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 60); // Apple auto-loaded
 
-  await page.locator('#midi-folder-files').selectOption({ label: 'Banana' });
+  await page.locator('#midi-source').selectOption({ label: 'Banana' });
   await page.waitForFunction(() => MidiMode.state.melody[0].midi === 61);
   expect(await page.evaluate(() => MidiMode.state.melody[0].midi)).toBe(61);
 });
@@ -369,10 +377,9 @@ test('MidiFolder: a granted saved folder restores silently on entering Melody mo
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.waitForFunction(() => document.getElementById('midi-folder-files').options.length > 0);
+  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 65);
 
-  expect(await page.evaluate(() => MidiMode.state.melody[0].midi)).toBe(65);
-  await expect(page.locator('#midi-folder-status')).toHaveText(/MySongs/);
+  await expect(page.locator('#midi-source-status')).toHaveText(/MySongs/);
 });
 
 test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnect instead of silently failing', async ({ page }) => {
@@ -383,14 +390,14 @@ test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnec
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.waitForFunction(() => document.getElementById('midi-folder-status').textContent.includes('Reconnect'));
+  await page.waitForFunction(() =>
+    [...document.getElementById('midi-source').options].some(o => o.value === 'reconnect-folder'));
 
   // No file should have loaded yet -- permission wasn't granted, so nothing was silently read.
-  expect(await page.evaluate(() => document.getElementById('midi-folder-files').options.length)).toBe(0);
+  expect(await sourceLocalOptionNames(page, 'midi-source')).toEqual([]);
 
-  await page.locator('#midi-choose-folder-btn').click(); // now reads "Reconnect Folder"
-  await page.waitForFunction(() => document.getElementById('midi-folder-files').options.length > 0);
-  expect(await page.evaluate(() => MidiMode.state.melody[0].midi)).toBe(62);
+  await page.locator('#midi-source').selectOption('reconnect-folder');
+  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 62);
 });
 
 test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the plain upload picker is untouched', async ({ page }) => {
@@ -398,15 +405,17 @@ test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the 
   await page.evaluate(() => { delete window.showDirectoryPicker; });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
 
-  await expect(page.locator('#midi-folder-group')).toBeHidden();
+  const hasFolderOption = await page.evaluate(() =>
+    [...document.getElementById('midi-source').options].some(o => o.value === 'choose-folder' || o.value === 'reconnect-folder'));
+  expect(hasFolderOption).toBe(false);
   await expect(page.locator('#midi-upload-group')).toBeVisible();
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// MidiFolder's online song folder (task #27): a plain relative fetch to ./midi/index.json, no
-// File System Access API involved -- works in every browser, degrades to "hidden" on any
-// failure (offline, file://, 404) rather than surfacing an error, since it's a bonus content
-// tier, not a required one.
+// MidiFolder's bundled online tier (task #27): a plain relative fetch to ./midi/index.json, no
+// File System Access API involved -- works in every browser, its entries simply don't appear in
+// #midi-source on any failure (offline, file://, 404) rather than surfacing an error, since it's
+// a bonus content tier, not a required one.
 // ────────────────────────────────────────────────────────────────────────
 
 test('MidiFolder online: populates the dropdown from index.json, and selecting a song loads the real fetched file', async ({ page }) => {
@@ -422,27 +431,32 @@ test('MidiFolder online: populates the dropdown from index.json, and selecting a
   await page.route('**/midi/b.mid', route => route.fulfill({ body: Buffer.from(bytes), contentType: 'audio/midi' }));
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.waitForFunction(() => document.getElementById('midi-online-files').options.length > 0);
+  await page.waitForFunction(() =>
+    [...document.getElementById('midi-source').options].some(o => o.value === 'bundled:1'));
 
-  const select = page.locator('#midi-online-files');
+  const select = page.locator('#midi-source');
   const optionNames = await page.evaluate(() =>
-    Array.from(document.getElementById('midi-online-files').options).map(o => o.textContent)
-  );
-  // No "Choose a song..." placeholder -- the first entry is simply the dropdown's own default
-  // selection, matching the melody already loaded on entry, not a separate status line.
+    Array.from(document.getElementById('midi-source').options)
+      .filter(o => o.value.startsWith('bundled:'))
+      .map(o => o.textContent));
   expect(optionNames).toEqual(['Test Song A', 'Test Song B']);
-  expect(await select.inputValue()).toBe('0');
+  // Melody's own offline-degrade (Random) stays the actually-loaded default -- the bundled tier
+  // is merely available, not auto-loaded, matching Melody's existing behavior before this reorg.
+  expect(await select.inputValue()).toBe('random');
 
   await select.selectOption({ label: 'Test Song B' });
   await page.waitForFunction(() => MidiMode.state.melody.length === 1 && MidiMode.state.melody[0].midi === 60);
 });
 
-test('MidiFolder online: a failed fetch (offline/404) hides the online group instead of erroring', async ({ page }) => {
+test('MidiFolder online: a failed fetch (offline/404) leaves no bundled entries in the dropdown', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.waitForTimeout(200); // let the failed fetch settle
 
-  await expect(page.locator('#midi-online-group')).toBeHidden();
+  const hasBundled = await page.evaluate(() =>
+    [...document.getElementById('midi-source').options].some(o => o.value.startsWith('bundled:')));
+  expect(hasBundled).toBe(false);
 });
 
 test('MidiFolder online: Compose gets the same bundled songs via its own dropdown', async ({ page }) => {
@@ -452,11 +466,43 @@ test('MidiFolder online: Compose gets the same bundled songs via its own dropdow
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
 
-  await page.waitForFunction(() => document.getElementById('compose-online-files').options.length > 0);
+  await page.waitForFunction(() =>
+    [...document.getElementById('compose-source').options].some(o => o.value === 'bundled:0'));
   const optionNames = await page.evaluate(() =>
-    Array.from(document.getElementById('compose-online-files').options).map(o => o.textContent)
-  );
+    Array.from(document.getElementById('compose-source').options)
+      .filter(o => o.value.startsWith('bundled:'))
+      .map(o => o.textContent));
   expect(optionNames).toEqual(['Test Song A']);
+});
+
+test('MidiFolder: choosing a folder copies bundled defaults into it that it does not already have', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.fulfill({
+    json: [{ name: 'Bundled Song', file: 'bundled.mid' }],
+  }));
+  const bytes = await Buffer.from([9]); // matches the fake parseMIDI stub's tag convention below
+  await page.route('**/midi/bundled.mid', route => route.fulfill({ body: bytes, contentType: 'audio/midi' }));
+
+  await page.goto('/');
+  await installFakeMidiFolder(page, { files: [{ name: 'Existing.mid', tag: 0 }] });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.waitForFunction(() =>
+    [...document.getElementById('midi-source').options].some(o => o.value === 'bundled:0'));
+
+  const written = await page.evaluate(async () => {
+    const calls = [];
+    window.__fakeFolderHandle.getFileHandle = async (name, opts) => {
+      if (!opts || !opts.create) throw new Error('not found'); // existence check: nothing there yet
+      calls.push(name);
+      return {
+        createWritable: async () => ({ write: async () => {}, close: async () => {} }),
+      };
+    };
+    document.getElementById('midi-source').value = 'choose-folder';
+    document.getElementById('midi-source').dispatchEvent(new Event('change'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return calls;
+  });
+  expect(written).toContain('bundled.mid');
 });
 
 test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys', async ({ page }) => {
@@ -1275,7 +1321,7 @@ for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
   test(`Scroll-wheel zoom works in ${mode} and persists across a redraw`, async ({ page }) => {
     await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-    if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+    if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
     const before = await page.evaluate(() => App.modeModule().state.zoom || Render.getResponsiveZoom());
     const container = page.locator('#game-container');
@@ -1644,7 +1690,7 @@ test('Life mode loads the 3,5/2 YAML automaton, renders it, and steps', async ({
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const init = await page.evaluate(() => ({
     mode: App.currentMode,
@@ -1708,10 +1754,10 @@ test('Life mode loads the beehive multi-state YAML and steps its glider', async 
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const loaded = await page.evaluate(async () => {
-    await LifeMode.loadAutomatonFile('beehive.yaml');
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/beehive.yaml')).text(), 'beehive.yaml');
     const s = LifeMode.state;
     const snapshot = () => [...s.live.entries()].map(([k, st]) => k + '=' + st).sort().join(';');
     const before = snapshot();
@@ -1753,8 +1799,8 @@ test('Life: switching away before its online fetch resolves does not repaint the
     document.querySelector('.mode-option[data-mode="life"]').click();
     document.querySelector('.mode-option[data-mode="blast"]').click();
   });
-  // The stale fetch is correctly dropped once fixed, so it never flips _loadedOnline -- just give
-  // it time to resolve (it's a same-host fetch) rather than waiting on that flag.
+  // The stale fetch is correctly dropped once fixed, so it never sets LifeFolder.currentValue --
+  // just give it time to resolve (it's a same-host fetch) rather than waiting on that flag.
   await page.waitForTimeout(1000);
   const after = await page.evaluate(() => ({
     mode: App.currentMode,
@@ -1772,10 +1818,10 @@ test('Life: switching away before its online fetch resolves does not repaint the
 test("Life mode: Grem's Theme One loads and oscillates with period 12", async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const out = await page.evaluate(async () => {
-    await LifeMode.loadAutomatonFile('grems-theme-one.yaml');
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/grems-theme-one.yaml')).text(), 'grems-theme-one.yaml');
     const snap = () => [...LifeMode.state.live.keys()].sort().join(';');
     const start = snap();
     const startSize = LifeMode.state.live.size;
@@ -1802,7 +1848,7 @@ test("Life mode: Grem's Theme One loads and oscillates with period 12", async ({
 test('Life: off-board cells keep living and sound their own pitch, never a stale one (#13)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const out = await page.evaluate(() => {
     LifeMode.state.rule = { survival: [3, 5], birth: [2] }; // 3,5/2 (already loaded)
@@ -1832,16 +1878,16 @@ test('Life: off-board cells keep living and sound their own pitch, never a stale
 test('Life: tapping a cell cycles it through all states (#85)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const out = await page.evaluate(async () => {
-    await LifeMode.loadAutomatonFile('beehive.yaml'); // 3-state
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/beehive.yaml')).text(), 'beehive.yaml'); // 3-state
     LifeMode.clear();
     const s = () => LifeMode.state.live.get('5,5') || 0;
     const multiSeq = [s()];
     for (let i = 0; i < 4; i++) { LifeMode.toggleCell(5, 5); multiSeq.push(s()); }
 
-    await LifeMode.loadAutomatonFile('3-5-2.yaml'); // 2-state
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/3-5-2.yaml')).text(), '3-5-2.yaml'); // 2-state
     LifeMode.clear();
     const t = () => LifeMode.state.live.get('6,6') || 0;
     const twoSeq = [t()];
@@ -1859,7 +1905,7 @@ test('Life: tapping a cell cycles it through all states (#85)', async ({ page })
 test('Life: dragging the mouse pans the view; a short click still toggles the cell', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const before = await page.evaluate(() => ({ x: LifeMode.state.viewX, y: LifeMode.state.viewY, liveSize: LifeMode.state.live.size }));
 
@@ -1901,12 +1947,13 @@ test('Life: Save As writes a YAML file that round-trips back to the same rule an
         }),
       }),
     };
-    LifeMode._folderHandle = fakeHandle;
+    LifeFolder.folderHandle = fakeHandle;
+    LifeFolder.needsReconnect = false;
     window.prompt = () => 'my-pattern.yaml';
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
   const before = await page.evaluate(() => {
     LifeMode.clear();
     LifeMode.toggleCell(0, 0);
@@ -1946,14 +1993,15 @@ test('Life: Save As round-trips a multi-state automaton (transition table + per-
         }),
       }),
     };
-    LifeMode._folderHandle = fakeHandle;
+    LifeFolder.folderHandle = fakeHandle;
+    LifeFolder.needsReconnect = false;
     window.prompt = () => 'my-beehive.yaml';
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
   const before = await page.evaluate(async () => {
-    await LifeMode.loadAutomatonFile('beehive.yaml');
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/beehive.yaml')).text(), 'beehive.yaml');
     return {
       multi: LifeMode.state.multi,
       live: [...LifeMode.state.live.entries()].sort(),
@@ -1980,7 +2028,7 @@ test('Life: Save As round-trips a multi-state automaton (transition table + per-
 test('Life: Save As refuses an empty board with a clear message, instead of writing an empty file', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
   await page.evaluate(() => LifeMode.clear());
 
   let alertMessage = null;
@@ -1996,7 +2044,7 @@ test('Life: Save As refuses an empty board with a clear message, instead of writ
 test('Life: opening a local automaton file loads its rule and cells', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const yaml = [
     'name: "Test Upload"',
@@ -2038,10 +2086,10 @@ test('Life: opening a local automaton file loads its rule and cells', async ({ p
 test('Life multi-state: per-state velocity varies volume, not pitch (#85)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
 
   const out = await page.evaluate(async () => {
-    await LifeMode.loadAutomatonFile('beehive.yaml');
+    LifeMode.loadAutomatonFromText(await (await fetch('./life/beehive.yaml')).text(), 'beehive.yaml');
     const unit = {
       louderThanSofter: LifeMode._peakOf(LifeMode.soundFor(1)) > LifeMode._peakOf(LifeMode.soundFor(2)),
       softerPositive: LifeMode._peakOf(LifeMode.soundFor(2)) > 0,
@@ -2151,7 +2199,7 @@ test('Copy/paste: copy also writes the real OS clipboard, and paste recovers fro
   expect(JSON.parse(payloadLine)).toEqual({ TONNCADE_CELLS_V1: 1, cells: [{ p: 0, q: 0 }, { p: 1, q: 0 }] });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
   await page.evaluate(() => {
     App.clipboard = []; // stand in for a separate window/tab's own empty in-memory clipboard
     LifeMode.clear();
@@ -2199,7 +2247,7 @@ test('Copy/paste: Sandbox cells paste into Life at the same pitches', async ({ p
   });
   expect(clip).toEqual(['0,0', '0,1', '1,0']); // copied Sandbox's placed cells (canonical coords)
 
-  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
   const res = await page.evaluate(() => {
     LifeMode.clear();
     App.paste();
