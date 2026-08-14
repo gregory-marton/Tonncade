@@ -1981,15 +1981,11 @@ test('Copy/paste into Gravity via the real header buttons places the copied cell
   const clipPitches = await page.evaluate(() => App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b));
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
-  // Stub out settling for this check: these 3 cells land unconnected and mid-air (q=4/5, not
-  // resting on the floor), so settleFloatingCells legitimately drops each one further -- that's
-  // separately covered by "pasted mid-air cells settle to the floor" below. Isolating paste's OWN
-  // placement from that later physics step is what actually tests paste's correctness (the
-  // pre-settle position must carry the exact copied pitch, per INV-47) without the assertion
-  // being confounded by an intentional, expected pitch change from falling.
-  await page.evaluate(() => { GravityMode.settleFloatingCells = () => {}; });
   await page.locator('#paste-btn').click();
 
+  // Paste itself never settles (that's a separate per-tick physics step -- see "pasted mid-air
+  // cells settle only once ticks resume" below), so these land exactly at their raw,
+  // unsettled canonical->gravity positions, mid-air or not.
   const res = await page.evaluate(() => ({
     boardSize: GravityBoard.cells.size,
     painted: document.querySelectorAll('#tonnetz-svg polygon.placed-piece').length,
@@ -1998,7 +1994,7 @@ test('Copy/paste into Gravity via the real header buttons places the copied cell
   expect(res.painted).toBe(3);   // and are actually drawn, not just in the data model
   const pitches = await page.evaluate(() =>
     [...GravityBoard.cells.keys()].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b));
-  expect(pitches).toEqual(clipPitches); // exact true pitch preserved, pre-settle
+  expect(pitches).toEqual(clipPitches); // exact true pitch preserved
 });
 
 // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are
@@ -2031,11 +2027,12 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   expect(res.size).toBe(2);           // original pile cell + one pasted cell
 });
 
-// Pasted mid-air cells fall to rest after a paste (the user's "then they can fall"). A single
-// pasted cell high in an empty column settles to the floor (q=0), staying one cell.
-test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async ({ page }) => {
+// Pasted mid-air cells fall to rest one row per TICK, exactly like the active piece, never in one
+// silent precomputed jump (reported live: an instant jump-to-rest was surprising). Paste itself
+// must leave the cell exactly where it landed; only once ticks actually run does it fall.
+test('Copy/paste into Gravity: pasted mid-air cells stay put until ticks resume, then settle one row at a time', async ({ page }) => {
   await page.goto('/');
-  const res = await page.evaluate(() => {
+  const afterPaste = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
     GravityBoard.cells.clear();
@@ -2044,8 +2041,22 @@ test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async 
     const qs = [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]);
     return { size: GravityBoard.cells.size, minQ: Math.min(...qs) };
   });
-  expect(res.size).toBe(1); // the one pasted cell
-  expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10
+  expect(afterPaste.size).toBe(1);   // the one pasted cell
+  expect(afterPaste.minQ).toBe(10);  // still exactly where it was pasted -- paste never settles
+
+  const stepped = await page.evaluate(() => {
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    const qsAfterOneTick = () => [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]);
+    GravityMode.tick(); // one tick, one row -- never a jump straight to the floor
+    const afterOne = Math.min(...qsAfterOneTick());
+    let guard = 0;
+    while (Math.min(...qsAfterOneTick()) > 0 && guard++ < 30) GravityMode.tick();
+    return { afterOne, finalMinQ: Math.min(...qsAfterOneTick()), size: GravityBoard.cells.size };
+  });
+  expect(stepped.afterOne).toBe(9);     // exactly one row per tick, not an instant drop to the floor
+  expect(stepped.finalMinQ).toBe(0);    // eventually settles all the way to the floor
+  expect(stepped.size).toBe(1);         // still just the one cell -- nothing lost or duplicated
 });
 
 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),

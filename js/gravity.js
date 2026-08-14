@@ -201,6 +201,15 @@ const GravityMode = {
         if (typeof Replay !== 'undefined') Replay.recordTick();
         if (this.state.isGameOver || this.state.isPaused) return;
 
+        // Any pasted (or otherwise loose) pile debris falls first, one row per tick -- same
+        // cadence as the active piece, so nothing moves without the player seeing/hearing it.
+        // Skip the active piece's own step the same tick debris moves, so the two don't visually
+        // compete for attention; normal play resumes once nothing is left floating.
+        if (this.settleFloatingCellsStep()) {
+            this.refreshUI();
+            return;
+        }
+
         const down = this.getDown(this.state.p, this.state.q);
         
         // 1. Try to move straight down
@@ -311,28 +320,7 @@ const GravityMode = {
         });
         if (cellsAbove.length === 0) return;
 
-        const byKey = new Map(cellsAbove.map(c => [c.key, c]));
-        const visited = new Set();
-        const components = [];
-        for (const start of cellsAbove) {
-            if (visited.has(start.key)) continue;
-            const component = [];
-            const stack = [start];
-            visited.add(start.key);
-            while (stack.length) {
-                const cur = stack.pop();
-                component.push(cur);
-                for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
-                    const nk = `${n.p},${n.q}`;
-                    const neighborCell = byKey.get(nk);
-                    if (neighborCell && !visited.has(nk)) {
-                        visited.add(nk);
-                        stack.push(neighborCell);
-                    }
-                }
-            }
-            components.push(component);
-        }
+        const components = this._groupIntoComponents(cellsAbove);
 
         // Delete every old position first, across all components, before inserting any new
         // one -- otherwise one component's insert could land on and overwrite another
@@ -395,7 +383,16 @@ const GravityMode = {
     // canonical coords via Tonnetz.gravity<->canonical (pitch-preserving). Copy = the pile. Paste =
     // send each canonical cell to its gravity cell and place it iff that cell is in the cup and
     // empty -- so cells outside the cup or overlapping the pile are ignored (per the user's rules).
-    // Pasted cells may land in the air; settleFloatingCells then drops them to rest.
+    // Cells land wherever they land, including mid-air -- paste itself never settles them (a
+    // connected piece can legitimately be pasted only PART way in, e.g. clipped by the cup wall
+    // under the 120deg rotation, and forcing an all-or-nothing rigid placement would silently
+    // refuse a large piece just because it "didn't quite fit"; independent per-cell placement, a
+    // "snow of 1x1s," is the least-surprising reading of a paste that partially overlaps the cup).
+    // What happens next is exactly what happens to any other pile cell: settleFloatingCellsStep()
+    // runs from tick(), so mid-air cells fall one row per tick, visibly and audibly, the same way
+    // the active piece does -- never a silent, precomputed jump straight to their resting spot.
+    // Gravity is paused while the player is off in another mode pasting (INV-48), so nothing
+    // actually falls until they resume; it then falls exactly as if freshly dropped.
     copyCells: function() {
         return [...GravityBoard.cells.keys()].map((k) => {
             const parts = k.split(',');
@@ -414,22 +411,19 @@ const GravityMode = {
         });
         if (!placed.length) return;
         GravityBoard.fillCells(placed, 'paste', '#6fae9b');
-        this.settleFloatingCells(); // "then they can fall"
         this.refreshBoard();
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
-    // The connected components of the whole board (cells sharing hex edges), as arrays of
-    // {p, q, val}. Same grouping dropRowsAbove uses, factored out.
-    _boardComponents: function() {
-        const byKey = new Map();
-        GravityBoard.cells.forEach((val, key) => {
-            const [p, q] = key.split(',').map(Number);
-            byKey.set(key, { p, q, val, key });
-        });
+    // Groups a flat list of {p, q, val, key} cells into connected components (cells sharing hex
+    // edges via Tonnetz.getNeighbors) -- shared by _boardComponents (the whole board) and
+    // dropRowsAbove (just the cells above a cleared row), so there's exactly one BFS doing this,
+    // not two copies that could quietly drift apart.
+    _groupIntoComponents: function(cells) {
+        const byKey = new Map(cells.map((c) => [c.key, c]));
         const visited = new Set();
         const components = [];
-        for (const start of byKey.values()) {
+        for (const start of cells) {
             if (visited.has(start.key)) continue;
             const component = [];
             const stack = [start];
@@ -439,7 +433,8 @@ const GravityMode = {
                 component.push(cur);
                 for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
                     const nk = `${n.p},${n.q}`;
-                    if (byKey.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push(byKey.get(nk)); }
+                    const neighbor = byKey.get(nk);
+                    if (neighbor && !visited.has(nk)) { visited.add(nk); stack.push(neighbor); }
                 }
             }
             components.push(component);
@@ -447,31 +442,51 @@ const GravityMode = {
         return components;
     },
 
-    // Drop every floating connected component to rest (used after a paste). Each component falls as
-    // a RIGID mass -- translated by one cell's getDown offset per step (a uniform translation
-    // preserves shape; moving cells individually by their own getDown would shear the mass, #6).
-    // A component rests when a step would take any of its cells out of the cup or onto a cell that
-    // isn't its own. Iterates until nothing moves (guarded against runaway).
-    settleFloatingCells: function() {
-        let moved = true, guard = 0;
-        while (moved && guard++ < 2000) {
-            moved = false;
-            for (const comp of this._boardComponents()) {
-                const ref = comp[0];
-                const down = this.getDown(ref.p, ref.q);
-                const dp = down.p - ref.p, dq = down.q - ref.q;
-                const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
-                const canFall = comp.every((c) => {
-                    const nk = (c.p + dp) + ',' + (c.q + dq);
-                    return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
-                });
-                if (!canFall) continue;
-                const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
-                comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q));
-                moves.forEach((m) => GravityBoard.cells.set(m.nk, m.val));
-                moved = true;
-            }
+    // The connected components of the whole board (cells sharing hex edges), as arrays of
+    // {p, q, val}.
+    _boardComponents: function() {
+        const cells = [];
+        GravityBoard.cells.forEach((val, key) => {
+            const [p, q] = key.split(',').map(Number);
+            cells.push({ p, q, val, key });
+        });
+        return this._groupIntoComponents(cells);
+    },
+
+    // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row
+    // (called once per tick, same cadence as the active piece's own fall -- see tick()). Each
+    // component falls as a RIGID mass -- translated by one cell's getDown offset per step (a
+    // uniform translation preserves shape; moving cells individually by their own getDown would
+    // shear the mass, #6). A component rests when a step would take any of its cells out of the
+    // cup or onto a cell that isn't its own. Returns true if anything moved, so tick() can skip
+    // the active piece's own step that tick (debris settles before normal play resumes) and so
+    // callers can decide whether to sound/redraw. This used to loop to completion in one silent
+    // jump (right after a paste) -- now every fall, pasted or otherwise, is this same one-row-per-
+    // tick step, so nothing a player didn't cause moves without them seeing and hearing it happen.
+    settleFloatingCellsStep: function() {
+        let moved = false;
+        const movedMidis = [];
+        for (const comp of this._boardComponents()) {
+            const ref = comp[0];
+            const down = this.getDown(ref.p, ref.q);
+            const dp = down.p - ref.p, dq = down.q - ref.q;
+            const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
+            const canFall = comp.every((c) => {
+                const nk = (c.p + dp) + ',' + (c.q + dq);
+                return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
+            });
+            if (!canFall) continue;
+            const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
+            comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q));
+            moves.forEach((m) => {
+                GravityBoard.cells.set(m.nk, m.val);
+                const [p, q] = m.nk.split(',').map(Number);
+                movedMidis.push(Tonnetz.getMidi(p, q));
+            });
+            moved = true;
         }
+        if (moved) Synth.playChord(movedMidis, false, 0.06, 0.3); // same soft tick sound the active piece's own step uses
+        return moved;
     },
 
     refreshUI: function() {
