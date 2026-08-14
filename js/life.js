@@ -666,6 +666,91 @@ const LifeMode = {
     clear: function() { this.stop(); this.state.live = new Map(); this.state.generation = 0; this.paintLive(); this.updateControls(); },
     reset: function() { this.stop(); this.state.live = new Map(this.state.initial); this.state.generation = 0; this.paintLive(); this.updateControls(); },
 
+    // Serializes the CURRENT automaton -- rule (or multi-state transition table), sound spec(s),
+    // tempo, and the LIVE cells right now (not the original seed -- a hand-tapped or mid-evolution
+    // pattern the player wants to keep is exactly the point of Save As) -- back into this
+    // project's own life/ YAML schema (see docs/life-rules.md). The inverse of parseYaml, but only
+    // as much of the format as this schema actually needs: a hand-rolled minimal writer to match
+    // parseYaml's own hand-rolled minimal parser, not a generic YAML library either direction.
+    toYaml: function(name) {
+        const lines = [];
+        lines.push(`name: "${String(name).replace(/"/g, '\\"')}"`);
+        if (this.state.multi) {
+            lines.push(`states: ${this.state.multi.states}`);
+            lines.push(`order: "${this.state.multi.order}"`);
+            lines.push('transition:');
+            this.state.multi.table.forEach((row) => lines.push(`  - [${row.join(', ')}]`));
+        } else {
+            lines.push('rule:');
+            lines.push(`  survival: [${this.state.rule.survival.join(', ')}]`);
+            lines.push(`  birth: [${this.state.rule.birth.join(', ')}]`);
+        }
+        const soundFlow = (s) => {
+            const parts = [`when: ${s.when}`, `duration: ${s.duration}`];
+            if (s.velocity != null) parts.push(`velocity: ${s.velocity}`);
+            return `{ ${parts.join(', ')} }`;
+        };
+        lines.push(`sound: ${soundFlow(this.state.sound)}`);
+        if (this.state.sounds) {
+            lines.push('sounds:');
+            Object.keys(this.state.sounds).sort().forEach((st) => {
+                const spec = this.state.sounds[st] || {};
+                const parts = [`state: ${st}`];
+                if (spec.velocity != null) parts.push(`velocity: ${spec.velocity}`);
+                if (spec.duration != null) parts.push(`duration: ${spec.duration}`);
+                lines.push(`  - { ${parts.join(', ')} }`);
+            });
+        }
+        lines.push('initial:');
+        lines.push('  cells:');
+        for (const [key, st] of this.state.live) {
+            const [p, q] = key.split(',').map(Number);
+            lines.push(this.state.multi ? `    - [${p}, ${q}, ${st}]` : `    - [${p}, ${q}]`);
+        }
+        lines.push(`tempo: ${this.state.tempo}`);
+        return lines.join('\n') + '\n';
+    },
+
+    // "Save As": persist the current automaton to a life/ YAML file -- same icon-button pattern
+    // as Compose's own Save (js/compose.js), and the same remembered-folder-with-download-
+    // fallback UX MidiFolder gives Melody/Compose, kept as Life's own separate remembered folder
+    // (a Life automaton isn't a MIDI file -- "your MIDI folder" and "your Life folder" are
+    // different places a player would keep these).
+    save: async function() {
+        if (this.state.live.size === 0) {
+            alert('Nothing to save yet -- place or evolve some cells first.');
+            return;
+        }
+        const name = prompt('Save as:', 'my-automaton.yaml');
+        if (!name) return;
+        const filename = /\.ya?ml$/i.test(name) ? name : `${name}.yaml`;
+        const text = this.toYaml(filename.replace(/\.ya?ml$/i, ''));
+
+        if (!this._folderHandle && typeof window !== 'undefined' && window.showDirectoryPicker) {
+            try { this._folderHandle = await window.showDirectoryPicker(); }
+            catch (e) { /* user cancelled the picker -- fall through to a plain download below */ }
+        }
+        if (this._folderHandle) {
+            try {
+                const fileHandle = await this._folderHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(text);
+                await writable.close();
+                return;
+            } catch (err) {
+                console.warn('Could not save into the remembered Life folder, falling back to a download:', err);
+            }
+        }
+        // Plain <a download> fallback -- always works regardless of browser/permission state.
+        const blob = new Blob([text], { type: 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+    },
+
     setupEvents: function() {
         const svg = Render.svg;
         if (svg) {
@@ -711,6 +796,7 @@ const LifeMode = {
         bind('life-step', this.stepOnce);
         bind('life-clear', this.clear);
         bind('life-reset', this.reset);
+        bind('life-save', this.save);
         const sel = document.getElementById('life-automaton');
         if (sel) sel.onchange = () => this.loadAutomatonFile(sel.value);
     },

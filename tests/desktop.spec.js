@@ -1879,6 +1879,116 @@ test('Life: dragging the mouse pans the view; a short click still toggles the ce
   expect(afterClick).toBe(1);
 });
 
+// Life had no way to persist a hand-arranged or mid-evolution pattern at all -- only the built-in/
+// online automata could ever be loaded, so a player's own creation was gone the moment they left
+// the page. Save As (mirroring Compose's own Save) writes the CURRENT live cells -- not the
+// original seed -- back out as a life/ YAML file, round-trippable through the real parser/loader.
+test('Life: Save As writes a YAML file that round-trips back to the same rule and live cells', async ({ page }) => {
+  await page.goto('/');
+
+  // A fake remembered folder whose getFileHandle/createWritable capture the written text, so this
+  // test can re-parse it and confirm Save round-trips real content, not just that some function
+  // ran. Mirrors the identical pattern used for Compose's own Save test.
+  await page.evaluate(() => {
+    window.__savedFiles = {};
+    const fakeHandle = {
+      name: 'MyAutomata',
+      values: async function* () {},
+      getFileHandle: async (name) => ({
+        createWritable: async () => ({
+          write: async (text) => { window.__savedFiles[name] = text; },
+          close: async () => {},
+        }),
+      }),
+    };
+    LifeMode._folderHandle = fakeHandle;
+    window.prompt = () => 'my-pattern.yaml';
+  });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  const before = await page.evaluate(() => {
+    LifeMode.clear();
+    LifeMode.toggleCell(0, 0);
+    LifeMode.toggleCell(1, 0);
+    LifeMode.toggleCell(0, 1);
+    return { rule: LifeMode.state.rule, live: [...LifeMode.state.live.entries()].sort() };
+  });
+
+  await page.locator('#life-save').click();
+  await page.waitForFunction(() => window.__savedFiles['my-pattern.yaml'] !== undefined);
+
+  const roundTripped = await page.evaluate(() => {
+    const text = window.__savedFiles['my-pattern.yaml'];
+    const parsed = Life.parseYaml(text);
+    return { rule: parsed.rule, cells: parsed.initial.cells };
+  });
+  expect(roundTripped.rule).toEqual(before.rule);
+  const roundTrippedLive = roundTripped.cells.map(([p, q]) => `${p},${q}`).sort();
+  expect(roundTrippedLive).toEqual(before.live.map(([k]) => k));
+});
+
+// The multi-state path (transition table, per-state sounds, [p,q,state] cells) is a genuinely
+// different branch of toYaml than the 2-state rule path above -- exercise it separately with
+// beehive.yaml's own glider seed, confirming BOTH the states/order/transition table and each
+// live cell's own state round-trip, not just its position.
+test('Life: Save As round-trips a multi-state automaton (transition table + per-cell state)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.__savedFiles = {};
+    const fakeHandle = {
+      name: 'MyAutomata',
+      values: async function* () {},
+      getFileHandle: async (name) => ({
+        createWritable: async () => ({
+          write: async (text) => { window.__savedFiles[name] = text; },
+          close: async () => {},
+        }),
+      }),
+    };
+    LifeMode._folderHandle = fakeHandle;
+    window.prompt = () => 'my-beehive.yaml';
+  });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  const before = await page.evaluate(async () => {
+    await LifeMode.loadAutomatonFile('beehive.yaml');
+    return {
+      multi: LifeMode.state.multi,
+      live: [...LifeMode.state.live.entries()].sort(),
+    };
+  });
+
+  await page.locator('#life-save').click();
+  await page.waitForFunction(() => window.__savedFiles['my-beehive.yaml'] !== undefined);
+
+  const roundTripped = await page.evaluate(() => {
+    const text = window.__savedFiles['my-beehive.yaml'];
+    const parsed = Life.parseYaml(text);
+    return { states: parsed.states, order: parsed.order, transition: parsed.transition, cells: parsed.initial.cells };
+  });
+  expect(roundTripped.states).toBe(before.multi.states);
+  expect(roundTripped.order).toBe(before.multi.order);
+  expect(roundTripped.transition).toEqual(before.multi.table);
+  const roundTrippedLive = roundTripped.cells.map(([p, q, s]) => `${p},${q},${s}`).sort();
+  expect(roundTrippedLive).toEqual(before.live.map(([k, s]) => `${k},${s}`).sort());
+});
+
+// A save with nothing on the board would silently write an empty, useless file -- catch it with
+// a clear message instead (mirrors Compose's own "Nothing to save yet" guard).
+test('Life: Save As refuses an empty board with a clear message, instead of writing an empty file', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+  await page.evaluate(() => LifeMode.clear());
+
+  let alertMessage = null;
+  page.on('dialog', async (d) => { alertMessage = d.message(); await d.accept(); });
+  await page.locator('#life-save').click();
+  expect(alertMessage).toMatch(/nothing to save/i);
+});
+
 // #85: a state's `velocity` must actually change how LOUD its cells sound (the pitch invariant
 // permits volume to vary by state -- only pitch may not). beehive.yaml gives state 1 velocity 95
 // and state 2 velocity 55, so a step must play head (state 1) cells louder than tail (state 2)
