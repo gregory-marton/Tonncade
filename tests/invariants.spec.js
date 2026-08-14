@@ -16,7 +16,11 @@ const { test, expect } = require('@playwright/test');
  * dependency, so they live in tests/run_tests.js instead — see that file for their coverage.
  */
 
-const MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
+// The full mode list, derived from the actual UI (.mode-option[data-mode]) rather than
+// hand-maintained here -- a hardcoded copy previously went stale (missing Life entirely) without
+// any test catching it. Requires a page already navigated to '/', so callable only from within a
+// test body (after beforeEach's page.goto), not at module scope.
+const getModes = (page) => page.evaluate(() => [...document.querySelectorAll('.mode-option')].map((el) => el.getAttribute('data-mode')));
 
 test.describe('Invariant tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -30,6 +34,7 @@ test.describe('Invariant tests', () => {
   // ────────────────────────────────────────────────────────────────────────
 
   test('INV-1: every mode is reachable from every other mode, in portrait and landscape', async ({ page }) => {
+    const MODES = await getModes(page);
     for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }, { width: 1280, height: 800 }]) {
       await page.setViewportSize(viewport);
 
@@ -466,12 +471,6 @@ test.describe('Invariant tests', () => {
     },
   };
 
-  // Derived, not hand-picked: everything NOT restricted is free-pan, and free-pan is exactly
-  // the set that both supports a manual pan gesture and must preserve its exact view position.
-  const RESTRICTED_MODES = new Set(Object.keys(RESTRICTED_BOARD_CELLS));
-  const VIEW_PERSISTS_MODES = new Set(MODES.filter(m => !RESTRICTED_MODES.has(m)));
-  const PANNABLE_MODES = VIEW_PERSISTS_MODES;
-
   async function checkBoardCentered(page, mode) {
     return page.evaluate(({ m, cellsSrc }) => {
       const cells = new Function('Board', `return (${cellsSrc})();`)(Board);
@@ -516,6 +515,9 @@ test.describe('Invariant tests', () => {
           ComposeMode.state.selectedIndices = [];
           ComposeMode.refreshBoard();
           break;
+        case 'life':
+          LifeMode.toggleCell(4, 4); // an extra live cell, distinct from the loaded automaton's own
+          break;
         default:
           break;
       }
@@ -534,12 +536,26 @@ test.describe('Invariant tests', () => {
         // legitimately advance/reset progress. targetLength is untouched by any of that.
         case 'midi': return { targetLength: MidiMode.state.targetLength };
         case 'compose': return { notes: ComposeMode.state.notes, selectedIndices: ComposeMode.state.selectedIndices };
+        case 'life': return { live: [...LifeMode.state.live.entries()], generation: LifeMode.state.generation };
         default: return {};
       }
     }, mode);
   }
 
   test('INV-9/INV-12: every mode\'s state survives resize, view rotation, and (where pannable) panning', async ({ page }) => {
+    const MODES = await getModes(page);
+    // Derived from production's own Render.RESTRICTED_MODES, not re-hand-picked here -- everything
+    // NOT restricted is free-pan, and free-pan is exactly the set that both supports a manual pan
+    // gesture and must preserve its exact view position. Cross-checked against
+    // RESTRICTED_BOARD_CELLS's own keys (the per-mode geometry this test needs for restricted
+    // boards) so the two can't silently drift apart -- a mode added to one without the other
+    // fails loudly here instead of quietly losing coverage.
+    const restrictedModeNames = await page.evaluate(() => Render.RESTRICTED_MODES);
+    expect(Object.keys(RESTRICTED_BOARD_CELLS).sort()).toEqual([...restrictedModeNames].sort());
+    const RESTRICTED_MODES = new Set(restrictedModeNames);
+    const VIEW_PERSISTS_MODES = new Set(MODES.filter(m => !RESTRICTED_MODES.has(m)));
+    const PANNABLE_MODES = VIEW_PERSISTS_MODES;
+
     for (const mode of MODES) {
       await page.setViewportSize({ width: 390, height: 844 });
       // Render.rotationDeg is a single global, persisted across mode switches (by design --
@@ -550,6 +566,7 @@ test.describe('Invariant tests', () => {
       await page.evaluate(() => Render.setRotation(0));
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       if (mode === 'midi') await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+      if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
       await setupModeState(page, mode);
 
       const pannable = PANNABLE_MODES.has(mode);
@@ -570,8 +587,8 @@ test.describe('Invariant tests', () => {
         // corruption. Offsetting the stored center by a modest amount and refreshing mirrors a real
         // pan exactly.
         await page.evaluate((m) => {
-          const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode }[m];
-          const refresh = { sandbox: () => SandboxMode.refreshLattice(), midi: () => MidiMode.refreshBoard(), compose: () => ComposeMode.refreshBoard() }[m];
+          const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode, life: LifeMode }[m];
+          const refresh = { sandbox: () => SandboxMode.refreshLattice(), midi: () => MidiMode.refreshBoard(), compose: () => ComposeMode.refreshBoard(), life: () => LifeMode.refreshLattice() }[m];
           refresh(); // ensure the view center is initialized (null -> origin) before offsetting it
           modeObj.state.viewX -= 60;
           modeObj.state.viewY -= 40;
@@ -724,6 +741,7 @@ test.describe('Invariant tests', () => {
   });
 
   test('INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation', async ({ page }) => {
+    const MODES = await getModes(page);
     for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
       await page.setViewportSize(viewport);
       for (const mode of MODES) {
@@ -1163,6 +1181,7 @@ test.describe('Invariant tests', () => {
   // ────────────────────────────────────────────────────────────────────────
 
   test('INV-29: the mode-slider active pill exactly covers the active mode option, for every mode, portrait and landscape', async ({ page }) => {
+    const MODES = await getModes(page);
     for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) {
       await page.setViewportSize(viewport);
       for (const mode of MODES) {

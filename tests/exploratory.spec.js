@@ -395,7 +395,6 @@ test.describe('Exploratory tests (prototype)', () => {
   // for height -- chosen to span real mobile devices through ordinary desktop window sizes.
   // ────────────────────────────────────────────────────────────────────────
 
-  const MATRIX_MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
   const WIDTH_RANGE = [320, 1920];
   const HEIGHT_RANGE = [480, 1080];
   const SIZES_PER_SCENARIO = 5;
@@ -403,6 +402,9 @@ test.describe('Exploratory tests (prototype)', () => {
 
   test('Random taps (full matrix): every mode x drawer-state x 5 random screen sizes', async ({ page }) => {
     test.setTimeout(600000);
+    // Derived from the actual UI (.mode-option[data-mode]), not hand-maintained here -- a
+    // hardcoded copy previously went stale (missing Life entirely) with nothing to catch it.
+    const MATRIX_MODES = await page.evaluate(() => [...document.querySelectorAll('.mode-option')].map((el) => el.getAttribute('data-mode')));
     // A fresh seed each run, not a fixed constant, so the sampled sizes vary run to run instead
     // of a fixed seed permanently fixating on whichever one scenario happened to be chosen first.
     // Whatever seed a given run draws is logged here so any specific failure is still exactly

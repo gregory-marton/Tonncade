@@ -1466,14 +1466,13 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   });
 
   // Was two hand-written tests ("switching Sandbox -> Gravity -> Sandbox", "... -> Blast -> ...")
-  // -- generalized to every one of the 6x6x6=216 mode triplets, not just two paths that happen
-  // to start and end at Sandbox. #piece-list/#palette is a single shared DOM element repopulated
-  // differently per mode (Sandbox's carousel, Blast/Gravity's next-piece queue, hidden entirely
-  // for Melody/Snake/Compose) -- the property that actually matters is "whatever the FINAL mode
+  // -- generalized to every mode triplet (the mode list itself is fetched from the live UI, not
+  // hardcoded -- see the test body), not just two paths that happen to start and end at Sandbox.
+  // #piece-list/#palette is a single shared DOM element repopulated differently per mode
+  // (Sandbox's carousel, Blast/Gravity's next-piece queue, hidden entirely for
+  // Melody/Snake/Compose/Life) -- the property that actually matters is "whatever the FINAL mode
   // is, its own content is correct", regardless of which two modes you passed through to get
   // there.
-  const MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity'];
-
   const PALETTE_EXPECTATION = {
     sandbox: async (page) => {
       await expect(page.locator('.piece-item').first()).toBeVisible();
@@ -1493,12 +1492,19 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     },
     snake: async (page) => PALETTE_EXPECTATION.midi(page),
     compose: async (page) => PALETTE_EXPECTATION.midi(page),
+    life: async (page) => PALETTE_EXPECTATION.midi(page),
   };
 
-  test('switching through any 3-mode sequence leaves the shared palette/piece-list correct for the final mode (6^3=216 triplets)', async ({ page }) => {
+  test('switching through any 3-mode sequence leaves the shared palette/piece-list correct for the final mode (N^3 triplets)', async ({ page }) => {
     const width = page.viewportSize().width;
     if (width >= 768) return;
 
+    // The default 30s no longer covers every mode (adding Life took N^3 from 216 to 343 triplets).
+    test.setTimeout(90000);
+
+    // Derived from the actual UI (.mode-option[data-mode]), not hand-maintained here -- a
+    // hardcoded copy previously went stale (missing Life entirely) with nothing to catch it.
+    const MODES = await page.evaluate(() => [...document.querySelectorAll('.mode-option')].map((el) => el.getAttribute('data-mode')));
     for (const a of MODES) {
       for (const b of MODES) {
         for (const c of MODES) {

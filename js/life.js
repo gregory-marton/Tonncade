@@ -669,25 +669,41 @@ const LifeMode = {
     setupEvents: function() {
         const svg = Render.svg;
         if (svg) {
-            // Tap a cell to toggle it alive/dead. (Panning is a later refinement -- the automaton
-            // evolves around the origin, which the centred view already shows.) Bound fresh on
-            // every init and torn down in cleanup() (#15/#16): `Render.svg` is the ONE <svg> every
-            // mode shares, so a listener added via addEventListener -- unlike the `.onmousedown =`
-            // property other modes use, which the next mode's own assignment naturally overwrites
-            // -- survives both drawLattice's `innerHTML = ''` and a mode switch. Left unremoved, it
-            // kept firing on taps made in whatever mode came next, toggling Life's own (now
-            // invisible) cells from underneath the player.
-            let down = null;
-            this._onPointerDown = (e) => { down = { x: e.clientX, y: e.clientY }; };
+            // Tap a cell to toggle it alive/dead; drag to pan (Life is a free-pan mode like
+            // Sandbox/Melody/Compose -- see Render.RESTRICTED_MODES -- and wheel/pinch zoom
+            // already applied here before drag-to-pan did, which was the actual gap: zoom worked,
+            // but there was no way to move the view at all on a mouse-driven desktop). Bound fresh
+            // on every init and torn down in cleanup() (#15/#16): `Render.svg` is the ONE <svg>
+            // every mode shares, so a listener added via addEventListener -- unlike the
+            // `.onmousedown =` property other modes use, which the next mode's own assignment
+            // naturally overwrites -- survives both drawLattice's `innerHTML = ''` and a mode
+            // switch. Left unremoved, it kept firing on taps made in whatever mode came next,
+            // toggling Life's own (now invisible) cells from underneath the player.
+            let down = null;   // pointerdown origin -- total distance from here decides tap vs. drag
+            let last = null;   // last pointermove position -- per-frame pan delta
+            let panning = false;
+            this._onPointerDown = (e) => { down = { x: e.clientX, y: e.clientY }; last = down; panning = false; };
+            this._onPointerMove = (e) => {
+                if (!down) return;
+                if (!panning && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) panning = true;
+                if (panning) {
+                    this.state.viewX -= (e.clientX - last.x);
+                    this.state.viewY -= (e.clientY - last.y);
+                    const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
+                    this.state.viewX = v.viewX;
+                    this.state.viewY = v.viewY;
+                }
+                last = { x: e.clientX, y: e.clientY };
+            };
             this._onPointerUp = (e) => {
                 if (!down) return;
-                const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
-                if (moved <= 6 && e.target && e.target.hasAttribute && e.target.hasAttribute('data-p')) {
+                if (!panning && e.target && e.target.hasAttribute && e.target.hasAttribute('data-p')) {
                     this.toggleCell(parseInt(e.target.getAttribute('data-p')), parseInt(e.target.getAttribute('data-q')));
                 }
-                down = null;
+                down = null; last = null; panning = false;
             };
             svg.addEventListener('pointerdown', this._onPointerDown);
+            svg.addEventListener('pointermove', this._onPointerMove);
             svg.addEventListener('pointerup', this._onPointerUp);
         }
         const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = () => fn.call(this); };
@@ -731,8 +747,10 @@ const LifeMode = {
         this._activeToken = (this._activeToken || 0) + 1;
         if (Render.svg && this._onPointerDown) {
             Render.svg.removeEventListener('pointerdown', this._onPointerDown);
+            Render.svg.removeEventListener('pointermove', this._onPointerMove);
             Render.svg.removeEventListener('pointerup', this._onPointerUp);
             this._onPointerDown = null;
+            this._onPointerMove = null;
             this._onPointerUp = null;
         }
     },

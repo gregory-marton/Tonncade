@@ -1852,6 +1852,33 @@ test('Life: tapping a cell cycles it through all states (#85)', async ({ page })
   expect(out.twoSeq).toEqual([0, 1, 0, 1]);      // 2-state remains a plain toggle
 });
 
+// Reported live: Life should be free-pan/zoomable exactly like Sandbox/Melody/Compose (see
+// Render.RESTRICTED_MODES), but it never actually implemented drag-to-pan on desktop -- only
+// tap-to-toggle. A short drag must pan the view (not toggle whatever cell it started on), and a
+// short, near-stationary click must still toggle exactly as before.
+test('Life: dragging the mouse pans the view; a short click still toggles the cell', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 });
+
+  const before = await page.evaluate(() => ({ x: LifeMode.state.viewX, y: LifeMode.state.viewY, liveSize: LifeMode.state.live.size }));
+
+  await page.mouse.move(400, 300);
+  await page.mouse.down();
+  await page.mouse.move(500, 380, { steps: 10 }); // well past the 6px tap-vs-drag threshold
+  await page.mouse.up();
+
+  const afterDrag = await page.evaluate(() => ({ x: LifeMode.state.viewX, y: LifeMode.state.viewY, liveSize: LifeMode.state.live.size }));
+  expect(afterDrag.x !== before.x || afterDrag.y !== before.y).toBe(true); // the view actually panned
+  expect(afterDrag.liveSize).toBe(before.liveSize); // and nothing was toggled by the drag itself
+
+  // A short, near-stationary click on an empty cell still toggles it (unaffected by the pan code).
+  const cell = page.locator('polygon.cell:not(.ghost)[data-p="3"][data-q="3"]');
+  await cell.click();
+  const afterClick = await page.evaluate(() => LifeMode.state.live.get('3,3') || 0);
+  expect(afterClick).toBe(1);
+});
+
 // #85: a state's `velocity` must actually change how LOUD its cells sound (the pitch invariant
 // permits volume to vary by state -- only pitch may not). beehive.yaml gives state 1 velocity 95
 // and state 2 velocity 55, so a step must play head (state 1) cells louder than tail (state 2)
