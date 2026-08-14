@@ -2059,6 +2059,121 @@ test('Copy/paste into Gravity: pasted mid-air cells stay put until ticks resume,
   expect(stepped.size).toBe(1);         // still just the one cell -- nothing lost or duplicated
 });
 
+// A row can be completed by debris settling into place, not just by the active piece locking --
+// checkForClears() runs every tick regardless of how a row got full, so this must clear it exactly
+// the same way a piece-completed row would.
+test('Gravity: a row completed by debris settling (not a piece locking) still clears', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // A full row at q=0 (col -5..4), completed directly (standing in for "settled into place" --
+    // checkForClears doesn't care how the cells got there, only that the row is full).
+    for (let col = -5; col <= 4; col++) {
+      GravityBoard.cells.set(`${col},0`, { type: 'X', color: '#fff' });
+    }
+    const before = { size: GravityBoard.cells.size, linesCleared: GravityMode.state.linesCleared };
+    const cleared = GravityMode.checkForClears();
+    return { before, cleared, sizeAfter: GravityBoard.cells.size, linesClearedAfter: GravityMode.state.linesCleared };
+  });
+  expect(res.before.size).toBe(10);
+  expect(res.cleared).toBe(true);
+  expect(res.sizeAfter).toBe(0);                                    // the full row is gone
+  expect(res.linesClearedAfter).toBe(res.before.linesCleared + 1);  // and it counted
+});
+
+// Clearing a line does NOT itself shift anything above it -- that's ordinary per-tick debris
+// settling (see settleFloatingCellsStep), not a special instant cascade. So immediately after a
+// clear, cells above are untouched; they only fall gradually as later ticks run.
+test('Gravity: clearing a line does not instantly shift what was above it -- it falls in via later ticks', async ({ page }) => {
+  await page.goto('/');
+  const afterClear = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    for (let col = -5; col <= 4; col++) GravityBoard.cells.set(`${col},0`, { type: 'X', color: '#fff' });
+    GravityBoard.cells.set('0,5', { type: 'X', color: '#fff' }); // floating well above the row, unconnected to it
+    GravityMode.checkForClears(); // clears the q=0 row
+    return { size: GravityBoard.cells.size, keys: [...GravityBoard.cells.keys()] };
+  });
+  expect(afterClear.size).toBe(1);
+  expect(afterClear.keys).toEqual(['0,5']); // untouched -- clearing alone never moves it
+
+  const settled = await page.evaluate(() => {
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    const q = () => +[...GravityBoard.cells.keys()][0].split(',')[1];
+    const qs = [q()];
+    for (let i = 0; i < 6; i++) { GravityMode.tick(); qs.push(q()); }
+    return qs;
+  });
+  // One row per tick -- 5, 4, 3, 2, 1, 0, then resting at the floor (no further change).
+  expect(settled).toEqual([5, 4, 3, 2, 1, 0, 0]);
+});
+
+// The literal reported scenario: figure out which note fills a gap in a low Gravity row, place
+// just that cell in Sandbox, copy, switch to Gravity via the real header buttons, paste, resume
+// play -- the completed row must clear, and whatever's above must cascade down correctly.
+test('Gravity: pasting the exact missing note into a near-complete row clears it and cascades correctly on resume', async ({ page }) => {
+  await page.goto('/');
+  const setup = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // Row q=0 complete except col=2 (the "hole"); a couple of unrelated cells above, to confirm
+    // they cascade down correctly once the gap opens up.
+    const holeP = 2, holeQ = 0;
+    for (let col = -5; col <= 4; col++) {
+      if (col === holeP) continue;
+      GravityBoard.cells.set(`${col},0`, { type: 'X', color: '#fff' });
+    }
+    GravityBoard.cells.set('3,3', { type: 'X', color: '#fff' }); // sits above the row, unconnected
+    // The exact canonical (Sandbox) cell whose gravity mapping IS the hole -- "figuring out which
+    // note fills it" in the reported workflow.
+    const holeCanonical = Tonnetz.gravityToCanonical(holeP, holeQ);
+    return { holeCanonical, sizeBefore: GravityBoard.cells.size };
+  });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  await page.evaluate((c) => {
+    SandboxMode.state.placedCells = [c];
+    SandboxMode.refreshLattice();
+  }, setup.holeCanonical);
+  await page.locator('#copy-btn').click();
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+  await page.locator('#paste-btn').click();
+  const afterPaste = await page.evaluate(() => ({
+    size: GravityBoard.cells.size,
+    rowStillFull: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4].every((col) => GravityBoard.cells.has(`${col},0`)),
+  }));
+  expect(afterPaste.size).toBe(setup.sizeBefore + 1); // the pasted cell landed
+  expect(afterPaste.rowStillFull).toBe(true);         // the hole is now filled -- row is complete
+
+  // Resume play: run enough ticks for checkForClears to catch the completed row and for the
+  // cell above to fully cascade down.
+  const final = await page.evaluate(() => {
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    for (let i = 0; i < 10; i++) GravityMode.tick();
+    return {
+      // NOT "is any of the row's original coordinate keys occupied" -- the unrelated debris cell
+      // legitimately zigzags down through some of those same keys as it falls (correct geometry,
+      // not a leftover of the row). The real question is whether q=0 is currently a FULL line.
+      rowGone: GravityBoard.findFullLines().length === 0,
+      linesCleared: GravityMode.state.linesCleared,
+      remaining: [...GravityBoard.cells.entries()].filter(([k, v]) => v.type === 'X'),
+    };
+  });
+  expect(final.rowGone).toBe(true);       // the completed row cleared -- on the very first tick
+  expect(final.linesCleared).toBe(1);     // and counted exactly once
+  expect(final.remaining.length).toBe(1); // the one unrelated cell that was above survives
+  // (4,0), not (3,0): the hex "straight down" zigzag (getDown) naturally drifts a falling cell
+  // sideways by one column over an odd number of rows -- correct, expected geometry, not a bug.
+  expect(final.remaining[0][0]).toBe('4,0'); // and cascaded all the way down to the (now-open) floor
+});
+
 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),
 // so it's reachable by panning -- not clipped to the fixed default band. Capped for performance.
 test('Sandbox: the gray lattice box grows to reach pasted far cells', async ({ page }) => {

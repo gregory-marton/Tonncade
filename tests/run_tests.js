@@ -893,40 +893,44 @@ try {
     GravityBoard.cells.clear();
     console.log("PASS: Gravity pieces can overhang the side walls down to a single toe-hold hex, and the floor stays solid!");
 
-    // Real bug (GitHub issue #6, "floating piece"): dropRowsAbove(qClear) shifted every cell
-    // above the cleared line by calling getDown(p, q) on EACH CELL INDEPENDENTLY, using that
-    // cell's own row parity. getDown's parity-dependent zigzag is only valid for moving a
-    // SINGLE reference point (a falling piece's anchor) down by one row -- applying it
-    // per-cell to an already-locked multi-cell structure tears it apart whenever the structure
-    // spans both an even and an odd row and has cells connected via a diagonal (non
-    // "same-column") hex direction: two originally-adjacent cells can land on a NON-adjacent
-    // relative offset after the "shift," splitting a solid mass into a disconnected, visibly
-    // floating fragment the instant a line below it clears -- confirmed live via a real
-    // captured session's byte-for-byte-verified sound trace (see js/replay.js's
-    // Replay.wrapSynth and scripts/replay-to-gif.js's sound verification).
-    console.log("Running Gravity dropRowsAbove shape-preservation test...");
+    // Real bug (GitHub issue #6, "floating piece"): the ORIGINAL post-clear cascade shifted every
+    // cell above the cleared line by calling getDown(p, q) on EACH CELL INDEPENDENTLY, using that
+    // cell's own row parity. getDown's parity-dependent zigzag is only valid for moving a SINGLE
+    // reference point (a falling piece's anchor) down by one row -- applying it per-cell to an
+    // already-locked multi-cell structure tears it apart whenever the structure spans both an
+    // even and an odd row and has cells connected via a diagonal (non "same-column") hex
+    // direction: two originally-adjacent cells can land on a NON-adjacent relative offset after
+    // the "shift," splitting a solid mass into a disconnected, visibly floating fragment the
+    // instant a line below it clears -- confirmed live via a real captured session's
+    // byte-for-byte-verified sound trace (see js/replay.js's Replay.wrapSynth and
+    // scripts/replay-to-gif.js's sound verification). Clearing and cascading are no longer one
+    // instant operation (see INV-48: falling, pasted or otherwise, is always a one-row-per-tick
+    // settleFloatingCellsStep, never a silent precomputed jump) -- this now exercises
+    // settleFloatingCellsStep directly, the single place any pile structure ever moves.
+    console.log("Running Gravity settleFloatingCellsStep shape-preservation test...");
     const GravityMode = vm.runInContext("GravityMode", context);
     GravityBoard.cells.clear();
 
     // Two cells connected via the "+Min3" hex direction (offset (-1,+1) -- see
-    // Tonnetz.getNeighbors), straddling an even/odd row boundary (q=4 even, q=5 odd), well
-    // above the row about to be cleared (q=0).
+    // Tonnetz.getNeighbors), straddling an even/odd row boundary (q=4 even, q=5 odd), floating
+    // (nothing below them, so they're free to fall).
     GravityBoard.cells.set('0,4', { type: 'X', color: '#ffffff' });
     GravityBoard.cells.set('-1,5', { type: 'X', color: '#ffffff' });
     const originalKeys = new Set(GravityBoard.cells.keys());
 
-    GravityMode.dropRowsAbove(0);
+    GravityMode.settleFloatingCellsStep();
 
     if (GravityBoard.cells.size !== 2) {
-        console.error(`FAIL: dropRowsAbove should move both cells, not lose or duplicate any -- got ${GravityBoard.cells.size} cells: ${JSON.stringify([...GravityBoard.cells.keys()])}`);
+        console.error(`FAIL: settleFloatingCellsStep should move both cells, not lose or duplicate any -- got ${GravityBoard.cells.size} cells: ${JSON.stringify([...GravityBoard.cells.keys()])}`);
         process.exit(1);
     }
     const movedKeys = [...GravityBoard.cells.keys()].map(k => k.split(',').map(Number));
-    // Both cells should have moved DOWN by exactly one row (q decreased by 1) each.
+    // Both cells should have moved DOWN by exactly one row (q decreased by 1) each -- one tick,
+    // one row, never further.
     const originalQs = [...originalKeys].map(k => Number(k.split(',')[1])).sort();
     const movedQs = movedKeys.map(([p, q]) => q).sort();
     if (JSON.stringify(movedQs) !== JSON.stringify(originalQs.map(q => q - 1))) {
-        console.error(`FAIL: dropRowsAbove should move every cell down by exactly one row! Original q's: ${JSON.stringify(originalQs)}, after: ${JSON.stringify(movedQs)}`);
+        console.error(`FAIL: settleFloatingCellsStep should move every cell down by exactly one row per call! Original q's: ${JSON.stringify(originalQs)}, after: ${JSON.stringify(movedQs)}`);
         process.exit(1);
     }
     // The two cells' RELATIVE offset (their shape) must be preserved -- still a valid hex
@@ -937,21 +941,22 @@ try {
     const validNeighborOffsets = [[1, 0], [-1, 0], [0, 1], [0, -1], [-1, 1], [1, -1]];
     const isValidNeighborOffset = (off) => validNeighborOffsets.some(v => v[0] === off[0] && v[1] === off[1]);
     if (!isValidNeighborOffset(relOffset) && !isValidNeighborOffset(relOffsetAlt)) {
-        console.error(`FAIL: dropRowsAbove sheared a connected structure apart! Cells that were adjacent (offset (-1,1)) ended up at a non-adjacent relative offset ${JSON.stringify(relOffset)} after the shift -- moved positions: ${JSON.stringify(movedKeys)}`);
+        console.error(`FAIL: settleFloatingCellsStep sheared a connected structure apart! Cells that were adjacent (offset (-1,1)) ended up at a non-adjacent relative offset ${JSON.stringify(relOffset)} after the shift -- moved positions: ${JSON.stringify(movedKeys)}`);
         process.exit(1);
     }
 
     GravityBoard.cells.clear();
-    console.log("PASS: Gravity's dropRowsAbove shifts connected structures as a single rigid body, never tearing them apart!");
+    console.log("PASS: Gravity's settleFloatingCellsStep shifts connected structures as a single rigid body, never tearing them apart!");
 
-    // Conservation of hexes: clearing a line and cascading everything above it down must never
-    // create or destroy cells -- the total board population after should be exactly what it was
-    // before, minus the width of the cleared row (always 10 for Gravity's constant-width cup).
-    // The shape-preservation test above already checks one connected structure keeps its own
-    // shape; this checks the WHOLE-BOARD count across MULTIPLE disconnected structures at once,
-    // which is where a silent collision could hide -- two different components, each shifted by
-    // its own consistent-but-different delta, landing on the same target cell and overwriting
-    // (silently losing) one of them, something a single-component test can't exercise at all.
+    // Conservation of hexes: clearing a line and letting everything above it settle down (over as
+    // many ticks as it takes) must never create or destroy cells -- the total board population
+    // after should be exactly what it was before, minus the width of the cleared row (always 10
+    // for Gravity's constant-width cup). The shape-preservation test above already checks one
+    // connected structure keeps its own shape; this checks the WHOLE-BOARD count across MULTIPLE
+    // disconnected structures at once, which is where a silent collision could hide -- two
+    // different components, each shifted by its own consistent-but-different delta, landing on
+    // the same target cell and overwriting (silently losing) one of them, something a
+    // single-component test can't exercise at all.
     console.log("Running Gravity clear+cascade conservation-of-hexes test...");
     GravityBoard.cells.clear();
     // A full row at q=0 (Gravity's cup is a constant 10 columns wide, col -5..4).
@@ -968,8 +973,10 @@ try {
     aboveCells.forEach(key => GravityBoard.cells.set(key, { type: 'X', color: '#ffffff' }));
 
     const sizeBefore = GravityBoard.cells.size; // 10 (row) + 8 (above) = 18
-    GravityBoard.clearCells(fullRow); // exactly what GravityMode.processClears itself calls
-    GravityMode.dropRowsAbove(0);
+    GravityBoard.clearCells(fullRow); // exactly what checkForClears itself calls
+    // Settle to completion, one tick/row at a time, exactly as real play would over many ticks.
+    let cascadeGuard = 0;
+    while (GravityMode.settleFloatingCellsStep() && cascadeGuard++ < 100) {}
     const sizeAfter = GravityBoard.cells.size;
 
     if (sizeAfter !== sizeBefore - fullRow.length) {
@@ -982,7 +989,7 @@ try {
     }
 
     GravityBoard.cells.clear();
-    console.log("PASS: clearing a line and cascading the board above it conserves exactly (before - row width) cells, even across multiple disconnected structures!");
+    console.log("PASS: clearing a line and settling the board above it down, one row per tick, conserves exactly (before - row width) cells, even across multiple disconnected structures!");
 
     // INVARIANT (see docs/invariants.md): rotation direction is a shared foundation used by
     // every mode (tap-to-rotate, keyboard Space/G, two-finger twist, Gravity's D-pad) — get it

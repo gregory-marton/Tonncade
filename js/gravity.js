@@ -201,14 +201,20 @@ const GravityMode = {
         if (typeof Replay !== 'undefined') Replay.recordTick();
         if (this.state.isGameOver || this.state.isPaused) return;
 
-        // Any pasted (or otherwise loose) pile debris falls first, one row per tick -- same
-        // cadence as the active piece, so nothing moves without the player seeing/hearing it.
-        // Skip the active piece's own step the same tick debris moves, so the two don't visually
-        // compete for attention; normal play resumes once nothing is left floating.
-        if (this.settleFloatingCellsStep()) {
-            this.refreshUI();
-            return;
-        }
+        // Any pasted (or otherwise loose) pile debris falls one row this tick too -- same cadence
+        // as the active piece, so nothing moves without the player seeing/hearing it. Runs
+        // alongside the active piece's own step below, not instead of it: there's no reason
+        // debris settling elsewhere on the board should freeze the piece the player is actively
+        // steering.
+        if (this.settleFloatingCellsStep()) this.refreshUI();
+
+        // A row completed by debris settling (not just by the active piece locking) is caught
+        // here, every tick -- nothing special about HOW a row got completed, only whether it's
+        // full. And what happens above a cleared row is likewise nothing special: clearing just
+        // deletes the row; whatever was above is now floating and falls via the SAME
+        // settleFloatingCellsStep on the next tick, one row at a time, not a separate instant
+        // shift.
+        if (this.checkForClears()) this.refreshUI();
 
         const down = this.getDown(this.state.p, this.state.q);
         
@@ -249,45 +255,31 @@ const GravityMode = {
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         Synth.playChord(midis, true, 0.16, 1.2);
 
-        // Clear completed lines and slide remaining blocks above down vertically
-        this.processClears();
-
+        // Any line THIS piece completed is caught by the next tick's checkForClears() -- same as
+        // a line completed by debris settling, nothing special about a piece lock specifically.
         if (!this.state.isGameOver) {
             this.spawnPiece();
             this.refreshUI();
         }
     },
 
-    processClears: function() {
-        let lines = GravityBoard.findFullLines();
-        let clearedCount = 0;
-        
-        while (lines.length > 0) {
-            const allNotes = [];
-            // Sort lines by row index q descending (top rows first) to prevent shifting index confusion
-            lines.sort((a, b) => b[0].q - a[0].q);
-
-            lines.forEach(line => {
-                const qClear = line[0].q;
-                line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
-                GravityBoard.clearCells(line);
-                this.state.linesCleared++;
-                clearedCount++;
-                
-                // Shift all rows above this cleared row vertically down by 1 unit
-                this.dropRowsAbove(qClear);
-            });
-
-            // Cleared chord sound
-            Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5);
-
-            // Re-evaluate if dropping completed new lines
-            lines = GravityBoard.findFullLines();
-        }
-
-        if (clearedCount > 0) {
-            this.updateSpeed();
-        }
+    // Clears every currently-complete line: deletes its cells and plays the clear chord, but does
+    // NOT shift anything above it -- whatever's now floating over the gap falls via the ordinary
+    // per-tick settleFloatingCellsStep (see tick()), exactly like any other loose pile cell, not a
+    // special instant cascade. Called every tick, so a row completed by debris settling is caught
+    // exactly the same way as one completed by a piece locking. Returns true if anything cleared.
+    checkForClears: function() {
+        const lines = GravityBoard.findFullLines();
+        if (lines.length === 0) return false;
+        const allNotes = [];
+        lines.forEach((line) => {
+            line.forEach((c) => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
+            GravityBoard.clearCells(line);
+            this.state.linesCleared++;
+        });
+        Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5);
+        this.updateSpeed();
+        return true;
     },
 
     getDown: function(p, q) {
@@ -295,46 +287,6 @@ const GravityMode = {
             return { p: p, q: q - 1 };
         } else {
             return { p: p + 1, q: q - 1 };
-        }
-    },
-
-    // Shifts every locked cell above the cleared row down by one row -- but as a set of RIGID
-    // connected components, not cell-by-cell. getDown(p, q)'s zigzag (p unchanged for odd q,
-    // p+1 for even q) is only valid for moving a SINGLE reference point down by one row -- it's
-    // how a falling piece's own anchor moves, with the piece's actual shape always recomputed
-    // fresh from that one anchor (Pieces.getAbsoluteCells), never touching individual cells.
-    // Calling it on every ALREADY-LOCKED cell independently, using each cell's own row parity,
-    // tears a structure apart the moment it spans both an even and an odd row: two cells that
-    // were hex-neighbors before the shift can land on a non-neighbor relative offset after it
-    // (found live, GitHub issue #6 -- a connected mass split into a solid base and a visibly
-    // floating fragment the instant a line below it cleared). The fix: group cells into
-    // connected components first (matching real physical structure -- pieces locked at
-    // different times can end up touching, merging into one mass), then shift each component
-    // by a single, uniform (dp, dq) offset -- a uniform translation preserves every relative
-    // offset within the component by construction, so its shape can never be sheared.
-    dropRowsAbove: function(qClear) {
-        const cellsAbove = [];
-        GravityBoard.cells.forEach((val, key) => {
-            const [p, q] = key.split(',').map(Number);
-            if (q > qClear) cellsAbove.push({ p, q, val, key });
-        });
-        if (cellsAbove.length === 0) return;
-
-        const components = this._groupIntoComponents(cellsAbove);
-
-        // Delete every old position first, across all components, before inserting any new
-        // one -- otherwise one component's insert could land on and overwrite another
-        // component's not-yet-relocated old cell.
-        cellsAbove.forEach(c => GravityBoard.cells.delete(c.key));
-
-        for (const component of components) {
-            const ref = component[0];
-            const down = this.getDown(ref.p, ref.q);
-            const dp = down.p - ref.p;
-            const dq = down.q - ref.q;
-            component.forEach(c => {
-                GravityBoard.cells.set(`${c.p + dp},${c.q + dq}`, c.val);
-            });
         }
     },
 
@@ -416,9 +368,7 @@ const GravityMode = {
     },
 
     // Groups a flat list of {p, q, val, key} cells into connected components (cells sharing hex
-    // edges via Tonnetz.getNeighbors) -- shared by _boardComponents (the whole board) and
-    // dropRowsAbove (just the cells above a cleared row), so there's exactly one BFS doing this,
-    // not two copies that could quietly drift apart.
+    // edges via Tonnetz.getNeighbors) -- the one BFS _boardComponents (the whole board) builds on.
     _groupIntoComponents: function(cells) {
         const byKey = new Map(cells.map((c) => [c.key, c]));
         const visited = new Set();
@@ -454,28 +404,41 @@ const GravityMode = {
     },
 
     // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row
-    // (called once per tick, same cadence as the active piece's own fall -- see tick()). Each
-    // component falls as a RIGID mass -- translated by one cell's getDown offset per step (a
-    // uniform translation preserves shape; moving cells individually by their own getDown would
-    // shear the mass, #6). A component rests when a step would take any of its cells out of the
-    // cup or onto a cell that isn't its own. Returns true if anything moved, so tick() can skip
-    // the active piece's own step that tick (debris settles before normal play resumes) and so
-    // callers can decide whether to sound/redraw. This used to loop to completion in one silent
-    // jump (right after a paste) -- now every fall, pasted or otherwise, is this same one-row-per-
-    // tick step, so nothing a player didn't cause moves without them seeing and hearing it happen.
+    // (called every tick, same cadence AND alongside the active piece's own fall -- see tick();
+    // debris settling elsewhere on the board is no reason to freeze the piece being steered). Each
+    // component falls as a RIGID mass -- translated by one cell's offset per step (a uniform
+    // translation preserves shape; moving cells individually would shear the mass, #6) -- straight
+    // down first, then the same diagonal-slide fallback the active piece's own tick() tries if
+    // that's blocked, so debris settles exactly as far as a normal falling piece would each tick,
+    // nothing special. A component rests when both offsets would take any of its cells out of the
+    // cup or onto a cell that isn't its own. Returns true if anything moved, so callers can decide
+    // whether to sound/redraw. This used to loop to completion in one silent jump (right after a
+    // paste) -- now every fall, pasted or otherwise, is this same one-row-per-tick step, so nothing
+    // a player didn't cause moves without them seeing and hearing it happen.
     settleFloatingCellsStep: function() {
         let moved = false;
         const movedMidis = [];
         for (const comp of this._boardComponents()) {
             const ref = comp[0];
-            const down = this.getDown(ref.p, ref.q);
-            const dp = down.p - ref.p, dq = down.q - ref.q;
             const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
-            const canFall = comp.every((c) => {
+            const canOffset = (dp, dq) => comp.every((c) => {
                 const nk = (c.p + dp) + ',' + (c.q + dq);
                 return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
             });
-            if (!canFall) continue;
+
+            // Straight down first (getDown's zigzag); if blocked, the SAME diagonal-slide fallback
+            // the active piece's own tick() tries -- the hex grid has no true "straight down", only
+            // two descending diagonals, and a real falling piece isn't stopped by one being blocked
+            // if the other is open. Debris gets the identical fallback so it settles exactly as far
+            // as a normal falling piece would, not "anything special."
+            const down = this.getDown(ref.p, ref.q);
+            let dp = down.p - ref.p, dq = down.q - ref.q;
+            if (!canOffset(dp, dq)) {
+                const slide = (ref.q % 2 !== 0) ? { p: ref.p + 1, q: ref.q - 1 } : { p: ref.p, q: ref.q - 1 };
+                dp = slide.p - ref.p; dq = slide.q - ref.q;
+                if (!canOffset(dp, dq)) continue;
+            }
+
             const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
             comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q));
             moves.forEach((m) => {
