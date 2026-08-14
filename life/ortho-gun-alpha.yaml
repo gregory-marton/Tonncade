@@ -1,0 +1,23 @@
+# Ortho Gun Alpha — a flyer gun under the Ortho2/S2 isotropy-aware rule.
+# Born on exactly 2 neighbours in ortho (adjacent-pair) arrangement;
+# survive on exactly 2 neighbours. This 6-cell pattern periodically
+# emits small gliders (flyers) that travel across the Tonnetz.
+# Discovered by computational search (life_helpers/build_gun_v2.js).
+# See docs/life-rules.md for the full rule language.
+name: "Ortho Gun Alpha"
+description: "A 6-cell flyer gun: emits gliders every ~3 generations under the Ortho2/S2 rule."
+rule:
+  birth:
+    - ring_count: [2]
+      isotropy: [ortho]
+  survival: [2]
+sound: { when: born, duration: 0.35 }
+initial:
+  cells:
+    - [0, 0]
+    - [1, 0]
+    - [1, 1]
+    - [1, 2]
+    - [-1, 0]
+    - [1, -1]
+tempo: 240

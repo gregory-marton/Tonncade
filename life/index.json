@@ -10,5 +10,17 @@
   {
     "name": "Beehive",
     "file": "beehive.yaml"
+  },
+  {
+    "name": "Ortho Gun Alpha",
+    "file": "ortho-gun-alpha.yaml"
+  },
+  {
+    "name": "Ortho Gun Epsilon",
+    "file": "ortho-gun-epsilon.yaml"
+  },
+  {
+    "name": "Ortho Gun Zeta",
+    "file": "ortho-gun-zeta.yaml"
   }
 ]
