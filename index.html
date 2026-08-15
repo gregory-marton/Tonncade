@@ -65,7 +65,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <div class="mode-slider">
                         <div class="mode-slider-active"></div>
                         <div class="mode-option active" data-mode="sandbox">Sandbox</div>
-                        <div class="mode-option" data-mode="midi">Melody</div>
+                        <div class="mode-option" data-mode="melody">Melody</div>
                         <div class="mode-option" data-mode="compose">Compose</div>
                         <div class="mode-option" data-mode="snake">Snake</div>
                         <div class="mode-option" data-mode="blast">Blast</div>
@@ -78,7 +78,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
             
             <div id="mobile-always-visible" class="mobile-only" style="width: 100%;">
                 <div id="sandbox-mobile-tools" style="display: none;"></div>
-                <div id="midi-mobile-tools" style="display: none;"></div>
+                <div id="melody-mobile-tools" style="display: none;"></div>
             </div>
             
             <div id="drawer-handle" class="mobile-only"></div>
@@ -126,23 +126,23 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 </div>
 
                 <!-- MIDI Mode Controls & Stats -->
-                <div id="midi-controls" style="display: none;">
+                <div id="melody-controls" style="display: none;">
                     <!-- One dropdown: Random (Melody's own offline-degrade, reselectable), then
                          bundled songs OR -- once a local folder is chosen -- that folder's own
                          listing, then a trailing "Choose/Change/Reconnect Folder" action item.
                          js/file-folder.js (via js/midi-folder.js's MidiFolder) builds this. -->
-                    <div id="midi-source-group" class="control-group">
-                        <select id="midi-source" aria-label="Song source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
-                        <span id="midi-source-status" style="font-size: 11px; color: var(--dim);"></span>
+                    <div id="melody-source-group" class="control-group">
+                        <select id="melody-source" aria-label="Song source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
+                        <span id="melody-source-status" style="font-size: 11px; color: var(--dim);"></span>
                     </div>
                     <!-- Fallback for browsers without the File System Access API (Safari/Firefox) --
                          js/midi-folder.js hides this once the folder tier above is available. -->
-                    <div id="midi-upload-group" class="control-group">
-                        <label for="midi-file-input" class="custom-file-upload">
+                    <div id="melody-upload-group" class="control-group">
+                        <label for="melody-file-input" class="custom-file-upload">
                             Upload MIDI File
                         </label>
-                        <input id="midi-file-input" type="file" accept=".mid,.midi" style="display: none;" />
-                        <span id="midi-filename"></span>
+                        <input id="melody-file-input" type="file" accept=".mid,.midi" style="display: none;" />
+                        <span id="melody-filename"></span>
                     </div>
                     <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
                          folder/song selectors so it routes into the drawer on mobile (see js/main.js),
@@ -150,28 +150,28 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <!-- Vertical dumbbell-barbell triplet (task #93), matching Blast/Gravity's own
                          difficulty control exactly -- this one was never converted when they were,
                          a leftover plain <select>. Difficulty here means how much of the note-list/
-                         Tonnetz hinting shows while drilling (see MidiMode.updateDifficultyUI,
+                         Tonnetz hinting shows while drilling (see MelodyMode.updateDifficultyUI,
                          which repaints those hints -- distinct from the barbell's own lit-icon
-                         update, MidiMode.updateDifficultyBarbell), not piece size like Blast/
+                         update, MelodyMode.updateDifficultyBarbell), not piece size like Blast/
                          Gravity's own control, so its title text says so instead. -->
-                    <div id="midi-settings-group" class="control-group" style="margin-top: 6px;">
-                        <div id="midi-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints">
+                    <div id="melody-settings-group" class="control-group" style="margin-top: 6px;">
+                        <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints">
                             <button type="button" class="weight-icon" data-difficulty="easy" title="Easy — full note list and highlighted upcoming notes" aria-label="Easy"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
                             <button type="button" class="weight-icon" data-difficulty="medium" title="Medium" aria-label="Medium"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
                             <button type="button" class="weight-icon" data-difficulty="hard" title="Hard — no note list, play by ear" aria-label="Hard"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
                         </div>
                     </div>
-                    <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">
-                        <button id="midi-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
-                        <button id="midi-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
+                    <div id="melody-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">
+                        <button id="melody-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
+                        <button id="melody-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
                     </div>
-                    <div id="midi-stats-group" class="stats-panel" style="margin-top: 15px;">
+                    <div id="melody-stats-group" class="stats-panel" style="margin-top: 15px;">
                         <div class="stat-bar" role="img" aria-label="Current streak as a fraction of your best">
-                            <div class="stat-bar-fill" id="midi-streak-fill"></div>
-                            <span class="stat-bar-num"><span id="midi-current-streak">0</span></span>
-                            <span class="stat-bar-best">/<span id="midi-best-streak">0</span></span>
+                            <div class="stat-bar-fill" id="melody-streak-fill"></div>
+                            <span class="stat-bar-num"><span id="melody-current-streak">0</span></span>
+                            <span class="stat-bar-best">/<span id="melody-best-streak">0</span></span>
                         </div>
-                        <p id="midi-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
+                        <p id="melody-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
                         <!-- #46 low-hanging fruit: lets a player replay from any note already
                              reached, instead of always restarting the drilled segment from its
                              own beginning. Rendered inline as a small draggable marker sitting
@@ -179,11 +179,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                              separate range slider below it (tried first -- see INV-26 -- but it
                              read as an abstract, disconnected control; a marker between the
                              actual notes shows directly which two notes you're starting between).
-                             Range is clamped in js/midi.js to [0, targetLength-1] -- "anywhere
+                             Range is clamped in js/melody.js to [0, targetLength-1] -- "anywhere
                              you've already played," never into unplayed territory. -->
-                        <p id="midi-note-list" style="font-size: 13px; color: var(--dim); margin-top: 4px; min-height: 18px; font-weight: bold;"></p>
+                        <p id="melody-note-list" style="font-size: 13px; color: var(--dim); margin-top: 4px; min-height: 18px; font-weight: bold;"></p>
                     </div>
-                    <div id="midi-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
+                    <div id="melody-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
                         <p style="margin: 0 0 5px 0;"><strong>Keyboard Play Controls:</strong></p>
                         <p style="margin: 2px 0;"><strong>Row 1-0</strong>: Number row</p>
                         <p style="margin: 2px 0;"><strong>Row q-p</strong>: Top letter row</p>
@@ -424,7 +424,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/sandbox.js"></script>
     <script src="js/blast.js"></script>
     <script src="js/gravity.js"></script>
-    <script src="js/midi.js"></script>
+    <script src="js/melody.js"></script>
     <script src="js/file-folder.js"></script>
     <script src="js/midi-folder.js"></script>
     <script src="js/midi-input.js"></script>

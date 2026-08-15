@@ -97,8 +97,8 @@ const MidiInput = {
         if (typeof App === 'undefined') return;
         if (App.currentMode === 'sandbox' && typeof SandboxMode !== 'undefined') {
             SandboxMode.playNoteByMidi(midi);
-        } else if (App.currentMode === 'midi' && typeof MidiMode !== 'undefined') {
-            MidiMode.playUserNoteByMidi(midi);
+        } else if (App.currentMode === 'melody' && typeof MelodyMode !== 'undefined') {
+            MelodyMode.playUserNoteByMidi(midi);
         } else if (App.currentMode === 'gravity' && typeof GravityMode !== 'undefined') {
             GravityMode.handleMidiNote(midi);
         } else if (App.currentMode === 'snake' && typeof SnakeMode !== 'undefined') {

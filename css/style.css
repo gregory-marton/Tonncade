@@ -314,7 +314,7 @@ svg {
     opacity: 0.9;
 }
 
-#midi-filename {
+#melody-filename {
     font-size: 11px;
     color: var(--dim);
     display: block;
@@ -323,7 +323,7 @@ svg {
     word-break: break-all;
 }
 
-/* #46 scrub marker: a small draggable glyph shown IN #midi-note-list, in the gap right before
+/* #46 scrub marker: a small draggable glyph shown IN #melody-note-list, in the gap right before
    the note it targets -- so it's visually clear which two notes a replay would start between,
    unlike the plain range-slider version this replaced (see INV-26/docs/invariants.md). */
 .scrub-marker {
@@ -753,17 +753,17 @@ button:hover {
     /* Compact text/button sizing for the stats/controls overlays. Landscape previously fell
        back to full desktop button sizing here (no override existed outside the portrait-only
        block below), ballooning #snake-controls/#gravity-controls over a third of the board. */
-    #blast-stats p, #gravity-controls p, #midi-controls p, #snake-controls p {
+    #blast-stats p, #gravity-controls p, #melody-controls p, #snake-controls p {
         margin: 2px 0;
         font-size: var(--chrome-font);
         font-weight: bold;
     }
 
-    #blast-stats *, #gravity-controls *, #midi-controls *, #snake-controls * {
+    #blast-stats *, #gravity-controls *, #melody-controls *, #snake-controls * {
         pointer-events: auto;
     }
 
-    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons, #midi-controls .control-buttons {
+    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons, #melody-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
         gap: var(--chrome-gap);
@@ -773,7 +773,7 @@ button:hover {
     /* .stats-panel is a sibling of .control-buttons now (single horizontal strip, not a stacked
        card), so the shared rule's margin-top above would misalign it vertically against
        .control-buttons within that row -- override it back to 0 for just these three.
-       #midi-controls keeps its own margin-top; it's still a stacked column layout.
+       #melody-controls keeps its own margin-top; it's still a stacked column layout.
        width: max-content is the real fix here: both .control-buttons and .stats-panel are
        THEMSELVES flex containers, so as flex ITEMS of the outer row their flex-basis:auto falls
        back to ordinary block width:auto (fill available space), not shrink-to-content -- forcing
@@ -806,7 +806,7 @@ button:hover {
         margin: 0;
     }
 
-    #blast-stats button, #gravity-controls button, #snake-controls button, #midi-controls button {
+    #blast-stats button, #gravity-controls button, #snake-controls button, #melody-controls button {
         padding: var(--chrome-btn-pad-v) var(--chrome-btn-pad-h);
         font-size: var(--chrome-btn-font);
         height: var(--chrome-btn-h);
@@ -820,7 +820,7 @@ button:hover {
        above, this rule never got the same top/left/max-width triple, so it defaulted to its
        natural (wide, content-driven) flow width while still being position:absolute -- floating
        over a large share of the board instead of a small corner HUD like the others. */
-    #midi-controls {
+    #melody-controls {
         position: absolute;
         top: 10px;
         left: 10px;
@@ -846,7 +846,7 @@ button:hover {
     /* Keyboard-instructions text (.desktop-only) is only hidden by the touch-pointer and
        max-width:767px rules elsewhere -- not this landscape breakpoint -- so on a device that
        matches only THIS rule (e.g. a laptop-class landscape width without a coarse pointer) it
-       kept contributing bulk to the now-compact #midi-controls HUD above. */
+       kept contributing bulk to the now-compact #melody-controls HUD above. */
     .desktop-only {
         display: none !important;
     }
@@ -1020,7 +1020,7 @@ button:hover {
         box-sizing: border-box;
     }
 
-    #sandbox-mobile-tools, #midi-mobile-tools {
+    #sandbox-mobile-tools, #melody-mobile-tools {
         padding: 0 10px 10px 10px;
         border-top: 1px solid var(--border);
         display: flex;
@@ -1247,7 +1247,7 @@ button:hover {
     }
 
     /* MIDI Controls all the way across top */
-    #midi-controls {
+    #melody-controls {
         position: absolute;
         top: 0;
         left: 0;
@@ -1270,32 +1270,32 @@ button:hover {
         pointer-events: none;
     }
 
-    #midi-controls .stats-panel {
+    #melody-controls .stats-panel {
         margin-top: 0 !important;
         display: flex;
         flex-direction: column;
         gap: var(--chrome-gap);
     }
 
-    #midi-controls .control-buttons {
+    #melody-controls .control-buttons {
         margin-top: 0 !important;
         flex-direction: row !important;
         gap: var(--chrome-gap);
     }
 
-    #midi-controls .control-buttons button {
+    #melody-controls .control-buttons button {
         flex: 1;
     }
 
     /* Keep stats text elements layout clean */
-    #blast-stats p, #gravity-controls p, #midi-controls p, #snake-controls p {
+    #blast-stats p, #gravity-controls p, #melody-controls p, #snake-controls p {
         margin: 2px 0;
         font-size: var(--chrome-font);
         font-weight: bold;
     }
 
     /* Allow buttons/inputs inside stats overlay to be clickable */
-    #blast-stats *, #gravity-controls *, #midi-controls *, #snake-controls * {
+    #blast-stats *, #gravity-controls *, #melody-controls *, #snake-controls * {
         pointer-events: auto;
     }
 
@@ -1411,7 +1411,7 @@ button:hover {
     }
 
     /* Hide Sandbox specific instructions & palettes on mobile sidebar */
-    #controls, #midi-keyboard-instructions, #snake-keyboard-instructions, #placement-controls, #sandbox-controls {
+    #controls, #melody-keyboard-instructions, #snake-keyboard-instructions, #placement-controls, #sandbox-controls {
         display: none !important;
     }
 
@@ -1772,7 +1772,7 @@ button:hover {
         justify-content: flex-start;
         overflow-y: auto;
     }
-    #sandbox-mobile-tools, #midi-mobile-tools {
+    #sandbox-mobile-tools, #melody-mobile-tools {
         flex-direction: column;
         height: 100%;
     }

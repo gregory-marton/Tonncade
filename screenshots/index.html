@@ -111,9 +111,7 @@ for the same reasoning applied elsewhere in this project).
     return;
   }
 
-  // The app's internal mode ids don't all match their UI names -- 'midi' is the mode the UI calls
-  // "Melody". Show the user-facing name here.
-  const DISPLAY_NAME = { sandbox: 'Sandbox', midi: 'Melody', compose: 'Compose', snake: 'Snake', blast: 'Blast', gravity: 'Gravity' };
+  const DISPLAY_NAME = { sandbox: 'Sandbox', melody: 'Melody', compose: 'Compose', snake: 'Snake', blast: 'Blast', gravity: 'Gravity' };
 
   // Group by device profile first (Desktop / Android phone / Tablet / iOS), then by mode within
   // each, so every profile is visible side by side rather than one clobbering the others.

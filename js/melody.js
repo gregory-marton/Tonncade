@@ -25,7 +25,7 @@ for the JavaScript code in this file.
  * midi.js - MIDI File Parser and Melody Game Mode.
  */
 
-const MidiMode = {
+const MelodyMode = {
     state: {
         melody: [],            // List of { midi, time, duration }
         // INV-48: a mode switch must pause the drill, never discard or restart it. gameStarted
@@ -109,12 +109,12 @@ const MidiMode = {
         return notes;
     },
 
-    // The "Random" entry in #midi-source (js/file-folder.js's FileFolder contract: `hasRandom`
+    // The "Random" entry in #melody-source (js/file-folder.js's FileFolder contract: `hasRandom`
     // modes need a `loadDefault()` the dropdown can call to explicitly re-roll it, not just the
     // implicit one-time fallback `init()` sets below).
     loadDefault: function() {
         this.state.melody = this.randomMelody();
-        const filenameSpan = document.getElementById('midi-filename');
+        const filenameSpan = document.getElementById('melody-filename');
         if (filenameSpan) filenameSpan.textContent = '';
         this.resetGame();
         this.refreshBoard();
@@ -123,8 +123,13 @@ const MidiMode = {
     init: function() {
         Render.init('tonnetz-svg');
         
-        // Load best streak from localStorage
-        this.state.bestStreak = parseInt(localStorage.getItem('tonncade_midi_best') || '0');
+        // Load best streak from localStorage. Reads the OLD key ('tonncade_midi_best', from
+        // before the mode's internal identifier was renamed midi -> melody) as a fallback, so a
+        // returning player's existing best streak isn't silently lost -- every future write goes
+        // only to the new key, so this self-migrates on the player's next best streak.
+        this.state.bestStreak = parseInt(
+            localStorage.getItem('tonncade_melody_best') || localStorage.getItem('tonncade_midi_best') || '0'
+        );
         this.updateStreakUI();
 
         // Offline degrade if nothing is loaded yet: a random one-octave sequence. The online
@@ -148,7 +153,7 @@ const MidiMode = {
             // Resuming after a mode switch (INV-48): repaint exactly where the player left off --
             // no reset, no auto-playing the target sequence. cleanup() (run when Melody was left)
             // already cleared the note-list markup and Tonnetz glow classes without touching
-            // targetLength/userIndex/startIndex/the streak or #midi-game-status's text, so
+            // targetLength/userIndex/startIndex/the streak or #melody-game-status's text, so
             // rebuilding the note list/ghost/streak bar from that untouched progress is enough to
             // make the resume look exactly like nothing happened.
             this.updateStreakUI();
@@ -160,10 +165,10 @@ const MidiMode = {
     },
 
     setupDOMEvents: function() {
-        const fileInput = document.getElementById('midi-file-input');
-        const playBtn = document.getElementById('midi-play-preview');
-        const restartBtn = document.getElementById('midi-game-restart');
-        const filenameSpan = document.getElementById('midi-filename');
+        const fileInput = document.getElementById('melody-file-input');
+        const playBtn = document.getElementById('melody-play-preview');
+        const restartBtn = document.getElementById('melody-game-restart');
+        const filenameSpan = document.getElementById('melody-filename');
 
         if (fileInput) {
             fileInput.onchange = (e) => {
@@ -198,16 +203,16 @@ const MidiMode = {
 
         // Dumbbell-triplet difficulty picker (task #93's pattern, matching Blast/Gravity's own
         // control) -- click the Nth weight to set easy/medium/hard.
-        document.querySelectorAll('#midi-difficulty .weight-icon').forEach((el) => {
+        document.querySelectorAll('#melody-difficulty .weight-icon').forEach((el) => {
             el.onclick = () => this.setDifficulty(el.dataset.difficulty);
         });
         this.updateDifficultyBarbell();
 
         if (typeof MidiFolder !== 'undefined') {
             MidiFolder.setup(this, {
-                sourceSelect: 'midi-source',
-                sourceStatus: 'midi-source-status',
-                uploadGroup: 'midi-upload-group',
+                sourceSelect: 'melody-source',
+                sourceStatus: 'melody-source-status',
+                uploadGroup: 'melody-upload-group',
             }, { hasRandom: true });
         }
     },
@@ -217,7 +222,7 @@ const MidiMode = {
     // File System Access folder browser (js/midi-folder.js), so parsing/centering/reset logic
     // lives in exactly one place regardless of which UI supplied the bytes.
     loadMelodyFromArrayBuffer: function(arrayBuffer, displayName) {
-        const filenameSpan = document.getElementById('midi-filename');
+        const filenameSpan = document.getElementById('melody-filename');
         try {
             const parsed = this.parseMIDI(arrayBuffer);
             if (!parsed || parsed.notes.length === 0) {
@@ -382,7 +387,7 @@ const MidiMode = {
     },
 
     setStatus: function(text, type = 'info') {
-        const statusEl = document.getElementById('midi-game-status');
+        const statusEl = document.getElementById('melody-game-status');
         if (statusEl) {
             statusEl.textContent = text;
             
@@ -402,13 +407,13 @@ const MidiMode = {
 
     updateStreak: function(streak) {
         this.state.currentStreak = streak;
-        const currentStreakEl = document.getElementById('midi-current-streak');
+        const currentStreakEl = document.getElementById('melody-current-streak');
         if (currentStreakEl) {
             currentStreakEl.textContent = streak;
         }
         if (streak > this.state.bestStreak) {
             this.state.bestStreak = streak;
-            localStorage.setItem('tonncade_midi_best', streak.toString());
+            localStorage.setItem('tonncade_melody_best', streak.toString());
         }
         this.updateStreakUI();
     },
@@ -416,11 +421,11 @@ const MidiMode = {
     // Current/longest streak as a bar-graph (same pattern as Blast/Gravity/Snake, #79) -- the bar
     // fills toward your best, with the current and best counts beside it.
     updateStreakUI: function() {
-        const bestStreakEl = document.getElementById('midi-best-streak');
+        const bestStreakEl = document.getElementById('melody-best-streak');
         if (bestStreakEl) {
             bestStreakEl.textContent = this.state.bestStreak;
         }
-        Render.setStatBar('midi-streak-fill', this.state.currentStreak, this.state.bestStreak);
+        Render.setStatBar('melody-streak-fill', this.state.currentStreak, this.state.bestStreak);
     },
 
     // No persistence (localStorage) -- matches this control's own prior behavior as a plain
@@ -441,13 +446,13 @@ const MidiMode = {
     updateDifficultyBarbell: function() {
         const order = { easy: 1, medium: 2, hard: 3 };
         const lit = order[this.state.difficulty] || 1;
-        document.querySelectorAll('#midi-difficulty .weight-icon').forEach((el, i) => {
+        document.querySelectorAll('#melody-difficulty .weight-icon').forEach((el, i) => {
             el.classList.toggle('lit', i < lit);
         });
     },
 
     updateDifficultyUI: function(overrideIndex) {
-        const listEl = document.getElementById('midi-note-list');
+        const listEl = document.getElementById('melody-note-list');
         const diff = this.state.difficulty;
 
         // Clear old glows (past, generic future, and the three coloured upcoming glows)
@@ -545,7 +550,7 @@ const MidiMode = {
     // silently breaking the rest of the gesture. Separator spans (.note-sep) are cheap to
     // recreate each call since nothing ever captures touch/mouse on them.
     positionScrubMarker: function(targetIdx) {
-        const listEl = document.getElementById('midi-note-list');
+        const listEl = document.getElementById('melody-note-list');
         if (!listEl) return;
 
         Array.from(listEl.querySelectorAll('.note-sep')).forEach(el => el.remove());
@@ -673,7 +678,7 @@ const MidiMode = {
     // mousedown-tracks-then-mousemove-updates-then-mouseup-commits shape every other drag
     // gesture in this project already uses (Sandbox's ghost drag, Melody's own pan/pinch fix).
     setupScrubMarker: function() {
-        const listEl = document.getElementById('midi-note-list');
+        const listEl = document.getElementById('melody-note-list');
         if (!listEl) return;
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -720,7 +725,7 @@ const MidiMode = {
     // comment for why: it would detach whatever a real touchstart captured as its event target
     // mid-gesture). seekTo() on release re-renders for real once the drag is over.
     updateScrubDragTarget: function(clientX) {
-        const tokens = Array.from(document.querySelectorAll('#midi-note-list .note-token'));
+        const tokens = Array.from(document.querySelectorAll('#melody-note-list .note-token'));
         if (tokens.length === 0) return;
 
         let closest = tokens[0];
@@ -744,7 +749,7 @@ const MidiMode = {
     // stops). Keep an English title/aria-label for accessibility and the tests; the visible label
     // is icon-only now (removes English UI text, per the i18n bias -- see task #77/#29).
     setPlayIcon: function(playing) {
-        const btn = document.getElementById('midi-play-preview');
+        const btn = document.getElementById('melody-play-preview');
         if (!btn) return;
         btn.textContent = playing ? '⏹' : '▶';
         const label = playing ? 'Stop preview' : 'Play melody';
@@ -819,7 +824,7 @@ const MidiMode = {
             if (this.state.userIndex >= this.state.melody.length) {
                 // Completed the entire song!
                 this.setStatus("Congratulations! You completed the song! 🎉", "success");
-                document.getElementById('midi-note-list').innerHTML = '';
+                document.getElementById('melody-note-list').innerHTML = '';
                 document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
                 document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
                 this.celebrate();
@@ -868,7 +873,7 @@ const MidiMode = {
             // Replay the target sequence after a 1.2s delay to let the wrong note decay
             this.state.mistakeTimeoutId = setTimeout(() => {
                 this.state.mistakeTimeoutId = null;
-                if (App.currentMode === 'midi' && !this.state.isPlayingPreview) {
+                if (App.currentMode === 'melody' && !this.state.isPlayingPreview) {
                     this.playTargetSequence();
                 }
             }, 1200);
@@ -917,7 +922,7 @@ const MidiMode = {
         document.querySelectorAll('.active-note').forEach(el => el.classList.remove('active-note'));
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
-        const listEl = document.getElementById('midi-note-list');
+        const listEl = document.getElementById('melody-note-list');
         if (listEl) listEl.innerHTML = '';
     },
 

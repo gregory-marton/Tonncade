@@ -217,16 +217,16 @@ test('INV-27: Sandbox (desktop) -- clicking a cell with an existing piece still 
 
 test('midi note list fades past notes progressively by recency', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MidiMode.state.difficulty = 'easy';
-    MidiMode.state.userIndex = 3;
-    MidiMode.updateDifficultyUI();
+    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.userIndex = 3;
+    MelodyMode.updateDifficultyUI();
   });
 
   const opacities = await page.evaluate(() => {
-    const spans = Array.from(document.querySelectorAll('#midi-note-list [data-note-role="past"]'));
+    const spans = Array.from(document.querySelectorAll('#melody-note-list [data-note-role="past"]'));
     const byDistance = {};
     spans.forEach(s => { byDistance[s.getAttribute('data-distance')] = parseFloat(s.style.opacity); });
     return byDistance;
@@ -238,13 +238,13 @@ test('midi note list fades past notes progressively by recency', async ({ page }
 
 test('updateDifficultyUI(overrideIndex) pivots the window on the override, not state.userIndex', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   const currentName = await page.evaluate(() => {
-    MidiMode.state.difficulty = 'easy';
-    MidiMode.state.userIndex = 0; // would normally show melody[0] as current
-    MidiMode.updateDifficultyUI(5); // override to pivot on index 5 instead
-    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.userIndex = 0; // would normally show melody[0] as current
+    MelodyMode.updateDifficultyUI(5); // override to pivot on index 5 instead
+    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
     return el ? el.textContent : null;
   });
 
@@ -252,7 +252,7 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
   // sharing a bare name were an understandable "wrong note" mix-up (real report), fixed by
   // making the octave part of every displayed name, not just the current target's.
   const expectedName = await page.evaluate(() => {
-    const midi = MidiMode.state.melody[5].midi;
+    const midi = MelodyMode.state.melody[5].midi;
     return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
@@ -261,26 +261,26 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
 test('playing the full melody preview live-updates the note list as it plays', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.evaluate(() => { MidiMode.state.difficulty = 'easy'; });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.evaluate(() => { MelodyMode.state.difficulty = 'easy'; });
 
   // resetGame() schedules an untracked 1s auto-kickoff of the "listen to the notes" teaching
   // intro that cleanupPlayback() can't cancel — let it fully play out and finish first so it
   // doesn't fire mid-test and wipe our own preview's scheduled timeouts via its own cleanup.
   await page.clock.fastForward(2000);
 
-  await page.locator('#midi-play-preview').click();
+  await page.locator('#melody-play-preview').click();
 
   // Advance to when the 3rd note (index 2, "buns", scheduled ~1.2s into the preview) should be sounding
   await page.clock.fastForward(1300);
 
   const currentName = await page.evaluate(() => {
-    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
     return el ? el.textContent : null;
   });
   // Octave-qualified since INV-25 -- see the comment on the preceding test.
   const expectedName = await page.evaluate(() => {
-    const midi = MidiMode.state.melody[2].midi;
+    const midi = MelodyMode.state.melody[2].midi;
     return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
@@ -289,29 +289,29 @@ test('playing the full melody preview live-updates the note list as it plays', a
 test('stopping preview restores the note list to reflect actual game progress', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.evaluate(() => {
-    MidiMode.state.difficulty = 'easy';
-    MidiMode.state.userIndex = 1; // simulate the player having already gotten 1 note right
+    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.userIndex = 1; // simulate the player having already gotten 1 note right
   });
 
   // Let the auto-kickoff teaching intro (see comment in the preceding test) finish first.
   await page.clock.fastForward(2000);
-  await page.evaluate(() => { MidiMode.state.userIndex = 1; }); // teaching intro reset it to 0
+  await page.evaluate(() => { MelodyMode.state.userIndex = 1; }); // teaching intro reset it to 0
 
-  await page.locator('#midi-play-preview').click();
+  await page.locator('#melody-play-preview').click();
   await page.clock.fastForward(1300); // let preview scrub ahead to index 2
 
   // Manually stop the preview (the play button now shows the ⏹ stop icon)
-  await page.locator('#midi-play-preview').click();
+  await page.locator('#melody-play-preview').click();
 
   const currentName = await page.evaluate(() => {
-    const el = document.querySelector('#midi-note-list [data-note-role="current"]');
+    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
     return el ? el.textContent : null;
   });
   // Octave-qualified since INV-25 -- see the comment on the earlier "pivots the window" test.
   const expectedName = await page.evaluate(() => {
-    const midi = MidiMode.state.melody[MidiMode.state.userIndex].midi;
+    const midi = MelodyMode.state.melody[MelodyMode.state.userIndex].midi;
     return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
@@ -319,13 +319,13 @@ test('stopping preview restores the note list to reflect actual game progress', 
 
 // ────────────────────────────────────────────────────────────────────────
 // MidiFolder (js/midi-folder.js -> js/file-folder.js's FileFolder, task #27 + the one-dropdown
-// reorg): local MIDI folder source, folded into the single #midi-source select alongside "Random"
+// reorg): local MIDI folder source, folded into the single #melody-source select alongside "Random"
 // and the bundled online tier, on browsers that support the File System Access API.
 // window.showDirectoryPicker is mocked with a fake directory handle (real handles are
 // structured-cloneable into IndexedDB specifically so they survive a real user's picker choice --
 // a fake JS object with methods is NOT structured-cloneable, so these tests exercise
 // FileFolder's own logic/wiring directly rather than round-tripping through real IndexedDB).
-// MidiMode.parseMIDI is stubbed too, since what's under test here is folder browsing, not
+// MelodyMode.parseMIDI is stubbed too, since what's under test here is folder browsing, not
 // Standard MIDI File decoding (which has no coverage of its own yet, tracked separately -- not
 // something to conflate with this feature).
 // ────────────────────────────────────────────────────────────────────────
@@ -340,7 +340,7 @@ const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.
   // FileFolder's own browsing/restore logic, not real IndexedDB persistence.
   MidiFolder.saveHandle = async () => {};
   window.__parseMIDICalls = [];
-  MidiMode.parseMIDI = (buf) => {
+  MelodyMode.parseMIDI = (buf) => {
     const tag = new Uint8Array(buf)[0];
     window.__parseMIDICalls.push(tag);
     return { notes: [{ midi: 60 + tag, time: 0, duration: 0.5 }] };
@@ -379,17 +379,17 @@ test('MidiFolder: choosing a folder lists only .mid/.midi files (sorted) and aut
       { name: 'readme.txt', tag: 2 }, // not a MIDI file -- must be filtered out
     ],
   });
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-  await page.locator('#midi-source').selectOption('choose-folder');
-  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 61);
+  await page.locator('#melody-source').selectOption('choose-folder');
+  await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 61);
 
   // Sorted alphabetically, and readme.txt excluded entirely.
-  expect(await sourceLocalOptionNames(page, 'midi-source')).toEqual(['Apple', 'Zebra']);
+  expect(await sourceLocalOptionNames(page, 'melody-source')).toEqual(['Apple', 'Zebra']);
 
   // The first file in SORTED order (Apple, tag 1) auto-loads, not upload order (Zebra was listed
   // first in the fake folder above).
-  const loadedMidi = await page.evaluate(() => MidiMode.state.melody[0].midi);
+  const loadedMidi = await page.evaluate(() => MelodyMode.state.melody[0].midi);
   expect(loadedMidi).toBe(61);
 });
 
@@ -398,14 +398,14 @@ test('MidiFolder: selecting a different dropdown entry loads that file instead',
   await installFakeMidiFolder(page, {
     files: [{ name: 'Apple.mid', tag: 0 }, { name: 'Banana.mid', tag: 1 }],
   });
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-  await page.locator('#midi-source').selectOption('choose-folder');
-  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 60); // Apple auto-loaded
+  await page.locator('#melody-source').selectOption('choose-folder');
+  await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 60); // Apple auto-loaded
 
-  await page.locator('#midi-source').selectOption({ label: 'Banana' });
-  await page.waitForFunction(() => MidiMode.state.melody[0].midi === 61);
-  expect(await page.evaluate(() => MidiMode.state.melody[0].midi)).toBe(61);
+  await page.locator('#melody-source').selectOption({ label: 'Banana' });
+  await page.waitForFunction(() => MelodyMode.state.melody[0].midi === 61);
+  expect(await page.evaluate(() => MelodyMode.state.melody[0].midi)).toBe(61);
 });
 
 test('MidiFolder: a granted saved folder restores silently on entering Melody mode, no click needed', async ({ page }) => {
@@ -415,10 +415,10 @@ test('MidiFolder: a granted saved folder restores silently on entering Melody mo
     MidiFolder.loadHandle = async () => window.__fakeFolderHandle;
   });
 
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 65);
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 65);
 
-  await expect(page.locator('#midi-source-status')).toHaveText(/MySongs/);
+  await expect(page.locator('#melody-source-status')).toHaveText(/MySongs/);
 });
 
 test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnect instead of silently failing', async ({ page }) => {
@@ -428,32 +428,32 @@ test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnec
     MidiFolder.loadHandle = async () => window.__fakeFolderHandle;
   });
 
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
-    [...document.getElementById('midi-source').options].some(o => o.value === 'reconnect-folder'));
+    [...document.getElementById('melody-source').options].some(o => o.value === 'reconnect-folder'));
 
   // No file should have loaded yet -- permission wasn't granted, so nothing was silently read.
-  expect(await sourceLocalOptionNames(page, 'midi-source')).toEqual([]);
+  expect(await sourceLocalOptionNames(page, 'melody-source')).toEqual([]);
 
-  await page.locator('#midi-source').selectOption('reconnect-folder');
-  await page.waitForFunction(() => MidiMode.state.melody[0] && MidiMode.state.melody[0].midi === 62);
+  await page.locator('#melody-source').selectOption('reconnect-folder');
+  await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 62);
 });
 
 test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the plain upload picker is untouched', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => { delete window.showDirectoryPicker; });
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   const hasFolderOption = await page.evaluate(() =>
-    [...document.getElementById('midi-source').options].some(o => o.value === 'choose-folder' || o.value === 'reconnect-folder'));
+    [...document.getElementById('melody-source').options].some(o => o.value === 'choose-folder' || o.value === 'reconnect-folder'));
   expect(hasFolderOption).toBe(false);
-  await expect(page.locator('#midi-upload-group')).toBeVisible();
+  await expect(page.locator('#melody-upload-group')).toBeVisible();
 });
 
 // ────────────────────────────────────────────────────────────────────────
 // MidiFolder's bundled online tier (task #27): a plain relative fetch to ./midi/index.json, no
 // File System Access API involved -- works in every browser, its entries simply don't appear in
-// #midi-source on any failure (offline, file://, 404) rather than surfacing an error, since it's
+// #melody-source on any failure (offline, file://, 404) rather than surfacing an error, since it's
 // a bonus content tier, not a required one.
 // ────────────────────────────────────────────────────────────────────────
 
@@ -463,19 +463,19 @@ test('MidiFolder online: populates the dropdown from index.json, and selecting a
   }));
   await page.goto('/');
 
-  // MIDI 60 specifically -- MidiMode.loadMelodyFromArrayBuffer runs loaded notes through
+  // MIDI 60 specifically -- MelodyMode.loadMelodyFromArrayBuffer runs loaded notes through
   // centerMelody(), which shifts by whole octaves toward 60; a non-centered test note would get
   // silently transposed, making this assertion fail for the wrong reason.
-  const bytes = await page.evaluate(() => Array.from(new Uint8Array(MidiMode.writeMIDI([{ midi: 60, time: 0, duration: 0.4 }]))));
+  const bytes = await page.evaluate(() => Array.from(new Uint8Array(MelodyMode.writeMIDI([{ midi: 60, time: 0, duration: 0.4 }]))));
   await page.route('**/midi/b.mid', route => route.fulfill({ body: Buffer.from(bytes), contentType: 'audio/midi' }));
 
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
-    [...document.getElementById('midi-source').options].some(o => o.value === 'bundled:1'));
+    [...document.getElementById('melody-source').options].some(o => o.value === 'bundled:1'));
 
-  const select = page.locator('#midi-source');
+  const select = page.locator('#melody-source');
   const optionNames = await page.evaluate(() =>
-    Array.from(document.getElementById('midi-source').options)
+    Array.from(document.getElementById('melody-source').options)
       .filter(o => o.value.startsWith('bundled:'))
       .map(o => o.textContent));
   expect(optionNames).toEqual(['Test Song A', 'Test Song B']);
@@ -484,17 +484,17 @@ test('MidiFolder online: populates the dropdown from index.json, and selecting a
   expect(await select.inputValue()).toBe('random');
 
   await select.selectOption({ label: 'Test Song B' });
-  await page.waitForFunction(() => MidiMode.state.melody.length === 1 && MidiMode.state.melody[0].midi === 60);
+  await page.waitForFunction(() => MelodyMode.state.melody.length === 1 && MelodyMode.state.melody[0].midi === 60);
 });
 
 test('MidiFolder online: a failed fetch (offline/404) leaves no bundled entries in the dropdown', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForTimeout(200); // let the failed fetch settle
 
   const hasBundled = await page.evaluate(() =>
-    [...document.getElementById('midi-source').options].some(o => o.value.startsWith('bundled:')));
+    [...document.getElementById('melody-source').options].some(o => o.value.startsWith('bundled:')));
   expect(hasBundled).toBe(false);
 });
 
@@ -523,9 +523,9 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
 
   await page.goto('/');
   await installFakeMidiFolder(page, { files: [{ name: 'Existing.mid', tag: 0 }] });
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
-    [...document.getElementById('midi-source').options].some(o => o.value === 'bundled:0'));
+    [...document.getElementById('melody-source').options].some(o => o.value === 'bundled:0'));
 
   const written = await page.evaluate(async () => {
     const calls = [];
@@ -536,8 +536,8 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
         createWritable: async () => ({ write: async () => {}, close: async () => {} }),
       };
     };
-    document.getElementById('midi-source').value = 'choose-folder';
-    document.getElementById('midi-source').dispatchEvent(new Event('change'));
+    document.getElementById('melody-source').value = 'choose-folder';
+    document.getElementById('melody-source').dispatchEvent(new Event('change'));
     await new Promise((resolve) => setTimeout(resolve, 300));
     return calls;
   });
@@ -556,7 +556,7 @@ test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for S
   // Melody/Compose/Snake/Gravity each bind their own, different keys -- this hint would be
   // actively misleading there (found live via Compose mode's visual QA: it used to show in
   // every mode unconditionally).
-  for (const mode of ['midi', 'compose', 'snake', 'gravity']) {
+  for (const mode of ['melody', 'compose', 'snake', 'gravity']) {
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
     await expect(hexNav, `mode=${mode}`).toBeHidden();
   }
@@ -603,7 +603,7 @@ test('Sandbox: holding an empty cell highlights every same-named cell with its o
 // Compose mode (task #27's "edit any melody, record a new song" -- built as its own mode rather
 // than bolted onto Melody's practice loop, since drag/rotate-to-transpose belongs to composition,
 // not a structured drill). v1 scope: record by tapping cells in real time, play back, Undo/Clear,
-// and Save (via MidiMode.writeMIDI + MidiFolder.saveFileAs, both new). Per-note drag-to-
+// and Save (via MelodyMode.writeMIDI + MidiFolder.saveFileAs, both new). Per-note drag-to-
 // reposition/retime, a timeline view, and polyphony are explicitly deferred.
 // ────────────────────────────────────────────────────────────────────────
 
@@ -715,8 +715,8 @@ test('Compose: Save writes a MIDI file that round-trips back to the same notes',
 
   const roundTripped = await page.evaluate(() => {
     const buf = window.__savedFiles['my-song.mid'];
-    const parsed = MidiMode.parseMIDI(buf);
-    return MidiMode.extractMonophonicMelody(parsed).map(n => ({ midi: n.midi, time: n.time }));
+    const parsed = MelodyMode.parseMIDI(buf);
+    return MelodyMode.extractMonophonicMelody(parsed).map(n => ({ midi: n.midi, time: n.time }));
   });
   expect(roundTripped.length).toBe(2);
   expect(roundTripped[0].midi).toBe(64);
@@ -729,7 +729,7 @@ test('Compose: loading an existing MIDI file lays its notes out as one connected
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
 
   await page.evaluate(() => {
-    MidiMode.parseMIDI = () => ({
+    MelodyMode.parseMIDI = () => ({
       notes: [
         { midi: 60, time: 0, duration: 0.4 },
         { midi: 64, time: 0.5, duration: 0.4 },
@@ -1038,7 +1038,7 @@ test('Compose: Save emits a real tempo meta event when Quantize was used, matchi
 // ────────────────────────────────────────────────────────────────────────
 // Melody mode mouse-drag panning -- real report: rotating the view (INV-24) could move a
 // melody's notes off-screen with no way back, since Melody had no pan capability at all (touch
-// OR mouse), despite Render.getPanBounds() already listing 'midi' among the free-pan modes.
+// OR mouse), despite Render.getPanBounds() already listing 'melody' among the free-pan modes.
 // Uses Playwright's real mouse API (not a synthetic .click()), matching this project's existing
 // discipline for touch events -- a real mousedown-then-move sequence is what actually exercises
 // the drag-vs-click distinction, not a single synthetic event.
@@ -1046,10 +1046,10 @@ test('Compose: Save emits a real tempo meta event when Quantize was used, matchi
 
 test('Melody mode: dragging the mouse pans the Tonnetz, and still plays the clicked cell\'s note', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   // resetGame()'s auto-kickoff "listen to the notes" intro sets isPlayingSequence, which blocks
   // svg.onmousedown entirely (including the pan it starts) until it finishes.
-  await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+  await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
 
   const before = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
 
@@ -1076,7 +1076,7 @@ test('Melody mode: dragging the mouse pans the Tonnetz, and still plays the clic
 
 test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead of snapping back to the fixed default', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   // A small, realistic pan offset -- large enough to prove refreshBoard() didn't just reset to the
   // default view, but well within Render.getPanBounds()'s allowed range so this verifies
@@ -1084,13 +1084,13 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
   // as a CENTER (Render.panView / INV-44), so this sets the mode's stored center and checks the
   // rendered view center survives the refresh, rather than the aspect-dependent viewBox top-left.
   await page.evaluate(() => {
-    MidiMode.refreshBoard(); // initialize the center (null -> origin) before offsetting it
-    MidiMode.state.viewX = -60;
-    MidiMode.state.viewY = -40;
-    MidiMode.refreshBoard();
+    MelodyMode.refreshBoard(); // initialize the center (null -> origin) before offsetting it
+    MelodyMode.state.viewX = -60;
+    MelodyMode.state.viewY = -40;
+    MelodyMode.refreshBoard();
   });
 
-  await page.evaluate(() => MidiMode.refreshBoard());
+  await page.evaluate(() => MelodyMode.refreshBoard());
 
   const center = await page.evaluate(() => {
     const vb = Render.svg.getAttribute('viewBox').split(/\s+/).map(Number);
@@ -1110,7 +1110,7 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
 test('Melody mode: the replay-from scrub marker stays hidden until more than one note has been reached', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.clock.fastForward(2000); // let the auto-kickoff intro finish; targetLength stays 1
 
   await expect(page.locator('.scrub-marker')).toHaveCount(0);
@@ -1118,12 +1118,12 @@ test('Melody mode: the replay-from scrub marker stays hidden until more than one
 
 test('Melody mode: the scrub marker appears once the drilled segment grows, sitting right before the note it targets', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MidiMode.state.targetLength = 4;
-    MidiMode.state.startIndex = 2;
-    MidiMode.updateDifficultyUI();
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.startIndex = 2;
+    MelodyMode.updateDifficultyUI();
   });
 
   await expect(page.locator('.scrub-marker')).toHaveCount(1);
@@ -1132,23 +1132,23 @@ test('Melody mode: the scrub marker appears once the drilled segment grows, sitt
   const isImmediatelyBefore = await page.evaluate(() => {
     const marker = document.querySelector('.scrub-marker');
     const nextEl = marker.nextElementSibling;
-    return nextEl && nextEl.classList.contains('note-token') && nextEl.getAttribute('data-note-idx') === String(MidiMode.state.startIndex);
+    return nextEl && nextEl.classList.contains('note-token') && nextEl.getAttribute('data-note-idx') === String(MelodyMode.state.startIndex);
   });
   expect(isImmediatelyBefore).toBe(true);
 });
 
 test('Melody mode: the scrub control clamps to notes already reached, never past targetLength', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MidiMode.state.targetLength = 4;
-    MidiMode.updateDifficultyUI();
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.updateDifficultyUI();
   });
 
   const clamped = await page.evaluate(() => {
-    MidiMode.seekTo(99); // far beyond targetLength - 1
-    return MidiMode.state.startIndex;
+    MelodyMode.seekTo(99); // far beyond targetLength - 1
+    return MelodyMode.state.startIndex;
   });
   expect(clamped).toBe(3);
 });
@@ -1156,15 +1156,15 @@ test('Melody mode: the scrub control clamps to notes already reached, never past
 test('Melody mode: dragging the scrub marker back replays the skipped-over earlier notes', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.clock.fastForward(2000); // clear the auto-kickoff intro
 
   await page.evaluate(() => {
     window.__played = [];
     Synth.playNote = (midi) => window.__played.push(midi);
-    MidiMode.state.targetLength = 4;
-    MidiMode.state.startIndex = 2; // simulate having already drilled through note 2
-    MidiMode.updateDifficultyUI();
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.startIndex = 2; // simulate having already drilled through note 2
+    MelodyMode.updateDifficultyUI();
   });
 
   const markerBox = await page.locator('.scrub-marker').boundingBox();
@@ -1173,29 +1173,29 @@ test('Melody mode: dragging the scrub marker back replays the skipped-over earli
   await page.mouse.down();
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 5 });
   await page.mouse.up();
-  expect(await page.evaluate(() => MidiMode.state.startIndex)).toBe(0);
+  expect(await page.evaluate(() => MelodyMode.state.startIndex)).toBe(0);
 
   await page.clock.fastForward(5000); // let the whole replayed segment (notes 0..3) finish
 
   const playedFromZero = await page.evaluate(() => {
-    const expected = MidiMode.state.melody.slice(0, 4).map(n => n.midi);
+    const expected = MelodyMode.state.melody.slice(0, 4).map(n => n.midi);
     return JSON.stringify(window.__played) === JSON.stringify(expected);
   });
   expect(playedFromZero).toBe(true);
-  expect(await page.evaluate(() => MidiMode.state.userIndex)).toBe(0);
+  expect(await page.evaluate(() => MelodyMode.state.userIndex)).toBe(0);
 });
 
 test('Melody mode: dragging the scrub marker forward skips already-mastered notes on replay', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.clock.fastForward(2000);
 
   await page.evaluate(() => {
     window.__played = [];
     Synth.playNote = (midi) => window.__played.push(midi);
-    MidiMode.state.targetLength = 4;
-    MidiMode.updateDifficultyUI();
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.updateDifficultyUI();
   });
 
   const markerBox = await page.locator('.scrub-marker').boundingBox();
@@ -1208,26 +1208,26 @@ test('Melody mode: dragging the scrub marker forward skips already-mastered note
   await page.clock.fastForward(5000);
 
   const playedFromTwo = await page.evaluate(() => {
-    const expected = MidiMode.state.melody.slice(2, 4).map(n => n.midi);
+    const expected = MelodyMode.state.melody.slice(2, 4).map(n => n.midi);
     return JSON.stringify(window.__played) === JSON.stringify(expected);
   });
   expect(playedFromTwo).toBe(true);
-  expect(await page.evaluate(() => MidiMode.state.userIndex)).toBe(2);
+  expect(await page.evaluate(() => MelodyMode.state.userIndex)).toBe(2);
 });
 
 test('Melody mode: a wrong note resets progress back to the scrub position, not always to note 0', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.clock.fastForward(2000);
 
   const resetIndex = await page.evaluate(() => {
-    MidiMode.state.isPlayingSequence = false;
-    MidiMode.state.targetLength = 4;
-    MidiMode.state.startIndex = 2; // player scrubbed to replay from note 2
-    MidiMode.state.userIndex = 3;  // got note 2 right, currently on note 3
-    MidiMode.handleUserInputNote(-1); // guaranteed wrong pitch
-    return MidiMode.state.userIndex;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.startIndex = 2; // player scrubbed to replay from note 2
+    MelodyMode.state.userIndex = 3;  // got note 2 right, currently on note 3
+    MelodyMode.handleUserInputNote(-1); // guaranteed wrong pitch
+    return MelodyMode.state.userIndex;
   });
   expect(resetIndex).toBe(2);
 });
@@ -1324,12 +1324,12 @@ test('clicking the active queue item does not place when the ghost position is i
 });
 
 // Render.getPanBounds() (js/render.js) only returns real bounds for non-restricted modes (see
-// Render.RESTRICTED_MODES) -- Sandbox, Melody ('midi'), Compose, and Life, each with a
+// Render.RESTRICTED_MODES) -- Sandbox, Melody ('melody'), Compose, and Life, each with a
 // free-panning, unrestricted Tonnetz. Blast/Gravity/Snake fit their own fixed board instead and
 // are covered by the "unclamped in restricted modes" test below. Exercise all four non-restricted
 // modes, not just Sandbox, so a future mode added to (or accidentally dropped from) that set gets
 // caught here instead of only being noticed by whichever mode someone happens to test by hand.
-for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
+for (const mode of ['sandbox', 'melody', 'compose', 'life']) {
   test(`panning cannot scroll far past the edge of the audible tonnetz (${mode})`, async ({ page }) => {
     await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
@@ -1356,7 +1356,7 @@ for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
 // (App.applyZoomDelta), driven by wheel/ctrl+wheel (trackpad pinch)/touch pinch, independent of
 // the browser's own zoom and not subject to its floor. Scroll-wheel here; touch pinch is covered
 // in tests/mobile.spec.js.
-for (const mode of ['sandbox', 'midi', 'compose', 'life']) {
+for (const mode of ['sandbox', 'melody', 'compose', 'life']) {
   test(`Scroll-wheel zoom works in ${mode} and persists across a redraw`, async ({ page }) => {
     await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
@@ -1488,33 +1488,33 @@ test('INV-30: leaving Blast mode stops it from repainting the board on a later r
 // keyboard-instructions text overlapped the Tonnetz at a landscape width under 950px, leaving
 // much less usable board space. Root cause: the (max-width: 950px) and (orientation: landscape)
 // breakpoint turns #blast-stats/#gravity-controls/#snake-controls into small, corner-anchored
-// (top/left: 10px) HUD overlays capped at max-width: 200px -- but #midi-controls's own version
+// (top/left: 10px) HUD overlays capped at max-width: 200px -- but #melody-controls's own version
 // of that same rule never got the position/max-width pair its siblings have, so it defaulted to
 // its natural (wide, content-driven) flow width while still being position:absolute, floating
 // over the board instead of being constrained to a small corner box. Separately,
-// #midi-keyboard-instructions (.desktop-only) is only hidden by the touch-pointer and
+// #melody-keyboard-instructions (.desktop-only) is only hidden by the touch-pointer and
 // max-width:767px rules -- not this landscape one -- so it kept contributing extra bulk here too.
 // ────────────────────────────────────────────────────────────────────────
 
 test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 600 });
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   // The always-visible Melody controls (streak readout + the Play/Restart transport icons) live
   // in the mobile dock; one-time setup (folder/song pickers, Difficulty) now routes to the drawer
-  // and #midi-controls itself is emptied + hidden on mobile (task #77). Guard the DOCK's width so
+  // and #melody-controls itself is emptied + hidden on mobile (task #77). Guard the DOCK's width so
   // the HUD stays compact -- the invariant's real intent, unchanged: not a wide overlay.
-  const dock = page.locator('#midi-mobile-tools');
+  const dock = page.locator('#melody-mobile-tools');
   await expect(dock).toBeVisible();
   const box = await dock.boundingBox();
   expect(box.width, 'the Melody HUD dock should stay a small corner HUD, like its Blast/Gravity/Snake siblings').toBeLessThanOrEqual(210);
 
-  // #midi-controls is emptied into the drawer on mobile -- it must not render as a wide overlay.
-  await expect(page.locator('#midi-controls')).toBeHidden();
+  // #melody-controls is emptied into the drawer on mobile -- it must not render as a wide overlay.
+  await expect(page.locator('#melody-controls')).toBeHidden();
 
   // The desktop-only keyboard instructions shouldn't contribute bulk to this compact overlay.
-  await expect(page.locator('#midi-keyboard-instructions')).toBeHidden();
+  await expect(page.locator('#melody-keyboard-instructions')).toBeHidden();
 });
 
 test('panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds)', async ({ page }) => {
@@ -1600,7 +1600,7 @@ test.describe('file:// support', () => {
 // A returning player's service worker (sw.js) can have precached index.html/js/etc. on some
 // earlier visit. If the site later changes and that cache is never invalidated, the player's
 // browser silently keeps serving the OLD markup/code -- exactly what happened live: index.html's
-// Melody/Compose/Life controls were reorganized into a single #midi-source dropdown, but a
+// Melody/Compose/Life controls were reorganized into a single #melody-source dropdown, but a
 // returning player's stale-cached index.html still had the OLD (pre-reorg) markup, so the new
 // select simply didn't exist on their page -- "the dropdown disappeared entirely." Root cause:
 // sw.js used a cache-first fetch strategy, so nothing about a code change alone (only bumping
@@ -2667,20 +2667,20 @@ test('Snake: head note sounds its true pitch, not a clamped one', async ({ page 
 // glow-next-0/1/2 on the matching Tonnetz cells -- linking board and timeline. No frequency shown.
 test('Melody: the next three notes are tri-coloured in the timeline and on the Tonnetz', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-  await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
   const out = await page.evaluate(() => {
-    MidiMode.state.difficulty = 'easy';
-    MidiMode.state.userIndex = 0;
-    MidiMode.updateDifficultyUI();
-    const tokens = [...document.querySelectorAll('#midi-note-list .note-token[data-upcoming]')];
+    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.updateDifficultyUI();
+    const tokens = [...document.querySelectorAll('#melody-note-list .note-token[data-upcoming]')];
     return {
       upcomingRanks: tokens.map((t) => t.getAttribute('data-upcoming')),
       tokenColors: tokens.map((t) => t.style.color),
       glow0: document.querySelectorAll('polygon.glow-next-0').length,
       glow1: document.querySelectorAll('polygon.glow-next-1').length,
       glow2: document.querySelectorAll('polygon.glow-next-2').length,
-      hasHz: /\d+Hz/.test(document.getElementById('midi-note-list').textContent),
+      hasHz: /\d+Hz/.test(document.getElementById('melody-note-list').textContent),
     };
   });
   expect(out.upcomingRanks).toEqual(['0', '1', '2']);            // the next three, ranked
@@ -2692,7 +2692,7 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
 });
 
 // #94: a URL hash deep-links to a mode, and clicking a mode updates the URL so links are shareable
-// and discoverable. Melody's URL name is the friendly "melody" (its data-mode is "midi").
+// and discoverable.
 test('URL routing: hash deep-links to a mode and the URL updates on click', async ({ page }) => {
   // A shared deep-link opens that mode on load...
   await page.goto('/#gravity');
@@ -2703,12 +2703,12 @@ test('URL routing: hash deep-links to a mode and the URL updates on click', asyn
   expect(await page.evaluate(() => App.currentMode)).toBe('compose');
   expect(await page.evaluate(() => location.hash)).toBe('#compose');
 
-  // More deep-links (fresh loads): the friendly "melody" alias -> midi mode, an unknown hash ->
-  // sandbox, and a normal one. (about:blank between forces a real reload -- goto to a hash-only
-  // change on the same path wouldn't re-init.)
+  // More deep-links (fresh loads): the Melody URL, an unknown hash -> sandbox, and a normal one.
+  // (about:blank between forces a real reload -- goto to a hash-only change on the same path
+  // wouldn't re-init.)
   // An unknown hash falls back to sandbox and NORMALIZES the bar to #sandbox (it reflects the
   // actual mode). Known ones keep their friendly name.
-  for (const [url, mode, hash] of [['/#melody', 'midi', '#melody'], ['/#nonsense', 'sandbox', '#sandbox'], ['/#blast', 'blast', '#blast']]) {
+  for (const [url, mode, hash] of [['/#melody', 'melody', '#melody'], ['/#nonsense', 'sandbox', '#sandbox'], ['/#blast', 'blast', '#blast']]) {
     await page.goto('about:blank');
     await page.goto(url);
     await expect.poll(() => page.evaluate(() => App.currentMode), { timeout: 5000 }).toBe(mode);
@@ -2722,7 +2722,7 @@ test('URL routing: hash deep-links to a mode and the URL updates on click', asyn
 // difficulty control (and everything else) never wired up. Every mode's init must be self-
 // sufficient: reachable as the FIRST mode of a session, not just via a click from another mode.
 test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly', async ({ page }) => {
-  for (const mode of ['blast', 'gravity', 'snake', 'compose', 'midi', 'life']) {
+  for (const mode of ['blast', 'gravity', 'snake', 'compose', 'melody', 'life']) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('about:blank');
@@ -2749,9 +2749,9 @@ test('Melody: offline (no online folder) degrades to a random 10-note, one-octav
   await page.route('**/midi/index.json', route => route.abort());
   await page.route('**/midi/*.mid', route => route.abort());
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForTimeout(600);
-  const melody = await page.evaluate(() => MidiMode.state.melody.map(n => n.midi));
+  const melody = await page.evaluate(() => MelodyMode.state.melody.map(n => n.midi));
   expect(melody.length, 'random fallback is 10 notes').toBe(10);
   expect(Math.max(...melody) - Math.min(...melody), 'all within one octave').toBeLessThan(12);
 });
@@ -2763,22 +2763,22 @@ test('Melody: offline (no online folder) degrades to a random 10-note, one-octav
 // pattern as Blast/Gravity's own barbell.
 test('Melody: the difficulty control is the same dumbbell-barbell as Blast/Gravity, not a dropdown', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-  await expect(page.locator('#midi-difficulty select')).toHaveCount(0);
-  const weights = page.locator('#midi-difficulty .weight-icon');
+  await expect(page.locator('#melody-difficulty select')).toHaveCount(0);
+  const weights = page.locator('#melody-difficulty .weight-icon');
   await expect(weights).toHaveCount(3);
 
   const litCount = () => page.evaluate(() =>
-    document.querySelectorAll('#midi-difficulty .weight-icon.lit').length);
+    document.querySelectorAll('#melody-difficulty .weight-icon.lit').length);
   expect(await litCount(), 'defaults to easy (1 lit)').toBe(1);
 
   await weights.nth(2).click();
-  expect(await page.evaluate(() => MidiMode.state.difficulty)).toBe('hard');
+  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe('hard');
   expect(await litCount(), 'hard lights all 3').toBe(3);
 
   await weights.nth(1).click();
-  expect(await page.evaluate(() => MidiMode.state.difficulty)).toBe('medium');
+  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe('medium');
   expect(await litCount(), 'medium lights 2').toBe(2);
 });
 

@@ -38,7 +38,7 @@ const App = {
     modeModule: function() {
         return ({
             sandbox: typeof SandboxMode !== 'undefined' ? SandboxMode : null,
-            midi: typeof MidiMode !== 'undefined' ? MidiMode : null,
+            melody: typeof MelodyMode !== 'undefined' ? MelodyMode : null,
             compose: typeof ComposeMode !== 'undefined' ? ComposeMode : null,
             snake: typeof SnakeMode !== 'undefined' ? SnakeMode : null,
             blast: typeof BlastMode !== 'undefined' ? BlastMode : null,
@@ -262,7 +262,7 @@ const App = {
             const gc = document.getElementById('game-container');
             if (gc) {
                 this._panResizeObserver = new ResizeObserver(() => {
-                    if (['sandbox', 'midi', 'compose'].includes(this.currentMode)) {
+                    if (['sandbox', 'melody', 'compose'].includes(this.currentMode)) {
                         const refresh = this.modeRefreshFns[this.currentMode];
                         if (refresh) refresh();
                     }
@@ -277,9 +277,11 @@ const App = {
         window.addEventListener('hashchange', () => this._applyHashRoute());
     },
 
-    // URL <-> mode names. Only Melody differs: its data-mode is 'midi' but the friendly URL is
-    // '#melody'. Everything else uses its own name.
-    MODE_URL_NAMES: { midi: 'melody' },
+    // URL <-> mode names. Every mode's internal id already matches its own friendly URL name
+    // (Melody's internal id used to be 'midi', a mismatch this table existed to bridge -- see
+    // the mode-identifier rename); kept as general infrastructure in case a future mode needs
+    // the same split again, but currently has no entries.
+    MODE_URL_NAMES: {},
     _modeToUrl: function(mode) { return this.MODE_URL_NAMES[mode] || mode; },
     _urlToMode: function(name) {
         for (const m in this.MODE_URL_NAMES) if (this.MODE_URL_NAMES[m] === name) return m;
@@ -341,8 +343,8 @@ const App = {
             BlastMode.cleanup();
         }
 
-        if (typeof MidiMode !== 'undefined') {
-            MidiMode.cleanup();
+        if (typeof MelodyMode !== 'undefined') {
+            MelodyMode.cleanup();
         }
 
         if (typeof SnakeMode !== 'undefined') {
@@ -365,9 +367,9 @@ const App = {
         // owns, so a bundled/folder load still in flight for it never lands after the player has
         // moved elsewhere (#15, #16, generalized from Life-only). Scoped to this.currentMode (the
         // mode we're actually leaving) rather than each mode's own cleanup() -- several modes'
-        // cleanup() is reused internally too (e.g. MidiMode.resetGame() calls it on normal entry,
+        // cleanup() is reused internally too (e.g. MelodyMode.resetGame() calls it on normal entry,
         // not just on exit), so invalidating from there fires far more often than "really left."
-        if ((this.currentMode === 'midi' || this.currentMode === 'compose') && typeof MidiFolder !== 'undefined') {
+        if ((this.currentMode === 'melody' || this.currentMode === 'compose') && typeof MidiFolder !== 'undefined') {
             MidiFolder.invalidate();
         }
         if (this.currentMode === 'life' && typeof LifeFolder !== 'undefined') {
@@ -411,7 +413,7 @@ const App = {
         // Hide/show palette
         const palette = document.getElementById('palette');
         if (palette) {
-            palette.style.display = (mode === 'midi' || mode === 'snake' || mode === 'compose') ? 'none' : 'block';
+            palette.style.display = (mode === 'melody' || mode === 'snake' || mode === 'compose') ? 'none' : 'block';
         }
 
         // Hide/show mobile controls
@@ -428,8 +430,8 @@ const App = {
         // Hide all mode-specific panels first
         stats.style.display = 'none';
         document.getElementById('gravity-controls').style.display = 'none';
-        if (document.getElementById('midi-controls')) {
-            document.getElementById('midi-controls').style.display = 'none';
+        if (document.getElementById('melody-controls')) {
+            document.getElementById('melody-controls').style.display = 'none';
         }
         if (document.getElementById('snake-controls')) {
             document.getElementById('snake-controls').style.display = 'none';
@@ -472,9 +474,9 @@ const App = {
         } else if (mode === 'gravity') {
             document.getElementById('gravity-controls').style.display = '';
             GravityMode.init();
-        } else if (mode === 'midi') {
-            document.getElementById('midi-controls').style.display = 'block';
-            MidiMode.init();
+        } else if (mode === 'melody') {
+            document.getElementById('melody-controls').style.display = 'block';
+            MelodyMode.init();
         } else if (mode === 'snake') {
             document.getElementById('snake-controls').style.display = '';
             SnakeMode.init();
@@ -651,16 +653,16 @@ const App = {
                 
                 // Set up contents of the drawer depending on mode
                 const sandboxTools = document.getElementById('sandbox-mobile-tools');
-                const midiTools = document.getElementById('midi-mobile-tools');
+                const melodyTools = document.getElementById('melody-mobile-tools');
                 const drawerInjected = document.getElementById('drawer-injected-tools');
                 const palette = document.getElementById('palette');
                 const guide = document.getElementById('sandbox-guide');
                 const sidebar = document.getElementById('sidebar');
 
-                const midiSource = document.getElementById('midi-source-group');
-                const midiUpload = document.getElementById('midi-upload-group');
-                const midiStats = document.getElementById('midi-stats-group');
-                const midiActions = document.getElementById('midi-actions-group');
+                const melodySource = document.getElementById('melody-source-group');
+                const melodyUpload = document.getElementById('melody-upload-group');
+                const melodyStats = document.getElementById('melody-stats-group');
+                const melodyActions = document.getElementById('melody-actions-group');
 
                 if (drawerInjected) drawerInjected.style.display = 'none';
 
@@ -689,30 +691,30 @@ const App = {
                     // Hide the full guide in the drawer (label + instruction text stay hidden)
                     if (guide) guide.style.display = 'none';
                     if (drawerInjected) drawerInjected.style.display = 'none';
-                    if (midiTools) midiTools.style.display = 'none';
-                } else if (this.currentMode === 'midi') {
+                    if (melodyTools) melodyTools.style.display = 'none';
+                } else if (this.currentMode === 'melody') {
                     if (sandboxTools) sandboxTools.style.display = 'none';
-                    // Every #midi-controls child is redistributed on mobile (stats+transport to the
+                    // Every #melody-controls child is redistributed on mobile (stats+transport to the
                     // always-visible dock, pickers+settings to the drawer), so the container itself
                     // would otherwise render as an empty padded sliver over the board -- hide it.
                     // The desktop branch restores its children and its display.
-                    const midiControlsEl = document.getElementById('midi-controls');
+                    const midiControlsEl = document.getElementById('melody-controls');
                     if (midiControlsEl) midiControlsEl.style.display = 'none';
-                    if (midiTools) {
-                        midiTools.style.display = 'flex';
-                        if (midiStats) midiTools.appendChild(midiStats);
-                        if (midiActions) midiTools.appendChild(midiActions);
+                    if (melodyTools) {
+                        melodyTools.style.display = 'flex';
+                        if (melodyStats) melodyTools.appendChild(melodyStats);
+                        if (melodyActions) melodyTools.appendChild(melodyActions);
                     }
                     // One-time setup + settings live in the drawer, out of the board's way: the
                     // song-source dropdown, the upload fallback, and the Difficulty selector. Only
                     // the transport (Play/Restart icons) and the streak stats stay in the
-                    // always-visible area (midiTools, appended above). See task #77.
+                    // always-visible area (melodyTools, appended above). See task #77.
                     if (drawerInjected) {
                         drawerInjected.style.display = 'block';
-                        const midiSettings = document.getElementById('midi-settings-group');
-                        if (midiSource) drawerInjected.appendChild(midiSource);
-                        if (midiUpload) drawerInjected.appendChild(midiUpload);
-                        if (midiSettings) drawerInjected.appendChild(midiSettings);
+                        const melodySettings = document.getElementById('melody-settings-group');
+                        if (melodySource) drawerInjected.appendChild(melodySource);
+                        if (melodyUpload) drawerInjected.appendChild(melodyUpload);
+                        if (melodySettings) drawerInjected.appendChild(melodySettings);
                     }
                     // #palette (Sandbox's carousel) isn't used in MIDI mode — return it home and
                     // hide it so it doesn't stay stranded inside a hidden sandboxTools.
@@ -723,7 +725,7 @@ const App = {
                     }
                 } else if (this.currentMode === 'blast' || this.currentMode === 'gravity') {
                     if (sandboxTools) sandboxTools.style.display = 'none';
-                    if (midiTools) midiTools.style.display = 'none';
+                    if (melodyTools) melodyTools.style.display = 'none';
                     // #palette doubles as Blast/Gravity's next-piece queue (their own
                     // renderNextQueue writes into #piece-list) — return it from wherever a
                     // previous mode left it and show it as a floating overlay over the board.
@@ -734,7 +736,7 @@ const App = {
                     }
                 } else {
                     if (sandboxTools) sandboxTools.style.display = 'none';
-                    if (midiTools) midiTools.style.display = 'none';
+                    if (melodyTools) melodyTools.style.display = 'none';
                     if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
                     if (palette) {
                         palette.style.display = 'none';
@@ -745,26 +747,26 @@ const App = {
                 // On desktop, ensure the drawer doesn't act like a drawer
                 topDrawer.classList.remove('expanded');
                 topDrawer.classList.remove('collapsed');
-                // Ensure midi controls are back in midi-controls container
-                const midiControls = document.getElementById('midi-controls');
-                const midiSource = document.getElementById('midi-source-group');
-                const midiUpload = document.getElementById('midi-upload-group');
-                const midiActions = document.getElementById('midi-actions-group');
-                const midiStats = document.getElementById('midi-stats-group');
+                // Ensure midi controls are back in melody-controls container
+                const melodyControls = document.getElementById('melody-controls');
+                const melodySource = document.getElementById('melody-source-group');
+                const melodyUpload = document.getElementById('melody-upload-group');
+                const melodyActions = document.getElementById('melody-actions-group');
+                const melodyStats = document.getElementById('melody-stats-group');
 
-                if (midiControls) {
+                if (melodyControls) {
                     // Undo the mobile branch's display:none (its content is back in-panel here). On
-                    // desktop the sidebar is always visible, so #midi-controls shows only when midi
+                    // desktop the sidebar is always visible, so #melody-controls shows only when midi
                     // is the active mode -- covers a mobile->desktop resize with no mode change.
-                    midiControls.style.display = (this.currentMode === 'midi') ? 'block' : 'none';
+                    melodyControls.style.display = (this.currentMode === 'melody') ? 'block' : 'none';
                     // Restore original DOM order so the desktop sidebar panel reads top-to-bottom
                     // as authored (source dropdown, upload fallback, settings/Difficulty, actions, stats).
-                    const midiSettings = document.getElementById('midi-settings-group');
-                    if (midiSource && midiSource.parentElement !== midiControls) midiControls.appendChild(midiSource);
-                    if (midiUpload && midiUpload.parentElement !== midiControls) midiControls.appendChild(midiUpload);
-                    if (midiSettings && midiSettings.parentElement !== midiControls) midiControls.appendChild(midiSettings);
-                    if (midiActions && midiActions.parentElement !== midiControls) midiControls.appendChild(midiActions);
-                    if (midiStats && midiStats.parentElement !== midiControls) midiControls.appendChild(midiStats);
+                    const melodySettings = document.getElementById('melody-settings-group');
+                    if (melodySource && melodySource.parentElement !== melodyControls) melodyControls.appendChild(melodySource);
+                    if (melodyUpload && melodyUpload.parentElement !== melodyControls) melodyControls.appendChild(melodyUpload);
+                    if (melodySettings && melodySettings.parentElement !== melodyControls) melodyControls.appendChild(melodySettings);
+                    if (melodyActions && melodyActions.parentElement !== melodyControls) melodyControls.appendChild(melodyActions);
+                    if (melodyStats && melodyStats.parentElement !== melodyControls) melodyControls.appendChild(melodyStats);
                 }
                 
                 // Ensure palette and guide are back in sidebar
@@ -922,7 +924,7 @@ const App = {
                 return;
             }
 
-            if (this.currentMode === 'midi' || this.currentMode === 'compose') {
+            if (this.currentMode === 'melody' || this.currentMode === 'compose') {
                 if (e.touches.length === 1) {
                     const cell = getCellFromTouch(e.touches[0]);
                     if (cell) {
@@ -949,7 +951,7 @@ const App = {
                             }, HOLD_DURATION_MS);
                         } else {
                             const midi = Tonnetz.getMidi(cell.p, cell.q);
-                            MidiMode.playUserNote(midi, cell.p, cell.q);
+                            MelodyMode.playUserNote(midi, cell.p, cell.q);
                         }
                     }
                     return;
@@ -1105,7 +1107,7 @@ const App = {
 
             // A single touch in Melody/Compose is tap-to-play (handled entirely in touchstart) --
             // only a 2-touch pan gesture (below) applies here.
-            if ((this.currentMode === 'midi' || this.currentMode === 'compose') && e.touches.length !== 2) {
+            if ((this.currentMode === 'melody' || this.currentMode === 'compose') && e.touches.length !== 2) {
                 e.preventDefault();
                 return;
             }
@@ -1162,7 +1164,7 @@ const App = {
 
                 // Twist angle threshold: 30 degrees. Melody has no selected/active-piece concept
                 // to rotate this way, so this whole sub-branch is Sandbox/Blast only -- letting
-                // 'midi' fall through here would read/write BlastMode's own state from inside a
+                // 'melody' fall through here would read/write BlastMode's own state from inside a
                 // completely unrelated mode's gesture.
                 if (Math.abs(diff) > 30 && (this.currentMode === 'sandbox' || this.currentMode === 'blast')) {
                     const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode;
@@ -1423,7 +1425,7 @@ const App = {
     modeRefreshFns: {
         sandbox: () => SandboxMode.refreshLattice(),
         blast: () => BlastMode.refreshUI(),
-        midi: () => MidiMode.refreshBoard(),
+        melody: () => MelodyMode.refreshBoard(),
         snake: () => SnakeMode.refreshBoard(),
         compose: () => ComposeMode.refreshBoard(),
     },

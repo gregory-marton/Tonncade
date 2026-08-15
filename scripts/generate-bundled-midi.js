@@ -23,9 +23,9 @@ for the JavaScript code in this file.
 */
 /**
  * generate-bundled-midi.js - Regenerates midi/*.mid and midi/index.json, the read-only online
- * song folder (task #27), from the note data below. Uses the real MidiMode.writeMIDI (js/midi.js)
- * rather than hand-rolling SMF bytes a second time -- run this again if that ever changes, or to
- * add another song.
+ * song folder (task #27), from the note data below. Uses the real MelodyMode.writeMIDI
+ * (js/melody.js) rather than hand-rolling SMF bytes a second time -- run this again if that ever
+ * changes, or to add another song.
  *
  * Usage: node scripts/generate-bundled-midi.js
  */
@@ -36,16 +36,16 @@ const vm = require('vm');
 const context = {};
 vm.createContext(context);
 // vm's top-level `const` doesn't become a context property on its own -- the appended line runs
-// in the same lexical scope as midi.js's own `const MidiMode = {...}`, so it can see the binding
-// and attach it to the context object (`this` at top level of a non-strict script).
-const code = fs.readFileSync(path.join(__dirname, '..', 'js', 'midi.js'), 'utf8') + '\nthis.MidiMode = MidiMode;';
-vm.runInContext(code, context, { filename: 'midi.js' });
-const MidiMode = context.MidiMode;
+// in the same lexical scope as melody.js's own `const MelodyMode = {...}`, so it can see the
+// binding and attach it to the context object (`this` at top level of a non-strict script).
+const code = fs.readFileSync(path.join(__dirname, '..', 'js', 'melody.js'), 'utf8') + '\nthis.MelodyMode = MelodyMode;';
+vm.runInContext(code, context, { filename: 'melody.js' });
+const MelodyMode = context.MelodyMode;
 
 // C4=60, D4=62, E4=64, F4=65, G4=67, A4=69, B4=71, C5=72, D5=74, E5=76, F5=77, G5=79, G3=55
 const NOTE = { C4: 60, D4: 62, E4: 64, F4: 65, G4: 67, A4: 69, B4: 71, C5: 72, D5: 74, E5: 76, F5: 77, G5: 79, G3: 55 };
 
-// Each song: array of [noteName, beats] pairs. 1 beat = 0.5s (matches MidiMode.defaultMelody's
+// Each song: array of [noteName, beats] pairs. 1 beat = 0.5s (matches MelodyMode.defaultMelody's
 // own implicit 120bpm), sound duration is 80% of the beat slot (same duty-cycle convention
 // defaultMelody already uses: quarter=0.4s sound in a 0.5s slot, eighth=0.2s sound in a 0.25s
 // slot, half=0.8s sound in a 1.0s slot).
@@ -119,10 +119,10 @@ const midiDir = path.join(__dirname, '..', 'midi');
 fs.mkdirSync(midiDir, { recursive: true });
 
 const index = [{ name: 'Hot Cross Buns', file: 'hot-cross-buns.mid' }];
-fs.writeFileSync(path.join(midiDir, 'hot-cross-buns.mid'), Buffer.from(MidiMode.writeMIDI(MidiMode.defaultMelody)));
+fs.writeFileSync(path.join(midiDir, 'hot-cross-buns.mid'), Buffer.from(MelodyMode.writeMIDI(MelodyMode.defaultMelody)));
 
 for (const [file, song] of Object.entries(SONGS)) {
-    const buffer = MidiMode.writeMIDI(toMelodySeq(song.notes));
+    const buffer = MelodyMode.writeMIDI(toMelodySeq(song.notes));
     fs.writeFileSync(path.join(midiDir, `${file}.mid`), Buffer.from(buffer));
     index.push({ name: song.name, file: `${file}.mid` });
 }

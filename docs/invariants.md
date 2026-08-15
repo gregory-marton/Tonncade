@@ -50,11 +50,11 @@ area is left unreachable by a hidden ancestor"
 **Follow-up gap, found live:** the test above only checks elements that DID get relocated for
 ending up orphaned afterward — it has no way to catch an element that was supposed to be
 relocated but wasn't, since it never looks anywhere else. That's exactly what happened:
-Melody's dropdown reorg (task, one-`<select>` #midi-source-group) added a new control, but
+Melody's dropdown reorg (task, one-`<select>` #melody-source-group) added a new control, but
 `js/main.js`'s mobile-drawer relocation logic still only knew the OLD ids it replaced
 (`#midi-folder-group`/`#midi-online-group`) — those lookups silently returned `null` (an
-already-existing `if (el) ...` guard swallowed it with no error), so `#midi-source-group` was
-never moved anywhere and stayed stranded inside `#midi-controls`, which this same code
+already-existing `if (el) ...` guard swallowed it with no error), so `#melody-source-group` was
+never moved anywhere and stayed stranded inside `#melody-controls`, which this same code
 correctly hides wholesale on mobile once redistribution is done. The dropdown existed in the
 DOM the entire time — invisible to any check that doesn't measure actual rendered visibility.
 
@@ -243,7 +243,7 @@ wrapping container's own id (not just a leaf control's) — Blast/Gravity's Easy
 difficulty buttons have no ids of their own at all, only `class="weight-icon"`, so the whole
 group is classified via its own `#blast-difficulty`/`#gravity-difficulty` wrapper. A newly
 added control that fits none of these buckets now fails loud immediately, instead of silently
-having zero reachability coverage the way `#midi-source` did.
+having zero reachability coverage the way `#melody-source` did.
 
 **Test:** `tests/invariants.spec.js` — "INV-13 coverage: every interactive control in a mode's
 panel is classified as primary or secondary, none forgotten"
@@ -347,7 +347,7 @@ audible/visible result as tapping the corresponding cell would: `Synth.playNote`
 MIDI number, and every currently-rendered cell sharing that pitch flashed via
 `Render.highlightByMidi` (a Tonnetz places the same pitch at multiple lattice positions by
 design — see INV-4/INV-5 for the tap-driven version of this same idea). In Melody mode, the note
-must also reach the practice game's own logic (`MidiMode.handleUserInputNote`), so playing the
+must also reach the practice game's own logic (`MelodyMode.handleUserInputNote`), so playing the
 physical keyboard advances a song exactly like tapping the matching cells would.
 
 This works for any class-compliant MIDI device, not specifically the isomorphic ("Tonnetz
@@ -402,7 +402,7 @@ label's on-screen aspect ratio stays constant across rotation, and Gravity's imm
 
 ### INV-25: A melody note's octave is part of its identity, and the UI must say so
 
-Melody mode's matching (`MidiMode.handleUserInputNote`) compares exact MIDI pitch, not just
+Melody mode's matching (`MelodyMode.handleUserInputNote`) compares exact MIDI pitch, not just
 note NAME — two different-octave "E"s are genuinely different notes to it, and that's the
 correct rule: a melody's octave is part of the tune, not an incidental detail a player should be
 free to substitute. Real report: a player found it possible to play "the wrong E" against a real
@@ -410,8 +410,8 @@ MIDI keyboard, which is an understandable mix-up, not a matching-logic bug — a
 keyboard with several octaves of physical keys) puts more than one cell with the exact same
 bare note-name letter within easy reach, and the letter alone doesn't say which one is meant.
 
-Fixed at the legibility layer rather than by relaxing the match: `MidiMode.updateDifficultyUI`'s
-current-target readout (`#midi-note-list`) shows an **octave-qualified name** (e.g. "E4", not just
+Fixed at the legibility layer rather than by relaxing the match: `MelodyMode.updateDifficultyUI`'s
+current-target readout (`#melody-note-list`) shows an **octave-qualified name** (e.g. "E4", not just
 "E") for every displayed note — that octave qualification is what resolves the "wrong E," since it
 says exactly which cell/pitch is meant. (Updated 2026-07-28: the timeline no longer shows the note's
 frequency — it isn't useful there, and the octave-qualified name already disambiguates. The next
@@ -428,14 +428,14 @@ getFrequency tests" (pure MIDI-to-Hz correctness, independent of any UI).
 
 ### INV-26: Melody's drilled segment can be replayed from any note already reached, not just note 0
 
-The "Simon says" drill (`MidiMode.playTargetSequence`) always used to replay the whole growing
+The "Simon says" drill (`MelodyMode.playTargetSequence`) always used to replay the whole growing
 segment starting at note 0, and a wrong note always reset practice back to note 0 too — fine for
 a short song, but a real scaling problem for a long one (task #46): every extension re-listens to
 an ever-longer prefix before the player gets to attempt the new note, and a single mistake near
 the end throws away the whole segment's progress.
 
-`MidiMode.state.startIndex` now tracks where the drilled segment begins, clamped to
-`[0, targetLength - 1]` — never past the notes already reached. `MidiMode.seekTo(index)` clears
+`MelodyMode.state.startIndex` now tracks where the drilled segment begins, clamped to
+`[0, targetLength - 1]` — never past the notes already reached. `MelodyMode.seekTo(index)` clears
 any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`,
 which now schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A
 wrong note resets `userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an
@@ -448,9 +448,9 @@ different, position-independent playback path.
 **UI, v2**: the original control was a plain HTML `<input type=range>` slider next to the note
 list. The user's own feedback: it read as an abstract, disconnected control — dragging it gave no
 sense of *which two notes* you were about to start between. Replaced with a small draggable
-marker (`▾`, `.scrub-marker`) rendered *inline, inside* `#midi-note-list` itself, in the gap
+marker (`▾`, `.scrub-marker`) rendered *inline, inside* `#melody-note-list` itself, in the gap
 right before whichever note it targets — so the note list literally reads "...D4 ▾ C4..." when
-the marker sits between D4 and C4. `MidiMode.positionScrubMarker(targetIdx)` places it (and
+the marker sits between D4 and C4. `MelodyMode.positionScrubMarker(targetIdx)` places it (and
 plain `.note-sep` separator spans everywhere else) by walking the currently-rendered
 `.note-token` elements; it only shows at all if its target note is within the currently-visible
 window (nothing to drag to if it's off-screen — an accepted scope limit, not a bug) and there's
@@ -526,7 +526,7 @@ expanded into v1.
 
 Two new, genuinely shared pieces make Save possible, both usable by Melody too whenever it grows
 its own save flow later:
-- `MidiMode.writeMIDI(melodySeq)` — a Standard MIDI File writer (single-track format-0), the
+- `MelodyMode.writeMIDI(melodySeq)` — a Standard MIDI File writer (single-track format-0), the
   inverse of the existing `parseMIDI`/`tickToSec` logic. Deliberately emits no tempo meta event,
   since `tickToSec` already defaults to 500000 usec/beat (120bpm) with none present — this keeps
   `parseMIDI(writeMIDI(x))` an exact round trip at the fixed 480-ticks-per-beat resolution
@@ -551,7 +551,7 @@ remembered folder while each keeps its own upload/folder/select/status DOM eleme
 
 **Test:** `tests/run_tests.js` — "Tonnetz.nearestCoordFor" (every returned coord actually
 produces the requested pitch; prefers a genuinely adjacent solution over a more distant one in
-the same family; keeps a short melody's path connected) and "MidiMode.writeMIDI round-trip"
+the same family; keeps a short melody's path connected) and "MelodyMode.writeMIDI round-trip"
 (reproduces midi/time/duration through `parseMIDI` within one tick's tolerance, including the
 empty-melody edge case). `tests/desktop.spec.js` — six "Compose: ..." tests covering recording,
 playback ordering, Undo, Clear, a Save round-trip through a faked folder handle, and loading an
@@ -606,7 +606,7 @@ it fired again and repainted Gravity's stale board directly over whatever the ne
 drawn on that same shared element.
 
 Fixed by giving `GravityMode` a real `cleanup()` (clears the timer *and* disconnects/nulls the
-`ResizeObserver`, matching the pattern `MidiMode`/`SnakeMode`/`SandboxMode`/`ComposeMode` already
+`ResizeObserver`, matching the pattern `MelodyMode`/`SnakeMode`/`SandboxMode`/`ComposeMode` already
 follow) and calling it from `setMode`, in place of the old inline timer-only clear.
 
 `BlastMode` had the exact same latent bug — its own `ResizeObserver` (added for the same mobile
@@ -630,30 +630,30 @@ leaving too little board to actually play on.
 The `(max-width: 950px) and (orientation: landscape)` breakpoint turns
 `#blast-stats`/`#gravity-controls`/`#snake-controls` into small, corner-anchored
 (`top`/`left: 10px`) HUD overlays capped at `max-width: 200px`, with their own buttons shrunk to
-match. `#midi-controls`'s version of that same rule never got the `top`/`left`/`max-width` triple
+match. `#melody-controls`'s version of that same rule never got the `top`/`left`/`max-width` triple
 its siblings have — it stayed `position: absolute` but otherwise defaulted to its natural,
 content-driven flow width, so it floated over the board at whatever size "Choose MIDI Folder" +
 the difficulty selector + Play/Restart naturally wanted. Separately,
-`#midi-keyboard-instructions` (`.desktop-only`) is hidden by the touch-pointer rule and the
+`#melody-keyboard-instructions` (`.desktop-only`) is hidden by the touch-pointer rule and the
 `max-width: 767px` rule elsewhere, but *not* this landscape one, so on a device that matches only
 this breakpoint (a laptop-class landscape width without a coarse pointer, e.g. a Chromebook) it
 kept contributing bulk to the overlay too.
 
-Fixed by giving `#midi-controls` the same `top`/`left`/`max-width` treatment (and adding it to
+Fixed by giving `#melody-controls` the same `top`/`left`/`max-width` treatment (and adding it to
 the shared compact-button selectors its siblings already use), and adding `.desktop-only` to this
 breakpoint's hidden set, matching the other two breakpoints that already hide it.
 
 **Update (task #77 — mode-chrome declutter):** Melody's controls were later restructured to take
 even less of the board. The one-time setup (folder/song pickers, Difficulty) now routes into the
 drawer, and Play/Restart became icon-only. The always-visible Melody HUD is now the mobile dock
-(`#midi-mobile-tools`: streak readout + transport icons); `#midi-controls` itself is emptied and
+(`#melody-mobile-tools`: streak readout + transport icons); `#melody-controls` itself is emptied and
 hidden on mobile (so it can't float over the board at all). The invariant's intent is unchanged —
 the always-visible controls stay a small corner HUD, never a wide overlay.
 
 **Test:** `tests/desktop.spec.js` — "INV-31: Melody's always-visible controls stay a small corner
-HUD (not a wide overlay) at a landscape width under 950px" — asserts the dock (`#midi-mobile-tools`)
-stays ≤210px wide, that `#midi-controls` is hidden (emptied into the drawer), and that
-`#midi-keyboard-instructions` is hidden, at exactly the width class that reproduced the report.
+HUD (not a wide overlay) at a landscape width under 950px" — asserts the dock (`#melody-mobile-tools`)
+stays ≤210px wide, that `#melody-controls` is hidden (emptied into the drawer), and that
+`#melody-keyboard-instructions` is hidden, at exactly the width class that reproduced the report.
 
 ---
 
@@ -844,7 +844,7 @@ bonus tier, not a required one — the app works identically without it.
 The six bundled songs (Hot Cross Buns plus Frère Jacques, Happy Birthday, the Alphabet Song/
 Twinkle Twinkle, Mary Had a Little Lamb, Row Row Row Your Boat) are real `.mid` files, generated
 by `scripts/generate-bundled-midi.js` from plain `[noteName, beats]` data using the actual
-`MidiMode.writeMIDI` — the correct tool now that it exists and is tested, rather than hand-rolling
+`MelodyMode.writeMIDI` — the correct tool now that it exists and is tested, rather than hand-rolling
 SMF bytes a second time. Run that script again to regenerate the files (e.g. after a `writeMIDI`
 change) or to add another song.
 
@@ -914,7 +914,7 @@ subdivisions), an optional metronome click while recording, and `quantizeNotes()
 user's own explicit call earlier this session: a rough recording is cheap to redo, so this
 shouldn't silently mangle a capture nobody asked to have quantized.
 
-`MidiMode.writeMIDI` gained an optional second `tempoBPM` argument to make any of this
+`MelodyMode.writeMIDI` gained an optional second `tempoBPM` argument to make any of this
 meaningful in the saved file: previously it always assumed a fixed 120bpm and emitted no tempo
 meta event at all. Passing an explicit tempo now emits a real `FF 51 03` tempo meta event at
 tick 0; omitting it (every existing caller, and Compose's own Save when `quantizeEnabled` is
@@ -976,7 +976,7 @@ Extending/overdubbing a recording (resuming to append more measures, or layering
 mouse-tapped takes into one merged chord-bearing sequence) is a distinct, larger piece of design
 work, tracked separately -- not folded in here.
 
-**Test:** `tests/run_tests.js` — "MidiMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event
+**Test:** `tests/run_tests.js` — "MelodyMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event
 inspection, plus confirming the no-arg default is unchanged) and "ComposeMode.quantizeNotes
 tests" (grid-snapping math at two different tempo/subdivision combinations, confirming the
 function actually reads current state rather than a hardcoded assumption).
@@ -1305,7 +1305,7 @@ from internal `state` objects — is unchanged from right after its own mutation
 Melody here as "a fixed practice drill [that] doesn't hold placed/scored state, matching its
 exemption from INV-47" — that claim was simply wrong: Melody's drill progress (`targetLength`,
 `userIndex`, `startIndex`, the streak) is exactly the kind of state every other mode's own
-exemption-from-exemption already covers. `MidiMode.init()` called `resetGame()`
+exemption-from-exemption already covers. `MelodyMode.init()` called `resetGame()`
 **unconditionally** on every entry, including mere re-entry after switching away — silently
 discarding progress and auto-replaying the intro sequence, precisely what this invariant forbids.
 Fixed with a `state.gameStarted` flag: `resetGame()` (still called unconditionally by the

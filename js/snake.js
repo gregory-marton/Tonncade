@@ -372,7 +372,7 @@ const SnakeMode = {
         });
     },
 
-    // Shared by the keyboard/D-pad direction keys and MidiMode's note-on routing (issue #11) --
+    // Shared by the keyboard/D-pad direction keys and MelodyMode's note-on routing (issue #11) --
     // the same "don't reverse directly into your own tail" guard applies regardless of input.
     turnTo: function(newDir) {
         const currentDir = this.state.direction;

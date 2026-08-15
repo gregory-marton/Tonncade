@@ -134,7 +134,7 @@ test.describe('Invariant tests', () => {
 
     // Only Sandbox and Melody populate #mobile-always-visible's panels — Snake/Blast/Gravity
     // correctly leave both panels display:none, which is not what this invariant is about.
-    for (const [mode, panelId] of [['sandbox', 'sandbox-mobile-tools'], ['midi', 'midi-mobile-tools']]) {
+    for (const [mode, panelId] of [['sandbox', 'sandbox-mobile-tools'], ['melody', 'melody-mobile-tools']]) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       const problems = await page.evaluate((id) => {
         const panel = document.getElementById(id);
@@ -159,11 +159,11 @@ test.describe('Invariant tests', () => {
   // The narrower INV-3 test above only checks elements that DID get moved into the
   // always-visible area for being orphaned there afterward -- it can't catch an element that
   // was supposed to be moved but wasn't, since it never looks anywhere else. This is exactly
-  // that gap: Melody's mobile-drawer logic (js/main.js) redistributes #midi-controls' children
+  // that gap: Melody's mobile-drawer logic (js/main.js) redistributes #melody-controls' children
   // into two destinations (an always-visible dock, a collapsible drawer) and then hides
-  // #midi-controls itself outright -- if any interactive control gets left behind because the
+  // #melody-controls itself outright -- if any interactive control gets left behind because the
   // code that names what to move by id fell out of sync with index.html's own markup (the
-  // literal bug this regresses against: a dropdown reorg added #midi-source-group but the
+  // literal bug this regresses against: a dropdown reorg added #melody-source-group but the
   // relocation code still only knew the old #midi-folder-group/#midi-online-group), it's now
   // stranded, invisible, inside a container that's correctly hidden for an entirely different
   // reason. General on purpose: it doesn't enumerate ids, so it needs no maintenance as
@@ -280,8 +280,8 @@ test.describe('Invariant tests', () => {
   });
 
   test('INV-5: tapping a cell in Melody mode both sounds its note AND visibly highlights that exact cell', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-    await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
 
     await page.evaluate(() => {
       window.__played = [];
@@ -368,15 +368,15 @@ test.describe('Invariant tests', () => {
   });
 
   test('INV-23: live MIDI hardware note-on advances Melody mode\'s practice sequence like a tap', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-    await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
     await connectFakeMidiDevice(page);
 
-    const before = await page.evaluate(() => MidiMode.state.userIndex);
-    const targetMidi = await page.evaluate(() => MidiMode.state.melody[MidiMode.state.userIndex].midi);
+    const before = await page.evaluate(() => MelodyMode.state.userIndex);
+    const targetMidi = await page.evaluate(() => MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
     await sendFakeNoteOn(page, targetMidi);
 
-    const after = await page.evaluate(() => MidiMode.state.userIndex);
+    const after = await page.evaluate(() => MelodyMode.state.userIndex);
     expect(after).toBe(before + 1);
   });
 
@@ -608,7 +608,7 @@ test.describe('Invariant tests', () => {
         // userIndex/startIndex are deliberately excluded here -- a pan gesture in Melody also
         // plays whatever note is under the initial click (by design, see INV-5), which can
         // legitimately advance/reset progress. targetLength is untouched by any of that.
-        case 'midi': return { targetLength: MidiMode.state.targetLength };
+        case 'melody': return { targetLength: MelodyMode.state.targetLength };
         case 'compose': return { notes: ComposeMode.state.notes, selectedIndices: ComposeMode.state.selectedIndices };
         case 'life': return { live: [...LifeMode.state.live.entries()], generation: LifeMode.state.generation };
         default: return {};
@@ -639,7 +639,7 @@ test.describe('Invariant tests', () => {
       // and cross-iteration test interference are indistinguishable.
       await page.evaluate(() => Render.setRotation(0));
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-      if (mode === 'midi') await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+      if (mode === 'melody') await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
       if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       await setupModeState(page, mode);
 
@@ -661,8 +661,8 @@ test.describe('Invariant tests', () => {
         // corruption. Offsetting the stored center by a modest amount and refreshing mirrors a real
         // pan exactly.
         await page.evaluate((m) => {
-          const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode, life: LifeMode }[m];
-          const refresh = { sandbox: () => SandboxMode.refreshLattice(), midi: () => MidiMode.refreshBoard(), compose: () => ComposeMode.refreshBoard(), life: () => LifeMode.refreshLattice() }[m];
+          const modeObj = { sandbox: SandboxMode, melody: MelodyMode, compose: ComposeMode, life: LifeMode }[m];
+          const refresh = { sandbox: () => SandboxMode.refreshLattice(), melody: () => MelodyMode.refreshBoard(), compose: () => ComposeMode.refreshBoard(), life: () => LifeMode.refreshLattice() }[m];
           refresh(); // ensure the view center is initialized (null -> origin) before offsetting it
           modeObj.state.viewX -= 60;
           modeObj.state.viewY -= 40;
@@ -846,7 +846,7 @@ test.describe('Invariant tests', () => {
       '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
       '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
     ],
-    midi: ['#tonnetz-svg', '#drawer-handle', '#midi-source', '#midi-play-preview', '#midi-game-restart', '#midi-stats-group', '#midi-game-status'],
+    melody: ['#tonnetz-svg', '#drawer-handle', '#melody-source', '#melody-play-preview', '#melody-game-restart', '#melody-stats-group', '#melody-game-status'],
     sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select'],
     compose: [
       '#tonnetz-svg', '#drawer-handle', '#compose-source', '#compose-record', '#compose-play',
@@ -939,7 +939,7 @@ test.describe('Invariant tests', () => {
   // existing signal this project already uses for "conditional, shown only in some state" --
   // e.g. Compose's #compose-edit-group, only shown once a note is selected). A newly-added
   // control that fits none of those three buckets fails LOUD instead of silently having no
-  // reachability coverage the way #midi-source did for a full day after it was added.
+  // reachability coverage the way #melody-source did for a full day after it was added.
   // ────────────────────────────────────────────────────────────────────────
 
   // Entries may name a single control's own id, OR a container's id whose entire subtree is
@@ -948,7 +948,7 @@ test.describe('Invariant tests', () => {
   // have no ids of their own at all (`class="weight-icon"` only), so the group is classified by
   // its own wrapping `#blast-difficulty`/`#gravity-difficulty` container instead.
   const SECONDARY_ELEMENTS = {
-    midi: ['#midi-file-input', '#midi-difficulty'], // upload fallback + a setting, not a top-level action
+    melody: ['#melody-file-input', '#melody-difficulty'], // upload fallback + a setting, not a top-level action
     blast: ['#blast-difficulty'], // Easy/Medium/Hard piece-size setting, not a top-level action
     gravity: ['#gravity-difficulty'], // same setting, Gravity's own copy
     compose: [
@@ -960,7 +960,7 @@ test.describe('Invariant tests', () => {
   test('INV-13 coverage: every interactive control in a mode\'s panel is classified as primary or secondary, none forgotten', async ({ page }) => {
     const CONTAINER_ID = {
       gravity: 'gravity-controls', blast: 'blast-stats', snake: 'snake-controls',
-      midi: 'midi-controls', compose: 'compose-controls', life: 'life-controls',
+      melody: 'melody-controls', compose: 'compose-controls', life: 'life-controls',
     };
     for (const [mode, containerId] of Object.entries(CONTAINER_ID)) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
@@ -1630,7 +1630,7 @@ test.describe('Invariant tests', () => {
     // window (Melody at ~2:1 showed the board squished into a 4:3 center band). Restricted modes
     // already aspect-match (INV-40); this extends the same "fill the space" property to the
     // pannable modes.
-    const modes = ['sandbox', 'midi', 'compose'];
+    const modes = ['sandbox', 'melody', 'compose'];
     const viewports = [
       { width: 1400, height: 600 },  // wide (2.33)
       { width: 700, height: 1100 },  // tall (0.64)
@@ -1666,7 +1666,7 @@ test.describe('Invariant tests', () => {
     // is what actually reproduces it.)
     await page.setViewportSize({ width: 390, height: 844 });
     for (const restricted of ['gravity', 'blast', 'snake']) {
-      for (const pannable of ['sandbox', 'midi', 'compose']) {
+      for (const pannable of ['sandbox', 'melody', 'compose']) {
         await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), restricted);
         await page.waitForTimeout(300); // let the restricted ResizeObserver settle its inline fit
         const restrictedInline = await page.evaluate(() => Render.svg.style.width);
@@ -1747,7 +1747,7 @@ test.describe('Invariant tests', () => {
   });
 
   test('INV-24: rotating the view keeps every playable cell visible and unobscured', async ({ page }) => {
-    for (const mode of ['sandbox', 'midi', 'snake', 'blast']) {
+    for (const mode of ['sandbox', 'melody', 'snake', 'blast']) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       await clickRotateButton(page, 3); // 90 degrees
       const { unobscured } = await measureBoardOcclusion(page);
@@ -1843,10 +1843,10 @@ test.describe('Invariant tests', () => {
   // ────────────────────────────────────────────────────────────────────────
 
   test('INV-25: Melody mode rejects a different-octave note with the same name, and accepts the exact pitch', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-    await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
 
-    const targetMidi = await page.evaluate(() => MidiMode.state.melody[MidiMode.state.userIndex].midi);
+    const targetMidi = await page.evaluate(() => MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
 
     // Same pitch class (note name), different octave -- the exact "wrong E" scenario. A wrong
     // note is also real, INTENDED to block further input for ~1.2s and requeue a full replay
@@ -1854,41 +1854,41 @@ test.describe('Invariant tests', () => {
     // checked independently rather than chained through that side effect.
     const wrongOctaveMidi = targetMidi + 12;
     const afterWrong = await page.evaluate((m) => {
-      MidiMode.handleUserInputNote(m);
-      return MidiMode.state.userIndex;
+      MelodyMode.handleUserInputNote(m);
+      return MelodyMode.state.userIndex;
     }, wrongOctaveMidi);
     expect(afterWrong, 'a different-octave note sharing the same name must NOT count as correct').toBe(0);
 
     await page.evaluate(() => {
-      MidiMode.state.isPlayingSequence = false;
-      if (MidiMode.state.mistakeTimeoutId) {
-        clearTimeout(MidiMode.state.mistakeTimeoutId);
-        MidiMode.state.mistakeTimeoutId = null;
+      MelodyMode.state.isPlayingSequence = false;
+      if (MelodyMode.state.mistakeTimeoutId) {
+        clearTimeout(MelodyMode.state.mistakeTimeoutId);
+        MelodyMode.state.mistakeTimeoutId = null;
       }
-      MidiMode.state.userIndex = 0;
+      MelodyMode.state.userIndex = 0;
     });
 
     const afterCorrect = await page.evaluate((m) => {
-      MidiMode.handleUserInputNote(m);
-      return MidiMode.state.userIndex;
+      MelodyMode.handleUserInputNote(m);
+      return MelodyMode.state.userIndex;
     }, targetMidi);
     expect(afterCorrect, 'the exact target pitch must still count as correct').toBe(1);
   });
 
   test('INV-25: Melody\'s current-target readout shows an octave-qualified note name', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-    await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
 
     const name = await page.evaluate(() => {
-      const midi = MidiMode.state.melody[MidiMode.state.userIndex].midi;
+      const midi = MelodyMode.state.melody[MelodyMode.state.userIndex].midi;
       return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`; // octave-qualified, e.g. "E4"
     });
 
-    const currentSpan = page.locator('#midi-note-list [data-note-role="current"]');
+    const currentSpan = page.locator('#melody-note-list [data-note-role="current"]');
     await expect(currentSpan).toBeVisible();
     const currentText = (await currentSpan.textContent()).trim();
     expect(currentText, `the current note should read "${name}"`).toBe(name); // qualified name...
-    const listText = (await page.locator('#midi-note-list').textContent()).replace(/\s+/g, ' ');
+    const listText = (await page.locator('#melody-note-list').textContent()).replace(/\s+/g, ' ');
     expect(listText, 'the timeline no longer shows a frequency').not.toMatch(/\d+Hz/); // ...and no Hz
   });
 
@@ -1981,7 +1981,7 @@ test.describe('Invariant tests', () => {
   const COUNTER_ID_FOR_MODE = {
     blast: 'lines-count', gravity: 'gravity-lines-count', snake: 'snake-score',
     life: 'life-generation', compose: 'compose-note-count', sandbox: null,
-    midi: 'midi-current-streak',
+    melody: 'melody-current-streak',
   };
   const paintedFingerprint = async (page, mode) => page.evaluate((counterId) => {
     const MEANINGFUL_CLASSES = [
@@ -2032,14 +2032,14 @@ test.describe('Invariant tests', () => {
       await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').click();
       await page.locator('#compose-record').click();
     } },
-    { mode: 'midi', mutate: async (page) => {
+    { mode: 'melody', mutate: async (page) => {
       // Wait out the intro "listen" playback (resetGame() -> playTargetSequence() runs on its
       // own timers) before answering, same as a real player would have to. Reads the actual
       // target note/melody rather than assuming one (Melody's own melody is whatever loaded --
       // often the random offline-degrade in a test environment with no network) -- a real tap on
       // the correct cell, not a direct state mutation, matching every other mode's own mutate().
-      await page.waitForFunction(() => !MidiMode.state.isPlayingSequence, { timeout: 5000 });
-      const midi = await page.evaluate(() => MidiMode.state.melody[MidiMode.state.userIndex].midi);
+      await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 5000 });
+      const midi = await page.evaluate(() => MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
       const coord = await page.evaluate((m) => Tonnetz.nearestCoordFor(m, { p: 0, q: 0 }), midi);
       await page.locator(`polygon.cell:not(.ghost)[data-p="${coord.p}"][data-q="${coord.q}"]`).click({ force: true });
     } },

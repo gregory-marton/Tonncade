@@ -605,8 +605,8 @@ const ComposeMode = {
         // in wouldn't add real information (see task #52; the default, no-tempo-arg path is
         // exactly today's existing behavior).
         const buffer = this.state.quantizeEnabled
-            ? MidiMode.writeMIDI(this.state.notes, this.state.tempoBPM)
-            : MidiMode.writeMIDI(this.state.notes);
+            ? MelodyMode.writeMIDI(this.state.notes, this.state.tempoBPM)
+            : MelodyMode.writeMIDI(this.state.notes);
         if (typeof MidiFolder !== 'undefined') {
             const savedToFolder = await MidiFolder.saveFileAs(name, buffer);
             this.setStatus(savedToFolder ? `Saved "${name}" to your MIDI folder.` : `Downloaded "${name}".`);
@@ -620,12 +620,12 @@ const ComposeMode = {
     // nearest the previous note's own chosen cell.
     loadMelodyFromArrayBuffer: function(arrayBuffer, displayName) {
         try {
-            const parsed = MidiMode.parseMIDI(arrayBuffer);
+            const parsed = MelodyMode.parseMIDI(arrayBuffer);
             if (!parsed || parsed.notes.length === 0) {
                 alert('No notes found in the MIDI file.');
                 return;
             }
-            const melody = MidiMode.extractMonophonicMelody(parsed);
+            const melody = MelodyMode.extractMonophonicMelody(parsed);
 
             let prev = { p: 0, q: 0 };
             this.state.notes = melody.map(note => {

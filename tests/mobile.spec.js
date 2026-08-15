@@ -26,7 +26,7 @@ async function countVisibleCells(page) {
       // .m-btn children actually paint anything opaque, so those are what should count as
       // occluding, not the whole (mostly empty) container rect.
       '#mobile-controls .m-btn', '#snake-mobile-controls .m-btn',
-      '#palette.floating-queue', '#midi-controls',
+      '#palette.floating-queue', '#melody-controls',
     ];
     const overlayRects = [];
     for (const sel of overlaySelectors) {
@@ -255,7 +255,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     if (width >= 768) return;
 
     // Switch to Melody mode
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     
     // The sandbox-mobile-tools area should be hidden
     const sandboxTools = page.locator('#sandbox-mobile-tools');
@@ -544,11 +544,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
 
   // Real report: rotating Melody's view (INV-24) could move a melody's notes off-screen with
   // no way back, since Melody had no pan capability at all (touch OR mouse) -- despite
-  // Render.getPanBounds() already listing 'midi' among the free-pan modes, its touchstart/
+  // Render.getPanBounds() already listing 'melody' among the free-pan modes, its touchstart/
   // touchmove handlers (js/main.js) unconditionally blocked it. Two real, simultaneous touch
   // points (not one dispatched twice) are required to exercise the actual 2-finger gesture path.
   test('Melody mode: a real two-finger drag pans the Tonnetz', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     await page.evaluate(() => {
       window.__dispatchTwoTouch = function(type, points) {
         const el = document.getElementById('tonnetz-svg');
@@ -588,11 +588,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   });
 
   test('Melody mode: a real single-finger touch drag moves the scrub marker to the touched note', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     await page.evaluate(() => {
-      MidiMode.state.targetLength = 4;
-      MidiMode.state.startIndex = 2;
-      MidiMode.updateDifficultyUI();
+      MelodyMode.state.targetLength = 4;
+      MelodyMode.state.startIndex = 2;
+      MelodyMode.updateDifficultyUI();
 
       // Targets whichever element the touch actually STARTED on (real "implicit capture"
       // semantics), same discipline as this file's other real-touch helpers -- a synthetic
@@ -629,7 +629,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchmove', x, y), [endX, endY]);
     await page.evaluate(([x, y]) => window.__dispatchScrubTouch('touchend', x, y), [endX, endY]);
 
-    expect(await page.evaluate(() => MidiMode.state.startIndex)).toBe(0);
+    expect(await page.evaluate(() => MelodyMode.state.startIndex)).toBe(0);
   });
 
   test('drag repositions ghost WITHOUT placing or picking up', async ({ page }) => {
@@ -1486,13 +1486,13 @@ test.describe('Mobile Viewport and Layout Tests', () => {
       expect(count).toBeGreaterThan(0);
     },
     gravity: async (page) => PALETTE_EXPECTATION.blast(page),
-    midi: async (page) => {
+    melody: async (page) => {
       const hidden = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).display === 'none');
       expect(hidden).toBe(true);
     },
-    snake: async (page) => PALETTE_EXPECTATION.midi(page),
-    compose: async (page) => PALETTE_EXPECTATION.midi(page),
-    life: async (page) => PALETTE_EXPECTATION.midi(page),
+    snake: async (page) => PALETTE_EXPECTATION.melody(page),
+    compose: async (page) => PALETTE_EXPECTATION.melody(page),
+    life: async (page) => PALETTE_EXPECTATION.melody(page),
   };
 
   test('switching through any 3-mode sequence leaves the shared palette/piece-list correct for the final mode (N^3 triplets)', async ({ page }) => {
@@ -1671,8 +1671,8 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await expect(page.locator('#controls')).toBeHidden();
 
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
-    await expect(page.locator('#midi-keyboard-instructions')).toBeHidden();
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-keyboard-instructions')).toBeHidden();
 
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
     await expect(page.locator('#snake-keyboard-instructions')).toBeHidden();
@@ -1796,9 +1796,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   });
 
   test('MIDI mode touch plays a note without crashing', async ({ page }) => {
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-    const status = page.locator('#midi-game-status');
+    const status = page.locator('#melody-game-status');
     await expect(status).toHaveText(/Your turn!/, { timeout: 8000 });
 
     const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');

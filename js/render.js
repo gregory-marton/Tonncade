@@ -146,7 +146,7 @@ const Render = {
     // Flashes every rendered cell sharing a given MIDI pitch (a Tonnetz places the same note at
     // multiple lattice positions by design, so "the cell for this note" is really "every cell for
     // this note" -- see data-midi in drawLattice/createHex). Generic across modes: originally
-    // Melody-mode-only (MidiMode.highlightCellByMidi), moved here once Sandbox and live MIDI
+    // Melody-mode-only (MelodyMode.highlightCellByMidi), moved here once Sandbox and live MIDI
     // hardware input needed the exact same behavior with no mode-specific state involved.
     highlightByMidi: function(midi, duration = 300) {
         const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
@@ -273,8 +273,8 @@ const Render = {
                     group.appendChild(this.createOctaveLabel(p, q, midi));
 
                     // Add QWERTY mapping label if in MIDI mode
-                    if (typeof App !== 'undefined' && App.currentMode === 'midi' && typeof MidiMode !== 'undefined') {
-                        const key = MidiMode.getQwertyKey(p, q);
+                    if (typeof App !== 'undefined' && App.currentMode === 'melody' && typeof MelodyMode !== 'undefined') {
+                        const key = MelodyMode.getQwertyKey(p, q);
                         if (key) {
                             const qLabel = this.createKeyboardLabel(p, q, key);
                             group.appendChild(qLabel);

@@ -237,11 +237,11 @@ test.describe('Exploratory tests (prototype)', () => {
       // consecutive same-mode scenarios, so an earlier scenario's interactions would otherwise
       // leave the board panned off to one side in this scenario's frame. Each captured image
       // should show the clean default centered view (null -> origin, see Render.panView).
-      const modeObj = { sandbox: SandboxMode, midi: MidiMode, compose: ComposeMode }[m];
+      const modeObj = { sandbox: SandboxMode, melody: MelodyMode, compose: ComposeMode }[m];
       if (modeObj) { modeObj.state.viewX = null; modeObj.state.viewY = null; }
       const fns = {
         sandbox: () => SandboxMode.refreshLattice(),
-        midi: () => MidiMode.refreshBoard(),
+        melody: () => MelodyMode.refreshBoard(),
         compose: () => ComposeMode.refreshBoard(),
         snake: () => SnakeMode.refreshBoard(),
         blast: () => BlastMode.refreshUI(),

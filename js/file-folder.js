@@ -82,7 +82,7 @@ const FileFolder = {
         // "left and went somewhere else entirely."
         //
         // Deliberately NOT called from each mode's own cleanup(): several modes' cleanup() is
-        // reused internally too (e.g. MidiMode.resetGame() calls this.cleanup() as part of normal
+        // reused internally too (e.g. MelodyMode.resetGame() calls this.cleanup() as part of normal
         // ENTRY, not just on exit), so it fires far more often than "the player actually left."
         // setMode is the one place that reliably knows the outgoing mode was really outgoing.
         invalidate: function() {

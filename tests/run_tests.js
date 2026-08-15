@@ -63,7 +63,7 @@ global.document = {
         if (selector === '.mode-option') {
             return [
                 { getAttribute: () => 'sandbox', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'midi', classList: { add: () => {}, remove: () => {} } },
+                { getAttribute: () => 'melody', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'snake', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'blast', classList: { add: () => {}, remove: () => {} } },
                 { getAttribute: () => 'gravity', classList: { add: () => {}, remove: () => {} } }
@@ -118,7 +118,7 @@ loadScript('render.js');
 loadScript('sandbox.js');
 loadScript('blast.js');
 loadScript('gravity.js');
-loadScript('midi.js');
+loadScript('melody.js');
 loadScript('compose.js');
 loadScript('snake.js');
 loadScript('file-folder.js'); // life.js's LifeFolder = FileFolder.create(...) needs this loaded first
@@ -178,7 +178,7 @@ try {
     const TonnetzObj = vm.runInContext("Tonnetz", context);
 
     // Standard Mode Tonnetz Isomorphism Test
-    App.currentMode = 'midi'; // Standard mode formula
+    App.currentMode = 'melody'; // Standard mode formula
     for (let p = -50; p <= 50; p++) {
         for (let q = -50; q <= 50; q++) {
             const currentMidi = TonnetzObj.getMidi(p, q);
@@ -389,13 +389,13 @@ try {
     })();
     console.log("PASS: Tonnetz.nearestCoordFor correctly finds the nearest lattice solution!");
 
-    // Test MidiMode.writeMIDI -- the inverse of parseMIDI/tickToSec, for Compose mode's Save.
+    // Test MelodyMode.writeMIDI -- the inverse of parseMIDI/tickToSec, for Compose mode's Save.
     // Round-trips through parseMIDI+extractMonophonicMelody and should reproduce the original
     // sequence (modulo tick-grid rounding, which is why the tolerance is a fraction of one tick
     // at the fixed 480-ticks-per-beat/120bpm resolution writeMIDI uses).
-    console.log("Running MidiMode.writeMIDI round-trip tests...");
+    console.log("Running MelodyMode.writeMIDI round-trip tests...");
     (function() {
-        const MidiModeObj = vm.runInContext("MidiMode", context);
+        const MidiModeObj = vm.runInContext("MelodyMode", context);
         const original = [
             { midi: 64, time: 0.0, duration: 0.4 },
             { midi: 62, time: 0.5, duration: 0.4 },
@@ -434,7 +434,7 @@ try {
             process.exit(1);
         }
     })();
-    console.log("PASS: MidiMode.writeMIDI round-trips correctly through parseMIDI!");
+    console.log("PASS: MelodyMode.writeMIDI round-trips correctly through parseMIDI!");
 
     // Task #52: writeMIDI must accept an explicit tempo and actually emit a real tempo meta
     // event (FF 51 03 <3-byte usec-per-beat>) for it -- previously always silently assumed
@@ -443,9 +443,9 @@ try {
     // whatever tempo they each independently assume (explicit or defaulted), so the seconds
     // cancel out correctly regardless of what BPM was actually requested. Only inspecting the
     // raw bytes for the real meta event proves one was actually written.
-    console.log("Running MidiMode.writeMIDI explicit-tempo tests...");
+    console.log("Running MelodyMode.writeMIDI explicit-tempo tests...");
     (function() {
-        const MidiModeObj = vm.runInContext("MidiMode", context);
+        const MidiModeObj = vm.runInContext("MelodyMode", context);
         const buffer = MidiModeObj.writeMIDI([{ midi: 60, time: 0, duration: 0.3 }], 90); // 90bpm
         const bytes = new Uint8Array(buffer);
 
@@ -475,7 +475,7 @@ try {
             process.exit(1);
         }
     })();
-    console.log("PASS: MidiMode.writeMIDI emits a real tempo meta event matching an explicit BPM, and the no-arg default is unchanged!");
+    console.log("PASS: MelodyMode.writeMIDI emits a real tempo meta event matching an explicit BPM, and the no-arg default is unchanged!");
 
     // Task #52: ComposeMode.quantizeNotes snaps each note's raw (freely-tapped) time/duration
     // onto the chosen tempo/subdivision grid. WRITE_TICKS_PER_BEAT (480) is divisible by both 32
@@ -635,7 +635,7 @@ try {
     console.log("Running MIDI Mode touch input test...");
     
     // Switch to MIDI mode
-    App.currentMode = 'midi';
+    App.currentMode = 'melody';
     
     // Ensure getCellFromTouch works by mocking elementFromPoint
     global.document.elementFromPoint = (x, y) => {
@@ -826,7 +826,7 @@ try {
     // browser/OS language. Scans the actual source files rather than checking a couple of
     // rendered links, so any future wikipedia.org link added without the prefix gets caught.
     console.log("Running Wikipedia links use Special:MyLanguage test...");
-    const filesToScan = ['index.html', 'js/main.js', 'js/sandbox.js', 'js/blast.js', 'js/gravity.js', 'js/snake.js', 'js/midi.js'];
+    const filesToScan = ['index.html', 'js/main.js', 'js/sandbox.js', 'js/blast.js', 'js/gravity.js', 'js/snake.js', 'js/melody.js'];
     const wikiUrlRe = /https?:\/\/[a-z-]+\.wikipedia\.org\/[^\s"'`)]+/g;
     let wikiLinksChecked = 0;
     for (const relPath of filesToScan) {
