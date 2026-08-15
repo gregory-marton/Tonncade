@@ -1302,9 +1302,10 @@ pieces or chord-guide results, are not listed separately):
 | Gravity | Tonnetz, each of the 5 (portrait) / 6 (landscape) D-pad buttons individually, the next-piece preview, Pause, Restart, Stats, Drawer pull |
 | Blast | Tonnetz, the preview/place control, Stats, Drawer pull |
 | Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
-| Melody | Tonnetz, Drawer pull, Play, Restart, Stats, Sequence message |
+| Melody | Tonnetz, Drawer pull, Song source, Play, Restart, Stats, Sequence message |
 | Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
-| Compose | Tonnetz, Drawer pull, Record, Play, Undo, Clear, Save, Stats |
+| Compose | Tonnetz, Drawer pull, Song source, Record, Play, Undo, Clear, Save, Stats |
+| Life | Tonnetz, Drawer pull, Automaton source, Play/Pause, Step, Reset, Clear, Save, Generation counter |
 
 This inventory is the reference list INV-13 (below) checks against, and the vocabulary the
 rest of this doc and its tests should stay consistent with.

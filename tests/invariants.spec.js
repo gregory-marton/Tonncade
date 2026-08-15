@@ -846,8 +846,16 @@ test.describe('Invariant tests', () => {
       '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
       '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
     ],
-    midi: ['#tonnetz-svg', '#drawer-handle', '#midi-play-preview', '#midi-game-restart', '#midi-stats-group', '#midi-game-status'],
+    midi: ['#tonnetz-svg', '#drawer-handle', '#midi-source', '#midi-play-preview', '#midi-game-restart', '#midi-stats-group', '#midi-game-status'],
     sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select'],
+    compose: [
+      '#tonnetz-svg', '#drawer-handle', '#compose-source', '#compose-record', '#compose-play',
+      '#compose-undo', '#compose-clear', '#compose-save', '#compose-stats-group',
+    ],
+    life: [
+      '#tonnetz-svg', '#drawer-handle', '#life-source', '#life-play-pause', '#life-step',
+      '#life-reset', '#life-clear', '#life-save', '#life-generation',
+    ],
   };
 
   test('INV-13: every mode\'s primary elements are reachable in both portrait and landscape', async ({ page }) => {
