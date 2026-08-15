@@ -1981,6 +1981,7 @@ test.describe('Invariant tests', () => {
   const COUNTER_ID_FOR_MODE = {
     blast: 'lines-count', gravity: 'gravity-lines-count', snake: 'snake-score',
     life: 'life-generation', compose: 'compose-note-count', sandbox: null,
+    midi: 'midi-current-streak',
   };
   const paintedFingerprint = async (page, mode) => page.evaluate((counterId) => {
     const MEANINGFUL_CLASSES = [
@@ -2030,6 +2031,17 @@ test.describe('Invariant tests', () => {
       await page.locator('#compose-record').click();
       await page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]').click();
       await page.locator('#compose-record').click();
+    } },
+    { mode: 'midi', mutate: async (page) => {
+      // Wait out the intro "listen" playback (resetGame() -> playTargetSequence() runs on its
+      // own timers) before answering, same as a real player would have to. Reads the actual
+      // target note/melody rather than assuming one (Melody's own melody is whatever loaded --
+      // often the random offline-degrade in a test environment with no network) -- a real tap on
+      // the correct cell, not a direct state mutation, matching every other mode's own mutate().
+      await page.waitForFunction(() => !MidiMode.state.isPlayingSequence, { timeout: 5000 });
+      const midi = await page.evaluate(() => MidiMode.state.melody[MidiMode.state.userIndex].midi);
+      const coord = await page.evaluate((m) => Tonnetz.nearestCoordFor(m, { p: 0, q: 0 }), midi);
+      await page.locator(`polygon.cell:not(.ghost)[data-p="${coord.p}"][data-q="${coord.q}"]`).click({ force: true });
     } },
   ];
 

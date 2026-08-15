@@ -28,6 +28,12 @@ for the JavaScript code in this file.
 const MidiMode = {
     state: {
         melody: [],            // List of { midi, time, duration }
+        // INV-48: a mode switch must pause the drill, never discard or restart it. gameStarted
+        // gates init()'s own resetGame() call so only a genuinely NEW game (first entry, the
+        // explicit Restart button, or loading a new song -- all of which call resetGame()
+        // directly and unconditionally) resets progress; a mere re-entry after switching away
+        // resumes exactly where the player left off instead.
+        gameStarted: false,
         targetLength: 1,       // Current number of notes to play/repeat
         userIndex: 0,          // Current progress of user in repeating the sequence
         startIndex: 0,         // Where the drilled segment begins (see #46 scrub control) --
@@ -136,7 +142,19 @@ const MidiMode = {
         }
 
         this.setupDOMEvents();
-        this.resetGame();
+        if (!this.state.gameStarted) {
+            this.resetGame();
+        } else {
+            // Resuming after a mode switch (INV-48): repaint exactly where the player left off --
+            // no reset, no auto-playing the target sequence. cleanup() (run when Melody was left)
+            // already cleared the note-list markup and Tonnetz glow classes without touching
+            // targetLength/userIndex/startIndex/the streak or #midi-game-status's text, so
+            // rebuilding the note list/ghost/streak bar from that untouched progress is enough to
+            // make the resume look exactly like nothing happened.
+            this.updateStreakUI();
+            this.updateDifficultyUI();
+            this.updateGhost();
+        }
         this.refreshBoard();
         this.setupKeyboardEvents();
     },
@@ -561,7 +579,13 @@ const MidiMode = {
         });
     },
 
+    // Marks the drill as genuinely started -- checked by init() so a mere mode SWITCH (away and
+    // back) never re-triggers this. Set unconditionally here (not just from init()'s own guard)
+    // so every real reset path -- first entry, the explicit Restart button, loading a new song --
+    // stays exactly as unconditional as it already was; only re-entering an ALREADY-started game
+    // is newly guarded (see init()).
     resetGame: function() {
+        this.state.gameStarted = true;
         this.cleanup();
         this.state.targetLength = 1;
         this.state.userIndex = 0;

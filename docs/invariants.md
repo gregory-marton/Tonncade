@@ -1294,13 +1294,33 @@ had already left Life; and Blast/Gravity's shared `Board.cells`, which silently 
 overwrite the other's board and reset progress on every re-entry).
 
 **Test:** `tests/invariants.spec.js` — "INV-48: ... survives a switch to ... and back untouched",
-once per stateful mode (Sandbox, Blast, Gravity, Snake, Life, Compose — Melody is a fixed
-practice drill and doesn't hold placed/scored state, matching its exemption from INV-47). Each
+once per stateful mode (Sandbox, Blast, Gravity, Snake, Life, Compose, **Melody**). Each
 mutates the mode via a real UI interaction, switches to the next mode round-robin and mutates
 that one too (proving no leakage either direction), waits past any relevant timer interval, then
 switches back and asserts the mode's black-box fingerprint — every meaningfully-classed painted
 cell on the shared canvas plus every mode's own score/counter text, read from the DOM rather than
 from internal `state` objects — is unchanged from right after its own mutation.
+
+**Melody was a real violation, found live, not just a coverage gap.** The doc previously exempted
+Melody here as "a fixed practice drill [that] doesn't hold placed/scored state, matching its
+exemption from INV-47" — that claim was simply wrong: Melody's drill progress (`targetLength`,
+`userIndex`, `startIndex`, the streak) is exactly the kind of state every other mode's own
+exemption-from-exemption already covers. `MidiMode.init()` called `resetGame()`
+**unconditionally** on every entry, including mere re-entry after switching away — silently
+discarding progress and auto-replaying the intro sequence, precisely what this invariant forbids.
+Fixed with a `state.gameStarted` flag: `resetGame()` (still called unconditionally by the
+legitimate reset paths — first-ever entry, the explicit Restart button, loading a new song) sets
+it; `init()` only calls `resetGame()` itself when it's still `false`, otherwise just repaints the
+UI from the untouched progress state, exactly mirroring "leaving pauses, entering never
+auto-resumes or resets" as every other mode already does.
+
+The exemption existed because nobody had re-checked it against what the code actually does since
+it was written — the same underlying failure mode as a stale reference (see `scripts/check-dom-ids.js`'s
+own history): a claim about the code, recorded once, drifting silently out of sync with reality,
+with nothing to catch it. There's no automatable check to prevent an *incorrect test-scope
+exemption* the way there is for a stale id string — the real defense here is `STATEFUL_MODES`
+covering every mode with any progress worth preserving, so no mode gets to claim an unverified
+exemption from this invariant going forward.
 
 ---
 
