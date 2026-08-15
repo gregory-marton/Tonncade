@@ -1558,6 +1558,56 @@ test.describe('file:// support', () => {
   });
 });
 
+// A returning player's service worker (sw.js) can have precached index.html/js/etc. on some
+// earlier visit. If the site later changes and that cache is never invalidated, the player's
+// browser silently keeps serving the OLD markup/code -- exactly what happened live: index.html's
+// Melody/Compose/Life controls were reorganized into a single #midi-source dropdown, but a
+// returning player's stale-cached index.html still had the OLD (pre-reorg) markup, so the new
+// select simply didn't exist on their page -- "the dropdown disappeared entirely." Root cause:
+// sw.js used a cache-first fetch strategy, so nothing about a code change alone (only bumping
+// CACHE_NAME, easy to forget) ever invalidated an existing precache. Fixed to network-first
+// (falls back to cache only when actually offline) -- this test simulates a stale precache
+// directly (not achievable by editing files on disk mid-test) and confirms a normal online visit
+// no longer serves it.
+test.describe('Service worker cache staleness (regression)', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('a stale precached index.html is never served while online -- network-first wins', async ({ page }) => {
+    await page.goto('/');
+    // First-ever visit: the SW installs/activates/claims the client, which fires main.js's own
+    // controllerchange handler and reloads once -- wait that out before touching the cache.
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+    await page.waitForLoadState('load');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+
+    // Directly corrupt whatever this SW actually precached for '/' and '/index.html' -- simulates
+    // a browser that cached index.html on an earlier visit, before some later markup change.
+    const patched = await page.evaluate(async () => {
+      const cacheName = (await caches.keys())[0];
+      const cache = await caches.open(cacheName);
+      const keys = await cache.keys();
+      const touched = [];
+      for (const req of keys) {
+        const url = new URL(req.url);
+        if (url.pathname !== '/' && url.pathname !== '/index.html') continue;
+        await cache.put(req, new Response('<html><body>STALE-CACHED-MARKER</body></html>', {
+          headers: { 'Content-Type': 'text/html' },
+        }));
+        touched.push(req.url);
+      }
+      return touched;
+    });
+    expect(patched.length).toBeGreaterThan(0);
+
+    // A normal (online) reload must ignore that stale cache entirely and fetch the real page.
+    await page.reload();
+    const bodyText = await page.evaluate(() => document.body.textContent);
+    expect(bodyText).not.toContain('STALE-CACHED-MARKER');
+    await expect(page.locator('#mode-slider, .mode-option').first()).toBeVisible();
+  });
+});
+
 // #85: Life mode -- the neighbor/isotropy classifier core. Classifies the 6-cell consonant ring
 // by its dihedral-orbit arrangement (see docs/life-rules.md).
 test.describe('Life isotropy classifier', () => {
