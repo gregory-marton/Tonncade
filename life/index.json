@@ -34,5 +34,9 @@
   {
     "name": "Beehive Glider Burst",
     "file": "beehive-glider-burst.yaml"
+  },
+  {
+    "name": "Beehive Glider Gun",
+    "file": "beehive-gun.yaml"
   }
 ]
