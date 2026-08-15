@@ -187,6 +187,22 @@ const Render = {
         return t;
     },
 
+    // A small, low-contrast octave digit beside (not merging into) the centered note-name label
+    // above -- the note letter's own centered position must never shift to accommodate this, so
+    // this is an independent, left-anchored text element (same pattern as createKeyboardLabel's
+    // own sibling label below), not a tspan inside createLabel's centered text run.
+    createOctaveLabel: function(p, q, midi) {
+        const pos = this.getScreenPos(p, q);
+        const t = document.createElementNS(this.NS, 'text');
+        t.setAttribute('x', pos.x + 7); // just right of the note-name glyph's own right edge
+        t.setAttribute('y', pos.y + 5); // same baseline as the note-name label
+        t.setAttribute('text-anchor', 'start');
+        t.setAttribute('class', 'octave-label');
+        t.textContent = Tonnetz.getOctave(midi);
+        this.applyLabelCounterRotation(t, pos.x + 7, pos.y + 5);
+        return t;
+    },
+
     createKeyboardLabel: function(p, q, text) {
         const pos = this.getScreenPos(p, q);
         const t = document.createElementNS(this.NS, 'text');
@@ -254,6 +270,7 @@ const Render = {
                 if (opacity > 0.5 && (audible || !options.grayInaudible)) {
                     const label = this.createLabel(p, q, Tonnetz.getNoteName(midi));
                     group.appendChild(label);
+                    group.appendChild(this.createOctaveLabel(p, q, midi));
 
                     // Add QWERTY mapping label if in MIDI mode
                     if (typeof App !== 'undefined' && App.currentMode === 'midi' && typeof MidiMode !== 'undefined') {

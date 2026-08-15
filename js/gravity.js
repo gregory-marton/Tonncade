@@ -540,6 +540,7 @@ const GravityMode = {
                 const midi = Tonnetz.getMidi(c.p, c.q);
                 const label = Render.createLabel(c.p, c.q, Tonnetz.getNoteName(midi));
                 Render.appendToLattice(label);
+                Render.appendToLattice(Render.createOctaveLabel(c.p, c.q, midi));
             });
 
             // Render ghost projection

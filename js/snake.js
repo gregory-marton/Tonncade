@@ -496,6 +496,7 @@ const SnakeMode = {
             const label = Render.createLabel(gem.p, gem.q, Tonnetz.getNoteName(gemMidi));
             label.setAttribute('class', 'note-label gem-label');
             Render.appendToLattice(label);
+            Render.appendToLattice(Render.createOctaveLabel(gem.p, gem.q, gemMidi));
         }
 
         // Draw pasted extra gems (same look as the main gem)
@@ -504,9 +505,11 @@ const SnakeMode = {
                 fill: '#ff9c4b', stroke: '#ffffff', strokeWidth: 2, className: 'snake-gem',
             });
             Render.appendToLattice(hex);
-            const label = Render.createLabel(g.p, g.q, Tonnetz.getNoteName(Tonnetz.getMidi(g.p, g.q)));
+            const extraMidi = Tonnetz.getMidi(g.p, g.q);
+            const label = Render.createLabel(g.p, g.q, Tonnetz.getNoteName(extraMidi));
             label.setAttribute('class', 'note-label gem-label');
             Render.appendToLattice(label);
+            Render.appendToLattice(Render.createOctaveLabel(g.p, g.q, extraMidi));
         });
 
         // Draw Snake body (backwards from tail to head, so head lays on top)
@@ -526,6 +529,7 @@ const SnakeMode = {
             const midi = Tonnetz.getMidi(segment.p, segment.q);
             const label = Render.createLabel(segment.p, segment.q, Tonnetz.getNoteName(midi));
             Render.appendToLattice(label);
+            Render.appendToLattice(Render.createOctaveLabel(segment.p, segment.q, midi));
         }
 
         // Aspect-matched fit against the board's own fixed radius-7 hex, the same treatment

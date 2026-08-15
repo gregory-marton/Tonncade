@@ -17,6 +17,45 @@ test('the "</>" version tag next to the title links to the GitHub repo', async (
   await expect(link.locator('.version-tag')).toBeVisible();
 });
 
+// Reported live: Melody drills a specific OCTAVE, but the board only ever labeled cells with the
+// bare note letter -- a player could never "read the music" directly off the Tonnetz, since the
+// octave wasn't shown anywhere permanent (only Sandbox's transient tap-and-hold overlay had it).
+// Added everywhere (not just Melody/Compose) via the shared Render.createLabel/createOctaveLabel
+// path. Explicit constraint: the note letter's own centered position must NOT shift to make room
+// for the octave digit -- confirmed here by checking the note-label's x is unchanged from its own
+// getScreenPos, with the octave digit as a separate, independently-positioned sibling element.
+test('Every cell shows a subtle octave digit beside (not merging into) its centered note-name label', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  const result = await page.evaluate(() => {
+    const { x: expectedX, y: expectedY } = Render.getScreenPos(0, 0);
+    // Match by BOTH x and y -- axial hex geometry means distinct (p,q) cells can share an x
+    // (same column, different row), so x alone is ambiguous.
+    const noteLabel = Array.from(document.querySelectorAll('text.note-label')).find(t =>
+      Math.abs(parseFloat(t.getAttribute('x')) - expectedX) < 0.5 &&
+      Math.abs(parseFloat(t.getAttribute('y')) - (expectedY + 5)) < 0.5
+    );
+    const octaveLabel = Array.from(document.querySelectorAll('text.octave-label')).find(t =>
+      Math.abs(parseFloat(t.getAttribute('y')) - parseFloat(noteLabel.getAttribute('y'))) < 0.5 &&
+      parseFloat(t.getAttribute('x')) > expectedX
+    );
+    return {
+      expectedX,
+      noteText: noteLabel && noteLabel.textContent,
+      noteX: noteLabel && parseFloat(noteLabel.getAttribute('x')),
+      octaveText: octaveLabel && octaveLabel.textContent,
+      octaveX: octaveLabel && parseFloat(octaveLabel.getAttribute('x')),
+    };
+  });
+
+  // (0,0) is MIDI 60 = C4 (getNoteName -> 'C', getOctave -> 4).
+  expect(result.noteText).toBe('C');
+  expect(result.noteX).toBeCloseTo(result.expectedX, 1); // unchanged, still exactly centered
+  expect(result.octaveText).toBe('4');
+  expect(result.octaveX).toBeGreaterThan(result.noteX); // to the right, a separate element
+});
+
 test('chord guide has no placeholder explanation text before a chord is chosen', async ({ page }) => {
   await page.goto('/');
   const text = await page.locator('#chord-guide-results').innerText();

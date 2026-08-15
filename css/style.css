@@ -223,6 +223,17 @@ svg {
     user-select: none;
 }
 
+/* A subtle octave digit beside (not part of) the centered note-name label -- lets a player
+   actually "read the music" (e.g. Melody drills a specific octave, not just a pitch class)
+   without the letter itself losing its centered position or the board reading as cluttered. */
+.octave-label {
+    fill: var(--dim);
+    font-size: 9px;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
+}
+
 .ghost {
     pointer-events: none;
     opacity: 0.6;
