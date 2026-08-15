@@ -178,14 +178,12 @@ const MidiMode = {
 
         this.setupScrubMarker();
 
-        const diffSelect = document.getElementById('midi-difficulty');
-        if (diffSelect) {
-            diffSelect.value = this.state.difficulty;
-            diffSelect.onchange = (e) => {
-                this.state.difficulty = e.target.value;
-                this.updateDifficultyUI();
-            };
-        }
+        // Dumbbell-triplet difficulty picker (task #93's pattern, matching Blast/Gravity's own
+        // control) -- click the Nth weight to set easy/medium/hard.
+        document.querySelectorAll('#midi-difficulty .weight-icon').forEach((el) => {
+            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        });
+        this.updateDifficultyBarbell();
 
         if (typeof MidiFolder !== 'undefined') {
             MidiFolder.setup(this, {
@@ -405,6 +403,29 @@ const MidiMode = {
             bestStreakEl.textContent = this.state.bestStreak;
         }
         Render.setStatBar('midi-streak-fill', this.state.currentStreak, this.state.bestStreak);
+    },
+
+    // No persistence (localStorage) -- matches this control's own prior behavior as a plain
+    // <select>, always defaulting to 'easy' each session; Blast/Gravity's own barbell does
+    // persist theirs, but changing that here would be an unrequested behavior change, not part
+    // of just swapping the UI control to match their look.
+    setDifficulty: function(diff) {
+        if (diff !== 'easy' && diff !== 'medium' && diff !== 'hard') return;
+        this.state.difficulty = diff;
+        this.updateDifficultyBarbell();
+        this.updateDifficultyUI();
+    },
+
+    // Highlight 1/2/3 of the dumbbell icons for easy/medium/hard -- same cumulative-lit pattern
+    // as Blast/Gravity's own updateDifficultyUI (see js/blast.js), named differently here since
+    // Melody's OWN updateDifficultyUI already means something else entirely (repainting the
+    // note-list/Tonnetz practice hints, not lighting icons).
+    updateDifficultyBarbell: function() {
+        const order = { easy: 1, medium: 2, hard: 3 };
+        const lit = order[this.state.difficulty] || 1;
+        document.querySelectorAll('#midi-difficulty .weight-icon').forEach((el, i) => {
+            el.classList.toggle('lit', i < lit);
+        });
     },
 
     updateDifficultyUI: function(overrideIndex) {

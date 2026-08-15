@@ -147,14 +147,18 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
                          folder/song selectors so it routes into the drawer on mobile (see js/main.js),
                          out of the board's way. -->
+                    <!-- Vertical dumbbell-barbell triplet (task #93), matching Blast/Gravity's own
+                         difficulty control exactly -- this one was never converted when they were,
+                         a leftover plain <select>. Difficulty here means how much of the note-list/
+                         Tonnetz hinting shows while drilling (see MidiMode.updateDifficultyUI,
+                         which repaints those hints -- distinct from the barbell's own lit-icon
+                         update, MidiMode.updateDifficultyBarbell), not piece size like Blast/
+                         Gravity's own control, so its title text says so instead. -->
                     <div id="midi-settings-group" class="control-group" style="margin-top: 6px;">
-                        <div style="display: flex; gap: 10px; align-items: center;">
-                            <label for="midi-difficulty" style="font-size: 13px;">Difficulty:</label>
-                            <select id="midi-difficulty" style="flex: 1; padding: 2px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px;">
-                                <option value="easy" selected>Easy</option>
-                                <option value="medium">Medium</option>
-                                <option value="hard">Hard</option>
-                            </select>
+                        <div id="midi-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints">
+                            <button type="button" class="weight-icon" data-difficulty="easy" title="Easy — full note list and highlighted upcoming notes" aria-label="Easy"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
+                            <button type="button" class="weight-icon" data-difficulty="medium" title="Medium" aria-label="Medium"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
+                            <button type="button" class="weight-icon" data-difficulty="hard" title="Hard — no note list, play by ear" aria-label="Hard"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
                         </div>
                     </div>
                     <div id="midi-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">

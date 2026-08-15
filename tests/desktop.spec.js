@@ -2717,6 +2717,32 @@ test('Melody: offline (no online folder) degrades to a random 10-note, one-octav
   expect(Math.max(...melody) - Math.min(...melody), 'all within one octave').toBeLessThan(12);
 });
 
+// Task #93's dumbbell-barbell difficulty control was only ever applied to Blast/Gravity --
+// Melody's own difficulty (which note-list/Tonnetz hints show while drilling, not piece size)
+// was left behind as a plain <select>, noticed live and converted to match. Confirms both the
+// click-to-set wiring and the cumulative lit-icon count (1/2/3 for easy/medium/hard), same
+// pattern as Blast/Gravity's own barbell.
+test('Melody: the difficulty control is the same dumbbell-barbell as Blast/Gravity, not a dropdown', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="midi"]').click());
+
+  await expect(page.locator('#midi-difficulty select')).toHaveCount(0);
+  const weights = page.locator('#midi-difficulty .weight-icon');
+  await expect(weights).toHaveCount(3);
+
+  const litCount = () => page.evaluate(() =>
+    document.querySelectorAll('#midi-difficulty .weight-icon.lit').length);
+  expect(await litCount(), 'defaults to easy (1 lit)').toBe(1);
+
+  await weights.nth(2).click();
+  expect(await page.evaluate(() => MidiMode.state.difficulty)).toBe('hard');
+  expect(await litCount(), 'hard lights all 3').toBe(3);
+
+  await weights.nth(1).click();
+  expect(await page.evaluate(() => MidiMode.state.difficulty)).toBe('medium');
+  expect(await litCount(), 'medium lights 2').toBe(2);
+});
+
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
 // pieces by cell-count, so an easier game deals smaller, more-placeable pieces and a harder one
 // deals only the full four-cell tetrahexes (the historical default).
