@@ -223,6 +223,31 @@ checks that one specifically, in both directions, instead of just excluding it.
 **Test:** `tests/invariants.spec.js` — "INV-13: every mode's primary elements are reachable in
 both portrait and landscape"
 
+**Coverage gap, found live:** `PRIMARY_ELEMENTS` (the test's own copy of the table above) is
+hand-maintained, and both copies missed real controls before anyone noticed — Melody's own song
+source dropdown (this week's regression) and, discovered while fixing that, Blast's Restart
+button (`#blast-reset`) had apparently never been listed at all, unlike Gravity/Snake's own
+Restart buttons. Full auto-discovery isn't possible here: "primary element" is a semantic
+judgment call, not a structural one — Compose's tempo/subdivision/Quantize/Metronome inputs sit
+at the exact same DOM depth as its Record/Play/Save buttons but are deliberately NOT primary
+(settings, not top-level actions), and a naive "every visible control counts" scan would
+misclassify them.
+
+What CAN be automated is noticing when the classification call was never made at all: a second
+test walks every interactive element inside each mode's own `#<mode>-controls`/`#<mode>-stats`
+container and fails if it's neither in `PRIMARY_ELEMENTS` nor in `SECONDARY_ELEMENTS` (the
+explicit "yes, deliberately not primary" list, with a reason) nor nested inside a sub-container
+the static markup itself starts `display:none` (the existing signal for "conditional, shown
+only in some state," e.g. `#compose-edit-group`). A `SECONDARY_ELEMENTS` entry may also name a
+wrapping container's own id (not just a leaf control's) — Blast/Gravity's Easy/Medium/Hard
+difficulty buttons have no ids of their own at all, only `class="weight-icon"`, so the whole
+group is classified via its own `#blast-difficulty`/`#gravity-difficulty` wrapper. A newly
+added control that fits none of these buckets now fails loud immediately, instead of silently
+having zero reachability coverage the way `#midi-source` did.
+
+**Test:** `tests/invariants.spec.js` — "INV-13 coverage: every interactive control in a mode's
+panel is classified as primary or secondary, none forgotten"
+
 ### INV-14: Every ghost motion sounds its own cells
 
 Placing, picking up, moving, and turning a candidate piece (Sandbox or Blast) must always play
@@ -1300,7 +1325,7 @@ pieces or chord-guide results, are not listed separately):
 | Mode | Primary elements |
 |---|---|
 | Gravity | Tonnetz, each of the 5 (portrait) / 6 (landscape) D-pad buttons individually, the next-piece preview, Pause, Restart, Stats, Drawer pull |
-| Blast | Tonnetz, the preview/place control, Stats, Drawer pull |
+| Blast | Tonnetz, the preview/place control, Restart, Stats, Drawer pull |
 | Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
 | Melody | Tonnetz, Drawer pull, Song source, Play, Restart, Stats, Sequence message |
 | Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |

@@ -841,7 +841,7 @@ test.describe('Invariant tests', () => {
       '#tonnetz-svg', '#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right',
       '#palette', '#gravity-start-pause', '#gravity-reset', '#gravity-controls .stats-panel', '#drawer-handle',
     ],
-    blast: ['#tonnetz-svg', '#blast-stats .stats-panel', '#drawer-handle'],
+    blast: ['#tonnetz-svg', '#blast-reset', '#blast-stats .stats-panel', '#drawer-handle'],
     snake: [
       '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
       '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
@@ -920,6 +920,80 @@ test.describe('Invariant tests', () => {
           }
         }
       }
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // INV-13 follow-up: PRIMARY_ELEMENTS (above) can't be derived automatically -- "primary
+  // element" is a semantic judgment call (a top-level affordance a player would name), not a
+  // structural one. Compose's tempo/subdivision/Quantize/Metronome inputs, for instance, sit at
+  // the exact same DOM depth as its Record/Play/Save buttons but are deliberately NOT primary
+  // (they're settings, not top-level actions) -- a naive "every visible control is primary"
+  // scan would misclassify them, and a human still has to make that call.
+  //
+  // What CAN be automated is noticing when the call was never made at all: this walks every
+  // interactive element (button/select/input) inside each mode's own `#<mode>-controls` /
+  // `#<mode>-stats` container and fails if it's neither in PRIMARY_ELEMENTS nor in
+  // SECONDARY_ELEMENTS (the explicit "yes, deliberately not primary, here's why" list) nor
+  // nested inside a sub-container the static markup itself starts as `display:none` (the
+  // existing signal this project already uses for "conditional, shown only in some state" --
+  // e.g. Compose's #compose-edit-group, only shown once a note is selected). A newly-added
+  // control that fits none of those three buckets fails LOUD instead of silently having no
+  // reachability coverage the way #midi-source did for a full day after it was added.
+  // ────────────────────────────────────────────────────────────────────────
+
+  // Entries may name a single control's own id, OR a container's id whose entire subtree is
+  // covered (matching how PRIMARY_ELEMENTS itself already uses container-scoped selectors like
+  // '#gravity-controls .stats-panel') -- Blast/Gravity's Easy/Medium/Hard difficulty buttons
+  // have no ids of their own at all (`class="weight-icon"` only), so the group is classified by
+  // its own wrapping `#blast-difficulty`/`#gravity-difficulty` container instead.
+  const SECONDARY_ELEMENTS = {
+    midi: ['#midi-file-input', '#midi-difficulty'], // upload fallback + a setting, not a top-level action
+    blast: ['#blast-difficulty'], // Easy/Medium/Hard piece-size setting, not a top-level action
+    gravity: ['#gravity-difficulty'], // same setting, Gravity's own copy
+    compose: [
+      '#compose-file-input', '#compose-tempo', '#compose-subdivision', '#compose-quantize', '#compose-metronome',
+    ], // upload fallback + recording settings, not top-level actions
+    life: ['#life-file-input'], // upload fallback, not a top-level action
+  };
+
+  test('INV-13 coverage: every interactive control in a mode\'s panel is classified as primary or secondary, none forgotten', async ({ page }) => {
+    const CONTAINER_ID = {
+      gravity: 'gravity-controls', blast: 'blast-stats', snake: 'snake-controls',
+      midi: 'midi-controls', compose: 'compose-controls', life: 'life-controls',
+    };
+    for (const [mode, containerId] of Object.entries(CONTAINER_ID)) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+      const unclassified = await page.evaluate(({ containerId, primary, secondary }) => {
+        const container = document.getElementById(containerId);
+        if (!container) return [`#${containerId} not found`];
+        const primaryIds = primary.map((s) => s.replace(/^#/, '').split(' ')[0]);
+        const secondaryIds = secondary.map((s) => s.replace(/^#/, ''));
+        const classifiedById = (id) => primaryIds.includes(id) || secondaryIds.includes(id);
+        const found = [];
+        container.querySelectorAll('button, select, input').forEach((el) => {
+          // Classified either directly (own id) or via an ancestor container's id (a group
+          // entry, e.g. '#blast-difficulty' covering every button inside it).
+          let node = el;
+          while (node && node !== container) {
+            if (node.id && classifiedById(node.id)) return;
+            node = node.parentElement;
+          }
+          // Conditional sub-panel, e.g. #compose-edit-group -- shown only in some state, not a
+          // permanent top-level affordance, so it's outside this check's scope by design.
+          let ancestor = el.parentElement;
+          while (ancestor && ancestor !== container) {
+            if (ancestor.getAttribute('style') && /display:\s*none/.test(ancestor.getAttribute('style'))) return;
+            ancestor = ancestor.parentElement;
+          }
+          found.push(el.id || `unidentified ${el.tagName} (add an id, or an id on a wrapping group, so it can be classified)`);
+        });
+        return found;
+      }, { containerId, primary: PRIMARY_ELEMENTS[mode] || [], secondary: SECONDARY_ELEMENTS[mode] || [] });
+
+      expect(unclassified, `mode=${mode}: found unclassified control(s) -- add each to PRIMARY_ELEMENTS ` +
+        `(docs/invariants.md's Primary Elements table too) or to SECONDARY_ELEMENTS with a reason`).toEqual([]);
     }
   });
 
