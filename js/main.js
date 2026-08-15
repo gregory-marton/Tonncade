@@ -408,41 +408,10 @@ const App = {
             }
         }
 
-        // Configure mobile navigation buttons based on active mode (hex layout)
-        const btnUl = document.getElementById('m-btn-ul');
-        const btnUr = document.getElementById('m-btn-ur');
-        const btnDr = document.getElementById('m-btn-dr');
-        const btnDl = document.getElementById('m-btn-dl');
-
-        if (btnUl && btnUr && btnDr && btnDl) {
-            if (mode === 'gravity') {
-                btnUl.style.display = 'none';
-                btnUr.style.display = 'none';
-                btnDr.style.display = 'none';
-                btnDl.textContent = '▼'; // Label as vertical down-arrow for gravity soft-drop
-            } else {
-                btnUl.style.display = 'block';
-                btnUr.style.display = 'block';
-                btnDr.style.display = 'block';
-                btnDl.textContent = '↙';
-            }
-        }
-
         // Hide/show palette
         const palette = document.getElementById('palette');
         if (palette) {
             palette.style.display = (mode === 'midi' || mode === 'snake' || mode === 'compose') ? 'none' : 'block';
-        }
-
-        // Hide/show mobile dock based on mode and screen width
-        const mobileDock = document.getElementById('mobile-dock');
-        if (mobileDock) {
-            const isMobileWidth = Render.isMobileViewport();
-            if (isMobileWidth && mode === 'sandbox') {
-                mobileDock.style.display = 'block';
-            } else {
-                mobileDock.style.display = 'none';
-            }
         }
 
         // Hide/show mobile controls
@@ -688,6 +657,7 @@ const App = {
                 const guide = document.getElementById('sandbox-guide');
                 const sidebar = document.getElementById('sidebar');
 
+                const midiSource = document.getElementById('midi-source-group');
                 const midiUpload = document.getElementById('midi-upload-group');
                 const midiStats = document.getElementById('midi-stats-group');
                 const midiActions = document.getElementById('midi-actions-group');
@@ -734,17 +704,14 @@ const App = {
                         if (midiActions) midiTools.appendChild(midiActions);
                     }
                     // One-time setup + settings live in the drawer, out of the board's way: the
-                    // file/folder/online-song pickers and the Difficulty selector. Only the
-                    // transport (Play/Restart icons) and the streak stats stay in the always-visible
-                    // area (midiTools, appended above). See task #77.
+                    // song-source dropdown, the upload fallback, and the Difficulty selector. Only
+                    // the transport (Play/Restart icons) and the streak stats stay in the
+                    // always-visible area (midiTools, appended above). See task #77.
                     if (drawerInjected) {
                         drawerInjected.style.display = 'block';
-                        const midiFolder = document.getElementById('midi-folder-group');
-                        const midiOnline = document.getElementById('midi-online-group');
                         const midiSettings = document.getElementById('midi-settings-group');
+                        if (midiSource) drawerInjected.appendChild(midiSource);
                         if (midiUpload) drawerInjected.appendChild(midiUpload);
-                        if (midiFolder) drawerInjected.appendChild(midiFolder);
-                        if (midiOnline) drawerInjected.appendChild(midiOnline);
                         if (midiSettings) drawerInjected.appendChild(midiSettings);
                     }
                     // #palette (Sandbox's carousel) isn't used in MIDI mode — return it home and
@@ -780,23 +747,21 @@ const App = {
                 topDrawer.classList.remove('collapsed');
                 // Ensure midi controls are back in midi-controls container
                 const midiControls = document.getElementById('midi-controls');
+                const midiSource = document.getElementById('midi-source-group');
                 const midiUpload = document.getElementById('midi-upload-group');
                 const midiActions = document.getElementById('midi-actions-group');
                 const midiStats = document.getElementById('midi-stats-group');
-                
+
                 if (midiControls) {
                     // Undo the mobile branch's display:none (its content is back in-panel here). On
                     // desktop the sidebar is always visible, so #midi-controls shows only when midi
                     // is the active mode -- covers a mobile->desktop resize with no mode change.
                     midiControls.style.display = (this.currentMode === 'midi') ? 'block' : 'none';
                     // Restore original DOM order so the desktop sidebar panel reads top-to-bottom
-                    // as authored (upload, folder, online, settings/Difficulty, actions, stats).
-                    const midiFolder = document.getElementById('midi-folder-group');
-                    const midiOnline = document.getElementById('midi-online-group');
+                    // as authored (source dropdown, upload fallback, settings/Difficulty, actions, stats).
                     const midiSettings = document.getElementById('midi-settings-group');
+                    if (midiSource && midiSource.parentElement !== midiControls) midiControls.appendChild(midiSource);
                     if (midiUpload && midiUpload.parentElement !== midiControls) midiControls.appendChild(midiUpload);
-                    if (midiFolder && midiFolder.parentElement !== midiControls) midiControls.appendChild(midiFolder);
-                    if (midiOnline && midiOnline.parentElement !== midiControls) midiControls.appendChild(midiOnline);
                     if (midiSettings && midiSettings.parentElement !== midiControls) midiControls.appendChild(midiSettings);
                     if (midiActions && midiActions.parentElement !== midiControls) midiControls.appendChild(midiActions);
                     if (midiStats && midiStats.parentElement !== midiControls) midiControls.appendChild(midiStats);

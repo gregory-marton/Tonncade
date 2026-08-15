@@ -47,6 +47,36 @@ results got moved into `#mobile-always-visible`, but the reset button was left b
 **Test:** `tests/invariants.spec.js` — "INV-3: nothing moved into the always-visible mobile
 area is left unreachable by a hidden ancestor"
 
+**Follow-up gap, found live:** the test above only checks elements that DID get relocated for
+ending up orphaned afterward — it has no way to catch an element that was supposed to be
+relocated but wasn't, since it never looks anywhere else. That's exactly what happened:
+Melody's dropdown reorg (task, one-`<select>` #midi-source-group) added a new control, but
+`js/main.js`'s mobile-drawer relocation logic still only knew the OLD ids it replaced
+(`#midi-folder-group`/`#midi-online-group`) — those lookups silently returned `null` (an
+already-existing `if (el) ...` guard swallowed it with no error), so `#midi-source-group` was
+never moved anywhere and stayed stranded inside `#midi-controls`, which this same code
+correctly hides wholesale on mobile once redistribution is done. The dropdown existed in the
+DOM the entire time — invisible to any check that doesn't measure actual rendered visibility.
+
+Fixed the code, and closed the general gap with a second, deliberately id-agnostic test: once a
+mode's own `#<mode>-controls` panel ends up `display:none` (the split-relocation pattern, today
+only Melody), that panel must contain zero remaining interactive descendants — everything in it
+was supposed to have somewhere else to go. This needs no id list and needs no maintenance as
+Melody's controls change or as any future mode adopts the same pattern; it checks the one
+property that must always hold for split-relocation to be correct, not a name that can drift
+out of sync with `index.html`.
+
+**Test:** `tests/invariants.spec.js` — "INV-3: once a mode-controls panel is hidden for mobile
+split-relocation, nothing interactive is left behind inside it"
+
+**Complementary, non-visual check:** the *underlying* mechanism (a stale `getElementById`/
+`querySelector` string literal after an id was renamed/removed) is general well beyond mobile
+relocation — any silently-null DOM lookup is a bug the moment it's introduced, regardless of
+whether a runtime test happens to exercise that exact code path. `scripts/check-dom-ids.js`
+(run on every `npm test`, no browser needed) statically cross-checks every literal id
+`js/*.js` looks up against every id `index.html` (or JS itself) actually defines, and would
+have caught this at edit time rather than days later, live.
+
 ### INV-4: Audio comes from exactly the notes it claims to
 
 Every sound the app plays corresponds exactly to the Tonnetz note(s) of the cell(s) actually

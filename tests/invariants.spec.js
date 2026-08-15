@@ -156,6 +156,40 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  // The narrower INV-3 test above only checks elements that DID get moved into the
+  // always-visible area for being orphaned there afterward -- it can't catch an element that
+  // was supposed to be moved but wasn't, since it never looks anywhere else. This is exactly
+  // that gap: Melody's mobile-drawer logic (js/main.js) redistributes #midi-controls' children
+  // into two destinations (an always-visible dock, a collapsible drawer) and then hides
+  // #midi-controls itself outright -- if any interactive control gets left behind because the
+  // code that names what to move by id fell out of sync with index.html's own markup (the
+  // literal bug this regresses against: a dropdown reorg added #midi-source-group but the
+  // relocation code still only knew the old #midi-folder-group/#midi-online-group), it's now
+  // stranded, invisible, inside a container that's correctly hidden for an entirely different
+  // reason. General on purpose: it doesn't enumerate ids, so it needs no maintenance as
+  // Melody's controls change, and it automatically covers any future mode that adopts the same
+  // split-relocation pattern -- it just checks the one property that must ALWAYS hold for that
+  // pattern to be correct: once a mode decides its own `#<mode>-controls` panel doesn't need to
+  // be shown directly (mobile split-relocation), that panel must contain zero remaining
+  // interactive elements, because everything in it was supposed to have somewhere else to go.
+  test('INV-3: once a mode-controls panel is hidden for mobile split-relocation, nothing interactive is left behind inside it', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const MODES = await getModes(page);
+
+    for (const mode of MODES) {
+      await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+      const leftBehind = await page.evaluate((m) => {
+        const panel = document.getElementById(`${m}-controls`);
+        if (!panel) return null; // this mode's panel isn't named this way -- not what this checks
+        if (getComputedStyle(panel).display !== 'none') return null; // not split-hiding -- nothing to check
+        return [...panel.querySelectorAll('button, select, input')]
+          .filter((el) => el.style.display !== 'none') // still counts as "moved out" conceptually if self-hidden
+          .map((el) => el.id || el.tagName);
+      }, mode);
+      if (leftBehind !== null) expect(leftBehind, `mode=${mode}`).toEqual([]);
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-4 & INV-5: Audio comes from exactly the notes/cells responsible for it, and the
   // responsible cell(s) show visible feedback when they sound.
