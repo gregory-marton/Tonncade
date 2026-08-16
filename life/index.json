@@ -50,5 +50,9 @@
   {
     "name": "Turing Eater Demo",
     "file": "turing-eater-demo.yaml"
+  },
+  {
+    "name": "Turing Glider Gun Demo",
+    "file": "turing-gun-demo.yaml"
   }
 ]

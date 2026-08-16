@@ -58,12 +58,12 @@ for (let trial = 0; trial < 1000; trial++) {
 console.log(`Extracted ${gliders.length} gliders and ${stationaries.length} stationary blocks.`);
 if (gliders.length === 0 || stationaries.length === 0) process.exit(0);
 
-// Phase 6: Glider Gun Search via Glider-Block Collisions
-console.log("=== Phase 6: Searching for Glider Guns (Glider + Block Collisions) ===");
+// Phase 6: Fast Glider Gun Search via Glider-Block Collisions
+console.log("=== Phase 6: Fast Glider Gun Search (Glider + Block Collisions) ===");
 
 let guns = 0;
-const GLIDER = gliders[0].triplets; // Use the most common small glider
-const maxB = Math.min(20, stationaries.length); // Test first 20 blocks
+const GLIDER = gliders[0].triplets;
+const maxB = Math.min(20, stationaries.length);
 
 for (let bIdx = 0; bIdx < maxB; bIdx++) {
     const BLOCK = stationaries[bIdx].triplets;
@@ -87,32 +87,21 @@ for (let bIdx = 0; bIdx < maxB; bIdx++) {
                 
                 let live = board;
                 let isGun = false;
-                let maxPop = 0;
+                
+                let pop100 = 0, pop150 = 0, pop200 = 0;
                 
                 for (let gen = 0; gen < 250; gen++) {
                     live = Life.stepStates(live, BEST_RULE, '21');
                     if (live.size === 0 || live.size > 200) break;
-                    if (live.size > maxPop) maxPop = live.size;
+                    
+                    if (gen === 100) pop100 = live.size;
+                    if (gen === 150) pop150 = live.size;
+                    if (gen === 200) pop200 = live.size;
                     
                     // A gun should continuously increase the population as it ejects gliders.
-                    // But wait until gen 150 to let debris settle.
-                    if (gen === 249 && maxPop > BLOCK.length + GLIDER.length + 5 && live.size > 20) {
-                        // Let's do a strict check: does the board contain MULTIPLE known gliders?
-                        const comps = connectedComponents(live);
-                        let knownGlidersCount = 0;
-                        
-                        for (const comp of comps) {
-                            if (comp.size > 15) continue;
-                            const cComp = canonical(mapFrom(tripletsFrom(comp)));
-                            if (gliders.some(g => g.c === cComp)) {
-                                knownGlidersCount++;
-                            }
-                        }
-                        
-                        // If it produced at least 2 gliders after 250 generations, it's highly likely a gun!
-                        if (knownGlidersCount >= 2) {
-                            isGun = true;
-                        }
+                    if (gen === 249 && pop100 > 0 && pop150 > pop100 && pop200 > pop150 && live.size > pop200) {
+                        // Linear growth! Highly likely to be a Glider Gun!
+                        isGun = true;
                     }
                 }
                 
