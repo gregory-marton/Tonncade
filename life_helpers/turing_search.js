@@ -58,81 +58,50 @@ for (let trial = 0; trial < 1000; trial++) {
 console.log(`Extracted ${gliders.length} gliders and ${stationaries.length} stationary blocks.`);
 if (gliders.length === 0 || stationaries.length === 0) process.exit(0);
 
-let eaters = 0;
-let reflectors = 0;
+// Test the first extracted glider against itself (rotated) for mutual annihilation
+const GLIDER = gliders[0].triplets;
+let annihilations = 0;
 
-// Test first 3 gliders against first 10 blocks
-const maxG = Math.min(3, gliders.length);
-const maxB = Math.min(10, stationaries.length);
+console.log("=== Phase 5: Synthesizing Logic Gates (Glider-Glider Annihilation) ===");
 
-for (let gIdx = 0; gIdx < maxG; gIdx++) {
-    const GLIDER = gliders[gIdx].triplets;
-    for (let bIdx = 0; bIdx < maxB; bIdx++) {
-        const BLOCK = stationaries[bIdx].triplets;
-        const canonBlock = stationaries[bIdx].c;
-        
-        for (let r = 0; r < 6; r++) {
-            let G2 = [];
-            for (const [p, q, s] of GLIDER) {
-                let cp = p, cq = q;
-                for (let i=0; i<r; i++) [cp, cq] = rotCW(cp, cq);
-                G2.push([cp, cq, s]);
+for (let r = 1; r < 6; r++) { // Don't test angle 0, they would just tail-chase
+    let G2 = [];
+    for (const [p, q, s] of GLIDER) {
+        let cp = p, cq = q;
+        for (let i=0; i<r; i++) [cp, cq] = rotCW(cp, cq);
+        G2.push([cp, cq, s]);
+    }
+    
+    // Sweep offsets
+    for (let op = -15; op <= 15; op++) {
+        for (let oq = -15; oq <= 15; oq++) {
+            
+            let board = new Map();
+            // Place G1 at a distance
+            for (const [p, q, s] of GLIDER) board.set(key(p + 15, q), s);
+            
+            // Place G2 at an offset
+            for (const [p, q, s] of G2) board.set(key(p + op, q + oq), s);
+            
+            if (board.size < GLIDER.length * 2) continue;
+            
+            let live = board;
+            let annihilated = false;
+            
+            for (let gen = 0; gen < 80; gen++) {
+                live = Life.stepStates(live, BEST_RULE, '21');
+                if (live.size === 0) {
+                    annihilated = true;
+                    break;
+                }
+                if (live.size > 50) break;
             }
             
-            for (let op = -10; op <= 10; op++) {
-                for (let oq = -10; oq <= 10; oq++) {
-                    let board = new Map();
-                    for (const [p, q, s] of BLOCK) board.set(key(p, q), s);
-                    for (const [p, q, s] of G2) board.set(key(p + op, q + oq), s);
-                    
-                    if (board.size < BLOCK.length + G2.length) continue;
-                    
-                    let live = board;
-                    let survived = false;
-                    let reflected = false;
-                    
-                    for (let gen = 0; gen < 60; gen++) {
-                        live = Life.stepStates(live, BEST_RULE, '21');
-                        if (live.size === 0 || live.size > 40) break;
-                        
-                        const c = canonical(live);
-                        if (c === canonBlock) {
-                            survived = true;
-                            break;
-                        }
-                    }
-                    
-                    if (survived) {
-                        console.log(`EATER FOUND! Glider ${gIdx} vs Block ${bIdx} | Angle: ${r}, Offset: (${op}, ${oq})`);
-                        eaters++;
-                        
-                        // Output demo YAML on first find!
-                        if (eaters === 1) {
-                            const yaml = `name: "Turing Eater Demo"
-states: 3
-order: "21"
-transition:
-  - [0, 0, 0, 2, 2, 0, 0]
-  - [0, 0, 0, 1, 2, 2]
-  - [2, 2, 0, 0, 0]
-  - [1, 0, 0, 0]
-  - [0, 0, 0]
-  - [0, 0]
-  - [2]
-initial:
-  cells:
-${BLOCK.map(c => `    - [${c[0]}, ${c[1]}, ${c[2]}]`).join('\\n')}
-${G2.map(c => `    - [${c[0] + op}, ${c[1] + oq}, ${c[2]}]`).join('\\n')}
-tempo: 120
-`;
-                            require('fs').writeFileSync('life/turing-eater-demo.yaml', yaml);
-                            console.log("Wrote life/turing-eater-demo.yaml!");
-                            process.exit(0); // Exit after finding one
-                        }
-                    }
-                }
+            if (annihilated) {
+                console.log(`LOGIC GATE (Mutual Annihilation) FOUND! Angle: ${r}, Offset: (${op}, ${oq})`);
+                annihilations++;
             }
         }
     }
 }
-console.log(`Phase 4 Complete: ${eaters} Eater collisions found.`);
+console.log(`Phase 5 Complete: ${annihilations} annihilation vectors found.`);
