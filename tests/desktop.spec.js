@@ -1127,14 +1127,17 @@ test('Melody mode: the scrub marker appears once the drilled segment grows, sitt
   });
 
   await expect(page.locator('.scrub-marker')).toHaveCount(1);
-  // The marker must sit immediately before the note token it targets (startIndex), not just
-  // anywhere in the list.
-  const isImmediatelyBefore = await page.evaluate(() => {
+  // The marker is absolutely positioned at the target token's own offsetLeft (see
+  // positionScrubMarker, #46), not inserted adjacent to it in DOM order -- assert its style.left
+  // matches the target token's offsetLeft (within the marker's own small offset), not adjacency.
+  const isAtTarget = await page.evaluate(() => {
     const marker = document.querySelector('.scrub-marker');
-    const nextEl = marker.nextElementSibling;
-    return nextEl && nextEl.classList.contains('note-token') && nextEl.getAttribute('data-note-idx') === String(MelodyMode.state.startIndex);
+    const target = document.querySelector(`.note-token[data-note-idx="${MelodyMode.state.startIndex}"]`);
+    if (!target) return false;
+    const markerLeft = parseFloat(marker.style.left);
+    return Math.abs(markerLeft - target.offsetLeft) <= 5;
   });
-  expect(isImmediatelyBefore).toBe(true);
+  expect(isAtTarget).toBe(true);
 });
 
 test('Melody mode: the scrub control clamps to notes already reached, never past targetLength', async ({ page }) => {
@@ -2827,4 +2830,184 @@ test.describe('Piece-size difficulty presets (Blast/Gravity)', () => {
       }
     });
   }
+});
+// #46 note-timeline redesign, parts 3-5: a real loaded song (not Random) renders its full
+// timeline up front, gets measure ticks, and drives the spaced-repetition auto-advance. All four
+// tests load the real bundled midi/frere-jacques.mid (32 notes, 120bpm/4-4 -- 2s/measure) rather
+// than a synthetic fixture, per the plan's own verification section.
+const loadFrereJacques = (page) => page.evaluate(async () => {
+  const res = await fetch('/midi/frere-jacques.mid');
+  const buf = await res.arrayBuffer();
+  MelodyMode.loadMelodyFromArrayBuffer(buf, 'frere-jacques.mid');
+});
+
+test('Melody: a real song renders its entire timeline up front, not a sliding window', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.targetLength = 8;
+    MelodyMode.state.userIndex = 5;
+    MelodyMode.updateDifficultyUI();
+    return {
+      isRandom: MelodyMode.state.isRandom,
+      tokenCount: document.querySelectorAll('#melody-note-list .note-token').length,
+      melodyLength: MelodyMode.state.melody.length,
+    };
+  });
+  expect(result.isRandom).toBe(false);
+  // The whole song is in the DOM at once -- not windowed to a few notes around current, unlike
+  // Random's sliding pastWindow/futureWindow (see the tri-coloured-notes test elsewhere, which
+  // exercises Random's own unchanged, small-window behavior).
+  expect(result.tokenCount).toBe(result.melodyLength);
+});
+
+test('Melody: Random keeps its small sliding window even with the song-timeline code present', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  // Default entry (loadDefault/Random), no song loaded -- explicit re-verification per the
+  // plan's own scope boundary: none of parts 3-5 should leak into Random.
+  const result = await page.evaluate(() => {
+    MelodyMode.state.targetLength = 8;
+    MelodyMode.state.userIndex = 5;
+    MelodyMode.updateDifficultyUI();
+    return {
+      isRandom: MelodyMode.state.isRandom,
+      tokenCount: document.querySelectorAll('#melody-note-list .note-token').length,
+      tickCount: document.querySelectorAll('#melody-note-list .measure-tick').length,
+    };
+  });
+  expect(result.isRandom).toBe(true);
+  expect(result.tokenCount).toBeLessThan(10); // pastWindow(3) + current + at most 3 hinted ahead
+  expect(result.tickCount).toBe(0); // no measures in Random, ever
+});
+
+test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-scroll)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  await page.evaluate(() => {
+    MelodyMode.state.targetLength = MelodyMode.state.melody.length;
+    MelodyMode.updateDifficultyUI();
+  });
+
+  const overflow = await page.evaluate(() => {
+    const el = document.getElementById('melody-note-list');
+    return el.scrollWidth > el.clientWidth;
+  });
+  expect(overflow, 'a 32-note song should overflow the visible timeline width').toBe(true);
+
+  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  const containerBox = await page.locator('#melody-note-list').boundingBox();
+  await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
+  await page.mouse.down();
+  const edgeX = containerBox.x + containerBox.width - 5; // inside the 40px edge-scroll zone
+  const edgeY = containerBox.y + containerBox.height / 2;
+  for (let i = 0; i < 10; i++) {
+    await page.mouse.move(edgeX, edgeY);
+  }
+  const scrollLeft = await page.evaluate(() => document.getElementById('melody-note-list').scrollLeft);
+  await page.mouse.up();
+  expect(scrollLeft).toBeGreaterThan(0);
+});
+
+test('Melody: measure ticks appear exactly where the computed measure changes (#46 part 4)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.targetLength = MelodyMode.state.melody.length;
+    MelodyMode.updateDifficultyUI(MelodyMode.state.melody.length - 1);
+    const tickCount = document.querySelectorAll('#melody-note-list .measure-tick').length;
+    let expected = 0, lastMeasure = null;
+    MelodyMode.state.melody.forEach((n) => {
+      const m = MelodyMode.measureOf(n.time);
+      if (lastMeasure !== null && m !== lastMeasure) expected++;
+      lastMeasure = m;
+    });
+    return { tickCount, expected };
+  });
+  expect(result.expected).toBeGreaterThan(0); // sanity: frere-jacques really does span >1 measure
+  expect(result.tickCount).toBe(result.expected);
+});
+
+test('Melody: 3 clean playthroughs auto-advance the segment into the next measure (#46 part 5)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    // frere-jacques is 120bpm/4-4 -- 2s/measure -- notes 0-3 (times 0/0.5/1/1.5) are measure 0.
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.cleanStreak = 0;
+
+    const streaks = [];
+    for (let pass = 0; pass < 3; pass++) {
+      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
+      MelodyMode.state.segmentHadMistake = false;
+      MelodyMode.state.isPlayingSequence = false;
+      const segEnd = MelodyMode.state.targetLength;
+      for (let i = MelodyMode.state.startIndex; i < segEnd; i++) {
+        MelodyMode.handleUserInputNote(MelodyMode.state.melody[i].midi);
+      }
+      streaks.push(MelodyMode.state.cleanStreak);
+    }
+    return {
+      streaks,
+      startIndex: MelodyMode.state.startIndex,
+      cleanStreak: MelodyMode.state.cleanStreak,
+      startMeasure: MelodyMode.measureOf(MelodyMode.state.melody[MelodyMode.state.startIndex].time),
+    };
+  });
+  expect(result.streaks).toEqual([1, 2, 0]); // the 3rd clean pass triggers auto-advance, resetting the streak
+  expect(result.cleanStreak).toBe(0);
+  expect(result.startIndex).toBeGreaterThan(0); // moved out of measure 0
+  expect(result.startMeasure).toBeGreaterThan(0); // landed in a later measure, not just +1 note
+});
+
+test('Melody: a mistake resets the clean-streak', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.cleanStreak = 2; // simulate 2 clean passes already banked
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.segmentHadMistake = false;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.handleUserInputNote(MelodyMode.state.melody[0].midi + 1); // deliberately wrong
+    return MelodyMode.state.cleanStreak;
+  });
+  expect(result).toBe(0);
+});
+
+test('Melody: a player-initiated scrub resets the clean-streak', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 2;
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.cleanStreak = 2;
+    MelodyMode.seekTo(0); // a different startIndex -- player-initiated
+    return MelodyMode.state.cleanStreak;
+  });
+  expect(result).toBe(0);
+});
+
+test('Melody: loading a new song resets the clean-streak', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+  await page.evaluate(() => { MelodyMode.state.cleanStreak = 2; });
+  await loadFrereJacques(page); // resetGame() runs again as part of loading
+  const streak = await page.evaluate(() => MelodyMode.state.cleanStreak);
+  expect(streak).toBe(0);
 });

@@ -323,15 +323,74 @@ svg {
     word-break: break-all;
 }
 
-/* #46 scrub marker: a small draggable glyph shown IN #melody-note-list, in the gap right before
-   the note it targets -- so it's visually clear which two notes a replay would start between,
-   unlike the plain range-slider version this replaced (see INV-26/docs/invariants.md). */
+/* #melody-note-list's timeline layout (#46 redesign): real flex+gap gives every pair of adjacent
+   tokens the same visual spacing, replacing the old literal " - " text-node separators that
+   `positionScrubMarker` used to insert between tokens (asymmetric right at the marker itself,
+   which is what read as "spacing collapses there" -- see docs/invariants.md's INV-26). Scrollable
+   so a real song's full timeline (rendered up front, not a small sliding window) can be panned
+   horizontally; Random's short window just never overflows. */
+.melody-note-list {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--dim);
+    margin-top: 4px;
+    min-height: 18px;
+    font-weight: bold;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+    position: relative; /* .scrub-marker's absolute-positioning anchor */
+}
+.note-token { flex: 0 0 auto; }
+
+/* A low-contrast tick between two adjacent notes whose computed measure differs (#46 part 4,
+   4/4 assumed -- see MelodyMode.measureOf). Never gets a data-note-idx, so it's naturally
+   invisible to positionScrubMarker's/updateScrubDragTarget's .note-token-only queries. */
+.measure-tick {
+    flex: 0 0 auto;
+    width: 1px;
+    height: 0.9em;
+    background: var(--dim);
+    opacity: 0.35;
+    align-self: center;
+}
+
+/* #46 scrub marker: a real I-beam (CSS-drawn vertical stem + top/bottom serifs, no glyph text),
+   absolutely positioned over #melody-note-list at the target token's offsetLeft -- so it's
+   visually clear which two notes a replay would start between, unlike the plain range-slider
+   version this replaced, and unlike the easy-to-miss ▾ glyph it replaced after that (see
+   INV-26/docs/invariants.md). The SAME <span> is created once and only ever repositioned via
+   style.left afterward -- never recreated -- so a live touch/mouse capture stays valid mid-drag. */
 .scrub-marker {
+    position: absolute;
+    top: 0;
     display: inline-block;
-    color: var(--accent);
+    width: 6px;
+    height: 1.4em;
+    margin: 0 1px;
     cursor: grab;
-    padding: 0 2px;
     touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
+}
+.scrub-marker::before {
+    /* the vertical stem */
+    content: '';
+    position: absolute;
+    left: 50%; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    transform: translateX(-50%);
+}
+.scrub-marker::after {
+    /* top serif; the bottom serif is the same box drawn again via box-shadow, no extra DOM */
+    content: '';
+    position: absolute;
+    left: 50%; top: 0;
+    width: 6px; height: 2px;
+    background: var(--accent);
+    transform: translateX(-50%);
+    box-shadow: 0 calc(1.4em - 2px) 0 0 var(--accent);
 }
 
 .scrub-marker:active {

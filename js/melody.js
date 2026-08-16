@@ -28,6 +28,16 @@ for the JavaScript code in this file.
 const MelodyMode = {
     state: {
         melody: [],            // List of { midi, time, duration }
+        // Set explicitly at both load sites (loadDefault/loadMelodyFromArrayBuffer) -- never
+        // inferred from #melody-filename's text or MidiFolder.currentValue, which would couple
+        // this file to file-folder.js internals. Random is a memory-quiz sliding window forever
+        // (no measures, no auto-advance -- it isn't a piece to progress through, #46); every
+        // other branch below reads this flag to pick the Random path or the full-song path.
+        isRandom: true,
+        // Effective BPM for the CURRENT state.melody -- only meaningful (and only read) when
+        // !isRandom. Assume 4/4 throughout (no time-signature parsing exists in this codebase --
+        // out of scope). Used by measureOf() for the timeline's measure-tick marks (#46).
+        melodyBPM: 120,
         // INV-48: a mode switch must pause the drill, never discard or restart it. gameStarted
         // gates init()'s own resetGame() call so only a genuinely NEW game (first entry, the
         // explicit Restart button, or loading a new song -- all of which call resetGame()
@@ -41,6 +51,13 @@ const MelodyMode = {
                                 // note already reached instead of always from note 0.
         isDraggingScrub: false, // Live-drag state for the inline scrub marker (see setupScrubMarker)
         scrubDragIndex: 0,      // The marker's candidate position while mid-drag, before it's committed
+        // Spaced-repetition auto-advance (#46, songs only -- see isRandom). cleanStreak counts
+        // consecutive full clean playthroughs of the current segment; segmentHadMistake is
+        // transient, tracking whether the in-progress pass has had a mistake yet. Neither is
+        // touched by cleanup()/init()'s resume branch, so both survive a mode switch away and
+        // back for free (INV-48), same as targetLength/userIndex/startIndex already do.
+        cleanStreak: 0,
+        segmentHadMistake: false,
         isPlayingPreview: false,
         isPlayingSequence: false,
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
@@ -114,6 +131,7 @@ const MelodyMode = {
     // implicit one-time fallback `init()` sets below).
     loadDefault: function() {
         this.state.melody = this.randomMelody();
+        this.state.isRandom = true;
         const filenameSpan = document.getElementById('melody-filename');
         if (filenameSpan) filenameSpan.textContent = '';
         this.resetGame();
@@ -245,6 +263,8 @@ const MelodyMode = {
             melodySeq = this.centerMelody(melodySeq);
 
             this.state.melody = melodySeq;
+            this.state.isRandom = false;
+            this.state.melodyBPM = parsed.bpm;
             if (filenameSpan && displayName) filenameSpan.textContent = displayName;
             this.resetGame();
             this.refreshBoard();
@@ -446,6 +466,24 @@ const MelodyMode = {
         this.updateDifficultyUI();
     },
 
+    // 4/4 assumed throughout (no time-signature parsing exists in this codebase -- out of
+    // scope, see next_steps.md). Only meaningful for a real song (see state.melodyBPM).
+    measureOf: function(timeSec) {
+        const secondsPerMeasure = (60 / this.state.melodyBPM) * 4;
+        return Math.floor(timeSec / secondsPerMeasure);
+    },
+
+    // Scrolls the timeline so the current note stays visible -- real songs only (Random's short
+    // sliding window never overflows). Not called mid-drag; updateScrubDragTarget's own
+    // edge-scroll owns scrollLeft while a drag is live, so the two don't fight over it.
+    scrollTimelineToCurrent: function(idx) {
+        const listEl = document.getElementById('melody-note-list');
+        const token = listEl && listEl.querySelector(`.note-token[data-note-idx="${idx}"]`);
+        if (!token) return;
+        const target = token.offsetLeft - listEl.clientWidth / 2 + token.offsetWidth / 2;
+        listEl.scrollLeft = Math.max(0, target);
+    },
+
     updateDifficultyUI: function(overrideIndex) {
         const listEl = document.getElementById('melody-note-list');
         const diff = this.state.difficulty;
@@ -466,13 +504,6 @@ const MelodyMode = {
 
         const melody = this.state.melody;
         const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
-
-        // {idx, html} per note, oldest to newest -- kept as structured entries (not a flat
-        // string) so the scrub marker (below) can be inserted at the exact gap between two
-        // specific notes, and each note token can carry a data-note-idx the drag logic reads.
-        let displayNotes = [];
-        const pastWindow = 3;
-        const futureWindow = diff === 1 ? 4 : 0; // Current + 3 ahead
         const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
 
         // Octave-qualified (e.g. "E4", not just "E") -- a big board renders the same note NAME
@@ -482,78 +513,123 @@ const MelodyMode = {
         // MIDI equality is the correct rule for a melody, where octave is part of the tune).
         const qualifiedName = (midi) => `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
 
-        // Add past notes, fading progressively with distance so the most recently
-        // played note reads as distinct from older history
-        for (let i = Math.max(0, current - pastWindow); i < current; i++) {
-            const midi = melody[i].midi;
-            const name = qualifiedName(midi);
-            const distance = current - i;
-            const opacity = pastOpacityByDistance[distance] || 0.3;
-            displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
-
-            // Add past glow
-            const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
-            polygons.forEach(p => p.classList.add('glow-past'));
-        }
-
-        // Add current/future notes. The next THREE to play each get their own colour, mirrored on
-        // the Tonnetz by glow-next-0/1/2 (see css/style.css), so the upcoming notes read as linked
-        // between board and timeline. No frequency here -- it isn't useful on the timeline, and the
+        // The next THREE to play each get their own colour, mirrored on the Tonnetz by
+        // glow-next-0/1/2 (see css/style.css), so the upcoming notes read as linked between
+        // board and timeline. No frequency here -- it isn't useful on the timeline, and the
         // octave-qualified names already disambiguate pitch (INV-25).
         const UPCOMING_COLORS = ['var(--accent)', '#e6b23c', '#d16a8f']; // next, 2nd, 3rd
-        if (diff === 1) {
-            for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
+
+        // {idx, html} per entry, oldest to newest -- kept as structured entries (not a flat
+        // string) so each note token can carry a data-note-idx the drag/marker logic reads.
+        // idx is null for a measure-tick entry (part 4), which is never a drag/marker target.
+        let displayNotes = [];
+
+        if (this.state.isRandom) {
+            // Random is a memory-quiz sliding window forever -- no measures, no full timeline,
+            // this isn't a piece to progress through (#46). Byte-for-byte the original behavior.
+            const pastWindow = 3;
+            const futureWindow = diff === 1 ? 4 : 0; // Current + 3 ahead
+
+            for (let i = Math.max(0, current - pastWindow); i < current; i++) {
                 const midi = melody[i].midi;
                 const name = qualifiedName(midi);
-                const rank = i - current; // 0 = next, 1 = 2nd, 2 = 3rd, 3+ = further out
+                const distance = current - i;
+                const opacity = pastOpacityByDistance[distance] || 0.3;
+                displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
+                document.querySelectorAll(`polygon[data-midi="${midi}"]`).forEach(p => p.classList.add('glow-past'));
+            }
+
+            if (diff === 1) {
+                for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
+                    const midi = melody[i].midi;
+                    const name = qualifiedName(midi);
+                    const rank = i - current; // 0 = next, 1 = 2nd, 2 = 3rd, 3+ = further out
+                    const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
+                    if (rank <= 2) {
+                        const color = UPCOMING_COLORS[rank];
+                        const size = rank === 0 ? '1.1em' : '1em';
+                        const weight = rank === 0 ? '900' : '700';
+                        const role = rank === 0 ? 'current' : 'future';
+                        displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="${role}" data-upcoming="${rank}" style="color: ${color}; font-size: ${size}; font-weight: ${weight};">${name}</span>` });
+                        polygons.forEach(p => p.classList.add('glow-next-' + rank));
+                    } else {
+                        displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.8;">${name}</span>` });
+                        polygons.forEach(p => p.classList.add('glow-future'));
+                    }
+                }
+            }
+        } else {
+            // #46: a real song renders EVERY note up front, not a small window -- a true
+            // seek-bar, scrollable (css/style.css), with measure ticks (part 4) inserted between
+            // notes whose computed measure differs. The current note is always highlighted
+            // regardless of difficulty; only the "next 2" colored hints are difficulty-gated
+            // (Easy/diff===1 only) -- Medium still shows every future note, just as plain dim
+            // text with no hint, since the whole timeline is now always visible.
+            let lastMeasure = null;
+            for (let i = 0; i < melody.length; i++) {
+                const measure = this.measureOf(melody[i].time);
+                if (lastMeasure !== null && measure !== lastMeasure) {
+                    displayNotes.push({ idx: null, html: '<span class="measure-tick" aria-hidden="true"></span>' });
+                }
+                lastMeasure = measure;
+
+                const midi = melody[i].midi;
+                const name = qualifiedName(midi);
                 const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
-                if (rank <= 2) {
-                    const color = UPCOMING_COLORS[rank];
-                    const size = rank === 0 ? '1.1em' : '1em';
-                    const weight = rank === 0 ? '900' : '700';
-                    const role = rank === 0 ? 'current' : 'future';
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="${role}" data-upcoming="${rank}" style="color: ${color}; font-size: ${size}; font-weight: ${weight};">${name}</span>` });
+                if (i < current) {
+                    const distance = current - i;
+                    const opacity = pastOpacityByDistance[distance] || 0.3;
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
+                    polygons.forEach(p => p.classList.add('glow-past'));
+                } else if (i === current) {
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="current" data-upcoming="0" style="color: ${UPCOMING_COLORS[0]}; font-size: 1.1em; font-weight: 900;">${name}</span>` });
+                    polygons.forEach(p => p.classList.add('glow-next-0'));
+                } else if (diff === 1 && i - current <= 2) {
+                    const rank = i - current;
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" data-upcoming="${rank}" style="color: ${UPCOMING_COLORS[rank]}; font-size: 1em; font-weight: 700;">${name}</span>` });
                     polygons.forEach(p => p.classList.add('glow-next-' + rank));
                 } else {
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.8;">${name}</span>` });
-                    polygons.forEach(p => p.classList.add('glow-future'));
+                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.5;">${name}</span>` });
                 }
             }
         }
 
-        // Note tokens only here -- no separators/marker inline. positionScrubMarker (below)
-        // inserts those afterward, since it also runs mid-drag on its own, WITHOUT rebuilding
-        // these note-token spans (rebuilding them via innerHTML here happens once per render;
-        // rebuilding the scrub marker's own DOM node specifically must not happen mid-drag, or a
-        // real touchstart's captured target goes stale -- see positionScrubMarker's own comment).
+        // Note tokens (+ measure ticks) only here -- the marker is positioned separately.
+        // positionScrubMarker (below) repositions the SAME marker node afterward, since it also
+        // runs mid-drag on its own, WITHOUT rebuilding these note-token spans (rebuilding them
+        // via innerHTML here happens once per render; rebuilding the scrub marker's own DOM node
+        // specifically must not happen mid-drag, or a real touchstart's captured target goes
+        // stale -- see positionScrubMarker's own comment).
         listEl.innerHTML = displayNotes.map(n => n.html).join('');
 
         const markerIdx = this.state.isDraggingScrub ? this.state.scrubDragIndex : this.state.startIndex;
         this.positionScrubMarker(markerIdx);
+        if (!this.state.isRandom && !this.state.isDraggingScrub) this.scrollTimelineToCurrent(current);
     },
 
-    // The scrub marker: a small draggable glyph shown in the gap right before whichever note it
-    // targets, so it's visually clear which two notes you'd start between -- not a separate,
+    // The scrub marker: a real I-beam (see css/style.css) absolutely positioned over the target
+    // note, so it's visually clear which two notes you'd start between -- not a separate,
     // disconnected slider (see INV-26's original version). Only shown if that target note is
-    // actually in the visible window AND there's more than one note reached so far
-    // (targetLength > 1) -- nothing to scrub to yet on the very first note.
+    // actually rendered AND there's more than one note reached so far (targetLength > 1) --
+    // nothing to scrub to yet on the very first note.
     //
-    // Reuses the SAME marker DOM node across calls (moving it, never recreating it) specifically
-    // so a live touch-drag capture on it survives every reposition during the gesture -- found
-    // the hard way via this project's own real-touch-event testing discipline: a full re-render
+    // Reuses the SAME marker DOM node across calls (created once via appendChild, only ever
+    // repositioned via style.left afterward -- never recreated) specifically so a live
+    // touch-drag capture on it survives every reposition during the gesture -- found the hard
+    // way via this project's own real-touch-event testing discipline: a full re-render
     // (innerHTML) mid-drag would detach whatever a real touchstart captured as its event target,
-    // silently breaking the rest of the gesture. Separator spans (.note-sep) are cheap to
-    // recreate each call since nothing ever captures touch/mouse on them.
+    // silently breaking the rest of the gesture. Mutating style.left on the same element
+    // reference a capture already holds is safe; only innerHTML replacement of the marker
+    // itself (never done here) would be the actual hazard.
     positionScrubMarker: function(targetIdx) {
         const listEl = document.getElementById('melody-note-list');
         if (!listEl) return;
 
-        Array.from(listEl.querySelectorAll('.note-sep')).forEach(el => el.remove());
         const tokens = Array.from(listEl.querySelectorAll('.note-token'));
 
         let marker = listEl.querySelector('.scrub-marker');
-        const showMarker = tokens.length > 0 && this.getMaxStartIndex() > 0 &&
-            tokens.some(t => parseInt(t.getAttribute('data-note-idx'), 10) === targetIdx);
+        const targetToken = tokens.find(t => parseInt(t.getAttribute('data-note-idx'), 10) === targetIdx);
+        const showMarker = tokens.length > 0 && this.getMaxStartIndex() > 0 && !!targetToken;
 
         if (!showMarker) {
             if (marker) marker.remove();
@@ -563,20 +639,15 @@ const MelodyMode = {
             marker = document.createElement('span');
             marker.className = 'scrub-marker';
             marker.title = 'Drag to replay from here';
-            marker.textContent = '▾';
+            listEl.appendChild(marker);
         }
 
-        tokens.forEach((token, pos) => {
-            const isTarget = parseInt(token.getAttribute('data-note-idx'), 10) === targetIdx;
-            if (isTarget) {
-                listEl.insertBefore(marker, token);
-            } else if (pos > 0) {
-                const sep = document.createElement('span');
-                sep.className = 'note-sep';
-                sep.textContent = ' - ';
-                listEl.insertBefore(sep, token);
-            }
-        });
+        // offsetLeft is relative to listEl's own content box, not the viewport -- stable across
+        // scroll position, unlike getBoundingClientRect() (see #46's scrollable timeline).
+        // Clamped to 0 -- a negative left would sit outside the scroll container's clipped
+        // content box (overflow-x: auto implicitly clips overflow-y too), making the marker
+        // unclickable/invisible for the very first token (offsetLeft 0).
+        marker.style.left = Math.max(0, targetToken.offsetLeft - 5) + 'px';
     },
 
     // Marks the drill as genuinely started -- checked by init() so a mere mode SWITCH (away and
@@ -590,6 +661,8 @@ const MelodyMode = {
         this.state.targetLength = 1;
         this.state.userIndex = 0;
         this.state.startIndex = 0;
+        this.state.cleanStreak = 0;
+        this.state.segmentHadMistake = false;
         this.updateStreak(0);
         this.updateGhost();
         this.updateDifficultyUI();
@@ -603,6 +676,7 @@ const MelodyMode = {
     playTargetSequence: function() {
         this.cleanupPlayback();
         this.state.isPlayingSequence = true;
+        this.state.segmentHadMistake = false; // fresh pass at this segment -- see handleUserInputNote
         this.setStatus("Listen to the notes...", "info");
 
         // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
@@ -665,6 +739,12 @@ const MelodyMode = {
             this.state.mistakeTimeoutId = null;
         }
 
+        // A player-initiated scrub to a different segment breaks the clean-streak (#46) -- it's
+        // now drilling a different stretch of the song, not continuing the one the streak counted.
+        // The internal auto-advance (handleUserInputNote) sets startIndex directly, not through
+        // seekTo, so it's naturally exempt from this reset.
+        if (clamped !== this.state.startIndex) this.state.cleanStreak = 0;
+
         this.state.startIndex = clamped;
         this.playTargetSequence();
     },
@@ -720,6 +800,24 @@ const MelodyMode = {
     // comment for why: it would detach whatever a real touchstart captured as its event target
     // mid-gesture). seekTo() on release re-renders for real once the drag is over.
     updateScrubDragTarget: function(clientX) {
+        const listEl = document.getElementById('melody-note-list');
+
+        // Edge-scroll (#46, real songs only -- Random's short window never overflows): nudge
+        // scrollLeft while the pointer sits near either edge, driven by this function's own
+        // per-mousemove/touchmove firing (no separate rAF loop needed). The closest-token lookup
+        // below re-queries live getBoundingClientRect() positions every call, so it already
+        // reflects wherever scrollLeft currently is -- no extra plumbing needed there.
+        if (!this.state.isRandom && listEl) {
+            const rect = listEl.getBoundingClientRect();
+            const EDGE = 40; // px from either edge that triggers auto-scroll
+            const MAX_SPEED = 12; // px per tick
+            if (clientX < rect.left + EDGE) {
+                listEl.scrollLeft -= MAX_SPEED * (1 - Math.max(0, clientX - rect.left) / EDGE);
+            } else if (clientX > rect.right - EDGE) {
+                listEl.scrollLeft += MAX_SPEED * (1 - Math.max(0, rect.right - clientX) / EDGE);
+            }
+        }
+
         const tokens = Array.from(document.querySelectorAll('#melody-note-list .note-token'));
         if (tokens.length === 0) return;
 
@@ -830,6 +928,33 @@ const MelodyMode = {
                 // User has repeated the target sequence and can keep going ahead!
                 this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
 
+                // #46 spaced-repetition auto-advance (songs only): reaching here with no mistake
+                // since playTargetSequence's own last call is a complete clean pass of the
+                // current segment. After 3 in a row, advance the drilled segment to the next
+                // measure instead of just +1 note, and reset the streak.
+                if (!this.state.isRandom && !this.state.segmentHadMistake) {
+                    this.state.cleanStreak++;
+                    if (this.state.cleanStreak >= 3) {
+                        const startMeasure = this.measureOf(this.state.melody[this.state.startIndex].time);
+                        let nextIdx = this.state.startIndex;
+                        while (nextIdx < this.state.melody.length && this.measureOf(this.state.melody[nextIdx].time) <= startMeasure) {
+                            nextIdx++;
+                        }
+                        if (nextIdx < this.state.melody.length) {
+                            // Advancing INTO the next measure moves startIndex past whatever's
+                            // currently drilled -- unlike a scrub (which only ever moves the
+                            // start EARLIER within already-established territory), this needs
+                            // targetLength to grow to cover it too, or the existing "startIndex
+                            // always <= targetLength - 1" invariant (see state.startIndex) breaks.
+                            this.state.startIndex = nextIdx;
+                            if (this.state.targetLength <= nextIdx) {
+                                this.state.targetLength = nextIdx + 1;
+                            }
+                        }
+                        this.state.cleanStreak = 0;
+                    }
+                }
+
                 this.state.userRepeatTimeoutId = setTimeout(() => {
                     // Timeout fired: User stopped playing ahead.
                     // Immediately transition to playing the new sequence (Silence is golden).
@@ -844,7 +969,9 @@ const MelodyMode = {
         } else {
             // Mistake!
             this.setStatus("Oops! Let's listen again...", "error");
-            
+            this.state.segmentHadMistake = true;
+            this.state.cleanStreak = 0;
+
             // If the user made progress up to or beyond the current target,
             // advance the target to show the correct version of the note they missed.
             if (this.state.userIndex >= this.state.targetLength) {
@@ -1064,11 +1191,12 @@ const MelodyMode = {
         
         // Convert ticks to seconds using tempo changes
         tempoChanges.sort((a, b) => a.tick - b.tick);
-        
+        const defaultTempo = this.DEFAULT_TEMPO_USEC_PER_BEAT;
+
         function tickToSec(tick) {
             let sec = 0;
             let lastTick = 0;
-            let lastTempo = 500000; // Default 120 BPM
+            let lastTempo = defaultTempo;
             for (const change of tempoChanges) {
                 if (change.tick > tick) break;
                 const deltaTicks = change.tick - lastTick;
@@ -1088,7 +1216,15 @@ const MelodyMode = {
         }));
 
         timedNotes.sort((a, b) => a.time - b.time);
-        return { notes: timedNotes };
+
+        // Effective BPM for the whole song (#46 part 4, measure ticks): first tempo event if the
+        // file has one, else the shared default -- assumes 4/4 (no time-signature parsing exists
+        // in this codebase, genuinely out of scope). Additive to this return shape; js/compose.js
+        // only reads .notes from its own call into this function, so this is a safe addition.
+        const effectiveTempo = tempoChanges.length > 0 ? tempoChanges[0].tempo : defaultTempo;
+        const bpm = 60000000 / effectiveTempo;
+
+        return { notes: timedNotes, bpm: bpm };
     },
 
     // Standard MIDI File writer -- the inverse of parseMIDI/tickToSec above, for Compose mode's
@@ -1099,10 +1235,14 @@ const MelodyMode = {
     // fixed WRITE_TICKS_PER_BEAT resolution, not just an equivalent-sounding one -- this is the
     // ONLY behavior for any existing caller that doesn't pass tempoBPM.
     WRITE_TICKS_PER_BEAT: 480,
-    WRITE_TEMPO_USEC_PER_BEAT: 500000, // 120bpm -- must match parseMIDI's tickToSec default
+    // Shared 120bpm/500000usec-per-beat default -- also read by parseMIDI's tickToSec (above) as
+    // its own no-tempo-event fallback, so the two stay in sync via one shared constant instead of
+    // two independently-hardcoded 500000 literals kept matched only by comment (same
+    // consolidation pattern as the difficulty-barbell hoist, see docs/invariants.md's INV-49).
+    DEFAULT_TEMPO_USEC_PER_BEAT: 500000, // 120bpm
 
     writeMIDI: function(melodySeq, tempoBPM) {
-        const usecPerBeat = tempoBPM ? Math.round(60000000 / tempoBPM) : this.WRITE_TEMPO_USEC_PER_BEAT;
+        const usecPerBeat = tempoBPM ? Math.round(60000000 / tempoBPM) : this.DEFAULT_TEMPO_USEC_PER_BEAT;
         const ticksPerSec = this.WRITE_TICKS_PER_BEAT * (1000000 / usecPerBeat);
 
         const events = [];

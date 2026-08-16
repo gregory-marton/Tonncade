@@ -449,31 +449,129 @@ different, position-independent playback path.
 list. The user's own feedback: it read as an abstract, disconnected control — dragging it gave no
 sense of *which two notes* you were about to start between. Replaced with a small draggable
 marker (`▾`, `.scrub-marker`) rendered *inline, inside* `#melody-note-list` itself, in the gap
-right before whichever note it targets — so the note list literally reads "...D4 ▾ C4..." when
-the marker sits between D4 and C4. `MelodyMode.positionScrubMarker(targetIdx)` places it (and
-plain `.note-sep` separator spans everywhere else) by walking the currently-rendered
-`.note-token` elements; it only shows at all if its target note is within the currently-visible
-window (nothing to drag to if it's off-screen — an accepted scope limit, not a bug) and there's
-more than one note reached yet.
+right before whichever note it targets.
+
+**UI, v3 (#46)**: v2's inline positioning had two compounding problems, found live recording a
+playthrough. First, the gap right at the marker read visually narrower than every other gap
+between notes — root cause: spacing between tokens was entirely literal `" - "` text nodes
+(`.note-sep`) inserted by `positionScrubMarker`, *except* immediately before the marker's own
+target token, where the marker's `padding: 0 2px` stood in instead — an inherent asymmetry, not a
+CSS bug to tweak. Second, the `▾` glyph itself was easy to miss. Both are fixed together:
+`#melody-note-list` (now `.melody-note-list`) is a real `display: flex` layout with a uniform
+`gap`, and `.note-sep` is gone entirely — CSS supplies uniform spacing directly, no text-node
+hack. The marker is a CSS-drawn I-beam (`::before`/`::after` stem + serifs, `var(--accent)`), the
+conventional text-cursor/seek-handle shape, `position: absolute` over the (now scrollable)
+container rather than `insertBefore`'d into token flow — its `style.left` is set to the target
+token's `offsetLeft` (stable across scroll position, unlike `getBoundingClientRect()`), clamped to
+`>= 0` so the very first token (offsetLeft 0) doesn't push it outside the container's clipped
+content box.
+
+`MelodyMode.positionScrubMarker(targetIdx)` still only shows the marker if its target note is
+currently rendered and there's more than one note reached yet. For Random (the memory-quiz sliding
+window, unchanged — see below) that's still a small window; for a real loaded song it's now every
+note in the timeline (see INV-50), so "off-screen" no longer means "not rendered," only "scrolled
+out of the visible portion of the timeline" — `scrollTimelineToCurrent` keeps the current note in
+view on each render, and `updateScrubDragTarget` edge-scrolls the container while a drag nears
+either edge.
 
 Dragging is `mousedown`/`touchstart` on `.scrub-marker` → `mousemove`/`touchmove` calls
 `updateScrubDragTarget`, which finds whichever rendered note token's center is closest to the
 pointer and repositions the marker there live (`state.scrubDragIndex`, not yet committed) →
 `mouseup`/`touchend` commits via `seekTo`. Critically, live repositioning during the drag reuses
-the *same* marker DOM node every time (moving it, never recreating it) instead of going through a
+the *same* marker DOM node every time (created once via `appendChild`, only ever repositioned via
+`style.left` afterward — never recreated, never re-`insertBefore`'d) instead of going through a
 full `updateDifficultyUI()` re-render on every move — found necessary via a real
 touchstart/touchmove/touchend test (not a synthetic `.click()`, per this project's standing
 touch-testing discipline): a full re-render replaces the marker's own element via `innerHTML`,
 which detaches whatever the original `touchstart` captured as its event target, silently breaking
-the rest of the gesture on a real device. Separator spans are cheap to recreate each call, since
-nothing ever captures touch/mouse on them.
+the rest of the gesture on a real device. Mutating `style.left` on the same element reference a
+capture already holds is safe; only `innerHTML` replacement of the marker itself (never done)
+would be the actual hazard.
 
 **Test:** `tests/desktop.spec.js` — "Melody mode: ... scrub marker/control ..." / "a wrong note
-resets progress back to the scrub position" tests (visibility, correct gap placement, clamping,
-real mouse-drag back/forward, mistake-branch reset landing on `startIndex`).
-`tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to the touched
-note", using genuine dispatched `Touch`/`TouchEvent` objects (this is the test that caught the
-detached-touch-target bug above — a mouse-only test wouldn't have).
+resets progress back to the scrub position" tests (visibility, correct `style.left` placement at
+the target token's own `offsetLeft`, clamping, real mouse-drag back/forward, mistake-branch reset
+landing on `startIndex`), plus "dragging the marker near the timeline edge scrolls it" (#46
+edge-scroll). `tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to
+the touched note", using genuine dispatched `Touch`/`TouchEvent` objects (this is the test that
+caught the detached-touch-target bug above — a mouse-only test wouldn't have).
+
+---
+
+### INV-50: a real loaded song renders its entire timeline up front and shows measure boundaries; Random never does
+
+Random (`MelodyMode.state.isRandom`, always true for the offline-degrade/dropdown "Random" entry,
+false once a real song loads via `loadMelodyFromArrayBuffer`) is a memory-quiz sliding window
+forever — it isn't a piece to progress through, so it keeps exactly its original small
+`pastWindow`/`futureWindow` rendering, no measures, no auto-advance (see INV-51). A **real song**
+(#46) instead renders **every** note in `state.melody` up front as a true, horizontally scrollable
+seek-bar (`.melody-note-list`'s `overflow-x: auto`) — the whole point of showing "where you are in
+the piece," which a small sliding window can't. `isRandom` is set explicitly at both load sites
+(`loadDefault()`/`loadMelodyFromArrayBuffer()`), never inferred from `#melody-filename`'s text or
+`MidiFolder.currentValue` (fragile, and would couple `melody.js` to `file-folder.js` internals).
+
+Rendering the whole song rather than a smaller window also sidesteps a real touch-target-stability
+hazard: if tokens were re-rendered mid-drag (as a windowed approach would need to, to reveal more
+content as the drag neared an edge), every token's position would shift out from under the drag's
+own closest-token lookup (`updateScrubDragTarget`). With everything already in the DOM, dragging
+near an edge only changes `scrollLeft` — no re-render, no jump.
+
+At Medium difficulty (level 2) a real song's not-yet-reached notes render as plain dim text
+(`opacity: 0.5`), visible but with no colored hint — a deliberate difference from Random's own
+Medium, which shows no future notes at all; the whole point of a seek-bar is to always show where
+the piece goes, difficulty only gates the colored "next 3" hints (Easy only), not the notes'
+existence. Easy's colored next-2 hint and the current-note highlight both render as before.
+
+Measure tick marks (`.measure-tick`, low-contrast, no `data-note-idx` so drag/marker logic
+naturally ignores them) are inserted between any two adjacent notes whose `MelodyMode.measureOf`
+differs, assuming 4/4 throughout (no time-signature parsing exists in this codebase — genuinely
+out of scope). `measureOf` divides by `state.melodyBPM * 4 / 60` seconds-per-measure;
+`state.melodyBPM` is set from `parseMIDI`'s new `bpm` return field (first tempo event if the file
+has one, else the same shared 120bpm default `parseMIDI`'s `tickToSec` already used —
+`DEFAULT_TEMPO_USEC_PER_BEAT`, hoisted from two independently-hardcoded `500000` literals kept in
+sync only by comment, same consolidation pattern as the difficulty-barbell hoist).
+
+**Test:** `tests/desktop.spec.js` — "a real song renders its entire timeline up front, not a
+sliding window", "Random keeps its small sliding window even with the song-timeline code present"
+(explicit re-verification that none of this leaks into Random), "measure ticks appear exactly
+where the computed measure changes" — all loading the real bundled `midi/frere-jacques.mid`
+(32 notes, 120bpm/4-4) rather than a synthetic fixture.
+
+---
+
+### INV-51: after 3 clean playthroughs in a row, Melody auto-advances the drilled segment to the next measure
+
+The first concrete mechanic of a spaced-repetition design (#46), built on INV-48's mode-switch
+pause/resume guarantee — state must survive stepping away for spaced repetition to mean anything.
+Real songs only (`!state.isRandom`); Random has no measures to advance into.
+
+`state.cleanStreak` counts consecutive clean passes of the current segment (`[startIndex,
+targetLength)`); `state.segmentHadMistake` is transient, reset to `false` at the top of every
+`playTargetSequence()` call and set `true` by `handleUserInputNote`'s Mistake branch (which also
+immediately zeroes `cleanStreak`). Reaching the existing "Correct! Go ahead!" branch
+(`userIndex >= targetLength`) with no mistake since the last `playTargetSequence()` call *is* a
+complete clean pass — `cleanStreak` increments there, before the branch's own 2s idle timeout.
+At 3, `MelodyMode.measureOf` finds the first note whose measure is strictly past the segment
+start's own measure and moves `startIndex` there — advancing a full measure, not just one note —
+and resets `cleanStreak` to 0. Because this can move `startIndex` *past* whatever's currently
+drilled (unlike a scrub, which only ever moves the start *earlier* within already-reached
+territory), `targetLength` grows to cover the new `startIndex` too, preserving the existing
+"`startIndex` always `<= targetLength - 1`" invariant (INV-26) rather than getting silently
+clamped back into the same measure.
+
+A player-initiated scrub (`seekTo`, committed by releasing a marker drag) to a different
+`startIndex` also resets `cleanStreak` — it's now drilling a different stretch than the one the
+streak counted. The auto-advance's own `startIndex` change is exempt, since it sets the field
+directly rather than going through `seekTo`. Loading a new song resets it too, via the existing
+`resetGame()` field-reset list (`loadMelodyFromArrayBuffer` already calls `resetGame()`
+unconditionally).
+
+**Test:** `tests/desktop.spec.js` — "3 clean playthroughs auto-advance the segment into the next
+measure", "a mistake resets the clean-streak", "a player-initiated scrub resets the clean-streak",
+"loading a new song resets the clean-streak". `tests/invariants.spec.js` — "INV-48: Melody's
+clean-streak survives a switch away and back untouched" (asserted directly against
+`MelodyMode.state`, since `paintedFingerprint`'s black-box DOM check has no visible on-screen
+representation of `cleanStreak` to catch a regression here).
 
 ---
 
