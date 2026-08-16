@@ -841,20 +841,20 @@ test.describe('Invariant tests', () => {
       '#tonnetz-svg', '#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right',
       '#palette', '#gravity-start-pause', '#gravity-reset', '#gravity-controls .stats-panel', '#drawer-handle',
     ],
-    blast: ['#tonnetz-svg', '#blast-reset', '#blast-undo', '#blast-stats .stats-panel', '#drawer-handle'],
+    blast: ['#tonnetz-svg', '#blast-reset', '#blast-stats .stats-panel', '#drawer-handle'],
     snake: [
       '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
       '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
     ],
     melody: ['#tonnetz-svg', '#drawer-handle', '#melody-source', '#melody-play-preview', '#melody-game-restart', '#melody-stats-group', '#melody-game-status'],
-    sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select', '#sandbox-undo'],
+    sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select'],
     compose: [
       '#tonnetz-svg', '#drawer-handle', '#compose-source', '#compose-record', '#compose-play',
-      '#compose-undo', '#compose-clear', '#compose-save', '#compose-stats-group',
+      '#compose-clear', '#compose-save', '#compose-stats-group',
     ],
     life: [
       '#tonnetz-svg', '#drawer-handle', '#life-source', '#life-play-pause', '#life-step',
-      '#life-reset', '#life-clear', '#life-undo', '#life-save', '#life-generation',
+      '#life-reset', '#life-clear', '#life-save', '#life-generation',
     ],
   };
 

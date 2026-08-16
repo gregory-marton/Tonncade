@@ -1651,6 +1651,23 @@ redraws once; an empty stack is a silent no-op.
   coherent after an undo, not just the note data. `loadMelodyFromArrayBuffer` clears the undo
   history (a freshly-loaded file is a fresh start, matching Blast/Life's own boundary).
 
+**One shared header button, not four per-mode ones.** Sandbox/Blast/Life/Compose originally each
+got their own `#<mode>-undo` button inside their own panel — simple, but it meant four buttons to
+keep in sync, and one (`#sandbox-undo`) leaked visible into every mode for a while because its
+wrapper `div` had no `id` and was never touched by `setMode`'s hide/show logic (reported live as
+"two undos in Blast"). Per follow-up direction, these were consolidated into a single `#undo-btn`
+in the header (`index.html`, next to `#copy-btn`/`#paste-btn`) — always present, never hidden, and
+simply **disabled** wherever undo isn't currently applicable: no undo support in the current mode
+at all (Melody/Snake/Gravity), or that mode's own `undoStack` is currently empty. `App.undo()`
+(`js/main.js`) dispatches to `App.modeModule().undo()`; `App.refreshUndoButton()` reads
+`App.modeModule().state.undoStack.canUndo()` (a new `UndoStack._proto` method) to set the
+button's `disabled`/opacity/cursor. Rather than requiring every one of the ~20 individual mutator
+call sites across the four mode files to remember to poke the button, `UndoStack.push()`/`undo()`/
+`clear()` themselves call `App.refreshUndoButton()` on every change (guarded for contexts where
+`App` isn't defined) — so the button can never go stale. Ctrl/Cmd+Z is wired the same way Ctrl/Cmd+C
+and Ctrl/Cmd+V already are (`App.setupClipboard`), stepping aside for editable fields and real text
+selections.
+
 **Test:** `tests/desktop.spec.js` — "Sandbox: Undo reverses a placement/pickup/paste", "Sandbox:
 Undo on an empty history is a silent no-op", "Blast: Undo reverses a placement" (plain, and the
 line-clear-cascade case, asserting the board's exact pre-placement `Map` contents round-trip),
@@ -1666,7 +1683,11 @@ before landing), "Compose: loading a file clears the undo history". `tests/invar
 "INV-48: Sandbox/Blast/Life/Compose's undo history survives a switch away and back untouched"
 (each mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as
 Melody's own `cleanStreak`, INV-51 — asserted directly since `paintedFingerprint`'s black-box DOM
-check has no visible representation of undo history to catch a regression here).
+check has no visible representation of undo history to catch a regression here). Also "Undo (#17):
+the single header button stays disabled everywhere undo has nothing to do, and enables once there
+is something to undo" — covers the always-disabled modes (Melody/Snake/Gravity), the
+empty-stack-disables/non-empty-enables transition (Sandbox, Blast), and that clicking back down to
+an empty stack re-disables it (not a one-way latch).
 
 ---
 
@@ -1691,12 +1712,14 @@ pieces or chord-guide results, are not listed separately):
 | Mode | Primary elements |
 |---|---|
 | Gravity | Tonnetz, each of the 5 (portrait) / 6 (landscape) D-pad buttons individually, the next-piece preview, Pause, Restart, Stats, Drawer pull |
-| Blast | Tonnetz, the preview/place control, Restart, Undo, Stats, Drawer pull |
+| Blast | Tonnetz, the preview/place control, Restart, Stats, Drawer pull |
 | Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
 | Melody | Tonnetz, Drawer pull, Song source, Play, Restart, Stats, Sequence message |
-| Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker, Undo |
-| Compose | Tonnetz, Drawer pull, Song source, Record, Play, Undo, Clear, Save, Stats |
-| Life | Tonnetz, Drawer pull, Automaton source, Play/Pause, Step, Reset, Clear, Undo, Save, Generation counter |
+| Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
+| Compose | Tonnetz, Drawer pull, Song source, Record, Play, Clear, Save, Stats |
+| Life | Tonnetz, Drawer pull, Automaton source, Play/Pause, Step, Reset, Clear, Save, Generation counter |
 
 This inventory is the reference list INV-13 (below) checks against, and the vocabulary the
-rest of this doc and its tests should stay consistent with.
+rest of this doc and its tests should stay consistent with. Undo (#17) isn't in any per-mode
+row: it consolidated into a single header control (`#undo-btn`, next to Copy/Paste) that lives
+outside every mode's own panel and is simply disabled where inapplicable — see INV-54.

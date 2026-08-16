@@ -810,7 +810,6 @@ const LifeMode = {
         bind('life-step', this.stepOnce);
         bind('life-clear', this.clear);
         bind('life-reset', this.reset);
-        bind('life-undo', this.undo);
         bind('life-save', this.save);
 
         // Open a LOCAL automaton file -- e.g. one previously written by Save As, or shared by

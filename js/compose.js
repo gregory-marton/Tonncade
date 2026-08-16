@@ -97,7 +97,6 @@ const ComposeMode = {
     setupDOMEvents: function() {
         const recordBtn = document.getElementById('compose-record');
         const playBtn = document.getElementById('compose-play');
-        const undoBtn = document.getElementById('compose-undo');
         const clearBtn = document.getElementById('compose-clear');
         const saveBtn = document.getElementById('compose-save');
         const fileInput = document.getElementById('compose-file-input');
@@ -114,7 +113,6 @@ const ComposeMode = {
                 else this.play();
             };
         }
-        if (undoBtn) undoBtn.onclick = () => this.undo();
         if (clearBtn) clearBtn.onclick = () => this.clear();
         if (saveBtn) saveBtn.onclick = () => this.save();
 

@@ -98,8 +98,6 @@ const SandboxMode = {
         this.refreshLattice();
         this.setupEvents();
         this.setupGuide();
-        const undoBtn = document.getElementById('sandbox-undo');
-        if (undoBtn) undoBtn.onclick = () => this.undo();
         this.setupDragToCandidate('piece-list', '.piece-item', item => ({
             key: item.getAttribute('data-key'),
             rotation: 0

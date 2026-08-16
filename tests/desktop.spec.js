@@ -756,7 +756,7 @@ test('Compose: Undo removes only the most recently added note', async ({ page })
   });
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(2);
 
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
 
   const notes = await page.evaluate(() => ComposeMode.state.notes.map(n => n.midi));
   expect(notes).toEqual([await page.evaluate(() => Tonnetz.getMidi(0, 0))]);
@@ -3259,7 +3259,7 @@ test('Sandbox: Undo reverses a placement', async ({ page }) => {
     SandboxMode.placePiece(2, 2);
   });
   expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(1);
-  await page.locator('#sandbox-undo').click();
+  await page.locator('#undo-btn').click();
   expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
 });
 
@@ -3270,7 +3270,7 @@ test('Sandbox: Undo reverses a pickup (puts the picked-up piece back)', async ({
     SandboxMode.handleAction(3, 3); // picks it up (an existing piece occupies that cell)
   });
   expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
-  await page.locator('#sandbox-undo').click();
+  await page.locator('#undo-btn').click();
   const restored = await page.evaluate(() => SandboxMode.state.placedPieces);
   expect(restored).toEqual([{ type: '.', p: 3, q: 3, rotation: 0 }]);
 });
@@ -3282,7 +3282,7 @@ test('Sandbox: Undo reverses a paste, but only the cells that paste actually add
     SandboxMode.pasteClipboard([{ p: 10, q: 10 }, { p: 11, q: 11 }]); // one dup, one new
   });
   expect(await page.evaluate(() => SandboxMode.state.placedCells.length)).toBe(2);
-  await page.locator('#sandbox-undo').click();
+  await page.locator('#undo-btn').click();
   const remaining = await page.evaluate(() => SandboxMode.state.placedCells);
   expect(remaining).toEqual([{ p: 10, q: 10 }]); // the pre-existing cell survives; the pasted one doesn't
 });
@@ -3291,7 +3291,11 @@ test('Sandbox: Undo on an empty history is a silent no-op', async ({ page }) => 
   await page.goto('/');
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.locator('#sandbox-undo').click();
+  // The header button is disabled with nothing to undo (page.locator(...).click() would just hang
+  // waiting for it to become enabled) -- calling App.undo() directly exercises the same no-op path
+  // the button's own onclick would take if it weren't disabled.
+  expect(await page.evaluate(() => document.getElementById('undo-btn').disabled)).toBe(true);
+  await page.evaluate(() => App.undo());
   expect(errors).toEqual([]);
   expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
 });
@@ -3305,7 +3309,7 @@ test('Blast: Undo reverses a placement', async ({ page }) => {
     BlastMode.placePiece(2, 2);
   });
   expect(await page.evaluate(() => Board.cells.size)).toBe(1);
-  await page.locator('#blast-undo').click();
+  await page.locator('#undo-btn').click();
   expect(await page.evaluate(() => Board.cells.size)).toBe(0);
 });
 
@@ -3348,7 +3352,7 @@ test('Blast: Undo reverses a paste', async ({ page }) => {
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
   await page.evaluate(() => BlastMode.pasteClipboard([{ p: 1, q: 1 }]));
   expect(await page.evaluate(() => Board.cells.size)).toBe(1);
-  await page.locator('#blast-undo').click();
+  await page.locator('#undo-btn').click();
   expect(await page.evaluate(() => Board.cells.size)).toBe(0);
 });
 
@@ -3362,7 +3366,8 @@ test('Blast: New Game clears the undo history -- undo cannot reach back into a p
   });
   await page.locator('#blast-reset').click();
   const sizeBeforeUndo = await page.evaluate(() => Board.cells.size);
-  await page.locator('#blast-undo').click();
+  expect(await page.evaluate(() => document.getElementById('undo-btn').disabled)).toBe(true);
+  await page.evaluate(() => App.undo());
   expect(await page.evaluate(() => Board.cells.size)).toBe(sizeBeforeUndo); // undo was a no-op
 });
 
@@ -3373,7 +3378,7 @@ test('Life: Undo reverses a single cell toggle', async ({ page }) => {
   const before = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
   await page.evaluate(() => LifeMode.toggleCell(20, 20));
   expect(await page.evaluate(() => LifeMode.state.live.has('20,20'))).toBe(true);
-  await page.locator('#life-undo').click();
+  await page.locator('#undo-btn').click();
   const after = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
   expect(after).toEqual(before);
 });
@@ -3387,7 +3392,7 @@ test('Life: Undo reverses Clear and Reset (human edits), restoring the exact pri
 
   await page.locator('#life-clear').click();
   expect(await page.evaluate(() => LifeMode.state.live.size)).toBe(0);
-  await page.locator('#life-undo').click();
+  await page.locator('#undo-btn').click();
   const afterClearUndo = await page.evaluate(() => ({ live: [...LifeMode.state.live.entries()].sort(), gen: LifeMode.state.generation }));
   expect(afterClearUndo).toEqual(before);
 });
@@ -3402,7 +3407,7 @@ test('Life: a simulation step is never undo-able -- undo after Step reverses the
   const genAfterStep = await page.evaluate(() => LifeMode.state.generation);
   expect(genAfterStep).toBe(genBeforeStep + 1);
 
-  await page.locator('#life-undo').click();
+  await page.locator('#undo-btn').click();
   const genAfterUndo = await page.evaluate(() => LifeMode.state.generation);
   expect(genAfterUndo).toBe(genAfterStep); // undo did NOT roll back the step
   expect(await page.evaluate(() => LifeMode.state.live.has('21,21'))).toBe(false); // it undid the toggle instead
@@ -3415,7 +3420,7 @@ test('Life: Undo reverses a paste', async ({ page }) => {
   const before = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
   await page.evaluate(() => LifeMode.pasteClipboard([{ p: 30, q: 30 }, { p: 31, q: 31 }]));
   expect(await page.evaluate(() => LifeMode.state.live.size)).toBeGreaterThan(before.length);
-  await page.locator('#life-undo').click();
+  await page.locator('#undo-btn').click();
   const after = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
   expect(after).toEqual(before);
 });
@@ -3427,7 +3432,8 @@ test('Life: loading a new automaton clears the undo history', async ({ page }) =
   await page.evaluate(() => LifeMode.toggleCell(20, 20));
   await page.evaluate(() => LifeMode.loadAutomaton(LifeMode.DEFAULT_AUTOMATON));
   const sizeBeforeUndo = await page.evaluate(() => LifeMode.state.live.size);
-  await page.locator('#life-undo').click();
+  expect(await page.evaluate(() => document.getElementById('undo-btn').disabled)).toBe(true);
+  await page.evaluate(() => App.undo());
   expect(await page.evaluate(() => LifeMode.state.live.size)).toBe(sizeBeforeUndo); // undo was a no-op
 });
 
@@ -3454,7 +3460,7 @@ test('Compose: Undo reverses a recorded chord (multiple simultaneous notes) as O
     ComposeMode.flushChordBuffer();
   });
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(2);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(0); // both notes gone, one undo
 });
 
@@ -3471,7 +3477,7 @@ test('Compose: Undo reverses Delete, restoring the exact prior notes and selecti
     return null;
   });
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(1);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const notes = await page.evaluate(() => ComposeMode.state.notes);
   expect(notes).toEqual([
     { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
@@ -3497,7 +3503,7 @@ test('Compose: Undo reverses Insert, including the time-shift it applied to LATE
     ComposeMode.insertAfterSelected(1, 0);
   });
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(3);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const notes = await page.evaluate(() => ComposeMode.state.notes);
   expect(notes).toEqual([
     { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
@@ -3514,7 +3520,7 @@ test('Compose: Undo reverses a translate (drag) of the selection', async ({ page
     ComposeMode.translateSelection(1, 0);
   });
   expect(await page.evaluate(() => ComposeMode.state.notes[0].p)).toBe(1);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const note = await page.evaluate(() => ComposeMode.state.notes[0]);
   expect(note).toEqual({ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 });
 });
@@ -3532,7 +3538,7 @@ test('Compose: Undo reverses a rotate of the selection around its pivot', async 
   });
   const rotated = await page.evaluate(() => ({ p: ComposeMode.state.notes[1].p, q: ComposeMode.state.notes[1].q }));
   expect(rotated).not.toEqual({ p: 1, q: 0 });
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const restored = await page.evaluate(() => ({ p: ComposeMode.state.notes[1].p, q: ComposeMode.state.notes[1].q, midi: ComposeMode.state.notes[1].midi }));
   expect(restored).toEqual({ p: 1, q: 0, midi: 67 });
 });
@@ -3552,7 +3558,7 @@ test('Compose: Undo reverses a paste-group (#82) of MULTIPLE notes as one action
     ComposeMode.pasteGroup();
   });
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(3);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const notes = await page.evaluate(() => ComposeMode.state.notes);
   expect(notes).toEqual([{ midi: 55, p: -1, q: 0, time: 0, duration: 0.4 }]);
   expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([]);
@@ -3564,7 +3570,7 @@ test('Compose: Undo reverses Clear', async ({ page }) => {
   await page.evaluate(() => { ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]; });
   await page.locator('#compose-clear').click();
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(0);
-  await page.locator('#compose-undo').click();
+  await page.locator('#undo-btn').click();
   const notes = await page.evaluate(() => ComposeMode.state.notes);
   expect(notes).toEqual([{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]);
 });
@@ -3582,32 +3588,51 @@ test('Compose: loading a file clears the undo history', async ({ page }) => {
     ComposeMode.loadMelodyFromArrayBuffer(new Uint8Array(bytes).buffer, 'test.mid');
   }, bytes);
   const sizeBeforeUndo = await page.evaluate(() => ComposeMode.state.notes.length);
-  await page.locator('#compose-undo').click();
+  expect(await page.evaluate(() => document.getElementById('undo-btn').disabled)).toBe(true);
+  await page.evaluate(() => App.undo());
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op
 });
 
 
-// Found live: #sandbox-undo (issue #17) sat in a bare, un-ID'd sibling div right before #palette
-// -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY
-// mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked
-// Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions
-// wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one
-// #sandbox-guide already uses). This checks the general property -- every mode's own Undo button
-// is visible ONLY in that mode -- not just the one specific leak that was reported.
-test('Undo buttons (#17) are each visible only in their own mode, never leaking into another', async ({ page }) => {
+// Four separate per-mode Undo buttons (#sandbox-undo/#blast-undo/#life-undo/#compose-undo) used to
+// each leak visible outside their own mode (a bare un-ID'd wrapper div never covered by setMode's
+// hide/show logic -- reported live as "two undos in Blast", a third button in Life, and a leaked
+// Undo showing up in Snake, which has no undo at all). Consolidated per user request into a single
+// shared #undo-btn in the header next to Copy/Paste (like those, always present, never hidden),
+// which is simply DISABLED wherever undo isn't currently applicable -- no undo support in this
+// mode at all, or this mode's own undo stack is currently empty.
+test('Undo (#17): the single header button stays disabled everywhere undo has nothing to do, and enables once there is something to undo', async ({ page }) => {
   await page.goto('/');
-  const undoButtons = { sandbox: 'sandbox-undo', blast: 'blast-undo', life: 'life-undo', compose: 'compose-undo' };
-  for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) {
-    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-    for (const [owningMode, id] of Object.entries(undoButtons)) {
-      const visible = await page.evaluate((id) => {
-        const el = document.getElementById(id);
-        if (!el) return false;
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      }, id);
-      const expected = mode === owningMode;
-      expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected);
-    }
+  const isDisabled = () => page.evaluate(() => document.getElementById('undo-btn').disabled);
+  const switchTo = (mode) => page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+  // Modes with no undo support at all: always disabled, regardless of any interaction.
+  for (const mode of ['melody', 'snake', 'gravity']) {
+    await switchTo(mode);
+    expect(await isDisabled(), mode).toBe(true);
   }
+
+  // Sandbox: disabled with an empty history, enabled the instant there's a placement to undo.
+  await switchTo('sandbox');
+  expect(await isDisabled(), 'sandbox, before placing').toBe(true);
+  await page.evaluate(() => {
+    SandboxMode.state.selectedPiece = '.';
+    SandboxMode.state.rotation = 0;
+    SandboxMode.placePiece(2, 2);
+  });
+  expect(await isDisabled(), 'sandbox, after placing').toBe(false);
+
+  // Blast: same shape -- empty stack disables, a placement enables.
+  await switchTo('blast');
+  expect(await isDisabled(), 'blast, before placing').toBe(true);
+  await page.evaluate(() => {
+    BlastMode.state.activePiece = '.';
+    BlastMode.state.rotation = 0;
+    BlastMode.placePiece(2, 2);
+  });
+  expect(await isDisabled(), 'blast, after placing').toBe(false);
+
+  // Clicking it back down to empty disables it again -- not a one-way latch.
+  await page.locator('#undo-btn').click();
+  expect(await isDisabled(), 'blast, after undoing back to empty').toBe(true);
 });

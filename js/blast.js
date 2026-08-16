@@ -274,9 +274,6 @@ const BlastMode = {
                 this.reset();
             };
         }
-        const undoBtn = document.getElementById('blast-undo');
-        if (undoBtn) undoBtn.onclick = () => this.undo();
-
         // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js): click the Nth weight to
         // set the piece-size level.
         this._difficultyBarbell = DifficultyBarbell.create({

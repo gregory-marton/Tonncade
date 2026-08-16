@@ -3161,3 +3161,43 @@ Want me to start with Life's Save As, or handle these in a different order?
 ### 2026-08-14T03:21:40.951Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 > I want you to comment on 15/16, but I'll do all the closing after push and test.
+
+
+### 2026-08-14T03:21:46.208Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git log --oneline -6
+
+
+### 2026-08-14T03:21:46.379Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 85657ce Gravity: unify line-clearing into ordinary per-tick falling, no special cases a144357 Gravity: pasted cells fall one row per tick, never a silent precomputed jump cb4b0e7 Compose: paste now gives the same feedback every other note-adding path gives c9502f6 Add [REDACTED_SECRET] (mode state is independent, switching pauses it) and fix its violations 733acf0 Life: fix two ways its state leaked into other modes after switching away 42ccde8 README: document running locally (file:// vs http-server) and the service-worker caveat
+
+
+### 2026-08-14T03:22:01.616Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: gh issue comment 16 --body "$(cat <<'EOF' Root-caused and fixed, [REDACTED_SECRET] (on `main`). Two separate bugs in Life mode, both letting it leak into whatever mode you'd switched to: 1. **The stale-fetch race** (the non-determinism you noticed): `loadOnlineFolder()`'s automaton fetch could resolve *after* you'd already left Life for another mode. Its callback still ran, repainting the shared `#tonnetz-svg` with Life's lattice/live cells on top of whatever mode was currently showing — explaining exactly "go to life, come back to blast, and every once in a while the life default pattern appears." Purely a timing race, which is why it wasn't reproducible on demand. Fixed with a per-visit token, invalidated on both entering and leaving Life, so a stale resolution is now dropped instead of applied. 2. **A leaked event listener** (the "even more notes" part, e.g. during the long-press in Sandbox): Life bound its tap-to-toggle handler via `addEventListener` directly on the shared `<svg>` element, guarded by a one-time flag so it was bound once and never removed. Unlike the `.onmousedown =` property assignment other modes use (which the next mode's own assignment naturally overwrites), an `addEventListener` survives both the canvas being wiped and redrawn *and* a mode switch — so a tap made in Sandbox (or any other mode) kept silently toggling Life's own cells underneath you, adding notes with no visible cause. Fixed by binding fresh each Life entry and explicitly tearing down in `cleanup()`. Also added **[REDACTED_SECRET]** (`docs/invariants.md`) codifying the general rule these violated — a mode switch must pause a mode, never let its state leak into or be touched by another mode — with a comprehensive regression suite covering all six stateful modes, so this class of bug is now caught automatically rather than only found live. EOF )"
+
+
+### 2026-08-14T03:22:03.115Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET]
+
+
+### 2026-08-14T03:22:11.971Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: gh issue comment 15 --body "$(cat <<'EOF' Root-caused and fixed, commit 733acf0 (on \`main\`) — same underlying bug as #16, from the other direction. [REDACTED_PERSON] bound its tap-to-toggle handler via \`addEventListener\` directly on the shared \`<svg>\` element (the one canvas every mode draws into), guarded by a flag that only prevented re-binding, not removal. Unlike the \`.onmousedown =\` property assignment other modes use — which the next mode's own assignment naturally overwrites — an \`addEventListener\` survives both the canvas being wiped/redrawn on every mode switch *and* the mode switch itself. So [REDACTED_PERSON]'s listener kept firing on taps made in [REDACTED_PERSON] (or wherever you went), silently toggling [REDACTED_PERSON]'s own now-invisible cells, and — since [REDACTED_PERSON]'s timer was gone but its board kept getting quietly mutated from elsewhere — resuming [REDACTED_PERSON] could look like "[REDACTED_PERSON] kept playing." Fixed by binding the listener fresh on each [REDACTED_PERSON] entry and explicitly removing it in \`cleanup()\`. Also added **INV-48** (\`docs/invariants.md\`) codifying the rule this violated — a mode switch must pause a mode and never let its state leak into or be touched by another mode — with a full regression suite across all six stateful modes ([REDACTED_PERSON], [REDACTED_PERSON], [REDACTED_PERSON], [REDACTED_PERSON], [REDACTED_PERSON], [REDACTED_PERSON]), so this class of bug is now caught automatically. EOF )"
+
+
+### 2026-08-14T03:22:12.830Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: https://[[REDACTED_SECRET]]#issuecomment-5289022985
+
+
+### 2026-08-14T03:22:16.144Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both comments posted. Now let's tackle the zoom range and Life Save As. Let's start by investigating the zoom limits.
+
+
+### 2026-08-14T03:22:16.589Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "zoom" js/render.js | head -60

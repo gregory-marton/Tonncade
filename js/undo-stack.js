@@ -48,6 +48,7 @@ const UndoStack = {
         push: function(invert) {
             this._entries.push(invert);
             if (this._entries.length > this._limit) this._entries.shift();
+            UndoStack._notify();
         },
 
         // Pops and runs the most recent inversion closure. Returns true if there was one to run
@@ -57,6 +58,7 @@ const UndoStack = {
             const invert = this._entries.pop();
             if (!invert) return false;
             invert();
+            UndoStack._notify();
             return true;
         },
 
@@ -66,6 +68,24 @@ const UndoStack = {
         // resets there rather than accumulating across it.
         clear: function() {
             this._entries = [];
+            UndoStack._notify();
         },
+
+        // Whether there's anything to undo right now -- the header's single shared #undo-btn
+        // (#17) reads this to decide its own disabled state.
+        canUndo: function() {
+            return this._entries.length > 0;
+        },
+    },
+
+    // push/undo/clear all funnel through here so the header's shared #undo-btn (js/main.js's
+    // App.refreshUndoButton) stays in sync automatically, without every mutator call site across
+    // sandbox.js/blast.js/life.js/compose.js (~20 of them) needing to remember to poke it itself.
+    // Guarded for contexts where App isn't defined (unit tests instantiating UndoStack in
+    // isolation) -- a no-op there, since there's no button to keep in sync with.
+    _notify: function() {
+        if (typeof App !== 'undefined' && typeof App.refreshUndoButton === 'function') {
+            App.refreshUndoButton();
+        }
     },
 };

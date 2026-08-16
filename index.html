@@ -53,6 +53,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                            style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
                            onmouseover="this.style.opacity='1'"
                            onmouseout="this.style.opacity='0.6'">&#x1F4CB;</button>
+                        <button type="button" id="undo-btn"
+                           aria-label="Undo (Ctrl/Cmd+Z)" title="Undo (Ctrl/Cmd+Z)"
+                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
+                           onmouseover="if (!this.disabled) this.style.opacity='1'"
+                           onmouseout="this.style.opacity=this.disabled ? '0.25' : '0.6'">&#x21B6;</button>
                     </h1>
                     <a href="https://en.wikipedia.org/wiki/Special:MyLanguage/Tonnetz" target="_blank" rel="noopener noreferrer"
                        style="color: var(--dim); font-size: 11px; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.2); transition: color 0.15s ease; width: fit-content;"
@@ -89,7 +94,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 <div id="blast-stats" style="display: none;">
                     <div class="control-buttons">
                         <button id="blast-reset" class="icon-btn" title="New game" aria-label="New game">↻</button>
-                        <button id="blast-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
                     </div>
                     <div id="blast-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"></div>
                     <div class="stats-panel">
@@ -222,7 +226,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px;">
                         <button id="compose-record" class="icon-btn" title="Record" aria-label="Record">⏺</button>
                         <button id="compose-play" class="icon-btn" title="Play" aria-label="Play">▶</button>
-                        <button id="compose-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
                         <button id="compose-clear" class="icon-btn" title="Clear" aria-label="Clear">✕</button>
                         <button id="compose-save" class="icon-btn" title="Save" aria-label="Save">💾</button>
                     </div>
@@ -300,7 +303,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button>
                         <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↻</button>
                         <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button>
-                        <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
                         <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button>
                     </div>
                     <div class="stats-panel">
@@ -308,9 +310,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     </div>
                 </div>
 
-                <div id="sandbox-actions" class="control-buttons" style="display: none;">
-                    <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
-                </div>
                 <div id="palette">
                     <div id="piece-list"></div>
                 </div>

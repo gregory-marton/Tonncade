@@ -142,6 +142,30 @@ const App = {
         setTimeout(() => { btn.style.transform = ''; btn.style.opacity = ''; }, 180);
     },
 
+    // Sandbox/Blast/Life/Compose each own an UndoStack (#17); Melody/Snake/Gravity don't support
+    // undo at all (see docs/invariants.md INV-54) and are simply absent here, so #undo-btn stays
+    // disabled in those modes regardless of any mode module's own state.
+    undo: function() {
+        const m = this.modeModule();
+        if (!m || typeof m.undo !== 'function') return;
+        m.undo();
+    },
+
+    // Keeps the single header #undo-btn (which replaced four separate per-mode buttons, #17) in
+    // sync with "is there anything to undo in the CURRENT mode right now" -- called on every mode
+    // switch, and (via UndoStack's own push/undo/clear) every time any mode's stack actually
+    // changes, so the button never goes stale without needing each of the ~20 individual mutator
+    // call sites across sandbox.js/blast.js/life.js/compose.js to remember to poke it themselves.
+    refreshUndoButton: function() {
+        const btn = document.getElementById('undo-btn');
+        if (!btn) return;
+        const m = this.modeModule();
+        const canUndo = !!(m && m.state && m.state.undoStack && typeof m.undo === 'function' && m.state.undoStack.canUndo());
+        btn.disabled = !canUndo;
+        btn.style.opacity = canUndo ? '0.6' : '0.25';
+        btn.style.cursor = canUndo ? 'pointer' : 'default';
+    },
+
     // Zoomable is exactly pannable: every non-restricted mode has its own free-pan Tonnetz view
     // and gets in-app zoom too (wheel, ctrl+wheel/trackpad pinch, and touch pinch -- see
     // setupZoomGestures/setupTouchGestures). Restricted-board modes (Render.RESTRICTED_MODES --
@@ -188,25 +212,30 @@ const App = {
         }, { passive: false });
     },
 
-    // Ctrl/Cmd+C / Ctrl/Cmd+V (desktop) + the header copy/paste buttons (touch). The keyboard path
-    // steps aside when the user is editing text or has a real text selection, so normal text
-    // copy/paste still works; otherwise it copies/pastes Tonnetz cells.
+    // Ctrl/Cmd+C / Ctrl/Cmd+V / Ctrl/Cmd+Z (desktop) + the header copy/paste/undo buttons (touch).
+    // The keyboard path steps aside when the user is editing text or has a real text selection, so
+    // normal text copy/paste/undo still works; otherwise it acts on Tonnetz cells.
     setupClipboard: function() {
         const editable = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
             el.tagName === 'SELECT' || el.isContentEditable);
         document.addEventListener('keydown', (e) => {
             if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
             const k = e.key.toLowerCase();
-            if (k !== 'c' && k !== 'v') return;
+            if (k !== 'c' && k !== 'v' && k !== 'z') return;
             if (editable(e.target)) return;
             if (k === 'c' && String(window.getSelection())) return; // real text selection -> let it copy
             e.preventDefault();
-            if (k === 'c') this.copy(); else this.pasteFromClipboardOrOS();
+            if (k === 'c') this.copy();
+            else if (k === 'v') this.pasteFromClipboardOrOS();
+            else this.undo();
         });
         const copyBtn = document.getElementById('copy-btn');
         const pasteBtn = document.getElementById('paste-btn');
+        const undoBtn = document.getElementById('undo-btn');
         if (copyBtn) copyBtn.onclick = () => this.copy();
         if (pasteBtn) pasteBtn.onclick = () => this.pasteFromClipboardOrOS();
+        if (undoBtn) undoBtn.onclick = () => this.undo();
+        this.refreshUndoButton();
     },
 
     init: function() {
@@ -451,15 +480,12 @@ const App = {
         if (guide) {
             guide.style.display = 'none';
         }
-        const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17
-        if (sandboxActions) sandboxActions.style.display = 'none';
 
         if (mode === 'sandbox') {
             document.getElementById('placement-controls').style.display = 'block';
             if (hexNavControls) hexNavControls.style.display = 'block';
             sandboxCtrls.style.display = 'block';
             if (guide) guide.style.display = 'block';
-            if (sandboxActions) sandboxActions.style.display = 'flex';
             if (clickAction) clickAction.textContent = 'Place/Pick up';
             SandboxMode.init();
         } else if (mode === 'blast') {
@@ -491,8 +517,9 @@ const App = {
             document.getElementById('life-controls').style.display = 'block';
             LifeMode.init();
         }
-        
+
         this.setupMobileControls();
+        this.refreshUndoButton();
     },
 
     setupMobileControls: function() {
