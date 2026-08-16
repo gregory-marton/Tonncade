@@ -116,6 +116,7 @@ loadScript('pieces.js');
 loadScript('board.js');
 loadScript('render.js');
 loadScript('sandbox.js');
+loadScript('difficulty-barbell.js'); // blast.js/gravity.js/melody.js's DifficultyBarbell.create(...) needs this loaded first
 loadScript('blast.js');
 loadScript('gravity.js');
 loadScript('melody.js');
