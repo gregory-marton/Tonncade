@@ -3587,3 +3587,27 @@ test('Compose: loading a file clears the undo history', async ({ page }) => {
 });
 
 
+// Found live: #sandbox-undo (issue #17) sat in a bare, un-ID'd sibling div right before #palette
+// -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY
+// mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked
+// Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions
+// wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one
+// #sandbox-guide already uses). This checks the general property -- every mode's own Undo button
+// is visible ONLY in that mode -- not just the one specific leak that was reported.
+test('Undo buttons (#17) are each visible only in their own mode, never leaking into another', async ({ page }) => {
+  await page.goto('/');
+  const undoButtons = { sandbox: 'sandbox-undo', blast: 'blast-undo', life: 'life-undo', compose: 'compose-undo' };
+  for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) {
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    for (const [owningMode, id] of Object.entries(undoButtons)) {
+      const visible = await page.evaluate((id) => {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      }, id);
+      const expected = mode === owningMode;
+      expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected);
+    }
+  }
+});
