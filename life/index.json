@@ -42,5 +42,9 @@
   {
     "name": "Beehive Glider Eater",
     "file": "beehive-eater.yaml"
+  },
+  {
+    "name": "Consonant Bloom",
+    "file": "consonant-bloom.yaml"
   }
 ]

@@ -1,0 +1,29 @@
+name: "Consonant Bloom"
+description: "A Tonnetz-aware rule that only grows harmonically consonant clusters by explicitly forbidding semitone and tritone clashes during birth and survival."
+rule:
+  birth:
+    # Bloom if we have exactly 2 consonant neighbors (e.g. forming a triad)
+    - ring_count: [2]
+      forbid: [semitone_up, semitone_down, tritone_up, tritone_down]
+    
+    # Or bloom if we have 3, but require it to be a symmetrical arrangement
+    - ring_count: [3]
+      forbid: [semitone_up, semitone_down, tritone_up, tritone_down]
+      
+  survival:
+    # Survive comfortably in a small consonant cluster
+    - ring_count: [1, 2, 3]
+      forbid: [semitone_up, semitone_down]
+      
+    # If the cluster gets too dense (4 neighbors), it dies of 'dissonance'
+    
+sound: { when: born, duration: "generation", velocity: 85 }
+
+initial:
+  cells: 
+    # Start with a simple Major Triad (Root, M3, P5)
+    - [0, 0]    # Root (C)
+    - [1, -1]   # Major Third (E)
+    - [1, 0]    # Perfect Fifth (G)
+
+tempo: 120
