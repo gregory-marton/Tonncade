@@ -58,50 +58,93 @@ for (let trial = 0; trial < 1000; trial++) {
 console.log(`Extracted ${gliders.length} gliders and ${stationaries.length} stationary blocks.`);
 if (gliders.length === 0 || stationaries.length === 0) process.exit(0);
 
-// Test the first extracted glider against itself (rotated) for mutual annihilation
-const GLIDER = gliders[0].triplets;
-let annihilations = 0;
+// Phase 6: Glider Gun Search via Glider-Block Collisions
+console.log("=== Phase 6: Searching for Glider Guns (Glider + Block Collisions) ===");
 
-console.log("=== Phase 5: Synthesizing Logic Gates (Glider-Glider Annihilation) ===");
+let guns = 0;
+const GLIDER = gliders[0].triplets; // Use the most common small glider
+const maxB = Math.min(20, stationaries.length); // Test first 20 blocks
 
-for (let r = 1; r < 6; r++) { // Don't test angle 0, they would just tail-chase
-    let G2 = [];
-    for (const [p, q, s] of GLIDER) {
-        let cp = p, cq = q;
-        for (let i=0; i<r; i++) [cp, cq] = rotCW(cp, cq);
-        G2.push([cp, cq, s]);
-    }
+for (let bIdx = 0; bIdx < maxB; bIdx++) {
+    const BLOCK = stationaries[bIdx].triplets;
     
-    // Sweep offsets
-    for (let op = -15; op <= 15; op++) {
-        for (let oq = -15; oq <= 15; oq++) {
-            
-            let board = new Map();
-            // Place G1 at a distance
-            for (const [p, q, s] of GLIDER) board.set(key(p + 15, q), s);
-            
-            // Place G2 at an offset
-            for (const [p, q, s] of G2) board.set(key(p + op, q + oq), s);
-            
-            if (board.size < GLIDER.length * 2) continue;
-            
-            let live = board;
-            let annihilated = false;
-            
-            for (let gen = 0; gen < 80; gen++) {
-                live = Life.stepStates(live, BEST_RULE, '21');
-                if (live.size === 0) {
-                    annihilated = true;
-                    break;
+    for (let r = 0; r < 6; r++) {
+        let G2 = [];
+        for (const [p, q, s] of GLIDER) {
+            let cp = p, cq = q;
+            for (let i=0; i<r; i++) [cp, cq] = rotCW(cp, cq);
+            G2.push([cp, cq, s]);
+        }
+        
+        for (let op = -12; op <= 12; op++) {
+            for (let oq = -12; oq <= 12; oq++) {
+                
+                let board = new Map();
+                for (const [p, q, s] of BLOCK) board.set(key(p, q), s);
+                for (const [p, q, s] of G2) board.set(key(p + op, q + oq), s);
+                
+                if (board.size < BLOCK.length + G2.length) continue;
+                
+                let live = board;
+                let isGun = false;
+                let maxPop = 0;
+                
+                for (let gen = 0; gen < 250; gen++) {
+                    live = Life.stepStates(live, BEST_RULE, '21');
+                    if (live.size === 0 || live.size > 200) break;
+                    if (live.size > maxPop) maxPop = live.size;
+                    
+                    // A gun should continuously increase the population as it ejects gliders.
+                    // But wait until gen 150 to let debris settle.
+                    if (gen === 249 && maxPop > BLOCK.length + GLIDER.length + 5 && live.size > 20) {
+                        // Let's do a strict check: does the board contain MULTIPLE known gliders?
+                        const comps = connectedComponents(live);
+                        let knownGlidersCount = 0;
+                        
+                        for (const comp of comps) {
+                            if (comp.size > 15) continue;
+                            const cComp = canonical(mapFrom(tripletsFrom(comp)));
+                            if (gliders.some(g => g.c === cComp)) {
+                                knownGlidersCount++;
+                            }
+                        }
+                        
+                        // If it produced at least 2 gliders after 250 generations, it's highly likely a gun!
+                        if (knownGlidersCount >= 2) {
+                            isGun = true;
+                        }
+                    }
                 }
-                if (live.size > 50) break;
-            }
-            
-            if (annihilated) {
-                console.log(`LOGIC GATE (Mutual Annihilation) FOUND! Angle: ${r}, Offset: (${op}, ${oq})`);
-                annihilations++;
+                
+                if (isGun) {
+                    console.log(`GLIDER GUN FOUND! Block ${bIdx} + Glider 0 | Angle: ${r}, Offset: (${op}, ${oq})`);
+                    guns++;
+                    
+                    if (guns === 1) {
+                        const yaml = `name: "Turing Glider Gun Candidate"
+states: 3
+order: "21"
+transition:
+  - [0, 0, 0, 2, 2, 0, 0]
+  - [0, 0, 0, 1, 2, 2]
+  - [2, 2, 0, 0, 0]
+  - [1, 0, 0, 0]
+  - [0, 0, 0]
+  - [0, 0]
+  - [2]
+initial:
+  cells:
+${BLOCK.map(c => `    - [${c[0]}, ${c[1]}, ${c[2]}]`).join('\\n')}
+${G2.map(c => `    - [${c[0] + op}, ${c[1] + oq}, ${c[2]}]`).join('\\n')}
+tempo: 120
+`;
+                        require('fs').writeFileSync('life/turing-gun-demo.yaml', yaml);
+                        console.log("Wrote life/turing-gun-demo.yaml!");
+                        process.exit(0);
+                    }
+                }
             }
         }
     }
 }
-console.log(`Phase 5 Complete: ${annihilations} annihilation vectors found.`);
+console.log(`Phase 6 Complete: ${guns} Glider Guns found.`);

@@ -381,6 +381,10 @@ test.describe('Exploratory tests (prototype)', () => {
       respondedToModeSwitch: modeAfter === nextMode,
       edgeReaches: edge.reaches,
       edgeMargins: edge.margins,
+      cellCount: edge.cells || 0, // how many cells are actually visible in this exact scenario --
+                                   // already computed by the edge-reach measurement above, just
+                                   // not previously surfaced (see screenshots/index.html's
+                                   // per-mode cell-count histogram).
       largestBlackFrac: flood.largestBlackFrac,
       totalBlackFrac: flood.totalBlackFrac,
     };
@@ -502,9 +506,11 @@ test.describe('Exploratory tests (prototype)', () => {
               edgeReaches: result.edgeReaches, edgeMargins: result.edgeMargins,
               belowFloor: result.largestBlackFrac > 0.5 || result.edgeReaches < 2,
               tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
+              cellCount: result.cellCount, // how many cells are visible in this exact scenario --
+                                            // see screenshots/index.html's per-mode histogram.
             });
 
-            console.log(`[${label}] largest-black ${(result.largestBlackFrac*100).toFixed(0)}% (total ${(result.totalBlackFrac*100).toFixed(0)}%)  edges ${result.edgeReaches}/4  ${(result.tonnetzShare*100).toFixed(0)}% taps`);
+            console.log(`[${label}] largest-black ${(result.largestBlackFrac*100).toFixed(0)}% (total ${(result.totalBlackFrac*100).toFixed(0)}%)  edges ${result.edgeReaches}/4  ${(result.tonnetzShare*100).toFixed(0)}% taps  ${result.cellCount} cells`);
             // Soft assertions (not hard) so a single failing scenario doesn't abort the whole
             // matrix loop -- this test doubles as the screenshots/ fixture generator (see the
             // screenshotDir block above), and a hard throw partway through would leave the fixture

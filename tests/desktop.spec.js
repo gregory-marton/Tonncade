@@ -1510,6 +1510,66 @@ test('Scroll-wheel zoom has no effect in restricted (fixed-board) modes', async 
 });
 
 // ────────────────────────────────────────────────────────────────────────
+// Real browser page-zoom (Ctrl+/Ctrl- in Chrome) changes window.devicePixelRatio proportionally
+// to the zoom level -- distinct from an ordinary window resize (which doesn't change dPR) and
+// from the app's own pinch/wheel zoom (a pure state.zoom multiplier, already correct, untouched
+// here). page.setViewportSize() -- used elsewhere to simulate the CONTAINER-area-growth half of
+// this bug -- does NOT change devicePixelRatio, so it can't exercise this fix; devicePixelRatio
+// is stubbed directly via a configurable getter installed before any app script runs (addInitScript),
+// so Render's _baselineDPR captures the stubbed starting value at parse time exactly like a real
+// page load would, then the stub is changed mid-test to simulate a zoom change (see INV-53).
+// ────────────────────────────────────────────────────────────────────────
+
+const stubDevicePixelRatio = (page, initial) => page.addInitScript((initial) => {
+  let dpr = initial;
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, get: () => dpr });
+  window.__setDPR = (v) => { dpr = v; };
+}, initial);
+
+const viewBoxSpan = async (page) => {
+  const vb = await page.evaluate(() => document.getElementById('tonnetz-svg').getAttribute('viewBox'));
+  const [, , w, h] = vb.split(' ').map(Number);
+  return { w, h };
+};
+
+test('Render: browser zoom (devicePixelRatio change) scales cell size in Sandbox, tracking the rest of the page', async ({ page }) => {
+  await stubDevicePixelRatio(page, 2); // arbitrary baseline, e.g. "100% zoom on a Retina-like display"
+  await page.goto('/');
+
+  const before = await viewBoxSpan(page);
+  await page.evaluate(() => window.__setDPR(1)); // simulate zooming OUT to 50% of baseline
+  await page.evaluate(() => SandboxMode.refreshLattice()); // as a real resize-triggered redraw would
+  const afterZoomOut = await viewBoxSpan(page);
+
+  // Zoomed out -> MORE world-units shown (bigger viewBox span) -> smaller cells, more visible --
+  // NOT the container's own CSS-px area, which this test never touches (viewport size is fixed
+  // throughout), isolating this from the separate, accepted container-area-growth effect.
+  expect(afterZoomOut.w).toBeGreaterThan(before.w * 1.8);
+  expect(afterZoomOut.h).toBeGreaterThan(before.h * 1.8);
+
+  await page.evaluate(() => window.__setDPR(3)); // simulate zooming IN to 150% of baseline
+  await page.evaluate(() => SandboxMode.refreshLattice());
+  const afterZoomIn = await viewBoxSpan(page);
+  // Zoomed in -> FEWER world-units shown (smaller viewBox span) -> bigger cells.
+  expect(afterZoomIn.w).toBeLessThan(before.w);
+  expect(afterZoomIn.h).toBeLessThan(before.h);
+});
+
+test('Render: browser zoom scales cell size in Gravity too (a restricted mode, no persisted state.zoom)', async ({ page }) => {
+  await stubDevicePixelRatio(page, 2);
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+  const before = await viewBoxSpan(page);
+  await page.evaluate(() => window.__setDPR(1)); // zoom OUT to 50% of baseline
+  await page.evaluate(() => GravityMode.refreshBoard());
+  const after = await viewBoxSpan(page);
+
+  expect(after.w).toBeGreaterThan(before.w * 1.8);
+  expect(after.h).toBeGreaterThan(before.h * 1.8);
+});
+
+// ────────────────────────────────────────────────────────────────────────
 // Issue #9: real report from a ChromeOS play session -- after finishing a Gravity game and
 // switching to another mode, the "done" Gravity board stayed on screen instead of clearing.
 // Root cause: GravityMode.init() (js/gravity.js) creates a ResizeObserver watching Render.svg
@@ -3127,4 +3187,54 @@ test('Melody: loading a new song resets the clean-streak', async ({ page }) => {
   await loadFrereJacques(page); // resetGame() runs again as part of loading
   const streak = await page.evaluate(() => MelodyMode.state.cleanStreak);
   expect(streak).toBe(0);
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// screenshots/index.html's per-mode cell-count histogram (tests/exploratory.spec.js's
+// runRandomTaps now surfaces `cellCount` -- how many cells are actually visible in that exact
+// scenario -- alongside the existing fill metrics). A fake manifest is routed in so this is
+// deterministic and doesn't depend on the real (gitignored, generated) fixture having been run.
+// ────────────────────────────────────────────────────────────────────────
+
+test('screenshots/index.html: renders a per-mode cell-count histogram and per-shot cell counts', async ({ page }) => {
+  const fakeManifest = `window.SCREENSHOT_MANIFEST = (window.SCREENSHOT_MANIFEST || []).concat(${JSON.stringify([
+    { profile: 'Desktop', profileSlug: 'desktop-chrome', mode: 'sandbox', drawerOpen: false, width: 800, height: 600, file: 'x.png', largestBlackFrac: 0, totalBlackFrac: 0, edgeReaches: 4, edgeMargins: {}, belowFloor: false, tonnetzShare: 0.6, cellCount: 120 },
+    { profile: 'Desktop', profileSlug: 'desktop-chrome', mode: 'sandbox', drawerOpen: true, width: 700, height: 500, file: 'y.png', largestBlackFrac: 0, totalBlackFrac: 0, edgeReaches: 4, edgeMargins: {}, belowFloor: false, tonnetzShare: 0.6, cellCount: 150 },
+  ])});`;
+  await page.route('**/manifest-desktop-chrome.js', (route) => route.fulfill({ body: fakeManifest, contentType: 'application/javascript' }));
+  await page.route('**/manifest-mobile-chrome.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/manifest-tablet-chrome.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/manifest-mobile-safari.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/*.png', (route) => route.fulfill({ body: Buffer.from([]), contentType: 'image/png' }));
+
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/screenshots/index.html');
+
+  await expect(page.locator('.cell-histogram')).toHaveCount(1);
+  const stats = await page.locator('.cell-histogram .stats').textContent();
+  expect(stats).toContain('n=2');
+  expect(stats).toContain('min=120');
+  expect(stats).toContain('max=150');
+
+  const captions = await page.locator('figcaption').allTextContents();
+  expect(captions.some((c) => c.includes('120 cells'))).toBe(true);
+  expect(captions.some((c) => c.includes('150 cells'))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('screenshots/index.html: an entry from before cellCount existed is excluded, not zeroed', async ({ page }) => {
+  const fakeManifest = `window.SCREENSHOT_MANIFEST = (window.SCREENSHOT_MANIFEST || []).concat(${JSON.stringify([
+    { profile: 'Desktop', profileSlug: 'desktop-chrome', mode: 'sandbox', drawerOpen: false, width: 800, height: 600, file: 'x.png', largestBlackFrac: 0, totalBlackFrac: 0, edgeReaches: 4, edgeMargins: {}, belowFloor: false, tonnetzShare: 0.6 }, // no cellCount, old manifest shape
+  ])});`;
+  await page.route('**/manifest-desktop-chrome.js', (route) => route.fulfill({ body: fakeManifest, contentType: 'application/javascript' }));
+  await page.route('**/manifest-mobile-chrome.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/manifest-tablet-chrome.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/manifest-mobile-safari.js', (route) => route.fulfill({ status: 404, body: '' }));
+  await page.route('**/*.png', (route) => route.fulfill({ body: Buffer.from([]), contentType: 'image/png' }));
+
+  await page.goto('/screenshots/index.html');
+  await expect(page.locator('.cell-histogram')).toHaveCount(0);
+  const caption = await page.locator('figcaption').first().textContent();
+  expect(caption).not.toContain('cells');
 });

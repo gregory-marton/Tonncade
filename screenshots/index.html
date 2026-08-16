@@ -65,6 +65,33 @@ for the same reasoning applied elsewhere in this project).
   .share.low { color: #e0555f; font-weight: bold; }
   .legend { font-size: 12px; color: #9aa0ad; margin: 4px 0 16px; }
   .legend b { color: #e0555f; }
+  /* Per-mode histogram of how many cells are visible on screen across that mode's own sampled
+     scenarios -- a plain horizontal bar chart, bucketed in 25s, no charting library (matches this
+     page's own no-dependency convention). */
+  .cell-histogram {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 44px;
+    margin: 4px 0 14px;
+  }
+  .cell-histogram .bar {
+    width: 14px;
+    background: #3a5a54;
+    border-radius: 2px 2px 0 0;
+    position: relative;
+  }
+  .cell-histogram .bar:hover { background: #7fe0d0; }
+  .cell-histogram .bar .count {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #9aa0ad;
+    white-space: nowrap;
+  }
+  .cell-histogram .stats { font-size: 11px; color: #9aa0ad; align-self: center; margin-left: 8px; }
   #empty {
     display: none;
     background: #1c1f28;
@@ -91,7 +118,7 @@ for the same reasoning applied elsewhere in this project).
   this page.
 </div>
 
-<div class="legend">Each caption shows two fill metrics: the largest contiguous <b>black</b> (empty) region as a % of the play area, and how many screen <b>edges</b> the Tonnetz reaches (within ~2 cells). <b>Red-framed</b> cards fail one: a black region over 50% (board floating/undersized) or fewer than 2 edges reached (board not spanning the space — move non-height chrome out of its way).</div>
+<div class="legend">Each caption shows three fill metrics: the largest contiguous <b>black</b> (empty) region as a % of the play area, how many screen <b>edges</b> the Tonnetz reaches (within ~2 cells), and how many <b>cells</b> are actually visible on screen. <b>Red-framed</b> cards fail one of the first two: a black region over 50% (board floating/undersized) or fewer than 2 edges reached (board not spanning the space — move non-height chrome out of its way). Each mode's own header shows a histogram of that cell count across its sampled scenarios.</div>
 
 <div id="groups"></div>
 
@@ -145,6 +172,35 @@ for the same reasoning applied elsewhere in this project).
 
     // Below-floor (worst-filling) scenarios first, so the cases worth looking at lead each mode.
     const entries = byMode[mode].slice().sort((a, b) => (b.belowFloor - a.belowFloor) || (a.tonnetzShare - b.tonnetzShare));
+
+    // Histogram of cellCount across this mode's own sampled scenarios -- bucketed in 25s. Missing
+    // (older, pre-cellCount manifest data) entries are simply excluded, not zeroed.
+    const counts = entries.map(e => e.cellCount).filter(c => c != null);
+    if (counts.length) {
+      const buckets = {};
+      counts.forEach(c => { const b = Math.floor(c / 25) * 25; buckets[b] = (buckets[b] || 0) + 1; });
+      const bucketKeys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
+      const maxCount = Math.max(...Object.values(buckets));
+      const hist = document.createElement('div');
+      hist.className = 'cell-histogram';
+      bucketKeys.forEach(b => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = Math.max(4, Math.round((buckets[b] / maxCount) * 36)) + 'px';
+        bar.title = `${b}-${b + 24} cells: ${buckets[b]} scenario${buckets[b] === 1 ? '' : 's'}`;
+        const label = document.createElement('span');
+        label.className = 'count';
+        label.textContent = buckets[b];
+        bar.appendChild(label);
+        hist.appendChild(bar);
+      });
+      const sorted = counts.slice().sort((a, b) => a - b);
+      const stats = document.createElement('span');
+      stats.className = 'stats';
+      stats.textContent = `n=${counts.length}  min=${sorted[0]}  median=${sorted[Math.floor(sorted.length / 2)]}  max=${sorted[sorted.length - 1]}`;
+      hist.appendChild(stats);
+      groupsEl.appendChild(hist);
+    }
     const row = document.createElement('div');
     row.className = 'row';
     entries.forEach(entry => {
@@ -164,7 +220,8 @@ for the same reasoning applied elsewhere in this project).
         ? ` — <span class="share${blackFail ? ' low' : ''}">${Math.round(entry.largestBlackFrac * 100)}% black${blackFail ? ' ⚠' : ''}</span>` +
           (entry.edgeReaches != null ? ` <span class="share${edgeFail ? ' low' : ''}" style="${edgeFail ? '' : 'color:#6b7280'}">${entry.edgeReaches}/4 edges${edgeFail ? ' ⚠' : ''}</span>` : '')
         : '';
-      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}`;
+      const cc = entry.cellCount != null ? ` <span style="color:#6b7280">${entry.cellCount} cells</span>` : '';
+      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}${cc}`;
       figure.appendChild(img);
       figure.appendChild(caption);
       row.appendChild(figure);

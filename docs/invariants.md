@@ -1518,6 +1518,72 @@ recorded `{fn, mode}` call log on the fake's `queryPermission`/`requestPermissio
 
 ---
 
+### INV-53: hex cells shrink/grow in sync with real browser page-zoom, not just the sidebar
+
+Reported live: in Chrome, Ctrl+Minus (page zoom out) correctly shrinks the sidebar/controls (plain
+fixed-CSS-px content — buttons, text — shrinks automatically with browser zoom, no app code
+involved) but the Tonnetz's hex cells didn't shrink at all, and the board read as *bigger*.
+
+Root cause: `#sidebar` is a fixed `300px`; `#game-container` fills the rest via `flex-grow: 1`.
+Real browser page-zoom changes the CSS-px viewport size layout reflows against (zooming out
+reports *more* CSS px available), so the fixed sidebar becomes a smaller proportion of the wider
+viewport and the fluid board area grows to fill the difference — while the Tonnetz's `viewBox` was
+computed purely from "however big the container's CSS-px box happens to be," with zero dependency
+on the browser's actual zoom level, so the cells rendered inside it never shrank at all.
+
+**This container-area shift is intentional and unchanged by this fix** — the sidebar responding
+to a zoom-resized viewport is correct, expected fluid-layout behavior, exactly like any other
+percentage/flex-based content on the page. What was actually broken, and the only thing this fix
+addresses, is that individual hex cells should shrink/grow *in sync* with the rest of the page's
+zoom (matching how zooming out on a map reveals more of it at a smaller scale) — which required
+detecting real browser zoom at all, something nothing in this codebase did (confirmed via
+`grep -rn "devicePixelRatio" js/` — only `js/replay.js`'s one-shot metadata snapshot, never read
+back). Real browser page-zoom changes `window.devicePixelRatio` proportionally to the zoom level;
+`Render._baselineDPR` (captured once, at script-parse time — i.e. once per real page load) and
+`Render.getBrowserZoomFactor()` (`devicePixelRatio / _baselineDPR`, a *ratio* rather than an
+absolute check, so a HiDPI/Retina display's `dPR > 1` at 100% zoom doesn't itself trigger anything
+— the ratio stays exactly 1.0 there until the user actually zooms) are read in exactly one place:
+the first line of `Render.updateView(viewX, viewY, zoom, refW, refH)`, `zoom = zoom /
+getBrowserZoomFactor()`, before that `zoom` flows into the pan-bounds clamp and the final
+`viewBox` string exactly as before.
+
+That single hook is sufficient for every mode, no other file needs to change: `updateView` is the
+one place the `viewBox` attribute is ever actually set, reached by every pannable mode's
+`panView(centerX, centerY, zoom)` (`sandbox`/`melody`/`compose`/`life`, passing the mode's own
+persisted `state.zoom` — the player's pinch/wheel preference, clamped by `applyZoomDelta`'s
+`MIN_ZOOM`/`MAX_ZOOM` *before* this compensation ever applies, so `state.zoom` keeps meaning
+exactly what it already meant, untouched by browser zoom) and by every restricted mode's
+`getFitView(...)` + `updateView(...)` (`blast`/`gravity`/`snake`, which have no persisted zoom at
+all — each refresh computes a fresh `fit.zoom`). Real browser zoom already reflows layout (it's
+the very mechanism the original bug depends on), which already fires the existing
+`ResizeObserver`s (the pannable-mode one in `js/main.js`, and each restricted mode's own) that
+already call the mode's refresh function — no new listener needed, the fix is picked up on the
+next resize-triggered redraw for free. `this.zoom` (what `updateView` stores) holds the
+*compensated* value, matching what `js/main.js`'s two-finger pan-drag math reads back
+(`Render.zoom` as a screen-px-to-world-units conversion), so drag panning stays correct too.
+
+**Accepted simplification:** the compensation applies *after* `applyZoomDelta`'s own
+`MIN_ZOOM`/`MAX_ZOOM` clamp, so an extreme combination (pinched to `MAX_ZOOM` *and* the browser
+heavily zoomed out) isn't re-clamped against those bounds — real browser zoom levels rarely reach
+extremes in practice, not worth a combined clamp for a first pass.
+
+**Non-goal:** OS/mobile-Safari-style visual-viewport pinch-zoom (a compositor-level zoom that
+doesn't reflow layout or change `devicePixelRatio`) is a different mechanism from desktop browser
+page-zoom and isn't addressed here — the report was specifically about Ctrl+/Ctrl-, and the app's
+own in-canvas pinch/wheel zoom (a pure `state.zoom` multiplier, no container/dPR reads at all)
+already worked correctly and is untouched.
+
+**Test:** `tests/desktop.spec.js` — "Render: browser zoom (devicePixelRatio change) scales cell
+size in Sandbox..." and "...in Gravity too (a restricted mode...)". `page.setViewportSize()`
+(used elsewhere to simulate the *container-area* half of this bug) does not change
+`devicePixelRatio`, so these tests instead stub it directly via a configurable getter installed
+with `page.addInitScript()` *before* any app script runs (so `Render._baselineDPR` captures the
+stubbed value at parse time, exactly like a real page load), then change the stub mid-test and
+force a redraw, asserting the `viewBox`'s world-unit span changed by the inverse ratio — isolated
+from the container-area effect, since the viewport itself is never resized in these tests.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —

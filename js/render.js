@@ -46,6 +46,29 @@ const Render = {
     MIN_ZOOM: 0.5,
     MAX_ZOOM: 3.5,
 
+    // Captured once, at script-parse time (i.e. once per real page load -- Render.init() reruns
+    // on every mode switch, so capturing there would need its own guard; parse time needs none).
+    // Real browser page-zoom (Ctrl+/Ctrl- and equivalents) changes window.devicePixelRatio
+    // proportionally to the zoom level; comparing the CURRENT dPR against this remembered
+    // baseline (a RATIO, not an absolute check) is what tells "the user zoomed" apart from "this
+    // is just a dense/Retina display" (dPR > 1 even at 100% zoom there) -- the ratio stays
+    // exactly 1.0 on a HiDPI display until the user actually changes zoom, regardless of the
+    // display's own fixed density.
+    _baselineDPR: (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+
+    // >1 once the browser has zoomed IN since page load, <1 once zoomed OUT. Applied in
+    // updateView so cells shrink/grow in sync with the rest of the page's fixed-CSS-px content
+    // (buttons, text -- which already do this for free, no JS involved) instead of staying
+    // whatever CSS-px size the container's own fluid layout happens to hand them, with zero
+    // relation to real browser zoom. The container's own occupied CSS-px area is deliberately
+    // NOT touched here -- #game-container growing/shrinking as #sidebar's fixed 300px becomes a
+    // smaller/larger proportion of a zoom-resized viewport is #sidebar's own layout responding
+    // correctly, not a bug (see docs/invariants.md's INV-53).
+    getBrowserZoomFactor: function() {
+        if (typeof window === 'undefined' || !window.devicePixelRatio) return 1;
+        return window.devicePixelRatio / this._baselineDPR;
+    },
+
     init: function(svgId) {
         this.svg = document.getElementById(svgId);
         const stored = parseInt(localStorage.getItem('tonncade_rotation_deg') || '0', 10);
@@ -803,6 +826,14 @@ const Render = {
     // see getFitView's comment. Every existing caller omits them and keeps the historical
     // 800x600 reference frame exactly as before.
     updateView: function(viewX, viewY, zoom = 1, refW = 800, refH = 600) {
+        // Real browser zoom changes devicePixelRatio; dividing by that factor here makes cells
+        // shrink/grow with the rest of the page instead of staying a constant CSS-px size
+        // regardless of browser zoom -- see INV-53. Zoomed out (factor < 1) -> divide -> MORE
+        // world-units shown -> smaller cells, more of the lattice visible, exactly like zooming
+        // out on a map. Flows through the pan-bounds clamp and the final viewBox string below
+        // unchanged, and into `this.zoom` (read back by main.js's two-finger pan-drag math),
+        // since both need to match what's actually rendered on screen.
+        zoom = zoom / this.getBrowserZoomFactor();
         const bounds = this.getPanBounds();
         if (bounds) {
             const vbWidth = refW * zoom;
