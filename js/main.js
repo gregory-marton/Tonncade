@@ -451,12 +451,15 @@ const App = {
         if (guide) {
             guide.style.display = 'none';
         }
+        const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17
+        if (sandboxActions) sandboxActions.style.display = 'none';
 
         if (mode === 'sandbox') {
             document.getElementById('placement-controls').style.display = 'block';
             if (hexNavControls) hexNavControls.style.display = 'block';
             sandboxCtrls.style.display = 'block';
             if (guide) guide.style.display = 'block';
+            if (sandboxActions) sandboxActions.style.display = 'flex';
             if (clickAction) clickAction.textContent = 'Place/Pick up';
             SandboxMode.init();
         } else if (mode === 'blast') {

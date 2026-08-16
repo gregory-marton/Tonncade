@@ -3585,3 +3585,5 @@ test('Compose: loading a file clears the undo history', async ({ page }) => {
   await page.locator('#compose-undo').click();
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op
 });
+
+

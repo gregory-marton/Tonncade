@@ -123,8 +123,8 @@ transition:
   - [2]
 initial:
   cells:
-${BLOCK.map(c => `    - [${c[0]}, ${c[1]}, ${c[2]}]`).join('\\n')}
-${G2.map(c => `    - [${c[0] + op}, ${c[1] + oq}, ${c[2]}]`).join('\\n')}
+${BLOCK.map(c => `    - [${c[0]}, ${c[1]}, ${c[2]}]`).join('\n')}
+${G2.map(c => `    - [${c[0] + op}, ${c[1] + oq}, ${c[2]}]`).join('\n')}
 tempo: 120
 `;
                         require('fs').writeFileSync('life/turing-gun-demo.yaml', yaml);
