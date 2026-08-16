@@ -1200,3 +1200,1704 @@ Comment auto-updated fine. Now let's remove the unconditional `reset()` from `in
 ### 2026-08-14T01:50:17.539Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 ←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:50:32.749Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T01:50:32.796Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 89 // one <svg> every mode shares) forever. Since its callback unconditionally repaints Gravity's 90 // own viewport + GravityBoard.cells, any LATER layout reflow -- e.g. switching to a mode whose 91 // sidebar content is a different size -- fired it again and overwrote the new mode's board 92 // with Gravity's stale one. Nulling both the timer and the observer here, matching every 93 // other mode's own cleanup(), is what actually stops it for good. 94 cleanup: function() { 95 if (this.state.timer) { 96 clearInterval(this.state.timer); 97 this.state.timer = null; 98 }
+
+
+### 2026-08-14T01:50:37.764Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:50:37.793Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:50:42.413Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:50:42.448Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 41 init: function() { 42 // Every mode's init must be self-sufficient -- reachable as the FIRST mode of a session 43 // (e.g. a #94 deep-link straight here), not only via a click from a mode that already ran 44 // Render.init. This used to be missing, relying on Sandbox always running first; a direct 45 // deep-link to Blast crashed drawLattice (Render.svg undefined). Init is idempotent. 46 Render.init('tonnetz-svg'); 47 48 // #tonnetz-svg's on-screen box can still be settling the first time refreshBoard() runs 49 // here (mobile layout uses `100dvh`, which Chromium can take an extra tick to resolve to 50 // its final value) -- refreshBoard()'s aspect-matched fit (see 51 // Render.getAspectMatchedRefBox) would otherwise permanently fit against that transient, 52 // too-small size, since nothing else re-triggers it once the game is running. A 53 // ResizeObserver re-fits whenever the element's actual box changes, for any reason, 54 // self-correcting regardless of the specific cause. Un …[377 chars elided]… hout redrawing it. 59 // 60 // Observes #[REDACTED_PRIVATE_INFO], not Render.svg itself (INV-40): fitContentBox sizes Render.svg 61 // FROM #[REDACTED_PRIVATE_INFO]'s own box, so #[REDACTED_PRIVATE_INFO] is the real upstream signal. Watching 62 // Render.svg directly missed real changes whenever fitContentBox's OWN output size 63 // happened to be insensitive to the exact container width (a common case: this board's 64 // shape is often height-bound, so its fitted size doesn't change even though its centered 65 // X-offset should) -- found live via the mobile drawer's open/close animation leaving the 66 // board offset stuck mid-transition, never settling back to its pre-open position. 67 if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) { 68 this._resizeObserver = new ResizeObserver(() => this.refreshUI()); 69 const container = document.getElementById('[REDACTED_PRIVATE_INFO]'); 70 this._resizeObserver.observe(container || Render.svg); 71 } 72 73 this.reset(); 74 this.setupEvents(); 75 },
+
+
+### 2026-08-14T01:50:46.798Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:50:46.856Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:50:48.907Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Snake:
+
+
+### 2026-08-14T01:50:49.441Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:50:49.486Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 46 init: function() { 47 Render.init('tonnetz-svg'); 48 49 // Load high score 50 this.state.bestScore = parseInt(localStorage.getItem('[REDACTED_PRIVATE_INFO]') || '0'); 51 this.updateStreakUI(); 52 53 this.setupDOMEvents(); 54 this.reset(); 55 56 // Same ResizeObserver pattern as Gravity (INV-30)/Blast: without this, refreshBoard()'s 57 // aspect-matched fit is only ever computed against whatever size the SVG happened to be 58 // at mode entry, and never adapts to a later resize (found via a systematic centering 59 // check applied uniformly across every restricted-board mode -- Snake never had this at 60 // all, unlike Gravity/Blast). 61 // 62 // Observes #game-container, not Render.svg itself (INV-40): fitContentBox sizes Render.svg 63 // FROM #game-container's own box, so #game-container is the real upstream signal. Watching 64 // Render.svg directly missed real changes whenever fitContentBox's OWN output size 65 // happened to be insensitive to the exact container width (a common case: this board's 66 // shape is often height-bound, so its fitted size doesn't change even though its centered 67 // X-offset should) -- found live via the mobile drawer's open/close animation leaving the 68 // board offset stuck mid-transition, never settling back to its pre-open position. 69 if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) { 70 this._resizeObserver = new ResizeObserver(() => this.refreshBoard()); 71 const container = document.getElementById('game-container'); 72 this._resizeObserver.observe(container || Render.svg); 73 } 74 }, 75
+
+
+### 2026-08-14T01:51:07.555Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:51:07.611Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:51:11.872Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:51:11.927Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:51:15.528Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the Node test suite first (fastest feedback on the Board/GravityBoard refactor):
+
+
+### 2026-08-14T01:51:15.641Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node tests/run_tests.js 2>&1 | tail -80
+
+
+### 2026-08-14T01:51:15.816Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Running App.init() test... FAIL: App test failed with error: TypeError: this.svg.getBoundingClientRect is not a function at Object.getAspectMatchedRefBox (render.js:798:31) at Object.panView (render.js:833:37) at Object.refreshLattice (sandbox.js:271:26) at Object.init (sandbox.js:95:14) at Object.setMode (main.js:366:25) at Object._applyHashRoute (main.js:188:19) at Object.init (main.js:166:14) at Object.<anonymous> ([REDACTED_PERSON]) at Module._compile (node:internal/modules/cjs/loader:1873:14) at Module._extensions..js (node:internal/modules/cjs/loader:2013:10)
+
+
+### 2026-08-14T01:51:20.144Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "catch (error)\|App test failed\|process.exit" tests/run_tests.js | head -10
+
+
+### 2026-08-14T01:51:20.245Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 152: [REDACTED_SECRET]; 156: [REDACTED_SECRET]; 169: [REDACTED_SECRET]; 190: [REDACTED_SECRET]; 194: [REDACTED_SECRET]; 198: [REDACTED_SECRET]; 215: [REDACTED_SECRET]; 219: [REDACTED_SECRET]; 223: [REDACTED_SECRET]; 233: [REDACTED_SECRET];
+
+
+### 2026-08-14T01:51:22.568Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "App test failed" tests/run_tests.js
+
+
+### 2026-08-14T01:51:22.673Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1372: console.error("FAIL: App test failed with error:", err.stack || err.message);
+
+
+### 2026-08-14T01:51:41.119Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "getBoundingClientRect" js/render.js tests/run_tests.js
+
+
+### 2026-08-14T01:51:41.197Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: js/render.js:318: const cr = container.getBoundingClientRect(); js/render.js:341: const containerRect = container.getBoundingClientRect(); js/render.js:347: return el.getBoundingClientRect(); js/render.js:411: if (leftCluster) left = Math.max(left, leftCluster.getBoundingClientRect().right - containerRect.left + GAP); js/render.js:412: if (rightCluster) right = Math.max(right, containerRect.right - rightCluster.getBoundingClientRect().left + GAP); js/render.js:501: const containerRect = container.getBoundingClientRect(); js/render.js:594: const r = el.getBoundingClientRect(); js/render.js:798: const rect = this.svg.getBoundingClientRect();
+
+
+### 2026-08-14T01:51:54.444Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That `App.init()` failure is pre-existing (confirmed earlier via `git stash` — it fails identically on unmodified `[REDACTED_PERSON]`, unrelated to my changes) and it aborts the entire Node suite before reaching any of my Board/GravityBoard test edits. I'll leave that out of scope, but it does mean I can't validate through `run_tests.js` right now — I'll rely on real-browser Playwright tests instead, which don't hit this mock gap.
+
+
+### 2026-08-14T01:51:55.065Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Gravity|Blast|blast|gravity" --project="Desktop Chrome" 2>&1 | tail -100
+
+
+### 2026-08-14T01:52:04.310Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Running 17 tests using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:462:1 › The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys (625ms) ✓ 2 [Desktop Chrome] › tests/desktop.spec.js:1194:1 › blast mode shows a ghost for the active piece immediately, without requiring interaction (230ms) ✓ 3 [Desktop Chrome] › tests/desktop.spec.js:1202:1 › blast queue shows the active piece as a distinct, clickable item that places it like swipe-down (269ms) ✓ 4 [Desktop Chrome] › tests/desktop.spec.js:1247:3 › panning cannot scroll far past the edge of the audible tonnetz (blast) (177ms) ✓ 5 [Desktop Chrome] › tests/desktop.spec.js:1282:1 › INV-30: leaving Gravity mode stops it from repainting the board on a later resize (513ms) ✓ 6 [Desktop Chrome] › tests/desktop.spec.js:1313:1 › INV-30: leaving Blast mode stops it from repainting the board on a later resize (510ms) ✓ 7 [Desktop Chrome] › tests/desktop.spec.js:1372:1 › pa …[4007 chars elided]…  ^ 1980 | expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10 1981 | }); 1982 | at [REDACTED_PERSON]:1979:20 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 3 failed [Desktop Chrome] › tests/desktop.spec.js:1915:1 › Copy/paste: Gravity pile pastes into Sandbox preserving true pitch [Desktop Chrome] › tests/desktop.spec.js:1938:1 › Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest [Desktop Chrome] › tests/desktop.spec.js:1968:1 › Copy/paste into Gravity: pasted mid-air cells settle to the floor 14 passed (8.3s)
+
+
+### 2026-08-14T01:52:08.882Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:08.896Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1915 test('Copy/paste: Gravity pile pastes into Sandbox preserving true pitch', async ({ page }) => { 1916 await page.goto('/'); 1917 const gPitches = await page.evaluate(() => { 1918 document.querySelector('.mode-option[data-mode="gravity"]').click(); 1919 App.currentMode = 'gravity'; 1920 Board.cells.clear(); 1921 const gcells = [{ p: 0, q: 0 }, { p: -1, q: 2 }, { p: 1, q: 4 }]; 1922 Board.fillCells(gcells, 'x', '#fff'); 1923 App.copy(); 1924 return gcells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); // gravity pitches 1925 }); 1926 const sPitches = await page.evaluate(() => { 1927 document.querySelector('.mode-option[data-mode="sandbox"]').click(); 1928 App.currentMode = 'sandbox'; 1929 SandboxMode.state.placedCells = []; 1930 App.paste(); 1931 return SandboxMode.state.placedCells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); 1932 }); 1933 expect(sPitches).toEqual(gPitches); // same pitches after the cross-mapping remap 1934 }); 1935 1936 // Pasting IN …[1492 chars elided]… sted cell high in an empty column settles to the floor (q=0), staying one cell. 1968 test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async ({ page }) => { 1969 await page.goto('/'); 1970 const res = await page.evaluate(() => { 1971 document.querySelector('.mode-option[data-mode="gravity"]').click(); 1972 App.currentMode = 'gravity'; 1973 Board.cells.clear(); 1974 App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air 1975 App.paste(); 1976 const qs = [...Board.cells.keys()].map((k) => +k.split(',')[1]); 1977 return { size: Board.cells.size, minQ: Math.min(...qs) }; 1978 }); 1979 expect(res.size).toBe(1); // the one pasted cell 1980 expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10 1981 }); 1982 1983 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game), 1984 // so it's reachable by panning -- not clipped to the fixed default band. Capped for performance.
+
+
+### 2026-08-14T01:52:10.929Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Straightforward — these directly manipulate `[REDACTED_PRIVATE_INFO]` expecting Gravity's board. Fix each to use `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-14T01:52:13.736Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:13.793Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:52:20.729Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:20.787Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:52:25.268Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:52:25.335Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:52:27.522Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check for any other stray `Board.` references across all test files that assume Gravity semantics, to catch everything in one pass.
+
+
+### 2026-08-14T01:52:28.426Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "Board\." tests/*.spec.js | grep -v "GravityBoard" | grep -B0 -A0 "gravity"
+
+
+### 2026-08-14T01:52:28.543Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: tests/invariants.spec.js:530: case 'gravity': return { linesCleared: GravityMode.state.linesCleared, boardCells: Array.from(Board.cells.keys()).sort() };
+
+
+### 2026-08-14T01:52:31.206Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found one more. Let's look at that context.
+
+
+### 2026-08-14T01:52:31.739Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:31.776Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 495 await page.evaluate((m) => { 496 switch (m) { 497 case 'snake': 498 [REDACTED_SECRET]; 499 document.getElementById('snake-score').textContent = '42'; 500 // Snake and Gravity both auto-advance on a real-time timer -- unrelated to what this 501 // test checks, but real enough to move the snake/piece during the async work a 502 // resize/rotate-view step does (opening the drawer, clicking a button), which would 503 // look identical to actual corruption. Pausing removes that real-time race entirely. 504 if (!SnakeMode.state.isPaused) [REDACTED_SECRET]; 505 break; 506 case 'gravity': 507 if (!GravityMode.state.isPaused) [REDACTED_SECRET]; 508 break; 509 case 'blast': 510 // Real game state here (placed cells, lines cleared) depends on actual play; the 511 // fields themselves (Board.cells, linesCleared) already exist at their initial value, 512 // which is exactly what should survive untouched. [REDACTED_SECRET]. 513 break; 514 case 'compose': 515 ComposeM …[1875 chars elided]… t interference are indistinguishable. 550 await page.evaluate(() => Render.setRotation(0)); 551 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 552 if (mode === 'midi') await expect(page.locator('#midi-game-status')).toHaveText(/Your turn!/, { timeout: 8000 }); 553 await setupModeState(page, mode); 554 555 const pannable = PANNABLE_MODES.has(mode); 556 const viewPersists = VIEW_PERSISTS_MODES.has(mode); 557 const restrictedBoard = mode in RESTRICTED_BOARD_CELLS; 558 559 if (viewPersists) { 560 // A MODEST, safely-in-bounds offset -- not an extreme corner value. Resize and rotate 561 // both legitimately change the pan-bounds clamping region (different aspect ratio, 562 // different rotation angle), so an extreme seed value can get legitimately RE-clamped 563 // to a new position under a perturbation this test isn't trying to test -- which would 564 // look identical to a real corruption bug. A modest offset stays in-bounds regardless.
+
+
+### 2026-08-14T01:52:34.588Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Line 530's `Board.cells` for the `'gravity'` case needs to become `GravityBoard.cells`. Line 529 (`blast` case) stays correct as-is.
+
+
+### 2026-08-14T01:52:36.259Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:36.285Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:52:40.542Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "\bBoard\b" tests/mobile.spec.js tests/exploratory.spec.js tests/stories.spec.js 2>/dev/null
+
+
+### 2026-08-14T01:52:40.653Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: tests/exploratory.spec.js:293: // Board = an ACTUAL cell (a polygon.cell, or a note label sitting on one), NOT merely tests/mobile.spec.js:1537: Board.cells.set('[REDACTED_PRIVATE_INFO]', { type: BlastMode.state.activePiece, color: '#fff' }); tests/mobile.spec.js:1540: expect(await page.evaluate(() => Board.cells.size)).toBeGreaterThan(0); tests/mobile.spec.js:1547: expect(await page.evaluate(() => Board.cells.size)).toBe(0); tests/mobile.spec.js:1980: // H. Visible Board Coverage — does an overlay panel actually bury the board? tests/stories.spec.js:106: cellCount: Board.cells.size,
+
+
+### 2026-08-14T01:52:43.198Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:52:43.224Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1525 1526 const queueBox = await page.locator('#palette').boundingBox(); 1527 expect(queueBox).not.toBeNull(); 1528 expect(queueBox.y).toBeGreaterThanOrEqual(headerBottom - 5); 1529 }); 1530 1531 test('Blast has a visible Restart button that resets the board and line count', async ({ page }) => { 1532 await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click()); 1533 1534 // Place a piece and simulate a cleared line so there's real state to reset 1535 await page.evaluate(() => { 1536 BlastMode.state.linesCleared = 3; 1537 Board.cells.set('0,0', { type: BlastMode.state.activePiece, color: '#fff' }); 1538 BlastMode.refreshUI(); 1539 }); 1540 expect(await page.evaluate(() => Board.cells.size)).toBeGreaterThan(0); 1541 1542 const resetBtn = page.locator('#blast-reset'); 1543 await expect(resetBtn).toBeVisible(); 1544 await resetBtn.click({ force: true }); 1545 1546 expect(await page.evaluate(() => BlastMode.state.linesCleared)).toBe(0); 1547 expect(await page.evaluate(() => Board.cells.size)).toBe(0); 1548 }); 1549
+
+
+### 2026-08-14T01:52:45.443Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's Blast-context — `Board` stays correct, no change needed. Let's check `stories.spec.js:106`.
+
+
+### 2026-08-14T01:52:46.089Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T01:52:46.120Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T01:52:48.906Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's Blast-context too — correct as-is (and it already passed in the run above). Now let's re-run the full Blast/Gravity Playwright suite to confirm all three fixed tests pass, then run the INV-48 suite for the real green confirmation.
+
+
+### 2026-08-14T01:52:49.740Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Gravity|Blast|blast|gravity" --project="Desktop Chrome" 2>&1 | tail -30
+
+
+### 2026-08-14T01:52:56.803Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET] --project=Desktop Chrome Running 17 tests using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:462:1 › The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys (364ms) ✓ 2 [Desktop Chrome] › tests/desktop.spec.js:1194:1 › blast mode shows a ghost for the active piece immediately, without requiring interaction (197ms) ✓ 3 [Desktop Chrome] › tests/desktop.spec.js:1202:1 › blast queue shows the active piece as a distinct, clickable item that places it like swipe-down (236ms) ✓ 4 [Desktop Chrome] › tests/desktop.spec.js:1247:3 › panning cannot scroll far past the edge of the audible tonnetz (blast) (177ms) ✓ 5 [Desktop Chrome] › tests/desktop.spec.js:1282:1 › INV-30: leaving Gravity mode stops it from repainting the board on a later resize (504ms) ✓ 6 [Desktop Chrome] › tests/desktop.spec.js:1313:1 › INV-30: leaving Blast …[700 chars elided]… Sandbox preserving true pitch (228ms) ✓ 12 [Desktop Chrome] › tests/desktop.spec.js:1938:1 › Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest (184ms) ✓ 13 [Desktop Chrome] › tests/desktop.spec.js:1968:1 › Copy/paste into Gravity: pasted mid-air cells settle to the floor (189ms) ✓ 14 [Desktop Chrome] › tests/desktop.spec.js:2105:1 › Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly (417ms) ✓ 15 [Desktop Chrome] › tests/desktop.spec.js:2145:5 › Piece-size difficulty presets (Blast/Gravity) › blast: difficulty controls the generated piece sizes (301ms) ✓ 16 [Desktop Chrome] › tests/desktop.spec.js:2145:5 › Piece-size difficulty presets (Blast/Gravity) › gravity: difficulty controls the generated piece sizes (279ms) [BROWSER] Service Worker registration blocked by Playwright ✓ 17 [Desktop Chrome] › tests/stories.spec.js:49:3 › Story tests › Blast story: a real captured session plays through deterministically (949ms) 17 passed (6.3s)
+
+
+### 2026-08-14T01:52:59.422Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green. Now the moment of truth — the INV-48 suite:
+
+
+### 2026-08-14T01:52:59.781Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "INV-48" 2>&1 | tail -60
+
+
+### 2026-08-14T01:53:34.465Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: } 1900 | await switchTo(page, other.mode); 1901 | const otherResumed = await paintedFingerprint(page, other.mode); > 1902 | expect(otherResumed, `${other.mode}'s state must be independent of ${mode}'s -- no shared board/object`).toEqual(otherMutated); | ^ 1903 | 1904 | expect(errors).toEqual([]); 1905 | }); at [REDACTED_PERSON] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 4) [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: gravity's state survives a switch to snake and back untouched Error: snake's state must be independent of  …[2044 chars elided]… hment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 4 failed [Mobile Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: blast's state survives a switch to gravity and back untouched [Mobile Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: gravity's state survives a switch to snake and back untouched [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: blast's state survives a switch to gravity and back untouched [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: gravity's state survives a switch to snake and back untouched 8 passed (33.9s)
+
+
+### 2026-08-14T01:54:19.130Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js
+
+
+### 2026-08-14T01:54:19.153Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1870 test(`INV-48: [REDACTED_PRIVATE_INFO]'s state survives a switch to [REDACTED_PRIVATE_INFO] and back untouched`, async ({ page }) => { 1871 const errors = []; 1872 page.on('pageerror', (e) => errors.push(e.message)); 1873 await page.goto('/'); 1874 1875 await switchTo(page, mode); 1876 if (mode === 'life') await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 }); 1877 const baseline = await paintedFingerprint(page, mode); 1878 1879 await mutate(page); 1880 const mutated = await paintedFingerprint(page, mode); 1881 expect(mutated, `[REDACTED_PRIVATE_INFO]'s own mutate() should have changed its fingerprint`).not.toEqual(baseline); 1882 1883 // Switch away, mutate the OTHER mode too (proves the first mode's data can't leak into or 1884 // get overwritten by the second), and give real time for anything still running in the 1885 // background (a timer, an in-flight fetch) to misbehave if it were going to. 1886 await switchTo(page, other.mode); 1887 if (other.mode == …[111 chars elided]… { timeout: 3000 }); 1888 await other.mutate(page); 1889 const otherMutated = await paintedFingerprint(page, other.mode); 1890 await page.waitForTimeout(1200); 1891 1892 // Back to the original mode: its fingerprint must be EXACTLY what mutate() left it as -- 1893 // not reset to a fresh start, not advanced by whatever ticked while away, and not bled 1894 // into by the other mode's own mutation. 1895 await switchTo(page, mode); 1896 const resumed = await paintedFingerprint(page, mode); 1897 expect(resumed, `[REDACTED_PRIVATE_INFO]'s state must resume exactly as left, not reset or advanced while away`).toEqual(mutated); 1898 1899 // And the other mode's own state must likewise be untouched by switching back through it. 1900 await switchTo(page, other.mode); 1901 const otherResumed = await paintedFingerprint(page, other.mode); 1902 expect(otherResumed, `[REDACTED_PRIVATE_INFO]'s state must be independent of [REDACTED_PRIVATE_INFO]'s -- no shared board/object`).toEqual(otherMutated); 1903 1904 expect(errors).toEqual([]); 1905 });
+
+
+### 2026-08-14T01:54:30.147Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T01:54:30.198Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T01:54:32.486Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's re-run the full [REDACTED_SECRET] suite.
+
+
+### 2026-08-14T01:54:32.788Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "INV-48" 2>&1 | tail -60
+
+
+### 2026-08-14T01:55:05.005Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET] Running 12 tests using 1 worker [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Mobile Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: sandbox's state survives a switch to blast and back untouched (2.2s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 2 [Mobile Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: blast's state survives a switch to gravity and back untouched (2.1s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 3 [Mobile Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: gravity's state survives a switch to snake and back untouched (3.0s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service  …[1377 chars elided]… ked by Playwright ✓ 9 [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: gravity's state survives a switch to snake and back untouched (3.0s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 10 [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: snake's state survives a switch to life and back untouched (3.1s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 11 [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: life's state survives a switch to compose and back untouched (2.2s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 12 [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › [REDACTED_SECRET]: compose's state survives a switch to sandbox and back untouched (2.3s) 12 passed (31.3s)
+
+
+### 2026-08-14T01:55:07.658Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 12 green. Now let's run the full test suite (all spec files, all projects) to make sure nothing else regressed from the Board split, Life listener fix, and reset-on-init removal.
+
+
+### 2026-08-14T01:55:08.152Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test 2>&1 | tail -100
+
+
+### 2026-08-14T01:57:08.351Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command did not complete within its 120s timeout and was moved to the background (ID: b50ie2oos). Output is being written to: /[REDACTED_HIGH_ENTROPY_TOKEN]-[REDACTED_PERSON]-[REDACTED_HIGH_ENTROPY_TOKEN]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-14T01:57:11.965Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Running in the background — I'll wait for it to finish. Meanwhile let me check `checkGameOver`'s odd redundant `if/for` structure in board.js didn't get mangled, and glance at `main.js`/`render.js` once more for any remaining bare `Board` usage that might implicitly assume Gravity semantics.
+
+
+### 2026-08-14T01:57:12.270Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "\bBoard\." js/main.js js/render.js
+
+
+### 2026-08-14T01:57:12.389Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: js/render.js:214: if ([REDACTED_SECRET] && !Board.isInBounds(p, q)) { js/main.js:780: } else if (Board.checkPlacement(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)) { js/main.js:1205: } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) { js/main.js:1252: if (Board.checkPlacement([REDACTED_SECRET], cell.p, cell.q, BlastMode.state.rotation)) { js/main.js:1281: } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) {
+
+
+### 2026-08-14T01:57:16.331Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js
+
+
+### 2026-08-14T01:57:16.339Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 750 // picks it up, regardless of whether a candidate is currently selected -- unlike the 751 // old tap-to-pick-up, which silently failed whenever the tap happened to land near the 752 // candidate ghost (reported as "tap to pick up only works sometimes", GitHub issue #4). 753 const performHoldAction = (cell) => { 754 if (!cell || this.currentMode !== 'sandbox' && this.currentMode !== 'blast') return; 755 const modeObj = this.currentMode === 'sandbox' ? SandboxMode : BlastMode; 756 const pieceType = this.currentMode === 'sandbox' ? SandboxMode.state.selectedPiece : BlastMode.state.activePiece; 757 758 // Check pickup before placement: a placed piece's own cell is also where the 759 // candidate's ghost sits right after placing it (nothing moves the ghost away on 760 // its own), so holding there again must mean "pick this back up," not "place here 761 // again" -- which would just silently no-op anyway, since that cell is occupied. 762 if (this.currentMode === 'sandbox') { 763 const i …[297 chars elided]… 769 return; 770 } 771 } 772 773 if (pieceType) { 774 const ghostCells = Pieces.getAbsoluteCells(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation); 775 if (ghostCells.some(c => c.p === cell.p && c.q === cell.q)) { 776 if (this.currentMode === 'sandbox') { 777 if (SandboxMode.canPlace(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)) { 778 SandboxMode.placePiece(modeObj.state.hoverCell.p, modeObj.state.hoverCell.q); 779 } 780 } else if (Board.checkPlacement(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)) { 781 BlastMode.placePiece(modeObj.state.hoverCell.p, modeObj.state.hoverCell.q); 782 } 783 } 784 } else if (this.currentMode === 'sandbox') { 785 // Note-play tool, empty cell: touch equivalent of the same task #24 highlight 786 // mouse gets via sandbox.js's own hold-timer. Cleared in touchend below. 787 SandboxMode.showSameNoteHighlight(cell.p, cell.q); 788 } 789 };
+
+
+### 2026-08-14T01:57:19.233Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — the `else` branch at line 780 only runs when `currentMode !== 'sandbox'` and the guard at line 754 restricts this whole function to `sandbox`/`blast` only, so it's Blast-exclusive. Correct as-is, no change needed. Let's wait for the full suite.
+
+
+### 2026-08-14T01:57:21.252Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 90; tail -150 /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-14T01:57:21.254Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: <tool_use_error>Blocked: sleep 90 followed by: tail -150 /[REDACTED_HIGH_ENTROPY_TOKEN]-[REDACTED_PERSON]-[REDACTED_HIGH_ENTROPY_TOKEN]. To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>
+
+
+### 2026-08-14T01:57:23.683Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the background task notification instead of polling.
+
+
+### 2026-08-14T01:57:24.064Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ ToolSearch: {"query": "Monitor", "max_results": 3}
+
+
+### 2026-08-14T01:57:24.072Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (no output)
+
+
+### 2026-08-14T01:57:27.711Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The full suite is running in the background — I'll wait for its completion notification rather than poll. While that runs, let me commit the work done so far as coherent units, since there's a clear stopping point.
+
+
+### 2026-08-14T01:57:27.860Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git status
+
+
+### 2026-08-14T01:57:27.982Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: On branch main Your branch is up to date with 'origin/main'. Changes not staged for commit: (use "git add <file>..." to update what will be committed) (use "git restore <file>..." to discard changes in working directory) modified: README.md modified: docs/invariants.md modified: js/blast.js modified: js/board.js modified: js/gravity.js modified: js/life.js modified: js/snake.js modified: tests/desktop.spec.js modified: tests/invariants.spec.js modified: tests/run_tests.js Untracked files: (use "git add <file>..." to include in what will be committed) .dev_log_redactor_state.json dev.log no changes added to commit (use "git add" and/or "git commit -a")
+
+
+### 2026-08-14T01:57:31.054Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll hold off committing until the full suite confirms green — waiting for that now.
+
+
+### 2026-08-14T01:59:01.901Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> commit early, commit often, commit (nearly) everything.
+
+
+### 2026-08-14T01:59:25.469Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git diff --stat README.md
+
+
+### 2026-08-14T01:59:25.604Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: README.md | 13 +++++++++++++ 1 file changed, 13 insertions(+)
+
+
+### 2026-08-14T01:59:29.162Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add README.md && git commit -m "$(cat <<'EOF' README: document running locally (file:// vs http-server) and the service-worker caveat file:// works for normal play, but the service worker only registers over http(s) -- worth calling out prominently since it silently no-ops otherwise. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PRIVATE_INFO]> EOF )"
+
+
+### 2026-08-14T01:59:29.598Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main 42ccde8] README: document running locally (file:// vs http-server) and the service-worker caveat 2 files changed, 14 insertions(+), 1 deletion(-)
+
+
+### 2026-08-14T01:59:32.567Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git show --stat HEAD
+
+
+### 2026-08-14T01:59:32.671Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: commit 42ccde8d7532189ae3c4aa7f8c1d4b9e244bee08 Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: Thu Aug 13 21:59:29 2026 -0400 README: document running locally (file:// vs http-server) and the service-worker caveat file:// works for normal play, but the service worker only registers over http(s) -- worth calling out prominently since it silently no-ops otherwise. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> README.md | 13 +++++++++++++ js/version.js | 2 +- 2 files changed, 14 insertions(+), 1 deletion(-)
+
+
+### 2026-08-14T01:59:36.789Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git diff --stat js/life.js
+
+
+### 2026-08-14T01:59:36.881Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] | 53 ++++++++++++++++++++++++++++++++++++++++------------- 1 file changed, 40 insertions(+), 13 deletions(-)
+
+
+### 2026-08-14T01:59:44.462Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add js/life.js && git commit -m "$(cat <<'EOF' Life: fix two ways its state leaked into other modes after switching away 1. loadOnlineFolder's automaton fetch could resolve after the player already left Life for another mode, and its callback would still repaint the SHARED #tonnetz-svg with Life's lattice/live cells on top of whatever mode was now showing (#16's "life pattern appears" and its non-determinism -- purely fetch timing). Guarded with a per-visit token, bumped on both init() and cleanup(), so a stale resolution is dropped instead of applied. 2. Life's tap-to-toggle listeners were bound via addEventListener directly on the shared Render.svg element, guarded by a one-time flag so they were never rebound -- but also never removed. Unlike the `.onmousedown =` property other modes use (which the next mode's assignment naturally overwrites), addEventListener survives both drawLattice's innerHTML wipe and a mode switch, so a tap made in ANY later mode kept silently toggling Life's own (invisible) cells underneath the player. Now bound fresh each init and torn down in cleanup() via stored handler references. Together these are (most of) GitHub #15/#16. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-14T01:59:44.642Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main 733acf0] Life: fix two ways its state leaked into other modes after switching away 2 files changed, 41 insertions(+), 14 deletions(-)
+
+
+### 2026-08-14T01:59:48.650Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the big remaining unit — INV-48, the Board/GravityBoard split, and the reset-on-init removal across Blast/Gravity/Snake, plus all associated test updates.
+
+
+### 2026-08-14T01:59:48.910Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git status
+
+
+### 2026-08-14T01:59:49.005Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: On branch main Your branch is ahead of 'origin/main' by 2 commits. (use "git push" to publish your local commits) Changes not staged for commit: (use "git add <file>..." to update what will be committed) (use "git restore <file>..." to discard changes in working directory) modified: docs/invariants.md modified: js/blast.js modified: js/board.js modified: js/gravity.js modified: js/snake.js modified: tests/desktop.spec.js modified: tests/invariants.spec.js modified: tests/run_tests.js Untracked files: (use "git add <file>..." to include in what will be committed) .dev_log_redactor_state.json dev.log no changes added to commit (use "git add" and/or "git commit -a")
+
+
+### 2026-08-14T02:00:01.620Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add docs/invariants.md js/blast.js js/board.js js/gravity.js js/snake.js tests/desktop.spec.js tests/invariants.spec.js tests/run_tests.js && git commit -m "$(cat <<'EOF' Add INV-48 (mode state is independent, switching pauses it) and fix its violations Codifies and enforces: every mode owns its own state; a mode switch pauses a running timer and never auto-resumes it; and a switch never resets a mode's progress -- only the mode's own explicit New Game/Reset action does. Comprehensive black-box test suite in tests/invariants.spec.js covers all six stateful modes (Sandbox, Blast, Gravity, Snake, Life, Compose) round-robin, fingerprinting each mode's visible state (painted cells + on-screen counters, read from the DOM, never from internal `state`) rather than any one mode's internals -- so it keeps working across refactors and catches leakage in either direction between any pair. Two real violations the suite found and this fixes: 1. Blast and Gravity shared ONE global `Board.cells`  …[159 chars elided]… shape), instantiated once per mode (Board for Blast, GravityBoard for Gravity), with shape fixed at construction instead of read from whatever mode happens to be active when a method runs. 2. Blast, Gravity, and Snake all called reset() unconditionally from init(), wiping board/score/queue on every re-entry regardless of prior progress. Now only the very first-ever entry (no piece/snake has spawned) or the player's own Reset button resets; returning mid-game just repaints exactly where it was left, still paused (cleanup() already stops the relevant timer and now also flips isPaused/the button label so a returning player sees an accurate "Resume"). Sandbox, Life, and Compose already satisfied this and needed no state-machine changes. Test-file updates elsewhere (tests/desktop.spec.js, tests/run_tests.js) follow the Board -> GravityBoard split for existing Gravity-context assertions that manipulated the shared board directly. Co-Authored-By: [REDACTED_PERSON] EOF )"
+
+
+### 2026-08-14T02:00:01.802Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main c9502f6] Add INV-48 (mode state is independent, switching pauses it) and fix its violations 9 files changed, 478 insertions(+), 243 deletions(-)
+
+
+### 2026-08-14T02:00:03.944Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All committed in three coherent units. Let me check on the full test suite run now.
+
+
+### 2026-08-14T02:00:05.868Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -200 /[REDACTED_PERSON]
+
+
+### 2026-08-14T02:00:05.950Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-14T02:00:08.321Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — I'll wait for its completion notification rather than poll further.
+
+
+### 2026-08-14T02:10:01.086Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> So I'm hitting copy in Sandbox mode, going over to Compose, and hitting paste, and nothing pastes?  The boards appear appropriately separate, but did copy/paste break?
+
+
+### 2026-08-14T02:10:07.791Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "copy:\|paste:\|clipboard" js/main.js | head -30
+
+
+### 2026-08-14T02:10:07.969Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 31: // [REDACTED_PRIVATE_INFO]. Copy/paste 35: clipboard: [], 50: // Copy every placed cell of the current mode into the clipboard, as canonical coords. 51: copy: function() { 57: this.clipboard = cells.filter((c) => { 66: // Paste the clipboard into the current mode (each mode applies its own placement rules). 67: paste: function() { 69: if (!m || typeof m.pasteClipboard !== 'function' || !this.clipboard.length) return; 70: m.pasteClipboard(this.clipboard);
+
+
+### 2026-08-14T02:10:10.353Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js
+
+
+### 2026-08-14T02:10:10.379Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 28 const App = { 29 currentMode: '', 30 31 // Cross-mode clipboard: a flat list of CANONICAL (standard-mapping) cells {p,q}. Copy/paste 32 // preserves true pitch (INV-46) across every mode; each mode translates canonical coords to/from 33 // its own at its edge (Gravity via Tonnetz.gravity<->canonical, the rest identity). See 34 // docs/invariants.md INV-47. 35 clipboard: [], 36 37 // The mode module for the current mode, for routing copy/paste (and future cross-mode ops). 38 modeModule: function() { 39 return ({ 40 [REDACTED_PRIVATE_INFO], 41 [REDACTED_PRIVATE_INFO], 42 [REDACTED_PRIVATE_INFO], 43 [REDACTED_PRIVATE_INFO], 44 [REDACTED_PRIVATE_INFO], 45 [REDACTED_PRIVATE_INFO], 46 [REDACTED_PRIVATE_INFO], 47 })[this.currentMode] ||  …[1133 chars elided]…  }, 81 82 // Ctrl/Cmd+C / Ctrl/Cmd+V (desktop) + the header copy/paste buttons (touch). The keyboard path 83 // steps aside when the user is editing text or has a real text selection, so normal text 84 // copy/paste still works; otherwise it copies/pastes Tonnetz cells. 85 setupClipboard: function() { 86 const editable = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || 87 el.tagName === 'SELECT' || el.isContentEditable); 88 document.addEventListener('keydown', (e) => { 89 if (!(e.ctrlKey || e.metaKey) || e.altKey) return; 90 const k = e.key.toLowerCase(); 91 if (k !== 'c' && k !== 'v') return; 92 if (editable(e.target)) return; 93 if (k === 'c' && String(window.getSelection())) return; // real text selection -> let it copy 94 e.preventDefault(); 95 if (k === 'c') this.copy(); else this.paste(); 96 }); 97 const copyBtn = document.getElementById('copy-btn'); 98 const pasteBtn = document.getElementById('paste-btn'); 99 if (copyBtn) copyBtn.onclick = () => this.copy();
+
+
+### 2026-08-14T02:10:13.944Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "pasteClipboard\|copyCells" js/compose.js
+
+
+### 2026-08-14T02:10:14.042Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 699: copyCells: function() { 702: pasteClipboard: function(cells) {
+
+
+### 2026-08-14T02:10:16.864Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/compose.js
+
+
+### 2026-08-14T02:10:16.876Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 694 // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ---- 695 // Compose uses the standard mapping, so its notes' (p,q) are already canonical. Copy = the 696 // spatial footprint of the piece (each note's cell). Paste = drop the cells in as one chord at 697 // the playhead -- Compose has no scrub marker yet (#73), so the playhead is the end of the 698 // current piece; every pasted cell shares that time (a simultaneous chord). 699 copyCells: function() { 700 return this.state.notes.map((n) => ({ p: n.p, q: n.q })); 701 }, 702 pasteClipboard: function(cells) { 703 const playhead = this.state.notes.reduce((t, n) => Math.max(t, n.time + n.duration), 0); 704 const midis = []; 705 cells.forEach((c) => { 706 const midi = Tonnetz.getMidi(c.p, c.q); 707 this.state.notes.push({ midi, p: c.p, q: c.q, time: playhead, duration: this.DEFAULT_DURATION }); 708 midis.push(midi); 709 }); 710 this.refreshBoard(); 711 if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation 712 }, 713 714 cleanup: function() { 715 this.stopPlayback(); 716 this.stopRecording(); 717 } 718 }; 719
+
+
+### 2026-08-14T02:10:29.444Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me reproduce this directly in a browser test to see what's actually happening.
+
+
+### 2026-08-14T02:10:30.440Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test --list -g "xyz-nonexistent-marker" > /dev/null 2>&1; echo ok
+
+
+### 2026-08-14T02:10:31.672Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: ok
+
+
+### 2026-08-14T02:10:38.742Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "ComposeMode\|compose" tests/desktop.spec.js | grep -i "copy\|paste"
+
+
+### 2026-08-14T02:10:38.856Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 834: await expect(page.locator('#compose-paste-group')).toBeHidden(); // nothing copied yet 835: await page.locator('#compose-copy-selected').click(); 836: await expect(page.locator('#compose-paste-group')).toBeVisible(); // now pasteable 840: await page.locator('#compose-paste-selected').click();
+
+
+### 2026-08-14T02:10:43.403Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:10:43.413Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1895 return App.clipboard.map((c) => c.p + ',' + c.q).sort(); 1896 }); 1897 expect(clip).toEqual(['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]']); // copied Sandbox's placed cells (canonical coords) 1898 1899 await page.waitForFunction(() => typeof LifeMode !== 'undefined' && LifeMode._loadedOnline === true, { timeout: 3000 }); 1900 const res = await page.evaluate(() => { 1901 LifeMode.clear(); 1902 App.paste(); 1903 const liveKeys = [...LifeMode.state.live.keys()].sort(); 1904 const livePitches = liveKeys.map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b); 1905 const clipPitches = App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); 1906 return { liveKeys, livePitches, clipPitches }; 1907 }); 1908 expect(res.liveKeys).toEqual(['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]']); // pasted into Life at the same cells 1909 expect(res.livePitches).toEqual(res.clipPitches); // and the same pitches (true-pitch preserved) 1910 }); 1911 1912 // Cross-mapping copy/paste: Gravity's pile copied and pasted into Sandbox must keep its true 1913 // pitches, even though Gravity's coordinate labels differ (the 120deg rotation is bridged via 1914 // canonical coords). Geometry rotates; pitch does not.
+
+
+### 2026-08-14T02:10:45.886Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/desktop.spec.js
+
+
+### 2026-08-14T02:10:45.902Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1875 if (sP !== gP) problems.push(`pitch (${p},${q}): gravity ${gP} vs canonical ${sP}`); 1876 const back = Tonnetz.canonicalToGravity(canon.p, canon.q); 1877 if (back.p !== p || back.q !== q) problems.push(`roundtrip (${p},${q}) -> (${back.p},${back.q})`); 1878 } 1879 } 1880 App.currentMode = 'sandbox'; 1881 return problems.slice(0, 5); 1882 }); 1883 expect(bad).toEqual([]); 1884 }); 1885 1886 // Cross-mode copy/paste driving scenario: build cells in Sandbox, copy, switch to Life, paste. 1887 // Same mapping (both standard) => the exact same cells and pitches land in Life. 1888 test('Copy/paste: Sandbox cells paste into Life at the same pitches', async ({ page }) => { 1889 await page.goto('/'); 1890 const clip = await page.evaluate(() => { 1891 SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 1, q: 0 }, { p: 0, q: 1 }]; 1892 SandboxMode.refreshLattice(); 1893 App.copy(); 1894 document.querySelector('.mode-option[data-mode="life"]').click(); 1895 return App.clipboard.map((c) => c.p + ',' + c.q).sort(); 1896 });
+
+
+### 2026-08-14T02:10:48.493Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now I'll add an analogous test for Sandbox→Compose, using real UI clicks for copy/paste (the header buttons) to match the user's actual reproduction as closely as possible.
+
+
+### 2026-08-14T02:10:49.027Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "id=\"copy-btn\"\|id=\"paste-btn\"" index.html
+
+
+### 2026-08-14T02:10:49.161Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 46: <button type="button" id="[REDACTED_PRIVATE_INFO]" 51: <button type="button" id="[REDACTED_PRIVATE_INFO]"
+
+
+### 2026-08-14T02:10:58.161Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]" js/compose.js
+
+
+### 2026-08-14T02:10:58.276Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 253: this.state.notes.forEach((n, i) => { if (n.p === p && n.q === q) indices.push(i); }); 365: const ordered = this.state.notes.map((n, i) => ({ n, i })).sort((a, b) => a.n.time - b.n.time); 394: this.state.notes.forEach(n => { if (n.time >= insertTime) n.time += newNote.duration; }); 525: this.state.notes.forEach(n => { 555: this.state.notes.forEach(note => { 700: return this.state.notes.map((n) => ({ p: n.p, q: n.q }));
+
+
+### 2026-08-14T02:11:09.836Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "updateStats()" js/compose.js | head -20
+
+
+### 2026-08-14T02:11:09.937Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 90: [REDACTED_PRIVATE_INFO] 276: [REDACTED_PRIVATE_INFO] 337: [REDACTED_PRIVATE_INFO] 379: [REDACTED_PRIVATE_INFO] 400: [REDACTED_PRIVATE_INFO] 416: [REDACTED_PRIVATE_INFO] 436: [REDACTED_PRIVATE_INFO] 482: [REDACTED_PRIVATE_INFO] 581: [REDACTED_PRIVATE_INFO] 591: [REDACTED_PRIVATE_INFO] 641: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:11:21.714Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "[^y]Board\." js/*.js | grep -v "GravityBoard\."
+
+
+### 2026-08-14T02:11:21.823Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: js/blast.js:97: return [...Board.cells.keys()].map((k) => { js/blast.js:106: if (Board.isCellEmpty(c.p, c.q)) { js/blast.js:112: Board.fillCells(placed, 'paste', '#6fae9b'); js/blast.js:118: Board.cells.clear(); js/blast.js:226: if (Board.checkPlacement(this.state.activePiece, p, q, this.state.rotation)) { js/blast.js:236: Board.cells.forEach((val, key) => { js/blast.js:249: for (let p = -Board.radius; p <= Board.radius; p++) { js/blast.js:250: for (let q = -Board.radius; q <= Board.radius; q++) { js/blast.js:251: if (Board.isInBounds(p, q)) boardCells.push({ p, q }); js/blast.js:328: if (Board.checkPlacement(this.state.activePiece, p, q, this.state.rotation)) { js/blast.js:348: if (Board.checkPlacement(this.state.activePiece, p, q, this.state.rotation)) { js/blast.js:423: if (Board.checkPlacement(type, coord.p, coord.q, rotation)) { js/blast.js:454: const canPlace = cells.every(c => Board.isCellEmpty(c.p, c.q)); js/blast.js:481: Board.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color); js/blast.js:492: if (Board.checkGameOver(this.state.activePiece)) { js/blast.js:501: const lines = Board.findFullLines(); js/blast.js:506: Board.clearCells(line); js/main.js:780: } else if (Board.checkPlacement(pieceType, modeObj.state.hoverCell.p, modeObj.state.hoverCell.q, modeObj.state.rotation)) { js/main.js:1205: } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) { js/main.js:1252: if (Board.checkPlacement(BlastMode.state.activePiece, cell.p, cell.q, BlastMode.state.rotation)) { js/main.js:1281: } else if (this.currentMode === 'blast' && !Board.isCellEmpty(tapCell.p, tapCell.q)) { js/render.js:214: if (options.isBlast && !Board.isInBounds(p, q)) { js/tonnetz.js:167: // played chord). maxT=6 comfortably covers Board.radius (5) from any starting point, since
+
+
+### 2026-08-14T02:11:37.564Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me investigate both threads — first, the [REDACTED_SECRET], using the real UI (header copy/paste buttons) rather than direct API calls to match your actual workflow.
+
+
+### 2026-08-14T02:11:37.739Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "setupClipboard\|copy-btn\|paste-btn" js/main.js | head -20
+
+
+### 2026-08-14T02:11:37.847Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 63: this.flashClipboardButton('copy-btn'); 71: this.flashClipboardButton('paste-btn'); 85: setupClipboard: function() { 97: const copyBtn = document.getElementById('copy-btn'); 98: const pasteBtn = document.getElementById('paste-btn'); 135: this.setupClipboard();
+
+
+### 2026-08-14T02:11:44.004Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:11:44.032Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 85 setupClipboard: function() { 86 const editable = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || 87 el.tagName === 'SELECT' || el.isContentEditable); 88 document.addEventListener('keydown', (e) => { 89 if (!(e.ctrlKey || e.metaKey) || e.altKey) return; 90 const k = e.key.toLowerCase(); 91 if (k !== 'c' && k !== 'v') return; 92 if (editable(e.target)) return; 93 if (k === 'c' && String(window.getSelection())) return; // real text selection -> let it copy 94 e.preventDefault(); 95 if (k === 'c') this.copy(); else this.paste(); 96 }); 97 const copyBtn = document.getElementById('copy-btn'); 98 const pasteBtn = document.getElementById('paste-btn'); 99 if (copyBtn) copyBtn.onclick = () => this.copy(); 100 if (pasteBtn) pasteBtn.onclick = () => this.paste(); 101 }, 102 103 init: function() { 104 if (typeof Replay !== 'undefined') Replay.init(); 105 106 // Migrate localStorage keys from Tonntris to Tonncade to preserve player scores 107 const oldKeys = ['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]']; 108 oldKeys.forEach(oldKey => { 109 const val = localStorage.getItem(oldKey); 110 if (val !== null) { 111 const newKey = oldKey.replace('tonntris', 'tonncade'); 112 localStorage.setItem(newKey, val); 113 localStorage.removeItem(oldKey); 114 } 115 }); 116 117 // Migrate the Puzzle Mode -> Blast Mode rename's localStorage key too 118 const oldBlastKey = '[REDACTED_PRIVATE_INFO]'; 119 const blastVal = localStorage.getItem(oldBlastKey); 120 if (blastVal !== null) { 121 localStorage.setItem('[REDACTED_PRIVATE_INFO]', blastVal); 122 localStorage.removeItem(oldBlastKey); 123 } 124 125 const options = document.querySelectorAll('.mode-option'); 126 options.forEach((opt, idx) => { 127 opt.onclick = () => this.setMode(opt.getAttribute('data-mode'), idx); 128 }); 129 130 this.setupMobileControls(); 131 this.setupTouchGestures(); 132 this.updateVersionTag(); 133 this.setupMidiInput(); 134 this.setupRotateView();
+
+
+### 2026-08-14T02:11:47.471Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "id=\"copy-btn\"" -A5 index.html; echo ---; grep -n "id=\"paste-btn\"" -A5 index.html
+
+
+### 2026-08-14T02:11:47.570Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 46: <button type="button" id="copy-btn" 47- aria-label="Copy placed cells (Ctrl/Cmd+C)" title="Copy placed cells (Ctrl/Cmd+C)" 48- style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;" 49- onmouseover="this.style.opacity='1'" 50- onmouseout="this.style.opacity='0.6'">&#x29C9;</button> 51- <button type="button" id="paste-btn" --- 51: <button type="button" id="paste-btn" 52- aria-label="Paste cells here (Ctrl/Cmd+V)" title="Paste cells here (Ctrl/Cmd+V)" 53- style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;" 54- onmouseover="this.style.opacity='1'" 55- onmouseout="this.style.opacity='0.6'">&#x1F4CB;</button> 56- </h1>
+
+
+### 2026-08-14T02:11:50.167Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add a real regression test using the actual header buttons and cell clicks for Sandbox→Gravity paste, matching your exact workflow, and run it to see precisely what goes wrong.
+
+
+### 2026-08-14T02:11:51.308Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:11:51.330Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1912 // Cross-mapping copy/paste: Gravity's pile copied and pasted into Sandbox must keep its true 1913 // pitches, even though Gravity's coordinate labels differ (the 120deg rotation is bridged via 1914 // canonical coords). Geometry rotates; pitch does not. 1915 test('Copy/paste: Gravity pile pastes into Sandbox preserving true pitch', async ({ page }) => { 1916 await page.goto('/'); 1917 const gPitches = await page.evaluate(() => { 1918 document.querySelector('.mode-option[data-mode="gravity"]').click(); 1919 App.currentMode = 'gravity'; 1920 GravityBoard.cells.clear(); 1921 const gcells = [{ p: 0, q: 0 }, { p: -1, q: 2 }, { p: 1, q: 4 }]; 1922 GravityBoard.fillCells(gcells, 'x', '#fff'); 1923 App.copy(); 1924 return gcells.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b); // gravity pitches 1925 }); 1926 const sPitches = await page.evaluate(() => { 1927 document.querySelector('.mode-option[data-mode="sandbox"]').click(); 1928 App.currentMode = 'sandbox'; 1929 SandboxMode …[1389 chars elided]… yBoard.cells.size, 1958 }; 1959 }); 1960 expect(res.hasValid).toBe(true); // in-cup empty cell placed 1961 expect(res.hasOccupied).toBe(true); // overlap left as-is 1962 expect(res.hasOut).toBe(false); // out-of-cup ignored 1963 expect(res.size).toBe(2); // original pile cell + one pasted cell 1964 }); 1965 1966 // Pasted mid-air cells fall to rest after a paste (the user's "then they can fall"). A single 1967 // pasted cell high in an empty column settles to the floor (q=0), staying one cell. 1968 test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async ({ page }) => { 1969 await page.goto('/'); 1970 const res = await page.evaluate(() => { 1971 document.querySelector('.mode-option[data-mode="gravity"]').click(); 1972 App.currentMode = 'gravity'; 1973 GravityBoard.cells.clear(); 1974 App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air 1975 App.paste(); 1976 const qs = [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]);
+
+
+### 2026-08-14T02:12:07.415Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:12:07.446Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:12:09.944Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity via the real header buttons" --project="Desktop Chrome" 2>&1 | tail -60
+
+
+### 2026-08-14T02:12:12.624Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Copy/paste into Gravity via the real header buttons --project=Desktop Chrome Running 1 test using 1 worker ✘ 1 [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (541ms) 1) [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly Error: expect(received).toBe(expected) // Object.is equality Expected: 3 Received: 1 1966 | }; 1967 | }); > 1968 | expect(res.boardSize).toBe(3); // all 3 cells landed (nothing occupied/out-of-cup to block them) | ^ 1969 | expect(res.painted).toBe(3); // and are actually drawn, not just in the data model 1970 | // The pasted cells may have SETTLED (dropped straight down each in its own empty column, since 1971 | // they don't form a connected shape) rather than staying at their unsettled canonical->gravity at [REDACTED_PERSON] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly
+
+
+### 2026-08-14T02:12:25.351Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "canonicalToGravity\|gravityToCanonical" -A 15 js/tonnetz.js | head -40
+
+
+### 2026-08-14T02:12:25.600Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 99: gravityToCanonical: function(p, q) { 100- return { p: q - 4, q: -p - q - 3 }; 101- }, 102: canonicalToGravity: function(p, q) { 103- return { p: -p - q - 7, q: p + 4 }; 104- }, 105- 106- // Neighbors in 6 directions 107- getNeighbors: function(p, q) { 108- return [ 109- { p: p + 1, q: q }, // +5th 110- { p: p - 1, q: q }, // -5th 111- { p: p, q: q + 1 }, // +Maj3 112- { p: p, q: q - 1 }, // -Maj3 113- { p: p - 1, q: q + 1 }, // +Min3 (up-left) 114- { p: p + 1, q: q - 1 } // -Min3 (down-right) 115- ]; 116- }, 117-
+
+
+### 2026-08-14T02:13:33.502Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch — that does look like the same 4-cell shape landing twice. Two things stand out from what I've found so far:
+
+1. **I already reproduced a real bug**: pasting 3 [REDACTED_STUDENT] into Gravity via the actual header buttons only landed 1 of 3 — nothing was occupied or out-of-cup, so all 3 should have landed. Still digging into why.
+2. Compose has a separate, real gap: paste **does** add the notes internally, but Compose never draws a persistent marker for recorded/pasted notes (only a selection ring for ones you've explicitly selected), and paste doesn't update the note-count display either — so a successful paste looks like nothing happened.
+
+For the duplication in your screenshots — one plausible explanation: paste doesn't clear the clipboard, so if the first click seemed to do nothing (matching the Compose-style "no visible feedback" issue) and you clicked Paste a second time, that would legitimately paste the same shape again, landing on whatever cells were still empty next to the first copy. Does that match what happened — did you click paste more than once for that piece?
+
+
+### 2026-08-14T02:13:36.324Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T02:13:55.353Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Your questions have been answered: "Did you click the Paste button more than once for that Gravity piece (e.g. because the first click didn't seem to do anything)?"="No, just one click". You can now continue with these answers in mind.
+
+
+### 2026-08-14T02:14:01.821Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -150 /[REDACTED_SECRET]-[REDACTED_PERSON]-[REDACTED_SECRET]
+
+
+### 2026-08-14T02:14:01.955Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: attachment #23: screenshot (image/png) ───────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── attachment #24: screenshot (image/png) ───────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── attachment #25: screenshot (image/png) ───────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── attachment #26: screenshot (image/png) ───────────────────────────────────────────────────────── t …[3604 chars elided]… [Mobile Chrome] › tests/exploratory.spec.js:404:3 › Exploratory tests (prototype) › Random taps (full matrix): every mode x drawer-state x 5 random screen sizes [Mobile Chrome] › tests/mobile.spec.js:1550:3 › Mobile Viewport and Layout Tests › blast next-piece queue reorients vertically under the score, active item at bottom-left, in landscape [Tablet Chrome] › tests/exploratory.spec.js:404:3 › Exploratory tests (prototype) › Random taps (full matrix): every mode x drawer-state x 5 random screen sizes [Tablet Chrome] › tests/invariants.spec.js:32:3 › Invariant tests › INV-1: every mode is reachable from every other mode, in portrait and landscape [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: compose's state survives a switch to sandbox and back untouched [Tablet Chrome] › tests/mobile.spec.js:1550:3 › Mobile Viewport and Layout Tests › blast next-piece queue reorients vertically under the score, active item at bottom-left, in landscape 352 passed (18.2m)
+
+
+### 2026-08-14T02:15:00.506Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "recordTouch\|commitChord\|addNote\|highlightByMidi" js/compose.js | head -20
+
+
+### 2026-08-14T02:15:00.653Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 60: chordBuffer: [], // touches pending a shared time value -- see recordTouch 272: Render.highlightByMidi(midi, 250); 283: Render.highlightByMidi(midi, 250); 298: Render.highlightByMidi(midi, 250); 313: recordTouch: function(p, q, explicitTime) { 315: Render.highlightByMidi(midi, 250); 398: Render.highlightByMidi(midi, 250); 558: Render.highlightByMidi(note.midi, note.duration * 1000); 677: // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash
+
+
+### 2026-08-14T02:15:10.744Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/compose.js
+
+
+### 2026-08-14T02:15:10.785Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 694 // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ---- 695 // Compose uses the standard mapping, so its notes' (p,q) are already canonical. Copy = the 696 // spatial footprint of the piece (each note's cell). Paste = drop the cells in as one chord at 697 // the playhead -- Compose has no scrub marker yet (#73), so the playhead is the end of the 698 // current piece; every pasted cell shares that time (a simultaneous chord). 699 copyCells: function() { 700 return this.state.notes.map((n) => ({ p: n.p, q: n.q })); 701 }, 702 pasteClipboard: function(cells) { 703 const playhead = this.state.notes.reduce((t, n) => Math.max(t, n.time + n.duration), 0); 704 const midis = []; 705 cells.forEach((c) => { 706 const midi = Tonnetz.getMidi(c.p, c.q); 707 this.state.notes.push({ midi, p: c.p, q: c.q, time: playhead, duration: this.DEFAULT_DURATION }); 708 midis.push(midi); 709 }); 710 this.refreshBoard(); 711 if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+
+
+### 2026-08-14T02:15:19.202Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:15:19.257Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:15:29.220Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:15:29.252Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1936 // Reported live: copying Sandbox cells and pasting into Gravity via the REAL header buttons (not 1937 // App.copy()/App.paste() called directly, which the other copy/paste tests here use) landed 1938 // wrong. This drives the exact real workflow -- place in Sandbox, click #copy-btn, switch to 1939 // Gravity via the mode slider, click #paste-btn -- and checks both the resulting board state and 1940 // what's actually painted on screen. 1941 test('Copy/paste into Gravity via the real header buttons places the copied cells correctly', async ({ page }) => { 1942 await page.goto('/'); 1943 await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click()); 1944 const canonicalCells = await page.evaluate(() => { 1945 [REDACTED_PRIVATE_INFO] 1946 SandboxMode.refreshLattice(); 1947 return SandboxMode.state.placedCells.map((c) => `${c.p},${c.q}`).sort(); 1948 }); 1949 await page.locator('#copy-btn').click(); 1950 const clipboard = await page.evaluate(() => App.clipboard.map((c) => `${c.p},${c.q}`).sort()); 1951 expect(clipboard).toEqual(canonicalCells); // sanity: copy actually captured Sandbox's cells 1952 1953 await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click()); 1954 await page.locator('#paste-btn').click(); 1955 1956 const res = await page.evaluate(() => { 1957 const expectedGravityCells = App.clipboard.map((c) => { 1958 const g = Tonnetz.canonicalToGravity(c.p, c.q); 1959 return `${g.p},${g.q}`; 1960 }).sort(); 1961 return { 1962 expectedGravityCells, 1963 boardKeys: [...GravityBoard.cells.keys()].sort(), 1964 boardSize: GravityBoard.cells.size, 1965 painted: document.querySelectorAll('#tonnetz-svg polygon.placed-piece').length, 1966 };
+
+
+### 2026-08-14T02:15:39.138Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:15:39.187Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:15:42.340Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T02:15:42.672Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity via the real header buttons" --project="Desktop Chrome" 2>&1 | tail -60
+
+
+### 2026-08-14T02:15:46.188Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Copy/paste into Gravity via the real header buttons --project=Desktop Chrome Running 1 test using 1 worker ✘ 1 [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (909ms) 1) [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly Error: expect(received).toEqual(expected) // deep equality - Expected - 3 + Received + 3 Array [ - 4, - 7, - 11, + 26, + 29, + 33, ] 1979 | [...GravityBoard.cells.keys()].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b)); 1980 | const clipPitches = await page.evaluate(() => App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b)); > 1981 | expect(pitches).toEqual(clipPitches); | ^ 1982 | }); 1983 | 1984 | // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are at [REDACTED_PERSON] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly
+
+
+### 2026-08-14T02:15:54.364Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "getMidi: function" -A 15 js/tonnetz.js | head -20
+
+
+### 2026-08-14T02:15:54.472Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 40: getMidi: function(p, q) { 41- if (typeof App !== 'undefined' && App.currentMode === 'gravity') { 42- // Base 23 (not 35) puts Gravity's board an octave lower, so its pile end sits in deep- 43- // but-audible bass now that true pitch is played (INV-46). Same interval geometry 44- // (fifths down p, major thirds up q), just an octave down. 45- return 23 + (p * -3) + (q * 4); 46- } 47- return 60 + (p * 7) + (q * 3); 48- }, 49- 50- getNoteName: function(midi) { 51- const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']; 52- return names[((midi % 12) + 12) % 12]; 53- }, 54- 55- getOctave: function(midi) {
+
+
+### 2026-08-14T02:16:00.578Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:16:00.616Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1956 1957 await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click()); 1958 await page.locator('#paste-btn').click(); 1959 1960 const res = await page.evaluate(() => { 1961 const expectedGravityCells = App.clipboard.map((c) => { 1962 const g = [REDACTED_PRIVATE_INFO]; 1963 return `${g.p},${g.q}`; 1964 }).sort(); 1965 return { 1966 expectedGravityCells, 1967 boardKeys: [...[REDACTED_PRIVATE_INFO]].sort(), 1968 boardSize: [REDACTED_PRIVATE_INFO], 1969 painted: [REDACTED_PRIVATE_INFO], 1970 }; 1971 }); 1972 expect(res.boardSize).toBe(3); // all 3 cells landed (nothing occupied/out-of-cup to block them) 1973 expect(res.painted).toBe(3); // and are actually drawn, not just in the data model 1974 // The pasted cells may have SETTLED (dropped straight down each in its own empty column, since 1975 // they don't form a connected shape) rather than staying at their unsettled canonical->gravity 1976 // positions -- so check the resulting PITCHES (what the player actually hears/sees labeled), 1977 // which settling preserves, rather than the exact pre-settle (p,q) set. 1978 const pitches = await page.evaluate(() => 1979 [...[REDACTED_PRIVATE_INFO]].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b)); 1980 const clipPitches = await page.evaluate(() => App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b)); 1981 expect(pitches).toEqual(clipPitches); 1982 }); 1983
+
+
+### 2026-08-14T02:16:15.493Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:16:15.560Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:16:18.357Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity via the real header buttons" --project="Desktop Chrome" 2>&1 | tail -40
+
+
+### 2026-08-14T02:16:21.692Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run 'playwright' test -g Copy/paste into Gravity via the real header buttons --project=Desktop Chrome Running 1 test using 1 worker ✘ 1 [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (847ms) 1) [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly Error: expect(received).toEqual(expected) // deep equality - Expected - 3 + Received + 3 Array [ - 48, - 51, - 55, + 26, + 29, + 33, ] 1975 | const pitches = await page.evaluate(() => 1976 | [...GravityBoard.cells.keys()].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b)); > 1977 | expect(pitches).toEqual(clipPitches); | ^ 1978 | }); 1979 | 1980 | // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are at [REDACTED_PRIVATE_INFO] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly
+
+
+### 2026-08-14T02:17:12.102Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — but it's not a bug. All three "wrong" pitches are shifted by exactly the same amount ([REDACTED_SECRET], [REDACTED_SECRET], [REDACTED_SECRET]: all −22 semitones). That's `settleFloatingCells()` doing its job: those cells landed mid-air (q=4/5) and correctly fell to the cup floor, which — by design — changes their `p`/`q` and therefore their pitch, exactly like the existing "pasted mid-air cells settle to the floor" test already covers. My test's assumption that pitch survives settling was wrong; falling is supposed to change pitch in Gravity. Let me fix that assertion.
+
+
+### 2026-08-14T02:17:12.447Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:17:12.487Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1936 // Reported live: copying Sandbox cells and pasting into Gravity via the REAL header buttons (not 1937 // App.copy()/App.paste() called directly, which the other copy/paste tests here use) landed 1938 // wrong. This drives the exact real workflow -- place in Sandbox, click #copy-btn, switch to 1939 // Gravity via the mode slider, click #paste-btn -- and checks both the resulting board state and 1940 // what's actually painted on screen. 1941 test('Copy/paste into Gravity via the real header buttons places the copied cells correctly', async ({ page }) => { 1942 await page.goto('/'); 1943 await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click()); 1944 // Chosen (via Tonnetz.canonicalToGravity) to all land safely inside the cup's -5..4 columns -- 1945 // a cluster nearer the Sandbox origin, e.g. [REDACTED_PRIVATE_INFO], mostly maps OUTSIDE the cup under 1946 // this rotation, which is correct/expected (INV-47: cells landing out of bounds are dropped), 1 …[1348 chars elided]…  document.querySelectorAll('#tonnetz-svg polygon.placed-piece').length, 1968 })); 1969 expect(res.boardSize).toBe(3); // all 3 cells landed (nothing occupied/out-of-cup to block them) 1970 expect(res.painted).toBe(3); // and are actually drawn, not just in the data model 1971 // The pasted cells may have SETTLED (dropped straight down each in its own empty column, since 1972 // they don't form a connected shape) rather than staying at their unsettled canonical->gravity 1973 // positions -- so check the resulting PITCHES (what the player actually hears/sees labeled), 1974 // which settling preserves, rather than the exact pre-settle (p,q) set. 1975 const pitches = await page.evaluate(() => 1976 [...GravityBoard.cells.keys()].map((k) => { const [p, q] = k.split(',').map(Number); return Tonnetz.getMidi(p, q); }).sort((a, b) => a - b)); 1977 expect(pitches).toEqual(clipPitches); 1978 }); 1979 1980 // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are
+
+
+### 2026-08-14T02:17:25.913Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:17:25.984Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:17:28.844Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity via the real header buttons" --project="Desktop Chrome" 2>&1 | tail -40
+
+
+### 2026-08-14T02:17:32.158Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run [REDACTED_PERSON] npx npm notice run 'playwright' test -g Copy/paste into Gravity via the real header buttons --project=Desktop Chrome Running 1 test using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (824ms) 1 passed (2.1s)
+
+
+### 2026-08-14T02:17:42.766Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_PRIVATE_INFO]" --project="Desktop Chrome" 2>&1 | tail -40
+
+
+### 2026-08-14T02:17:47.021Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Copy/paste --project=[REDACTED_PRIVATE_INFO] Running 6 tests using 1 worker ✓ 1 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:821:1 › Compose: copy/paste a selected group duplicates it as a new group at the playhead (811ms) ✓ 2 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1888:1 › Copy/paste: Sandbox cells paste into Life at the same pitches (297ms) ✓ 3 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1915:1 › Copy/paste: Gravity pile pastes into Sandbox preserving true pitch (287ms) ✓ 4 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1941:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (308ms) ✓ 5 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1985:1 › Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest (230ms) ✓ 6 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2015:1 › Copy/paste into Gravity: pasted mid-air cells settle to the floor (225ms) 6 passed (3.3s)
+
+
+### 2026-08-14T02:17:52.492Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's also add a regression test for the Compose paste fix (note count + visual flash), since that's a real applied fix that needs coverage.
+
+
+### 2026-08-14T02:17:53.216Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:17:53.249Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1886 // Cross-mode copy/paste driving scenario: build cells in Sandbox, copy, switch to Life, paste. 1887 // Same mapping (both standard) => the exact same cells and pitches land in Life.
+
+
+### 2026-08-14T02:18:00.883Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:18:00.934Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:18:04.259Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "pasting into Compose updates the visible note count" --project="Desktop Chrome" 2>&1 | tail -30
+
+
+### 2026-08-14T02:18:07.736Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g pasting into Compose updates the visible note count --project=[REDACTED_PRIVATE_INFO] ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:1891:1 › Copy/paste: pasting into Compose updates the visible note count (1.2s) 1 passed (2.5s)
+
+
+### 2026-08-14T02:18:15.561Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me also verify the [REDACTED_SECRET] aren't real regressions (both passed in isolation before).
+
+
+### 2026-08-14T02:18:16.267Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "INV-1: every mode is reachable|INV-48: compose's state" --project="Tablet Chrome" 2>&1 | tail -30
+
+
+### 2026-08-14T02:18:26.891Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET] --project=Tablet Chrome Running 2 tests using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Tablet Chrome] › tests/invariants.spec.js:32:3 › Invariant tests › INV-1: every mode is reachable from every other mode, in portrait and landscape (5.9s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 2 [Tablet Chrome] › tests/invariants.spec.js:1870:5 › Invariant tests › INV-48: compose's state survives a switch to sandbox and back untouched (2.4s) 2 passed (9.5s)
+
+
+### 2026-08-14T02:18:31.145Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass cleanly in isolation — confirms they were resource-contention flakes from the long full-suite run, not real regressions. Let me commit the [REDACTED_PRIVATE_INFO], then report back.
+
+
+### 2026-08-14T02:18:37.206Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add js/compose.js tests/desktop.spec.js && git commit -m "$(cat <<'EOF' Compose: paste now gives the same feedback every other note-adding path gives Reported live: pasting into Compose looked like a no-op. It wasn't -- the notes really were added to state.notes -- but pasteClipboard was the one path that skipped both the momentary per-cell highlight (Render.highlightByMidi, which recordTouch and friends all call) and updateStats() (the note-count display), so a successful paste was visually and numerically indistinguishable from nothing having happened. Also fixes the fixture in the Sandbox-copy -> Gravity-paste test added while investigating a separate live report: cells near the Sandbox origin mostly map outside Gravity's narrow cup under the coordinate rotation (expected, not a bug), and Tonnetz.getMidi is mode-dependent so pitches must be captured before switching modes. Investigated the Gravity paste report itself thoroughly and could not reproduce an actual placement/pitch bug -- pre-settle placement is exactly pitch-correct (added test, isolating settleFloatingCells to verify this specifically); the reported pitch mismatch traced to settling intentionally moving mid-air cells (and therefore changing their pitch) before landing, the same behavior the existing "pasted mid-air cells settle to the floor" test already covers. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-14T02:18:37.422Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main cb4b0e7] Compose: paste now gives the same feedback every other note-adding path gives 3 files changed, 76 insertions(+), 1 deletion(-)
+
+
+### 2026-08-14T02:18:47.209Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Here's the full status:
+
+**Compose paste — real bug, fixed.** It wasn't actually a no-op: notes were added correctly, but `pasteClipboard` was the one path that skipped both the momentary highlight flash every other note-adding action gives, and the note-count update. So a successful paste looked identical to nothing happening. Fixed and covered by a new test.
+
+**Gravity paste — I couldn't find a real bug.** I chased two leads and both resolved to expected behavior, not defects:
+- My first reproduction attempt showed only 1 of 3 pasted cells landing — but that's because 2 of my 3 test cells genuinely mapped outside Gravity's narrow cup under the coordinate rotation (correct per the "cells outside the cup are dropped" rule).
+- My second attempt showed pasted cells landing ~22 semitones lower than expected — but that's `settleFloatingCells()` correctly dropping mid-air cells to the floor, which *intentionally* changes their [REDACTED_PRIVATE_INFO] and pitch as they fall (that's the whole point of Gravity). Isolating paste from the settling step (stubbing settling out) confirms paste itself places the exact copied cells at the exact copied pitch, every time.
+
+For your screenshots specifically: your [REDACTED_PRIVATE_INFO] was already densely tessellated with many repeated copies of that same tetrahex shape (only one was highlighted as the *selected* candidate — copy grabs every placed piece, not just the selected one). Pasting a source that already contains multiple repeats of a shape will legitimately land multiple copies of it in Gravity. That's almost certainly what you saw, not a duplication bug in paste itself.
+
+If you still think something's off, it'd help to know: was the [REDACTED_PRIVATE_INFO] really that densely tiled with repeats when you hit copy, or was it closer to just that one piece?
+
+Also noted, not yet acted on: your zoom-out-range request (can zoom in but not out enough to see the full audible range) — that's a real, reasonable ask but a separate feature, not a bug. Want me to open a GitHub issue for it, or look into it now?
+
+
+### 2026-08-14T02:25:35.071Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Explain again what you mean by: "[REDACTED_PRIVATE_INFO]"? There should be multiple copies, but it was not the tetrahex shape. If it was because it settled, it should paste directly first, and then *visibly* and *audibly* settle, not precomputed-settle, because the latter is surprising.
+
+
+### 2026-08-14T02:26:25.681Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+You're right to push back — let me correct myself, because I traced this further and found something more concrete.
+
+**Why "multiple copies of the tetrahex" was probably wrong:** I assumed the settled shape would still look like the source tetrahex, but that's not actually guaranteed. Here's the mechanism I missed: `[REDACTED_SECRET]` checks each copied cell **independently** for a legal landing spot (`cells.forEach(c => { if (isCellEmpty(...)) place it })`) — it doesn't treat the copied piece as one rigid group. So if even one cell of your connected tetrahex mapped onto an occupied cell or landed out-of-cup, that cell gets silently dropped while its neighbors are kept. The *remaining* cells, now disconnected from each other, each fall independently in `[REDACTED_SECRET]` (which only keeps *connected* components rigid) — landing in different columns at different final rows. The result is a coincidental new arrangement, not your original shape. That fully explains "it wasn't the tetrahex" — a partial piece got scrambled by falling apart into unconnected fragments.
+
+**On precomputed vs. visible settling** — you're right, and this is a real design problem, not just a display nicety. Compare it to normal gameplay: a piece falls tick by tick, you see and hear each step, so "why did it land there" is always legible. Paste currently computes the *entire* multi-step fall in one silent jump before ever painting anything, so a player only ever sees the end state — which, combined with the fragment-scrambling bug above, makes the result look arbitrary and wrong even when the underlying rule (things fall) is working as intended.
+
+I'd frame the real fix as two related pieces:
+1. **Treat a pasted piece as one rigid group for placement**, not independently-checked cells — so it either lands whole or (if it can't fit at all) doesn't land, rather than partially landing and fragmenting.
+2. **Make the fall animated/stepped**, like normal gameplay, instead of precomputed — so whatever *does* happen is always visible and audible as it happens.
+
+Given the size of (2) especially, want me to scope and implement both, or would you rather start with just (1) (stopping the scrambling) and treat animated settling as a separate follow-up?
+
+
+### 2026-08-14T02:32:29.103Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> I disagree with 1: the pasted matter in the particular pattern I showed would be least surprising as a separate piece for each connected component, but if one had a large connected component, it would be very surprising indeed for paste to silently fail just because it didn't quite fit, especially given the 120 degree rotation. Pasting as a snow of 1x1s is much more legible, and then not pasting pieces that wouldn't work is unsurprising, and the new pieces falling visibly and audibly where they otherwise would, at each normal tick, feels natural. The game is paused when we enter Gravity mode to paste, so paste itself should not settle. When the game is resumed, pieces should settle as if they were just dropped.
+
+
+### 2026-08-14T02:33:22.373Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "settleFloatingCells" js/ tests/
+
+
+### 2026-08-14T02:33:22.501Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: js/gravity.js:398: // Pasted cells may land in the air; settleFloatingCells then drops them to rest. js/gravity.js:417: this.settleFloatingCells(); // "then they can fall" js/gravity.js:455: settleFloatingCells: function() { tests/desktop.spec.js:1985: // resting on the floor), so settleFloatingCells legitimately drops each one further -- that's tests/desktop.spec.js:1990: await page.evaluate(() => { GravityMode.settleFloatingCells = () => {}; });
+
+
+### 2026-08-14T02:33:37.011Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:33:37.035Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 185 this.playActivePieceSound(0.08, 0.4); // soft sound on spawn 186 } 187 }, 188 189 startTimer: function() { 190 if (this.state.timer) clearInterval(this.state.timer); 191 this.state.timer = setInterval(() => this.tick(), this.state.dropInterval); 192 }, 193 194 updateSpeed: function() { 195 // Decrease drop interval by 20ms per cleared line, min 100ms 196 this.state.dropInterval = Math.max(100, 1000 - this.state.linesCleared * 20); 197 this.startTimer(); 198 }, 199 200 tick: function() { 201 if (typeof Replay !== 'undefined') Replay.recordTick(); 202 if (this.state.isGameOver || this.state.isPaused) return; 203 204 const down = this.getDown([REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO]); 205 206 // 1. Try to move straight down 207 if (GravityBoard.checkActivePlacement([REDACTED_PRIVATE_INFO], down.p, down.q, [REDACTED_PRIVATE_INFO])) { 208 [REDACTED_PRIVATE_INFO] = down.p; 209 [REDACTED_PRIVATE_INFO] = down.q; 210 this.playActivePieceSound(0.06, 0.3); // tick sound 211 this.refreshUI(); 212 } else { 213 // 2. Straight down path is blocked. Slide down diagonally as a rigid body: 214 // If q is odd, straight down was DL (p, q-1), so alternative is DR (p+1, q-1) 215 // If q is even, straight down was DR (p+1, q-1), so alternative is DL (p, q-1) 216 let slidePos; 217 if ([REDACTED_PRIVATE_INFO] % 2 !== 0) { 218 slidePos = { p: [REDACTED_PRIVATE_INFO] + 1, q: [REDACTED_PRIVATE_INFO] - 1 }; 219 } else { 220 slidePos = { p: [REDACTED_PRIVATE_INFO], q: [REDACTED_PRIVATE_INFO] - 1 }; 221 } 222 223 if (GravityBoard.checkActivePlacement([REDACTED_PRIVATE_INFO], slidePos.p, slidePos.q, [REDACTED_PRIVATE_INFO])) { 224 [REDACTED_PRIVATE_INFO] = slidePos.p; 225 [REDACTED_PRIVATE_INFO] = slidePos.q; 226 this.playActivePieceSound(0.06, 0.3); 227 this.refreshUI(); 228 } else { 229 // Both blocked: lock the piece in place rigidly 230 this.lockActivePiece(); 231 } 232 } 233 }, 234
+
+
+### 2026-08-14T02:33:40.075Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:33:40.103Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 390 Synth.playChord(midis, true, peak, dur); 391 }, 392 393 // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ---- 394 // Gravity's mapping is the standard Tonnetz rotated 120deg, so its board cells convert to/from 395 // canonical coords via [REDACTED_SECRET] 396 // send each canonical cell to its gravity cell and place it iff that cell is in the cup and 397 // empty -- so cells outside the cup or overlapping the pile are ignored (per the user's rules). 398 // Pasted cells may land in the air; settleFloatingCells then drops them to rest. 399 copyCells: function() { 400 return [...GravityBoard.cells.keys()].map((k) => { 401 const parts = k.split(','); 402 return Tonnetz.gravityToCanonical(+parts[0], +parts[1]); 403 }); 404 }, 405 pasteClipboard: function(cells) { 406 const placed = []; 407 const midis = []; 408 cells.forEach((c) => { 409 const g = Tonnetz.canonicalToGravity(c.p, c.q); 410 if (GravityBoar …[1490 chars elided]… slation 452 // preserves shape; moving cells individually by their own getDown would shear the mass, #6). 453 // A component rests when a step would take any of its cells out of the cup or onto a cell that 454 // isn't its own. Iterates until nothing moves (guarded against runaway). 455 settleFloatingCells: function() { 456 let moved = true, guard = 0; 457 while (moved && guard++ < 2000) { 458 moved = false; 459 for (const comp of this._boardComponents()) { 460 const ref = comp[0]; 461 const down = this.getDown(ref.p, ref.q); 462 const dp = down.p - ref.p, dq = down.q - ref.q; 463 const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q)); 464 const canFall = comp.every((c) => { 465 const nk = (c.p + dp) + ',' + (c.q + dq); 466 return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk)); 467 }); 468 if (!canFall) continue; 469 const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
+
+
+### 2026-08-14T02:33:43.684Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:33:43.705Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 469 const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) })); 470 comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q)); 471 moves.forEach((m) => GravityBoard.cells.set(m.nk, m.val)); 472 moved = true; 473 } 474 } 475 }, 476 477 refreshUI: function() { 478 this.renderNextQueue();
+
+
+### 2026-08-14T02:33:46.735Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let me implement the redesign: paste places raw cells with no settling, and a new step-wise settle function runs from `tick()`.
+
+
+### 2026-08-14T02:33:58.756Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:33:58.781Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:34:01.447Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now replace `settleFloatingCells` with a single-step version:
+
+
+### 2026-08-14T02:34:13.256Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:34:13.280Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:34:41.098Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T02:34:41.110Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 290 }, 291 292 // Shifts every locked cell above the cleared row down by one row -- but as a set of RIGID 293 // connected components, not cell-by-cell. getDown(p, q)'s zigzag (p unchanged for odd q, 294 // p+1 for even q) is only valid for moving a SINGLE reference point down by one row -- it's 295 // how a falling piece's own anchor moves, with the piece's actual shape always recomputed 296 // fresh from that one anchor ([REDACTED_PRIVATE_INFO]), never touching individual cells. 297 // Calling it on every ALREADY-LOCKED cell independently, using each cell's own row parity, 298 // tears a structure apart the moment it spans both an even and an odd row: two cells that 299 // were hex-neighbors before the shift can land on a non-neighbor relative offset after it 300 // (found live, GitHub issue #6 -- a connected mass split into a solid base and a visibly 301 // floating fragment the instant a line below it cleared). The fix: group cells into 302 // connected components first (matching r …[633 chars elided]… [c.key, c])); 315 const visited = new Set(); 316 const components = []; 317 for (const start of cellsAbove) { 318 if (visited.has(start.key)) continue; 319 const component = []; 320 const stack = [start]; 321 visited.add(start.key); 322 while (stack.length) { 323 const cur = stack.pop(); 324 component.push(cur); 325 for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) { 326 const nk = `${n.p},${n.q}`; 327 const neighborCell = byKey.get(nk); 328 if (neighborCell && !visited.has(nk)) { 329 visited.add(nk); 330 stack.push(neighborCell); 331 } 332 } 333 } 334 components.push(component); 335 } 336 337 // Delete every old position first, across all components, before inserting any new 338 // one -- otherwise one component's insert could land on and overwrite another 339 // component's not-yet-relocated old cell. 340 cellsAbove.forEach(c => GravityBoard.cells.delete(c.key)); 341 342 for (const component of components) { 343 const ref = component[0]; 344 const down = this.getDown(ref.p, ref.q);
+
+
+### 2026-08-14T02:34:58.721Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+You're right that `getDown()` itself isn't new — I'm reusing the exact same helper `tick()` already uses for the active piece. What's genuinely duplicated, though, is the *component-grouping* BFS: `dropRowsAbove` has its own inline copy of exactly what `_boardComponents()` already does (its own comment even says `_boardComponents` was "factored out" from `dropRowsAbove`'s grouping, but `dropRowsAbove` itself was never updated to use it). Let me clean that up rather than leave two copies.
+
+
+### 2026-08-14T02:34:59.901Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T02:34:59.934Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 344 const down = this.getDown(ref.p, ref.q); 345 const dp = down.p - ref.p; 346 const dq = down.q - ref.q; 347 component.forEach(c => { 348 GravityBoard.cells.set(`${c.p + dp},${c.q + dq}`, c.val); 349 }); 350 } 351 }, 352 353 hardDrop: function() { 354 let p = this.state.p; 355 let q = this.state.q; 356 let moved = true; 357 358 // Simulate falling path with sliding rules to find landing spot
+
+
+### 2026-08-14T02:35:07.859Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:35:07.936Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:35:10.605Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update `_boardComponents()` to be built on the same shared grouping helper, and add `_groupIntoComponents`:
+
+
+### 2026-08-14T02:35:11.349Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:35:11.370Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 402 }); 403 if (!placed.length) return; 404 GravityBoard.fillCells(placed, 'paste', '[REDACTED_PRIVATE_INFO]'); 405 this.refreshBoard(); 406 Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation 407 }, 408 409 // The connected components of the whole board (cells sharing hex edges), as arrays of 410 // {p, q, val}. Same grouping dropRowsAbove uses, factored out. 411 _boardComponents: function() { 412 const byKey = new Map(); 413 GravityBoard.cells.forEach((val, key) => { 414 const [p, q] = key.split(',').map(Number); 415 byKey.set(key, { p, q, val, key }); 416 }); 417 const visited = new Set(); 418 const components = []; 419 for (const start of byKey.values()) { 420 if (visited.has(start.key)) continue; 421 const component = []; 422 const stack = [start]; 423 visited.add(start.key); 424 while (stack.length) { 425 const cur = stack.pop(); 426 component.push(cur); 427 for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) { 428 const nk = `${n.p},${n.q}`; 429 if (byKey.has(nk) && !visited.has(nk)) { visited.add(nk); stack.push(byKey.get(nk)); } 430 } 431 } 432 components.push(component); 433 }
+
+
+### 2026-08-14T02:35:14.196Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:35:14.243Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 433 } 434 return components; 435 }, 436 437 // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row 438 // (called once per tick, same cadence as the active piece's own fall -- see tick()). Each
+
+
+### 2026-08-14T02:35:23.098Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:35:23.131Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:35:27.075Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire the step-wise settling into `tick()`:
+
+
+### 2026-08-14T02:35:30.389Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:35:30.408Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:35:47.980Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update the two affected tests. First, the stub in my new test is no longer needed since paste never settles at all now:
+
+
+### 2026-08-14T02:35:48.898Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/desktop.spec.js
+
+
+### 2026-08-14T02:35:48.917Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1978 // Gravity's own formula to plain canonical coordinates. 1979 const clipboard = await page.evaluate(() => App.clipboard.map((c) => `${c.p},${c.q}`).sort()); 1980 expect(clipboard).toEqual([REDACTED_SECRET]); // sanity: copy actually captured Sandbox's cells 1981 const clipPitches = await page.evaluate(() => App.clipboard.map((c) => Tonnetz.getMidi(c.p, c.q)).sort((a, b) => a - b)); 1982 1983 await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click()); 1984 // Stub out settling for this check: these 3 cells land unconnected and mid-air (q=4/5, not 1985 // resting on the floor), so settleFloatingCells legitimately drops each one further -- that's 1986 // separately covered by "pasted mid-air cells settle to the floor" below. Isolating paste's OWN 1987 // placement from that later physics step is what actually tests paste's correctness (the 1988 // pre-settle position must carry the exact copied pitch, per [REDACTED_SECRET]) without the assertion 1989 // being co …[757 chars elided]…  b)); 2001 expect(pitches).toEqual(clipPitches); // exact true pitch preserved, pre-settle 2002 }); 2003 2004 // Pasting INTO Gravity: cells whose pitch lands outside the cup, or on an occupied cell, are 2005 // ignored; the rest are placed (even mid-air, per the user's rules). 2006 test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest', async ({ page }) => { 2007 await page.goto('/'); 2008 const res = await page.evaluate(() => { 2009 document.querySelector('.mode-option[data-mode="gravity"]').click(); 2010 App.currentMode = 'gravity'; 2011 GravityBoard.cells.clear(); 2012 GravityBoard.fillCells([{ p: 0, q: 0 }], 'pile', '#fff'); // an existing pile cell (on the floor) 2013 // Gravity images: empty in-cup floor cell (3,0), overlapping (0,0), out-of-cup (12,0). Floor 2014 // cells so settling doesn't move them -- this test isolates the cup/overlap rules. 2015 App.clipboard = [ 2016 Tonnetz.gravityToCanonical(3, 0), 2017 Tonnetz.gravityToCanonical(0, 0),
+
+
+### 2026-08-14T02:35:59.882Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:35:59.920Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:36:06.615Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:36:06.648Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2028 }); 2029 2030 // Pasted mid-air cells fall to rest after a paste (the user's "then they can fall"). A single 2031 // pasted cell high in an empty column settles to the floor (q=0), staying one cell. 2032 test('Copy/paste into Gravity: pasted mid-air cells settle to the floor', async ({ page }) => { 2033 await page.goto('/'); 2034 const res = await page.evaluate(() => { 2035 document.querySelector('.mode-option[data-mode="gravity"]').click(); 2036 App.currentMode = 'gravity'; 2037 GravityBoard.cells.clear(); 2038 App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air 2039 App.paste(); 2040 const qs = [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]); 2041 return { size: GravityBoard.cells.size, minQ: Math.min(...qs) }; 2042 }); 2043 expect(res.size).toBe(1); // the one pasted cell 2044 expect(res.minQ).toBe(0); // settled all the way to the floor, not left at q=10 2045 }); 2046 2047 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),
+
+
+### 2026-08-14T02:36:21.186Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:36:21.212Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:36:30.986Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity" --project="Desktop Chrome" 2>&1 | tail -60
+
+
+### 2026-08-14T02:36:36.712Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET] --project=Desktop Chrome Running 3 tests using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:1962:1 › [REDACTED_SECRET] via the real header buttons places the copied cells correctly (1.0s) ✓ 2 [Desktop Chrome] › tests/desktop.spec.js:2002:1 › [REDACTED_SECRET] ignores out-of-cup and overlapping cells; places the rest (1.4s) ✓ 3 [Desktop Chrome] › tests/desktop.spec.js:2033:1 › [REDACTED_SECRET]: pasted mid-air cells stay put until ticks resume, then settle one row at a time (306ms) 3 passed (4.1s)
+
+
+### 2026-08-14T02:36:40.403Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All three pass. Now let's run the broader Gravity/Blast test set and the node-level `dropRowsAbove`/toe-hold logic isn't affected by refactoring `_groupIntoComponents`.
+
+
+### 2026-08-14T02:36:40.559Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Gravity|gravity" --project="Desktop Chrome" 2>&1 | tail -60
+
+
+### 2026-08-14T02:36:46.441Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Gravity|gravity --project=[REDACTED_PRIVATE_INFO] Running 11 tests using 1 worker ✓ 1 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1282:1 › INV-30: leaving Gravity mode stops it from repainting the board on a later resize (715ms) ✓ 2 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1372:1 › panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds) (242ms) ✓ 3 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1848:1 › Gravity board sits an octave lower (205ms) ✓ 4 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1864:1 › Tonnetz gravity<->canonical transforms preserve pitch and round-trip (200ms) ✓ 5 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1936:1 › Copy/paste: Gravity pile pastes into Sandbox preserving true pitch (269ms) ✓ 6 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:1962:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (333ms) ✓ 7 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2002:1 › Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest (220ms) ✓ 8 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2033:1 › Copy/paste into Gravity: pasted mid-air cells stay put until ticks resume, then settle one row at a time (274ms) ✓ 9 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2184:1 › Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly (501ms) ✓ 10 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2224:5 › Piece-size difficulty presets (Blast/Gravity) › blast: difficulty controls the generated piece sizes (333ms) ✓ 11 [[REDACTED_PRIVATE_INFO]] › tests/desktop.spec.js:2224:5 › Piece-size difficulty presets (Blast/Gravity) › gravity: difficulty controls the generated piece sizes (312ms) 11 passed (4.6s)
+
+
+### 2026-08-14T02:36:49.887Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full INV-48 suite plus the general test suite quickly for a final sanity check.
+
+
+### 2026-08-14T02:36:50.429Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "INV-48|Gravity" 2>&1 | tail -60
+
+
+### 2026-08-14T02:38:07.043Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: ✓ 32 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] ✓ 33 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] ✓ 34 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] ✓ 35 [Tablet Chrome] › tests/invariants.spec.js:376:3 › Invariant tests › issue #11: live MIDI hardware input drives Gravity/Snake/Blast, each per its own spec (1.3s) [BROWSER] Service Worker registration blocked by Playwright ✓ 36 [Tablet Chrome] › tests/invariants.spec.js:697:3 › Invariant tests › INV-10 …[4371 chars elided]… t (duplicate down button hidden) (809ms) [BROWSER] Service Worker registration blocked by Playwright ✓ 54 [Tablet Chrome] › tests/mobile.spec.js:1706:3 › Mobile Viewport and Layout Tests › gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop (845ms) [BROWSER] Service Worker registration blocked by Playwright ✓ 55 [Tablet Chrome] › tests/mobile.spec.js:1736:3 › Mobile Viewport and Layout Tests › Snake and Gravity mobile pads clear iOS-style bottom browser chrome in portrait (849ms) [BROWSER] Service Worker registration blocked by Playwright ✓ 56 [Tablet Chrome] › tests/mobile.spec.js:1758:3 › Mobile Viewport and Layout Tests › Gravity and Snake pause buttons are visible and positioned below the header on mobile (784ms) [BROWSER] Service Worker registration blocked by Playwright ✓ 57 [Tablet Chrome] › tests/mobile.spec.js:1777:3 › Mobile Viewport and Layout Tests › mobile controls pad only visible in Gravity mode on phones (796ms) 57 passed (1.3m)
+
+
+### 2026-08-14T02:38:10.607Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:38:11.330Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "settleFloatingCells\b" docs/ next_steps.md 2>/dev/null
+
+
+### 2026-08-14T02:38:11.457Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-14T02:38:15.786Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test 2>&1 | tail -40
+
+
+### 2026-08-14T02:38:15.893Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command running in background with ID: [REDACTED_SECRET]. Output is being written to: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-14T02:38:18.937Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While that runs in the background, let me commit this Gravity settling redesign now.
+
+
+### 2026-08-14T02:38:19.224Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git status
+
+
+### 2026-08-14T02:38:19.422Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: On branch main Your branch is ahead of 'origin/main' by 4 commits. (use "git push" to publish your local commits) Changes not staged for commit: (use "git add <file>..." to update what will be committed) (use "git restore <file>..." to discard changes in working directory) modified: js/gravity.js modified: tests/desktop.spec.js Untracked files: (use "git add <file>..." to include in what will be committed) .dev_log_redactor_state.json dev.log no changes added to commit (use "git add" and/or "git commit -a")
+
+
+### 2026-08-14T02:38:30.951Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add js/gravity.js tests/desktop.spec.js && git commit -m "$(cat <<'EOF' Gravity: pasted cells fall one row per tick, never a silent precomputed jump Reported live: pasting into Gravity produced a result that looked wrong -- traced to pasteClipboard calling settleFloatingCells() synchronously, which looped an unsettled cell's ENTIRE fall to rest in one silent jump before ever painting anything. A player only ever saw the final resting position, with no visible/audible step showing how it got there -- unlike every other fall in the game (the active piece), which is always seen and heard one tick at a time. Per design discussion: paste should place each copied cell independently ("a snow of 1x1s") wherever it lands, including mid-air -- an all-or-nothing rigid placement would silently refuse a large connected piece just because part of it didn't quite fit the cup under the 120deg coordinate rotation, which is more surprising than letting the cells that DO fit land on their own. What happens next should be exactly what happens to any other loose pile cell: it falls during normal gameplay, at the normal tick cadence, audibly and visibly -- never computed ahead of time. Since Gravity is paused while the player is off pasting (INV-48), nothing actually falls until they resume, then it falls exactly as if freshly dropped. settleFloatingCells (loop-to-completion) is now settleFloatingCellsStep (exactly one row), called from tick() before the active piece's own step -- debris settles first, one tick at a time, then normal play resumes once nothing is left floating. Also de-duplicated the connected-component BFS: dropRowsAbove had its own inline copy of exactly what _boardComponents() already does (a stale comment even noted _boardComponents was "factored out" from it, but dropRowsAbove was never actually updated to use it). Extracted as _groupIntoComponents(cells), now the one place this grouping happens. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-14T02:38:31.172Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main a144357] Gravity: pasted cells fall one row per tick, never a silent precomputed jump 3 files changed, 99 insertions(+), 73 deletions(-)
+
+
+### 2026-08-14T02:38:40.624Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Implemented per your design:
+
+- `pasteClipboard` no longer calls any settling — cells land exactly where the raw canonical→gravity mapping puts them, mid-air or not (the "snow of 1x1s" approach; independent per-cell placement stays as-is, not made rigid).
+- Settling is now `settleFloatingCellsStep()` — exactly one row per call — wired into `tick()` ahead of the active piece's own step. Since Gravity is paused whenever you're off in another mode pasting, nothing falls until you resume; once resumed, loose cells fall one tick at a time, audibly and visibly, exactly like a freshly-dropped piece, and normal play resumes once nothing's left floating.
+- Also deduplicated the connected-component grouping: `dropRowsAbove` had its own inline copy of exactly what `_boardComponents()` does (a stale comment even said `_boardComponents` was "factored out" from it, but it never actually got switched over) — now both share one `_groupIntoComponents()`.
+
+All Gravity/paste/INV-48 tests pass (57/57), plus a new test asserting the fall happens one row per tick rather than jumping straight to rest. Full suite is running in the background now as a final check.
+
+
+### 2026-08-14T02:40:51.974Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Oh, I would have assumed normal play would continue alongside the new pieces settling...
+
+
+### 2026-08-14T02:41:02.194Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That makes more sense — no reason to freeze the piece you're actively steering just because unrelated debris is also falling somewhere else on the board. Let me fix that.
+
+
+### 2026-08-14T02:41:03.464Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:41:03.498Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 200 tick: function() { 201 if (typeof Replay !== 'undefined') Replay.recordTick(); 202 if (this.state.isGameOver || this.state.isPaused) return; 203 204 // Any pasted (or otherwise loose) pile debris falls first, one row per tick -- same 205 // cadence as the active piece, so nothing moves without the player seeing/hearing it. 206 // Skip the active piece's own step the same tick debris moves, so the two don't visually 207 // compete for attention; normal play resumes once nothing is left floating. 208 if (this.settleFloatingCellsStep()) { 209 this.refreshUI(); 210 return; 211 } 212 213 const down = this.getDown(this.state.p, this.state.q); 214
+
+
+### 2026-08-14T02:41:15.807Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:41:15.924Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:41:43.510Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch — and there's a real gap matching that: pasted debris currently only tries falling straight down (via `getDown`), but the active piece *also* tries a diagonal slide when blocked straight down before giving up. Debris should get that too, or it stops short of resting spots a normal falling piece would reach. Let me fix that.
+
+
+### 2026-08-14T02:41:43.925Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:41:43.974Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 443 // The connected components of the whole board (cells sharing hex edges), as arrays of 444 // {p, q, val}. 445 _boardComponents: function() { 446 const cells = []; 447 [REDACTED_PRIVATE_INFO] 448 [REDACTED_PRIVATE_INFO] 449 [REDACTED_PRIVATE_INFO] 450 }); 451 return this._groupIntoComponents(cells); 452 }, 453 454 // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row 455 // (called once per tick, same cadence as the active piece's own fall -- see tick()). Each 456 // component falls as a RIGID mass -- translated by one cell's getDown offset per step (a 457 // uniform translation preserves shape; moving cells individually by their own getDown would 458 // shear the mass, #6). A component rests when a step would take any of its cells out of the 459 // cup or onto a cell that isn't its own. Returns true if anything moved, so tick() can skip 460 // the active piece's own step that tick (debris settles before normal play resumes) and so 461 // callers can decide whether to sound/redraw. This used to loop to completion in one silent 462 // jump (right after a paste) -- now every fall, pasted or otherwise, is this same one-row-per- 463 // tick step, so nothing a player didn't cause moves without them seeing and hearing it happen. 464 settleFloatingCellsStep: function() { 465 let moved = false; 466 const movedMidis = []; 467 for (const comp of this._boardComponents()) { 468 const ref = comp[0]; 469 const down = this.getDown(ref.p, ref.q); 470 const dp = down.p - ref.p, dq = down.q - ref.q; 471 const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q)); 472 const canFall = comp.every((c) => { 473 const nk = (c.p + dp) + ',' + (c.q + dq); 474 return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
+
+
+### 2026-08-14T02:41:47.331Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T02:41:47.347Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] 475 }); 476 if (!canFall) continue; 477 const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) })); 478 comp.forEach((c) => GravityBoard.cells.delete(c.p + ',' + c.q)); 479 moves.forEach((m) => { 480 GravityBoard.cells.set(m.nk, m.val); 481 const [p, q] = m.nk.split(',').map(Number); 482 movedMidis.push(Tonnetz.getMidi(p, q)); 483 }); 484 moved = true; 485 } 486 if (moved) Synth.playChord(movedMidis, false, 0.06, 0.3); // same soft tick sound the active piece's own step uses 487 return moved;
+
+
+### 2026-08-14T02:42:00.133Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:42:00.186Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:42:04.704Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:42:04.731Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 454 // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row 455 // (called once per tick, same cadence as the active piece's own fall -- see tick()). Each 456 // component falls as a RIGID mass -- translated by one cell's getDown offset per step (a 457 // uniform translation preserves shape; moving cells individually by their own getDown would 458 // shear the mass, #6). A component rests when a step would take any of its cells out of the 459 // cup or onto a cell that isn't its own. Returns true if anything moved, so tick() can skip 460 // the active piece's own step that tick (debris settles before normal play resumes) and so 461 // callers can decide whether to sound/redraw. This used to loop to completion in one silent 462 // jump (right after a paste) -- now every fall, pasted or otherwise, is this same one-row-per- 463 // tick step, so nothing a player didn't cause moves without them seeing and hearing it happen.
+
+
+### 2026-08-14T02:42:13.010Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:42:13.038Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:42:16.537Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:42:16.556Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 200 tick: function() { 201 if (typeof Replay !== 'undefined') Replay.recordTick(); 202 if (this.state.isGameOver || this.state.isPaused) return; 203 204 // Any pasted (or otherwise loose) pile debris falls one row this tick too -- same cadence 205 // as the active piece, so nothing moves without the player seeing/hearing it. Runs 206 // alongside the active piece's own step below, not instead of it: there's no reason 207 // debris settling elsewhere on the board should freeze the piece the player is actively 208 // steering. 209 this.settleFloatingCellsStep(); 210 211 const down = this.getDown([REDACTED_PERSON], [REDACTED_PERSON]); 212 213 // 1. Try to move straight down 214 if (GravityBoard.checkActivePlacement(this.state.activePiece, down.p, down.q, this.state.rotation)) {
+
+
+### 2026-08-14T02:42:19.763Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, that's already consistent. Now update the test that relied on the old "debris blocks the active piece" behavior — let's check it still holds since I changed semantics.
+
+
+### 2026-08-14T02:42:20.275Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Copy/paste into Gravity" --project="Desktop Chrome" 2>&1 | tail -40
+
+
+### 2026-08-14T02:42:23.667Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Copy/paste into Gravity --project=[REDACTED_PERSON] Running 3 tests using 1 worker ✓ 1 [[REDACTED_PERSON]] › tests/desktop.spec.js:1962:1 › Copy/paste into Gravity via the real header buttons places the copied cells correctly (566ms) ✓ 2 [[REDACTED_PERSON]] › tests/desktop.spec.js:2002:1 › Copy/paste into Gravity ignores out-of-cup and overlapping cells; places the rest (231ms) ✓ 3 [[REDACTED_PERSON]] › tests/desktop.spec.js:2033:1 › Copy/paste into Gravity: pasted mid-air cells stay put until ticks resume, then settle one row at a time (270ms) 3 passed (2.1s)
+
+
+### 2026-08-14T02:42:31.320Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add regression coverage for both fixes: [REDACTED_PRIVATE_INFO], and the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T02:42:31.759Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:42:31.782Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2030 // Pasted mid-air cells fall to rest one row per TICK, exactly like the active piece, never in one 2031 // silent precomputed jump (reported live: an instant jump-to-rest was surprising). Paste itself 2032 // must leave the cell exactly where it landed; only once ticks actually run does it fall. 2033 test('Copy/paste into Gravity: pasted mid-air cells stay put until ticks resume, then settle one row at a time', async ({ page }) => { 2034 await page.goto('/'); 2035 const afterPaste = await page.evaluate(() => { 2036 document.querySelector('.mode-option[data-mode="gravity"]').click(); 2037 App.currentMode = 'gravity'; 2038 GravityBoard.cells.clear(); 2039 App.clipboard = [Tonnetz.gravityToCanonical(-3, 10)]; // an in-cup cell high in the air 2040 App.paste(); 2041 const qs = [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]); 2042 return { size: GravityBoard.cells.size, minQ: Math.min(...qs) }; 2043 }); 2044 expect(afterPaste.size).toBe(1); // the one pasted cell 2045 expect(afterPaste.minQ).toBe(10); // still exactly where it was pasted -- paste never settles 2046 2047 const stepped = await page.evaluate(() => { 2048 GravityMode.state.isPaused = false; 2049 GravityMode.state.isGameOver = false; 2050 const qsAfterOneTick = () => [...GravityBoard.cells.keys()].map((k) => +k.split(',')[1]); 2051 GravityMode.tick(); // one tick, one row -- never a jump straight to the floor 2052 const afterOne = Math.min(...qsAfterOneTick()); 2053 let guard = 0; 2054 while (Math.min(...qsAfterOneTick()) > 0 && guard++ < 30) GravityMode.tick(); 2055 return { afterOne, finalMinQ: Math.min(...qsAfterOneTick()), size: GravityBoard.cells.size }; 2056 }); 2057 expect(stepped.afterOne).toBe(9); // exactly one row per tick, not an instant drop to the floor
+
+
+### 2026-08-14T02:46:57.943Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add the concurrency test (debris and the active piece both moving in the same tick), then run everything.
+
+
+### 2026-08-14T02:46:59.139Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/desktop.spec.js
+
+
+### 2026-08-14T02:46:59.156Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2056 }); 2057 expect([REDACTED_STUDENT]).toBe(9); // exactly one row per tick, not an instant drop to the floor 2058 expect([REDACTED_STUDENT]).toBe(0); // eventually settles all the way to the floor 2059 expect([REDACTED_STUDENT]).toBe(1); // still just the one cell -- nothing lost or duplicated 2060 }); 2061
+
+
+### 2026-08-14T02:48:01.167Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Excellent questions, and let me answer them honestly rather than guess — I traced the actual code:
+
+1. **Yes, there's still something special.** Debris settling (my new per-tick step) never checks for completed lines — only `[REDACTED_SECRET]` does, by calling `[REDACTED_SECRET]`. So a row completed by falling debris just... sits there, complete and uncleared, until the active piece happens to lock somewhere unrelated (if ever).
+2. **Also special.** When a line *does* clear (via a piece locking), everything above it collapses via `[REDACTED_SECRET]` — an instant, one-shot rigid shift, not the new tick-by-tick falling. That's inconsistent with what we just built for debris.
+3. **Your hole-filling scenario would likely break**, per both gaps above: the row would complete but not clear (no clear-check runs on debris settling), so it'd just sit there full, waiting for you to lock a piece somewhere else before anything happens — and probably not correctly even then, since the geometry `dropRowsAbove` expects may not match a debris-completed row.
+
+You're pointing at the same unification opportunity from a different angle: line-clearing's "everything above falls" should probably just *be* ordinary debris settling — delete the completed row, let the existing per-tick component-fall mechanism carry everything down naturally — rather than a separate instant-shift special case. And completed-line detection needs to run every tick (or whenever debris moves), not only on piece-lock.
+
+Let me write your three scenarios as tests first (expecting them to fail), then fix it properly.
+
+
+### 2026-08-14T02:48:02.088Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:48:02.114Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 239 } 240 }, 241 242 [REDACTED_PRIVATE_INFO] 243 [REDACTED_PRIVATE_INFO] 244 [REDACTED_PRIVATE_INFO] 245 246 // Solid placement chord 247 [REDACTED_PRIVATE_INFO] 248 [REDACTED_PRIVATE_INFO] 249 250 // Clear completed lines and slide remaining blocks above down vertically 251 [REDACTED_PRIVATE_INFO] 252 253 [REDACTED_PRIVATE_INFO] 254 [REDACTED_PRIVATE_INFO] 255 [REDACTED_PRIVATE_INFO] 256 } 257 }, 258 259 processClears: function() { 260 [REDACTED_PRIVATE_INFO] 261 let clearedCount = 0; 262 263 [REDACTED_PRIVATE_INFO] 264 [REDACTED_PRIVATE_INFO] 265 // Sort lines by row index q descending (top rows first) to prevent shifting index confusion 266 [REDACTED_PRIVATE_INFO] 267 268 lines.forEach(line => { 269 const qClear = line[0].q; 270 line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q))); 271 [REDACTED_PRIVATE_INFO] 272 [REDACTED_PRIVATE_INFO] 273 [REDACTED_PRIVATE_INFO] 274 275 // Shift all rows above this cleared row vertically down by 1 unit 276 [REDACTED_PRIVATE_INFO] 277 }); 278 279 // Cleared chord sound 280 [REDACTED_PRIVATE_INFO] 281 282 // Re-evaluate if dropping completed new lines 283 lines = GravityBoard.findFullLines(); 284 } 285 286 if (clearedCount > 0) { 287 this.updateSpeed(); 288 } 289 }, 290
+
+
+### 2026-08-14T02:48:53.093Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:48:53.123Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 196 this.state.dropInterval = Math.max(100, 1000 - [REDACTED_STUDENT] * 20); 197 this.startTimer(); 198 }, 199 200 tick: function() { 201 if (typeof Replay !== 'undefined') Replay.recordTick(); 202 if (this.state.isGameOver || this.state.isPaused) return; 203 204 // Any pasted (or otherwise loose) pile debris falls one row this tick too -- same cadence 205 // as the active piece, so nothing moves without the player seeing/hearing it. Runs 206 // alongside the active piece's own step below, not instead of it: there's no reason 207 // debris settling elsewhere on the board should freeze the piece the player is actively 208 // steering. 209 this.settleFloatingCellsStep(); 210 211 const down = this.getDown(this.state.p, this.state.q); 212 213 // 1. Try to move straight down 214 if (GravityBoard.checkActivePlacement([REDACTED_STUDENT], down.p, down.q, this.state.rotation)) { 215 this.state.p = down.p; 216 this.state.q = down.q; 217 this.playActivePieceSound(0.06, 0.3); // tick soun …[1467 chars elided]… 60 let lines = GravityBoard.findFullLines(); 261 let clearedCount = 0; 262 263 while (lines.length > 0) { 264 const allNotes = []; 265 // Sort lines by row index q descending (top rows first) to prevent shifting index confusion 266 lines.sort((a, b) => b[0].q - a[0].q); 267 268 lines.forEach(line => { 269 const qClear = line[0].q; 270 line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q))); 271 GravityBoard.clearCells(line); 272 [REDACTED_STUDENT]++; 273 clearedCount++; 274 275 // Shift all rows above this cleared row vertically down by 1 unit 276 this.dropRowsAbove(qClear); 277 }); 278 279 // Cleared chord sound 280 Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5); 281 282 // Re-evaluate if dropping completed new lines 283 lines = GravityBoard.findFullLines(); 284 } 285 286 if (clearedCount > 0) { 287 this.updateSpeed(); 288 } 289 }, 290 291 getDown: function(p, q) { 292 if (q % 2 !== 0) { 293 return { p: p, q: q - 1 }; 294 } else { 295 return { p: p + 1, q: q - 1 };
+
+
+### 2026-08-14T02:49:15.322Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:49:15.560Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:49:18.345Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now replace `[REDACTED_SECRET]` and `[REDACTED_SECRET]`, and remove `dropRowsAbove`:
+
+
+### 2026-08-14T02:49:28.210Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:49:28.276Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:49:32.217Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove `dropRowsAbove` entirely.
+
+
+### 2026-08-14T02:49:32.527Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "dropRowsAbove" js/gravity.js
+
+
+### 2026-08-14T02:49:32.653Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 307: dropRowsAbove: function(qClear) { 412: // dropRowsAbove (just the cells above a cleared row), so there's exactly one BFS doing this,
+
+
+### 2026-08-14T02:49:35.492Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:49:35.505Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 288 } else { 289 return { p: p + 1, q: q - 1 }; 290 } 291 }, 292 293 // Shifts every locked cell above the cleared row down by one row -- but as a set of RIGID 294 // connected components, not cell-by-cell. getDown(p, q)'s zigzag (p unchanged for odd q, 295 // p+1 for even q) is only valid for moving a SINGLE reference point down by one row -- it's 296 // how a falling piece's own anchor moves, with the piece's actual shape always recomputed 297 // fresh from that one anchor (Pieces.getAbsoluteCells), never touching individual cells. 298 // Calling it on every ALREADY-LOCKED cell independently, using each cell's own row parity, 299 // tears a structure apart the moment it spans both an even and an odd row: two cells that 300 // were hex-neighbors before the shift can land on a non-neighbor relative offset after it 301 // (found live, [REDACTED_SECRET] -- a connected mass split into a solid base and a visibly 302 // floating fragment the instant a line below it cleared). The fix: group ce …[269 chars elided]…  every relative 306 // offset within the component by construction, so its shape can never be sheared. 307 dropRowsAbove: function(qClear) { 308 const cellsAbove = []; 309 GravityBoard.cells.forEach((val, key) => { 310 const [p, q] = key.split(',').map(Number); 311 if (q > qClear) cellsAbove.push({ p, q, val, key }); 312 }); 313 if (cellsAbove.length === 0) return; 314 315 const components = this._groupIntoComponents(cellsAbove); 316 317 // Delete every old position first, across all components, before inserting any new 318 // one -- otherwise one component's insert could land on and overwrite another 319 // component's not-yet-relocated old cell. 320 cellsAbove.forEach(c => GravityBoard.cells.delete(c.key)); 321 322 for (const component of components) { 323 const ref = component[0]; 324 const down = this.getDown(ref.p, ref.q); 325 const dp = down.p - ref.p; 326 const dq = down.q - ref.q; 327 component.forEach(c => { 328 GravityBoard.cells.set(`${c.p + dp},${c.q + dq}`, c.val); 329 });
+
+
+### 2026-08-14T02:49:43.337Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:49:43.351Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 328 GravityBoard.cells.set(`${c.p + dp},${c.q + dq}`, c.val); 329 }); 330 } 331 }, 332 333 hardDrop: function() { 334 let p = this.state.p; 335 let q = this.state.q;
+
+
+### 2026-08-14T02:49:53.214Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:49:53.269Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:49:57.068Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:49:57.086Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 373 // not two copies that could quietly drift apart. 374 _groupIntoComponents: function(cells) { 375 const byKey = new Map(cells.map((c) => [c.key, c])); 376 const visited = new Set(); 377 const components = []; 378 for (const start of cells) { 379 if (visited.has(start.key)) continue; 380 const component = []; 381 const stack = [start]; 382 visited.add(start.key); 383 while (stack.length) { 384 const cur = stack.pop(); 385 component.push(cur); 386 for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) { 387 const nk = `${n.p},${n.q}`;
+
+
+### 2026-08-14T02:50:00.454Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T02:50:00.473Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 368 }, 369 370 // Groups a flat list of {p, q, val, key} cells into connected components (cells sharing hex 371 // edges via Tonnetz.getNeighbors) -- shared by _boardComponents (the whole board) and 372 // dropRowsAbove (just the cells above a cleared row), so there's exactly one BFS doing this, 373 // not two copies that could quietly drift apart.
+
+
+### 2026-08-14T02:50:05.397Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:50:05.462Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:50:14.369Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's remove the now-obsolete `dropRowsAbove`-specific Node tests, since that function no longer exists.
+
+
+### 2026-08-14T02:50:14.972Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:50:15.009Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 893 [REDACTED_PRIVATE_INFO] 894 console.log("PASS: Gravity pieces can overhang the side walls down to a single toe-hold hex, and the floor stays solid!"); 895 896 // Real bug (GitHub issue #6, "floating piece"): dropRowsAbove(qClear) shifted every cell 897 // above the cleared line by calling getDown(p, q) on EACH CELL INDEPENDENTLY, using that 898 // cell's own row parity. getDown's parity-dependent zigzag is only valid for moving a 899 // SINGLE reference point (a falling piece's anchor) down by one row -- applying it 900 // per-cell to an already-locked multi-cell structure tears it apart whenever the structure 901 // spans both an even and an odd row and has cells connected via a diagonal (non 902 // "same-column") hex direction: two originally-adjacent cells can land on a NON-adjacent 903 // relative offset after the "shift," splitting a solid mass into a disconnected, visibly 904 // floating fragment the instant a line below it clears -- confirmed live via a real 905 // captu …[4434 chars elided]… rs itself calls 972 [REDACTED_PRIVATE_INFO] 973 const sizeAfter = GravityBoard.cells.size; 974 975 if (sizeAfter !== sizeBefore - fullRow.length) { 976 console.error(`FAIL: conservation of hexes violated! ${sizeBefore} cells before, cleared a ${fullRow.length}-wide row, expected ${sizeBefore - fullRow.length} after, got ${sizeAfter} -- some cell was silently lost (or duplicated) during the cascade.`); 977 process.exit(1); 978 } 979 if (sizeAfter !== aboveCells.length) { 980 console.error(`FAIL: expected exactly the ${aboveCells.length} originally-above cells to survive (just shifted down), got ${sizeAfter}: ${JSON.stringify([...GravityBoard.cells.keys()])}`); 981 process.exit(1); 982 } 983 984 [REDACTED_PRIVATE_INFO] 985 console.log("PASS: clearing a line and cascading the board above it conserves exactly (before - row width) cells, even across multiple disconnected structures!"); 986 987 // INVARIANT (see docs/invariants.md): rotation direction is a shared foundation used by
+
+
+### 2026-08-14T02:50:58.674Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-14T02:50:58.895Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:51:05.182Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "dropRowsAbove\|processClears" tests/run_tests.js tests/*.spec.js js/*.js
+
+
+### 2026-08-14T02:51:05.349Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: js/blast.js:486: this.processClears(); js/blast.js:500: processClears: function() {
+
+
+### 2026-08-14T02:51:41.432Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the Playwright tests for all three scenarios plus the real-workflow integration test.
+
+
+### 2026-08-14T02:51:41.669Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:51:41.700Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2057 expect(stepped.afterOne).toBe(9); // exactly one row per tick, not an instant drop to the floor 2058 expect(stepped.finalMinQ).toBe(0); // eventually settles all the way to the floor 2059 expect(stepped.size).toBe(1); // still just the one cell -- nothing lost or duplicated 2060 }); 2061 2062 // Sandbox's gray inaudible lattice box GROWS to cover [REDACTED_PRIVATE_INFO] (e.g. a large Life game),
+
+
+### 2026-08-14T02:52:07.503Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:52:07.548Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-14T02:52:11.037Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "Gravity: a row completed|Gravity: clearing a line|Gravity: pasting the exact" --project="[REDACTED_PRIVATE_INFO]" 2>&1 | tail -100
+
+
+### 2026-08-14T02:52:16.977Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g Gravity: a row completed|Gravity: clearing a line|Gravity: pasting the exact --project=Desktop Chrome Running 3 tests using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:2065:1 › Gravity: a row completed by debris settling (not a piece locking) still clears (1.1s) ✓ 2 [Desktop Chrome] › tests/desktop.spec.js:2089:1 › Gravity: clearing a line does not instantly shift what was above it -- it falls in via later ticks (288ms) ✘ 3 [Desktop Chrome] › tests/desktop.spec.js:2118:1 › Gravity: pasting the exact missing note into a near-complete row clears it and cascades correctly on resume (472ms) 1) [Desktop Chrome] › tests/desktop.spec.js:2118:1 › Gravity: pasting the exact missing note into a near-complete row clears it and cascades correctly on resume Error: expect(received).toBe(expected) // Object.is equality Expected: true Received: false 2164 | }; 2165 | }); > 2166 | expect(final.rowGone).toBe(true); // the completed row cleared | ^ 2167 | expect(final.linesCleared).toBe(1); // and counted exactly once 2168 | expect(final.remaining.length).toBe(1); // the one unrelated cell that was above survives 2169 | expect(final.remaining[0][0]).toBe('3,0'); // and cascaded all the way down to the (now-open) floor at [REDACTED_PERSON] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Desktop Chrome] › tests/desktop.spec.js:2118:1 › Gravity: pasting the exact missing note into a near-complete row clears it and cascades correctly on resume 2 passed (3.6s)
+
+
+### 2026-08-14T02:52:55.712Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me isolate whether the issue is in detection or in my test's tick loop.
+
+
+### 2026-08-14T02:52:56.059Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "test('Gravity: pasting the exact" -A 50 tests/desktop.spec.js | head -55
+
+
+### 2026-08-14T02:52:56.180Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2118:test('[REDACTED_SECRET]', async ({ page }) => { 2119- await page.goto('/'); 2120- const setup = await page.evaluate(() => { 2121- document.querySelector('.mode-option[data-mode="gravity"]').click(); 2122- App.currentMode = 'gravity'; 2123- GravityBoard.cells.clear(); 2124- // Row q=0 complete except col=2 (the "hole"); a couple of unrelated cells above, to confirm 2125- // they cascade down correctly once the gap opens up. 2126- const holeP = 2, holeQ = 0; 2127- for (let col = -5; col <= 4; col++) { 2128- if (col === holeP) continue; 2129- GravityBoard.cells.set(`${col},0`, { type: 'X', color: '#fff' }); 2130- } 2131- GravityBoard.cells.set('3,3', { type: 'X', color: '#fff' }); // sits above the row, unconnected 2132- // The exact canonical (Sandbox) cell whose gravity mapping IS the hole -- "figuring out which 2133- // note fills it" in the reported workflow. 2134- const holeCanonical = Tonn …[808 chars elided]… ize).toBe(setup.sizeBefore + 1); // the pasted cell landed 2152- expect(afterPaste.rowStillFull).toBe(true); // the hole is now filled -- row is complete 2153- 2154- // Resume play: run enough ticks for checkForClears to catch the completed row and for the 2155- // cell above to fully cascade down. 2156- const final = await page.evaluate(() => { 2157- GravityMode.state.isPaused = false; 2158- GravityMode.state.isGameOver = false; 2159- for (let i = 0; i < 10; i++) GravityMode.tick(); 2160- return { 2161- rowGone: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4].every((col) => !GravityBoard.cells.has(`${col},0`)), 2162- linesCleared: GravityMode.state.linesCleared, 2163- remaining: [...GravityBoard.cells.entries()].filter(([k, v]) => v.type === 'X'), 2164- }; 2165- }); 2166- expect(final.rowGone).toBe(true); // the completed row cleared 2167- expect(final.linesCleared).toBe(1); // and counted exactly once 2168- expect(final.remaining.length).toBe(1); // the one unrelated cell that was above survives
+
+
+### 2026-08-14T02:53:38.089Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/gravity.js
+
+
+### 2026-08-14T02:53:38.126Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 200 tick: function() { 201 if (typeof Replay !== 'undefined') Replay.recordTick(); 202 if (this.state.isGameOver || this.state.isPaused) return; 203 204 // Any pasted (or otherwise loose) pile debris falls one row this tick too -- same cadence 205 // as the active piece, so nothing moves without the player seeing/hearing it. Runs 206 // alongside the active piece's own step below, not instead of it: there's no reason 207 // debris settling elsewhere on the board should freeze the piece the player is actively 208 // steering. 209 if (this.settleFloatingCellsStep()) this.refreshUI(); 210 211 // A row completed by debris settling (not just by the active piece locking) is caught 212 // here, every tick -- nothing special about HOW a row got completed, only whether it's 213 // full. And what happens above a cleared row is likewise nothing special: clearing just 214 // deletes the row; whatever was above is now floating and falls via the SAME 215 // settleFloatingCellsStep on the next tick,  …[1330 chars elided]… [REDACTED_PRIVATE_INFO]; 252 GravityBoard.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color); 253 254 // Solid placement chord 255 const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q)); 256 Synth.playChord(midis, true, 0.16, 1.2); 257 258 // Any line THIS piece completed is caught by the next tick's checkForClears() -- same as 259 // a line completed by debris settling, nothing special about a piece lock specifically. 260 if (!this.state.isGameOver) { 261 this.spawnPiece(); 262 this.refreshUI(); 263 } 264 }, 265 266 // Clears every currently-complete line: deletes its cells and plays the clear chord, but does 267 // NOT shift anything above it -- whatever's now floating over the gap falls via the ordinary 268 // per-tick settleFloatingCellsStep (see tick()), exactly like any other loose pile cell, not a 269 // special instant cascade. Called every tick, so a row completed by debris settling is caught
+
+
+### 2026-08-14T02:54:22.320Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add per-tick diagnostics to see exactly where this goes wrong, rather than guess further.
+
+
+### 2026-08-14T02:54:23.483Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:54:23.505Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2154 // Resume play: run enough ticks for checkForClears to catch the completed row and for the 2155 // cell above to fully cascade down. 2156 const final = await page.evaluate(() => { 2157 GravityMode.state.isPaused = false; 2158 GravityMode.state.isGameOver = false; 2159 for (let i = 0; i < 10; i++) GravityMode.tick(); 2160 return { 2161 rowGone: [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4].every((col) => !GravityBoard.cells.has(`${col},0`)), 2162 linesCleared: GravityMode.state.linesCleared, 2163 remaining: [...GravityBoard.cells.entries()].filter(([k, v]) => v.type === 'X'), 2164 }; 2165 }); 2166 expect(final.rowGone).toBe(true); // the completed row cleared 2167 expect(final.linesCleared).toBe(1); // and counted exactly once

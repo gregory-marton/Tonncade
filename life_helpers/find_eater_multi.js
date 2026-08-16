@@ -18,15 +18,15 @@ const RULE_TABLE = [
 ];
 const ORDER = '21';
 
-// Generate small soups to find small stable oscillators (our candidate eaters)
+// Generate small soups to find small stationary oscillators (our candidate eaters)
 console.log("Generating candidate eaters...");
 const candidates = new Map();
 
-for (let trial = 0; trial < 10000; trial++) {
+for (let trial = 0; trial < 50000; trial++) {
     let m = new Map();
-    // small 3x3 box
-    for (let p=-1; p<=1; p++) {
-        for (let q=-1; q<=1; q++) {
+    // 5x5 box
+    for (let p=-2; p<=2; p++) {
+        for (let q=-2; q<=2; q++) {
             if (Math.random() < 0.4) m.set(key(p,q), Math.random() < 0.5 ? 1 : 2);
         }
     }
@@ -37,16 +37,19 @@ for (let trial = 0; trial < 10000; trial++) {
     const history = [];
     
     for (let gen = 0; gen < 50; gen++) {
-        const c = canonical(m);
+        // Use an absolute hash for history to ensure it doesn't move!
+        const pairs = tripletsFrom(m).sort((a,b) => a[0]-b[0] || a[1]-b[1] || a[2]-b[2]);
+        const absKey = JSON.stringify(pairs);
+        
         if (m.size === 0 || m.size > 30) break; // dead or exploded
         
-        const idx = history.indexOf(c);
+        const idx = history.indexOf(absKey);
         if (idx !== -1) {
             stable = true;
             period = history.length - idx;
             break;
         }
-        history.push(c);
+        history.push(absKey);
         m = Life.stepStates(m, RULE_TABLE, ORDER);
     }
     

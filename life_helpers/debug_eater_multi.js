@@ -4,7 +4,7 @@ global.FileFolder = { create: () => ({ on: () => {} }) };
 global.AudioFolder = { create: () => ({ on: () => {} }) };
 
 const {
-    Life, key, mapFrom, tripletsFrom, canonical, connectedComponents
+    Life, key, mapFrom, tripletsFrom, canonical, connectedComponents, bbox
 } = require('./simulate_multi.js');
 
 const RULE_TABLE = [
@@ -32,11 +32,8 @@ for (const [p, q, s] of BEEHIVE_GLIDER) {
 const canonCore = canonical(mapFrom(CORE));
 
 for (let gen = 0; gen <= 30; gen++) {
+    const b = bbox(board);
     console.log(`\n=== Gen ${gen} ===`);
-    console.log(`Board Size: ${board.size}`);
-    const c = canonical(board);
-    if (c === canonCore) {
-        console.log("Glider successfully eaten! Core restored.");
-    }
+    console.log(`Board Size: ${board.size}, BBox: minP=${b.minP}, minQ=${b.minQ}`);
     board = Life.stepStates(board, RULE_TABLE, ORDER);
 }

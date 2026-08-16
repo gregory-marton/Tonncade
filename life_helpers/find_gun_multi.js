@@ -4,7 +4,7 @@ global.FileFolder = { create: () => ({ on: () => {} }) };
 global.AudioFolder = { create: () => ({ on: () => {} }) };
 
 const {
-    Life, key, parseKey, mapFrom, tripletsFrom, canonicalForm, connectedComponents, rotCW
+    Life, key, parseKey, mapFrom, tripletsFrom, canonicalForm, connectedComponents, rotCW, bbox
 } = require('./simulate_multi.js');
 
 const RULE_TABLE = [
@@ -62,26 +62,49 @@ function applySymmetry(triplets, symType) {
 
 function checkSymmetricGun(initialTriplets, maxGens) {
     let live = mapFrom(initialTriplets);
-    let maxGliders = 0;
+    const gliderHistory = [];
 
     for (let gen = 1; gen <= maxGens; gen++) {
         live = Life.stepStates(live, RULE_TABLE, ORDER);
         if (live.size === 0 || live.size > 2000) return false;
 
-        const comps = connectedComponents(live);
-        if (comps.length > 1) {
+        if (gen % 50 === 0) {
+            const comps = connectedComponents(live);
             let coreCells = 0;
             let glidersNow = 0;
             for (const comp of comps) {
                 if (isGlider(tripletsFrom(comp))) glidersNow++;
                 else coreCells += comp.size;
             }
-            if (glidersNow > maxGliders) maxGliders = glidersNow;
             if (coreCells === 0) return false;
+            gliderHistory.push(glidersNow);
         }
     }
-    // A true gun shooting periodically for 400 generations must accumulate a lot of gliders.
-    return maxGliders >= 15; 
+    
+    if (gliderHistory.length < 8) return false;
+    
+    // Ensure the number of gliders strictly increased at the end of the simulation
+    const last = gliderHistory.length - 1;
+    if (gliderHistory[last] > gliderHistory[last-1] && 
+        gliderHistory[last-1] > gliderHistory[last-2] &&
+        gliderHistory[last-2] > 4) {
+        
+        // Ensure the non-glider core is small and stationary
+        const comps = connectedComponents(live);
+        let coreMap = new Map();
+        for (const comp of comps) {
+            if (!isGlider(tripletsFrom(comp))) {
+                for (const [k, v] of comp.entries()) coreMap.set(k, v);
+            }
+        }
+        const b = bbox(coreMap);
+        const w = b.maxP - b.minP;
+        const h = b.maxQ - b.minQ;
+        
+        // A true stationary core shouldn't be larger than a small area
+        if (w < 40 && h < 40) return true;
+    }
+    return false;
 }
 
 console.log("Searching for 3-state TRUE GUNS (rotationally symmetric)...");
