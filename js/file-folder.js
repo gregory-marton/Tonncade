@@ -136,7 +136,20 @@ const FileFolder = {
             if (this.hasRandom && this.currentValue === null) this.currentValue = 'random';
 
             const select = document.getElementById(ids.sourceSelect);
-            if (select) select.onchange = () => this.handleSelect(select.value);
+            if (select) {
+                select.onchange = () => this.handleSelect(select.value);
+                // Re-list on open, not just at setup/reconnect/choose-folder/post-save time -- a
+                // FileSystemDirectoryHandle's .values() genuinely re-reads the OS on every call
+                // (Chrome doesn't cache directory contents), so the underlying data was never
+                // stale; only the trigger to re-read it was missing, meaning a file moved/renamed/
+                // added on disk outside the app stayed invisible until one of those other actions
+                // happened to fire. mousedown/focus fire before the native dropdown paints, so this
+                // is necessarily best-effort (the async re-list can't block a synchronous native
+                // popup) -- the CURRENT open may still show what was cached, but the next one won't.
+                const refresh = () => this.refreshFileList();
+                select.addEventListener('mousedown', refresh);
+                select.addEventListener('focus', refresh);
+            }
 
             await this.setupOnline(token);
             if (token !== this._token) return;
@@ -207,7 +220,11 @@ const FileFolder = {
             }
             if (!handle || (token !== undefined && token !== this._token)) return;
             this.folderHandle = handle;
-            const permission = await handle.queryPermission({ mode: 'read' });
+            // 'readwrite', not 'read' -- saveFileAs needs to actually write into this folder, not
+            // just list it. A folder granted under the old read-only default (before this fix)
+            // queries as not-granted here and correctly falls into needsReconnect below, prompting
+            // one re-grant click rather than silently downgrading writes to a download forever.
+            const permission = await handle.queryPermission({ mode: 'readwrite' });
             if (token !== undefined && token !== this._token) return;
             if (permission === 'granted') {
                 await this.listFiles(handle, token);
@@ -218,7 +235,7 @@ const FileFolder = {
 
         reconnect: async function() {
             if (!this.folderHandle) return;
-            const permission = await this.folderHandle.requestPermission({ mode: 'read' });
+            const permission = await this.folderHandle.requestPermission({ mode: 'readwrite' });
             if (permission === 'granted') await this.listFiles(this.folderHandle);
             else this.renderOptions();
         },
@@ -226,7 +243,10 @@ const FileFolder = {
         chooseFolder: async function() {
             let handle;
             try {
-                handle = await window.showDirectoryPicker();
+                // 'readwrite' -- without this, showDirectoryPicker defaults to read-only, and
+                // saveFileAs's write below throws (permission denied), silently falling back to a
+                // browser download instead of writing into the chosen folder as the player expects.
+                handle = await window.showDirectoryPicker({ mode: 'readwrite' });
             } catch (err) {
                 // AbortError: the player closed the picker without choosing anything -- expected,
                 // not worth logging. Either way, put the select back to what's actually loaded.
@@ -277,6 +297,41 @@ const FileFolder = {
             if (token !== undefined && token !== this._token) return;
             if (files.length > 0) await this.loadFileAt(0, token);
             else this.renderOptions();
+        },
+
+        // Re-reads the folder's listing WITHOUT touching what's currently loaded -- unlike
+        // listFiles (which always auto-loads index 0), this is meant to run silently just from
+        // the player opening the dropdown, and must never replace their in-progress content just
+        // because they hovered a menu. Since the listing is re-sorted alphabetically every time,
+        // a plain numeric index can silently point at a DIFFERENT file after an external rename/
+        // add/remove -- so the currently-selected file is re-found by NAME in the fresh listing
+        // and currentValue's index is corrected to match, rather than trusting the old index.
+        refreshFileList: async function() {
+            if (!this.folderHandle || this.needsReconnect) return;
+            const currentName = (this.currentValue && this.currentValue.startsWith('local:') && this.fileHandles)
+                ? (this.fileHandles[parseInt(this.currentValue.slice(6), 10)] || {}).name
+                : null;
+
+            const files = [];
+            try {
+                for await (const entry of this.folderHandle.values()) {
+                    if (entry.kind === 'file' && this.extensionPattern.test(entry.name)) files.push(entry);
+                }
+            } catch (err) {
+                console.warn('Could not refresh the folder listing:', err);
+                return;
+            }
+            files.sort((a, b) => a.name.localeCompare(b.name));
+            this.fileHandles = files;
+
+            if (currentName) {
+                const newIndex = files.findIndex((f) => f.name === currentName);
+                // Still present -- keep pointing at the SAME file at its (possibly new) index. If
+                // it's gone (renamed/moved/deleted externally), leave currentValue as-is; it just
+                // won't match any option, which is a display-only quirk, not a content change.
+                if (newIndex >= 0) this.currentValue = 'local:' + newIndex;
+            }
+            this.renderOptions();
         },
 
         loadFileAt: async function(index, token) {

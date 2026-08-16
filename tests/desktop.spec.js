@@ -351,17 +351,23 @@ const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.
     name: f.name,
     getFile: async () => ({ name: f.name, arrayBuffer: async () => new Uint8Array([f.tag]).buffer }),
   }));
+  // Records every {mode} a caller asks for, regardless of what's granted -- used by the
+  // permission-mode regression tests below, which check WHAT was requested (readwrite vs read),
+  // not just whether the fake grants it (a fake that grants everything regardless of mode is
+  // exactly why this bug went uncaught: real browsers only grant what's actually asked for).
+  window.__permissionModeCalls = [];
   window.__fakeFolderHandle = {
     name: 'MySongs',
     values: async function* () { for (const e of entries) yield e; },
-    queryPermission: async () => permission,
-    requestPermission: async () => 'granted',
+    queryPermission: async (opts) => { window.__permissionModeCalls.push({ fn: 'query', mode: opts && opts.mode }); return permission; },
+    requestPermission: async (opts) => { window.__permissionModeCalls.push({ fn: 'request', mode: opts && opts.mode }); return 'granted'; },
     // Default: nothing bundled already exists in this fake folder (chooseFolder's
     // copyDefaultsInto checks this before writing); tests that care about the copy-in behavior
     // itself override this after installFakeMidiFolder runs.
     getFileHandle: async () => { throw new Error('not found'); },
   };
-  window.showDirectoryPicker = async () => window.__fakeFolderHandle;
+  window.__showDirectoryPickerCalls = [];
+  window.showDirectoryPicker = async (opts) => { window.__showDirectoryPickerCalls.push(opts); return window.__fakeFolderHandle; };
 }, { files, permission });
 
 // The dropdown's local-folder entries have value "local:N"; helper to read them back as names.
@@ -542,6 +548,93 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
     return calls;
   });
   expect(written).toContain('bundled.mid');
+});
+
+// A folder picked/restored under only 'read' permission can list files, but saveFileAs's write
+// (getFileHandle().createWritable()) throws against a real browser's read-only grant and silently
+// falls back to a plain download -- the exact bug reported live ("Life save gives me a download
+// rather than saving to my local folder"). These fakes always grant whatever's asked regardless of
+// mode (see installFakeMidiFolder's own comment), so they can't reproduce the real throw -- what
+// they CAN and must verify is that 'readwrite' is what actually gets asked for in the first place.
+test('MidiFolder: choosing a folder requests readwrite permission, not just read', async ({ page }) => {
+  await page.goto('/');
+  await installFakeMidiFolder(page, { files: [] });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() =>
+    [...document.getElementById('melody-source').options].some(o => o.value === 'choose-folder'));
+  await page.evaluate(() => {
+    document.getElementById('melody-source').value = 'choose-folder';
+    document.getElementById('melody-source').dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => window.__showDirectoryPickerCalls.length > 0);
+  const mode = await page.evaluate(() => window.__showDirectoryPickerCalls[0] && window.__showDirectoryPickerCalls[0].mode);
+  expect(mode).toBe('readwrite');
+});
+
+test('MidiFolder: restoring a saved folder queries readwrite permission, not just read', async ({ page }) => {
+  await page.goto('/');
+  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 1 }], permission: 'granted' });
+  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => window.__permissionModeCalls.some((c) => c.fn === 'query'));
+  const call = await page.evaluate(() => window.__permissionModeCalls.find((c) => c.fn === 'query'));
+  expect(call.mode).toBe('readwrite');
+});
+
+test('MidiFolder: reconnecting a lapsed folder requests readwrite permission, not just read', async ({ page }) => {
+  await page.goto('/');
+  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 2 }], permission: 'prompt' });
+  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() =>
+    [...document.getElementById('melody-source').options].some(o => o.value === 'reconnect-folder'));
+
+  await page.locator('#melody-source').selectOption('reconnect-folder');
+  await page.waitForFunction(() => window.__permissionModeCalls.some((c) => c.fn === 'request'));
+  const call = await page.evaluate(() => window.__permissionModeCalls.find((c) => c.fn === 'request'));
+  expect(call.mode).toBe('readwrite');
+});
+
+// Files moved/renamed/added in the OS folder outside the app weren't picked up until one of a few
+// fixed trigger points (restore/reconnect/choose-folder/post-save) -- reported live ("moved files
+// in my local folder, didn't see the available options update"). Opening the dropdown now
+// re-lists in the background. Also verifies the fix doesn't silently reload the currently-loaded
+// file's content just because the player hovered the dropdown -- a real risk, since re-listing
+// re-sorts alphabetically and a plain numeric index could otherwise start pointing at a different
+// file after an external rename/add.
+test('MidiFolder: opening the dropdown re-lists the folder, picking up an externally added file', async ({ page }) => {
+  await page.goto('/');
+  await installFakeMidiFolder(page, { files: [{ name: 'Existing.mid', tag: 3 }], permission: 'granted' });
+  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 63);
+
+  expect(await sourceLocalOptionNames(page, 'melody-source')).toEqual(['Existing']);
+
+  // Simulate a file added externally, outside the app, after the folder was last listed.
+  await page.evaluate(() => {
+    const newEntry = {
+      kind: 'file', name: 'Added.mid',
+      getFile: async () => ({ name: 'Added.mid', arrayBuffer: async () => new Uint8Array([9]).buffer }),
+    };
+    const existing = window.__fakeFolderHandle.values;
+    window.__fakeFolderHandle.values = async function* () {
+      yield { kind: 'file', name: 'Existing.mid', getFile: async () => ({ name: 'Existing.mid', arrayBuffer: async () => new Uint8Array([3]).buffer }) };
+      yield newEntry;
+    };
+    void existing; // silence unused-var; replaced deliberately, not composed with the original
+  });
+
+  await page.locator('#melody-source').dispatchEvent('mousedown');
+  await page.waitForFunction(() =>
+    [...document.getElementById('melody-source').options].some(o => o.textContent === 'Added'));
+
+  expect(await sourceLocalOptionNames(page, 'melody-source')).toEqual(['Added', 'Existing']);
+  // The externally-added file appearing must not have reloaded the currently-playing content --
+  // parseMIDI should still have been called exactly once (the original load), not again just
+  // because the dropdown was opened.
+  expect(await page.evaluate(() => window.__parseMIDICalls.length)).toBe(1);
+  expect(await page.evaluate(() => MelodyMode.state.melody[0].midi)).toBe(63);
 });
 
 test('The F/T/Y/H/B/V hover-move and Space/G/Arrows rotate hints only show for Sandbox and Blast, which actually bind those keys', async ({ page }) => {
@@ -2065,6 +2158,30 @@ test('Life: Save As writes a YAML file that round-trips back to the same rule an
   expect(roundTripped.rule).toEqual(before.rule);
   const roundTrippedLive = roundTripped.cells.map(([p, q]) => `${p},${q}`).sort();
   expect(roundTrippedLive).toEqual(before.live.map(([k]) => k));
+});
+
+// LifeFolder is just FileFolder.create({...}) like MidiFolder (js/life.js) -- the readwrite-
+// permission fix lives entirely in the shared js/file-folder.js code the MidiFolder tests above
+// already cover in detail, but this confirms Life's own instance inherits it too, since the bug
+// was reported live specifically against Life's own Save As ("gives me a download rather than
+// saving to my local folder").
+test('LifeFolder: choosing a folder requests readwrite permission, not just read', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    window.__showDirectoryPickerCalls = [];
+    const fakeHandle = { name: 'MyAutomata', values: async function* () {}, getFileHandle: async () => { throw new Error('not found'); } };
+    window.showDirectoryPicker = async (opts) => { window.__showDirectoryPickerCalls.push(opts); return fakeHandle; };
+  });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() =>
+    [...document.getElementById('life-source').options].some(o => o.value === 'choose-folder'));
+  await page.evaluate(() => {
+    document.getElementById('life-source').value = 'choose-folder';
+    document.getElementById('life-source').dispatchEvent(new Event('change'));
+  });
+  await page.waitForFunction(() => window.__showDirectoryPickerCalls.length > 0);
+  const mode = await page.evaluate(() => window.__showDirectoryPickerCalls[0] && window.__showDirectoryPickerCalls[0].mode);
+  expect(mode).toBe('readwrite');
 });
 
 // The multi-state path (transition table, per-state sounds, [p,q,state] cells) is a genuinely

@@ -1472,6 +1472,52 @@ exemption from this invariant going forward.
 
 ---
 
+### INV-52: the shared local-folder tier writes into the folder and re-lists it live, not just once
+
+`js/file-folder.js`'s `FileFolder.create(config)` is the single shared local-folder mechanism
+behind `MidiFolder` (Melody/Compose, `.mid` files) and `LifeFolder` (Life, `.yaml` files) — see
+INV-28. Two bugs, both reported live against Life's own Save As, traced to this shared code
+rather than anything Life-specific:
+
+**Writes silently downgraded to a download.** `showDirectoryPicker()`, `queryPermission`, and
+`requestPermission` were all called with `{ mode: 'read' }` (or no `mode` at all, which defaults
+to `'read'`) — enough to *list* the folder, but `saveFileAs`'s own write
+(`getFileHandle(...).createWritable()`) requires `'readwrite'`. Against a real browser's
+permission model that throws (caught, logged only to `console.warn`, never surfaced to the
+player) and falls through to `saveFileAs`'s `<a download>` fallback — exactly "Save gives me a
+download rather than saving to my local folder." Fixed by requesting `'readwrite'` at all three
+call sites (`chooseFolder`, `restore`, `reconnect`). A folder granted under the old read-only
+default queries as not-granted on the next `restore()`, correctly surfacing the existing
+"Reconnect Folder" one-click flow rather than silently staying downgraded forever.
+
+**The dropdown only re-listed at four fixed trigger points.** `handle.values()` genuinely re-reads
+the OS on every call (Chrome doesn't cache directory contents) — the data was never stale, only
+the *trigger* to re-read it was missing. `listFiles` (the full re-list + auto-load-index-0 path)
+only ran from `restore`/`reconnect`/`chooseFolder`/post-`saveFileAs`, never from opening the
+dropdown itself, so a file moved/renamed/added on disk outside the app stayed invisible until one
+of those four actions happened to fire again. Fixed with a new `refreshFileList` — re-lists
+without touching what's currently loaded, triggered on the select's `mousedown`/`focus` (best
+effort only: a native `<select>` can't be told to await an async refresh before it paints, so the
+CURRENTLY opening dropdown may still show what was cached; the next one won't). Deliberately a
+separate method from `listFiles`, not a reuse of it: `listFiles` unconditionally loads index 0,
+which would have silently replaced the player's in-progress content just from hovering the
+dropdown. Since the listing re-sorts alphabetically on every read, a plain numeric index can point
+at a *different* file after an external rename/add/remove — `refreshFileList` re-finds the
+currently-loaded file by name in the fresh listing and corrects its index rather than trusting the
+old one.
+
+**Test:** `tests/desktop.spec.js` — "MidiFolder: choosing/restoring/reconnecting ... requests
+readwrite permission, not just read" (three call sites), "MidiFolder: opening the dropdown
+re-lists the folder, picking up an externally added file" (also asserts the currently-loaded
+file's content is untouched — `parseMIDI` called exactly once), "LifeFolder: choosing a folder
+requests readwrite permission, not just read" (confirms Life inherits the same shared-code fix).
+The existing fakes in these tests grant whatever permission mode is asked regardless of what's
+requested — by design, real `FileSystemDirectoryHandle`s don't grant more than requested, which is
+exactly how this bug went uncaught; the tests instead assert on *what was requested*, via a
+recorded `{fn, mode}` call log on the fake's `queryPermission`/`requestPermission`.
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
