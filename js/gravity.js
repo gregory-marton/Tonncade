@@ -37,7 +37,7 @@ const GravityMode = {
         rotation: 0,
         dropInterval: 1000, // ms
         timer: null,
-        difficulty: (typeof localStorage !== 'undefined' && localStorage.getItem('tonncade_gravity_difficulty')) || 'hard',
+        difficulty: DifficultyBarbell.migrateLevel('tonncade_gravity_difficulty', 3),
     },
 
     init: function() {
@@ -145,25 +145,17 @@ const GravityMode = {
     },
 
     randomPiece: function() {
-        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS;
+        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty - 1] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
     },
 
-    // Piece-size difficulty (task #39): easy=small pieces .. hard=tetrahexes only. Persisted, and
-    // reflected in the dumbbell-triplet control.
-    setDifficulty: function(diff) {
-        if (!Pieces.DIFFICULTY_KEYS[diff]) return;
-        this.state.difficulty = diff;
-        try { localStorage.setItem('tonncade_gravity_difficulty', diff); } catch (e) {}
-        this.updateDifficultyUI();
-    },
-
-    updateDifficultyUI: function() {
-        const order = { easy: 1, medium: 2, hard: 3 };
-        const lit = order[this.state.difficulty] || 3;
-        document.querySelectorAll('#gravity-difficulty .weight-icon').forEach((el, i) => {
-            el.classList.toggle('lit', i < lit);
-        });
+    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Persisted, and
+    // reflected in the shared DifficultyBarbell control.
+    setDifficulty: function(level) {
+        if (!Pieces.DIFFICULTY_KEYS[level - 1]) return;
+        this.state.difficulty = level;
+        try { localStorage.setItem('tonncade_gravity_difficulty', String(level)); } catch (e) {}
+        this._difficultyBarbell.setLevel(level);
     },
 
     spawnPiece: function() {
@@ -683,11 +675,20 @@ const GravityMode = {
     },
 
     setupEvents: function() {
-        // Dumbbell-triplet difficulty picker: click the Nth weight to set easy/medium/hard.
-        document.querySelectorAll('#gravity-difficulty .weight-icon').forEach(el => {
-            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js): click the Nth weight to
+        // set the piece-size level.
+        this._difficultyBarbell = DifficultyBarbell.create({
+            containerId: 'gravity-difficulty',
+            levelCount: 3,
+            labels: [
+                { title: 'Easy — small pieces', ariaLabel: 'Easy' },
+                { title: 'Medium', ariaLabel: 'Medium' },
+                { title: 'Hard — full four-cell pieces', ariaLabel: 'Hard' },
+            ],
+            onSelect: (level) => this.setDifficulty(level),
         });
-        this.updateDifficultyUI();
+        this._difficultyBarbell.render();
+        this._difficultyBarbell.setLevel(this.state.difficulty);
 
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();

@@ -220,7 +220,7 @@ test('midi note list fades past notes progressively by recency', async ({ page }
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 3;
     MelodyMode.updateDifficultyUI();
   });
@@ -241,7 +241,7 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   const currentName = await page.evaluate(() => {
-    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0; // would normally show melody[0] as current
     MelodyMode.updateDifficultyUI(5); // override to pivot on index 5 instead
     const el = document.querySelector('#melody-note-list [data-note-role="current"]');
@@ -262,7 +262,7 @@ test('playing the full melody preview live-updates the note list as it plays', a
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await page.evaluate(() => { MelodyMode.state.difficulty = 'easy'; });
+  await page.evaluate(() => { MelodyMode.state.difficulty = 1; });
 
   // resetGame() schedules an untracked 1s auto-kickoff of the "listen to the notes" teaching
   // intro that cleanupPlayback() can't cancel — let it fully play out and finish first so it
@@ -291,7 +291,7 @@ test('stopping preview restores the note list to reflect actual game progress', 
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.evaluate(() => {
-    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 1; // simulate the player having already gotten 1 note right
   });
 
@@ -2670,7 +2670,7 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
   const out = await page.evaluate(() => {
-    MelodyMode.state.difficulty = 'easy';
+    MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0;
     MelodyMode.updateDifficultyUI();
     const tokens = [...document.querySelectorAll('#melody-note-list .note-token[data-upcoming]')];
@@ -2732,10 +2732,14 @@ test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly
     const cellCount = await page.locator('#tonnetz-svg polygon.cell').count();
     expect(cellCount, `${mode}: lattice should render`).toBeGreaterThan(0);
     // ...and, for Blast/Gravity, the difficulty control lit up correctly (proof
-    // setupEvents/updateDifficultyUI ran, not just that currentMode flipped).
+    // setupEvents/DifficultyBarbell ran, not just that currentMode flipped). Reads the mode's own
+    // configured levelCount rather than a bare literal, so it can't silently drift if a mode's
+    // level count ever changes.
     if (mode === 'blast' || mode === 'gravity') {
+      const levelCount = await page.evaluate((m) =>
+        (m === 'blast' ? BlastMode : GravityMode)._difficultyBarbell.levelCount, mode);
       const lit = await page.locator(`#${mode}-difficulty .weight-icon.lit`).count();
-      expect(lit, `${mode}: default 'hard' difficulty should light all 3 weights`).toBe(3);
+      expect(lit, `${mode}: default (highest) difficulty should light all ${levelCount} weights`).toBe(levelCount);
     }
     expect(errors, `${mode}: no page errors`).toEqual([]);
     page.removeAllListeners('pageerror');
@@ -2759,8 +2763,9 @@ test('Melody: offline (no online folder) degrades to a random 10-note, one-octav
 // Task #93's dumbbell-barbell difficulty control was only ever applied to Blast/Gravity --
 // Melody's own difficulty (which note-list/Tonnetz hints show while drilling, not piece size)
 // was left behind as a plain <select>, noticed live and converted to match. Confirms both the
-// click-to-set wiring and the cumulative lit-icon count (1/2/3 for easy/medium/hard), same
-// pattern as Blast/Gravity's own barbell.
+// click-to-set wiring and the cumulative lit-icon count (1/2/3), same shared DifficultyBarbell
+// component as Blast/Gravity's own barbell (js/difficulty-barbell.js) -- levels are plain
+// integers, not word-keyed, so the underlying state is asserted as a number.
 test('Melody: the difficulty control is the same dumbbell-barbell as Blast/Gravity, not a dropdown', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -2771,15 +2776,15 @@ test('Melody: the difficulty control is the same dumbbell-barbell as Blast/Gravi
 
   const litCount = () => page.evaluate(() =>
     document.querySelectorAll('#melody-difficulty .weight-icon.lit').length);
-  expect(await litCount(), 'defaults to easy (1 lit)').toBe(1);
+  expect(await litCount(), 'defaults to level 1 (1 lit)').toBe(1);
 
   await weights.nth(2).click();
-  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe('hard');
-  expect(await litCount(), 'hard lights all 3').toBe(3);
+  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe(3);
+  expect(await litCount(), 'level 3 lights all 3').toBe(3);
 
   await weights.nth(1).click();
-  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe('medium');
-  expect(await litCount(), 'medium lights 2').toBe(2);
+  expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe(2);
+  expect(await litCount(), 'level 2 lights 2').toBe(2);
 });
 
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
@@ -2800,25 +2805,25 @@ test.describe('Piece-size difficulty presets (Blast/Gravity)', () => {
         return [...sizes].sort();
       }, { M, diff });
 
-      // Easy: only small pieces (never a full four-cell tetrahex).
-      const easy = await sizesFor(Mode, 'easy');
-      expect(Math.max(...easy), `${mode} easy should deal small pieces`).toBeLessThanOrEqual(3);
+      // Level 1: only small pieces (never a full four-cell tetrahex).
+      const level1 = await sizesFor(Mode, 1);
+      expect(Math.max(...level1), `${mode} level 1 should deal small pieces`).toBeLessThanOrEqual(3);
 
-      // Hard: exclusively four-cell tetrahexes (the current default game).
-      const hard = await sizesFor(Mode, 'hard');
-      expect(hard, `${mode} hard should deal only tetrahexes`).toEqual([4]);
+      // Level 3: exclusively four-cell tetrahexes (the current default game).
+      const level3 = await sizesFor(Mode, 3);
+      expect(level3, `${mode} level 3 should deal only tetrahexes`).toEqual([4]);
 
-      // Medium sits between -- includes 4-cell pieces but also at least one smaller size.
-      const medium = await sizesFor(Mode, 'medium');
-      expect(medium.includes(4) && Math.min(...medium) < 4, `${mode} medium should mix sizes`).toBe(true);
+      // Level 2 sits between -- includes 4-cell pieces but also at least one smaller size.
+      const level2 = await sizesFor(Mode, 2);
+      expect(level2.includes(4) && Math.min(...level2) < 4, `${mode} level 2 should mix sizes`).toBe(true);
 
-      // The dumbbell triplet: clicking the Nth weight sets that level and lights 1/2/3 of them.
-      for (const [diff, lit] of [['easy', 1], ['medium', 2], ['hard', 3]]) {
-        await page.click(`#${mode}-difficulty .weight-icon[data-difficulty="${diff}"]`);
+      // The dumbbell barbell: clicking the Nth weight sets that level and lights 1/2/3 of them.
+      for (const level of [1, 2, 3]) {
+        await page.click(`#${mode}-difficulty .weight-icon[data-difficulty="${level}"]`);
         const state = await page.evaluate((M) => (M === 'BlastMode' ? BlastMode : GravityMode).state.difficulty, Mode);
-        expect(state, `${mode} clicking ${diff} weight`).toBe(diff);
+        expect(state, `${mode} clicking level ${level} weight`).toBe(level);
         const litCount = await page.$$eval(`#${mode}-difficulty .weight-icon.lit`, els => els.length);
-        expect(litCount, `${mode} ${diff} should light ${lit} weights`).toBe(lit);
+        expect(litCount, `${mode} level ${level} should light ${level} weights`).toBe(level);
       }
     });
   }

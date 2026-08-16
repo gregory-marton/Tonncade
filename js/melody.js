@@ -48,7 +48,7 @@ const MelodyMode = {
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
         currentStreak: 0,      // Current streak (drives the stat bar-graph vs bestStreak)
         bestStreak: 0,         // Longest streak achieved
-        difficulty: 'easy',    // 'easy', 'medium', 'hard'
+        difficulty: 1,    // 1=full hints .. 3=no hints (see DifficultyBarbell, js/difficulty-barbell.js)
         hoverCell: { p: 0, q: 0 }, // Keyboard navigation hover cell
         reverseQwertyMap: {},      // Reverse mapping built in init()
 
@@ -201,12 +201,20 @@ const MelodyMode = {
 
         this.setupScrubMarker();
 
-        // Dumbbell-triplet difficulty picker (task #93's pattern, matching Blast/Gravity's own
-        // control) -- click the Nth weight to set easy/medium/hard.
-        document.querySelectorAll('#melody-difficulty .weight-icon').forEach((el) => {
-            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js, shared with Blast/Gravity)
+        // -- click the Nth weight to set the practice-hint level.
+        this._difficultyBarbell = DifficultyBarbell.create({
+            containerId: 'melody-difficulty',
+            levelCount: 3,
+            labels: [
+                { title: 'Easy — full note list and highlighted upcoming notes', ariaLabel: 'Easy' },
+                { title: 'Medium', ariaLabel: 'Medium' },
+                { title: 'Hard — no note list, play by ear', ariaLabel: 'Hard' },
+            ],
+            onSelect: (level) => this.setDifficulty(level),
         });
-        this.updateDifficultyBarbell();
+        this._difficultyBarbell.render();
+        this._difficultyBarbell.setLevel(this.state.difficulty);
 
         if (typeof MidiFolder !== 'undefined') {
             MidiFolder.setup(this, {
@@ -429,26 +437,13 @@ const MelodyMode = {
     },
 
     // No persistence (localStorage) -- matches this control's own prior behavior as a plain
-    // <select>, always defaulting to 'easy' each session; Blast/Gravity's own barbell does
+    // <select>, always defaulting to level 1 each session; Blast/Gravity's own barbell does
     // persist theirs, but changing that here would be an unrequested behavior change, not part
     // of just swapping the UI control to match their look.
-    setDifficulty: function(diff) {
-        if (diff !== 'easy' && diff !== 'medium' && diff !== 'hard') return;
-        this.state.difficulty = diff;
-        this.updateDifficultyBarbell();
+    setDifficulty: function(level) {
+        if (level < 1 || level > 3) return;
+        this.state.difficulty = level;
         this.updateDifficultyUI();
-    },
-
-    // Highlight 1/2/3 of the dumbbell icons for easy/medium/hard -- same cumulative-lit pattern
-    // as Blast/Gravity's own updateDifficultyUI (see js/blast.js), named differently here since
-    // Melody's OWN updateDifficultyUI already means something else entirely (repainting the
-    // note-list/Tonnetz practice hints, not lighting icons).
-    updateDifficultyBarbell: function() {
-        const order = { easy: 1, medium: 2, hard: 3 };
-        const lit = order[this.state.difficulty] || 1;
-        document.querySelectorAll('#melody-difficulty .weight-icon').forEach((el, i) => {
-            el.classList.toggle('lit', i < lit);
-        });
     },
 
     updateDifficultyUI: function(overrideIndex) {
@@ -464,7 +459,7 @@ const MelodyMode = {
 
         if (!listEl) return;
 
-        if (diff === 'hard' || this.state.melody.length === 0) {
+        if (diff === 3 || this.state.melody.length === 0) {
             listEl.innerHTML = '';
             return;
         }
@@ -477,7 +472,7 @@ const MelodyMode = {
         // specific notes, and each note token can carry a data-note-idx the drag logic reads.
         let displayNotes = [];
         const pastWindow = 3;
-        const futureWindow = diff === 'easy' ? 4 : 0; // Current + 3 ahead
+        const futureWindow = diff === 1 ? 4 : 0; // Current + 3 ahead
         const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
 
         // Octave-qualified (e.g. "E4", not just "E") -- a big board renders the same note NAME
@@ -506,7 +501,7 @@ const MelodyMode = {
         // between board and timeline. No frequency here -- it isn't useful on the timeline, and the
         // octave-qualified names already disambiguate pitch (INV-25).
         const UPCOMING_COLORS = ['var(--accent)', '#e6b23c', '#d16a8f']; // next, 2nd, 3rd
-        if (diff === 'easy') {
+        if (diff === 1) {
             for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
                 const midi = melody[i].midi;
                 const name = qualifiedName(midi);

@@ -90,11 +90,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <div class="control-buttons">
                         <button id="blast-reset" class="icon-btn" title="New game" aria-label="New game">↻</button>
                     </div>
-                    <div id="blast-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size">
-                        <button type="button" class="weight-icon" data-difficulty="easy" title="Easy — small pieces" aria-label="Easy"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                        <button type="button" class="weight-icon" data-difficulty="medium" title="Medium" aria-label="Medium"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                        <button type="button" class="weight-icon" data-difficulty="hard" title="Hard — full four-cell pieces" aria-label="Hard"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                    </div>
+                    <div id="blast-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"></div>
                     <div class="stats-panel">
                         <div class="stat-bar" role="img" aria-label="Lines cleared as a fraction of your best">
                             <div class="stat-bar-fill" id="blast-lines-fill"></div>
@@ -110,11 +106,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="gravity-start-pause">Pause</button>
                         <button id="gravity-reset">Restart</button>
                     </div>
-                    <div id="gravity-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size">
-                        <button type="button" class="weight-icon" data-difficulty="easy" title="Easy — small pieces" aria-label="Easy"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                        <button type="button" class="weight-icon" data-difficulty="medium" title="Medium" aria-label="Medium"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                        <button type="button" class="weight-icon" data-difficulty="hard" title="Hard — full four-cell pieces" aria-label="Hard"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                    </div>
+                    <div id="gravity-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"></div>
                     <div class="stats-panel">
                         <div class="stat-bar" role="img" aria-label="Lines cleared as a fraction of your best">
                             <div class="stat-bar-fill" id="gravity-lines-fill"></div>
@@ -147,19 +139,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
                          folder/song selectors so it routes into the drawer on mobile (see js/main.js),
                          out of the board's way. -->
-                    <!-- Vertical dumbbell-barbell triplet (task #93), matching Blast/Gravity's own
-                         difficulty control exactly -- this one was never converted when they were,
-                         a leftover plain <select>. Difficulty here means how much of the note-list/
-                         Tonnetz hinting shows while drilling (see MelodyMode.updateDifficultyUI,
-                         which repaints those hints -- distinct from the barbell's own lit-icon
-                         update, MelodyMode.updateDifficultyBarbell), not piece size like Blast/
-                         Gravity's own control, so its title text says so instead. -->
+                    <!-- Vertical dumbbell-barbell (js/difficulty-barbell.js, shared with Blast/
+                         Gravity). Difficulty here means how much of the note-list/Tonnetz hinting
+                         shows while drilling (see MelodyMode.updateDifficultyUI, which repaints
+                         those hints), not piece size like Blast/Gravity's own control -- its
+                         labels say so instead; the barbell itself is populated by JS. -->
                     <div id="melody-settings-group" class="control-group" style="margin-top: 6px;">
-                        <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints">
-                            <button type="button" class="weight-icon" data-difficulty="easy" title="Easy — full note list and highlighted upcoming notes" aria-label="Easy"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                            <button type="button" class="weight-icon" data-difficulty="medium" title="Medium" aria-label="Medium"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                            <button type="button" class="weight-icon" data-difficulty="hard" title="Hard — no note list, play by ear" aria-label="Hard"><svg class="dumbbell" viewBox="0 0 16 24" aria-hidden="true"><g fill="currentColor"><rect x="3" y="1" width="10" height="3" rx="1"/><rect x="6.5" y="4" width="3" height="4" rx="0.5"/><rect x="7" y="8" width="2" height="8"/><rect x="6.5" y="16" width="3" height="4" rx="0.5"/><rect x="3" y="20" width="10" height="3" rx="1"/></g></svg></button>
-                        </div>
+                        <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints"></div>
                     </div>
                     <div id="melody-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">
                         <button id="melody-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
@@ -422,6 +408,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/board.js"></script>
     <script src="js/render.js"></script>
     <script src="js/sandbox.js"></script>
+    <script src="js/difficulty-barbell.js"></script>
     <script src="js/blast.js"></script>
     <script src="js/gravity.js"></script>
     <script src="js/melody.js"></script>

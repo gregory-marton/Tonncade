@@ -32,7 +32,7 @@ const BlastMode = {
         isGameOver: false,
         activePiece: null,
         rotation: 0,
-        difficulty: (typeof localStorage !== 'undefined' && localStorage.getItem('tonncade_blast_difficulty')) || 'hard',
+        difficulty: DifficultyBarbell.migrateLevel('tonncade_blast_difficulty', 3),
         hoverCell: { p: 0, q: 0 },
         lastChordKey: null,     // sorted-pitch signature of the last MIDI chord played
         chordCandidateIndex: 0  // which of that chord's matching placements is currently shown
@@ -126,26 +126,17 @@ const BlastMode = {
     },
 
     randomPiece: function() {
-        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS;
+        const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty - 1] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
     },
 
-    // Piece-size difficulty (task #39): easy=small pieces .. hard=tetrahexes only. Persisted, and
-    // reflected in the dumbbell-triplet control. Takes effect for pieces dealt from here on.
-    setDifficulty: function(diff) {
-        if (!Pieces.DIFFICULTY_KEYS[diff]) return;
-        this.state.difficulty = diff;
-        try { localStorage.setItem('tonncade_blast_difficulty', diff); } catch (e) {}
-        this.updateDifficultyUI();
-    },
-
-    // Highlight 1/2/3 of the dumbbell icons for easy/medium/hard.
-    updateDifficultyUI: function() {
-        const order = { easy: 1, medium: 2, hard: 3 };
-        const lit = order[this.state.difficulty] || 3;
-        document.querySelectorAll('#blast-difficulty .weight-icon').forEach((el, i) => {
-            el.classList.toggle('lit', i < lit);
-        });
+    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Persisted, and
+    // reflected in the shared DifficultyBarbell control. Takes effect for pieces dealt from here on.
+    setDifficulty: function(level) {
+        if (!Pieces.DIFFICULTY_KEYS[level - 1]) return;
+        this.state.difficulty = level;
+        try { localStorage.setItem('tonncade_blast_difficulty', String(level)); } catch (e) {}
+        this._difficultyBarbell.setLevel(level);
     },
 
     refreshUI: function() {
@@ -271,11 +262,20 @@ const BlastMode = {
             };
         }
 
-        // Dumbbell-triplet difficulty picker: click the Nth weight to set easy/medium/hard.
-        document.querySelectorAll('#blast-difficulty .weight-icon').forEach(el => {
-            el.onclick = () => this.setDifficulty(el.dataset.difficulty);
+        // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js): click the Nth weight to
+        // set the piece-size level.
+        this._difficultyBarbell = DifficultyBarbell.create({
+            containerId: 'blast-difficulty',
+            levelCount: 3,
+            labels: [
+                { title: 'Easy — small pieces', ariaLabel: 'Easy' },
+                { title: 'Medium', ariaLabel: 'Medium' },
+                { title: 'Hard — full four-cell pieces', ariaLabel: 'Hard' },
+            ],
+            onSelect: (level) => this.setDifficulty(level),
         });
-        this.updateDifficultyUI();
+        this._difficultyBarbell.render();
+        this._difficultyBarbell.setLevel(this.state.difficulty);
 
         window.onmousemove = (e) => {
             if (this.state.isGameOver) return;
