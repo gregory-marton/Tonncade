@@ -22,12 +22,20 @@ global.window.matchMedia = function(query) {
         dispatchEvent: function() { return false; }
     };
 };
+// A real element's getBoundingClientRect always exists, even pre-layout (Node has no layout
+// engine at all here, so it can only ever report zero size) -- render.js's own callers already
+// have a documented zero-size fallback for exactly this ("before first paint"), so a zero rect is
+// the correct mock, not a workaround. Missing this entirely (rather than returning zeros) is what
+// threw "getBoundingClientRect is not a function" and broke `npm test`'s node step outright.
+const ZERO_RECT = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0 });
+
 global.document = {
     createElement: (tag) => ({
         style: {},
         setAttribute: () => {},
         appendChild: () => {},
         addEventListener: () => {},
+        getBoundingClientRect: ZERO_RECT,
         querySelector: () => ({ setAttribute: () => {}, appendChild: () => {}, addEventListener: () => {} })
     }),
     createElementNS: (ns, tag) => ({
@@ -35,6 +43,7 @@ global.document = {
         setAttribute: () => {},
         appendChild: () => {},
         addEventListener: () => {},
+        getBoundingClientRect: ZERO_RECT,
         classList: { add: () => {}, remove: () => {} }
     }),
     getElementById: (id) => {
@@ -46,6 +55,7 @@ global.document = {
                 addEventListener: (type, callback) => {
                     svgListeners[type] = callback;
                 },
+                getBoundingClientRect: ZERO_RECT,
                 classList: { add: () => {}, remove: () => {} },
                 querySelectorAll: () => []
             };
@@ -55,26 +65,27 @@ global.document = {
             setAttribute: () => {},
             appendChild: () => {},
             addEventListener: () => {},
+            getBoundingClientRect: ZERO_RECT,
             classList: { add: () => {}, remove: () => {} },
             querySelectorAll: () => []
         };
     },
     querySelectorAll: (selector) => {
         if (selector === '.mode-option') {
-            return [
-                { getAttribute: () => 'sandbox', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'melody', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'snake', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'blast', classList: { add: () => {}, remove: () => {} } },
-                { getAttribute: () => 'gravity', classList: { add: () => {}, remove: () => {} } }
-            ];
+            // Every mode, hand-maintained (this Node harness has no real index.html DOM to read
+            // data-mode from live, unlike the Playwright tests' own getModes() helper) -- keep in
+            // sync with index.html's .mode-option list by hand.
+            return ['sandbox', 'melody', 'snake', 'blast', 'gravity', 'compose', 'life'].map((mode) => (
+                { getAttribute: () => mode, classList: { add: () => {}, remove: () => {} } }
+            ));
         }
         return [];
     },
     querySelector: (selector) => {
         return {
             style: {},
-            classList: { add: () => {}, remove: () => {} }
+            classList: { add: () => {}, remove: () => {} },
+            getBoundingClientRect: ZERO_RECT,
         };
     },
     addEventListener: () => {},

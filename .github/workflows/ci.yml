@@ -73,10 +73,14 @@ jobs:
       - name: Install Playwright browsers (chromium + webkit)
         run: npx playwright install --with-deps chromium webkit
 
+      # `npm test` (not a bare `npx playwright test`) so the DOM-id check
+      # (scripts/check-dom-ids.js) and the node-VM unit suite (tests/run_tests.js) actually run in
+      # CI too, not just locally -- they didn't for a while, which is exactly how a script-load-
+      # order bug and a missing DOM-mock method both went unnoticed until someone hit them by hand.
       - name: Run the full suite (generates screenshots/)
         env:
           CI: '1'
-        run: npx playwright test
+        run: npm test
 
       - name: Upload Playwright HTML report
         if: always()
