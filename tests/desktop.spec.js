@@ -745,17 +745,21 @@ test('Compose: Undo removes only the most recently added note', async ({ page })
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
 
+  // Recorded via the real mutator (tapCell), not a direct state assignment -- #17's undo is now a
+  // real history stack (js/undo-stack.js), not a naive notes.pop(), so it only has something to
+  // reverse if the mutator that pushes to it actually ran.
   await page.evaluate(() => {
-    ComposeMode.state.notes = [
-      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
-      { midi: 64, p: 1, q: 0, time: 0.5, duration: 0.4 },
-    ];
+    ComposeMode.state.isRecording = true;
+    ComposeMode.tapCell(0, 0);
+    ComposeMode.tapCell(1, 0);
+    ComposeMode.state.isRecording = false;
   });
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(2);
 
   await page.locator('#compose-undo').click();
 
-  const notes = await page.evaluate(() => ComposeMode.state.notes);
-  expect(notes).toEqual([{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]);
+  const notes = await page.evaluate(() => ComposeMode.state.notes.map(n => n.midi));
+  expect(notes).toEqual([await page.evaluate(() => Tonnetz.getMidi(0, 0))]);
   expect(await page.locator('#compose-note-count').textContent()).toBe('1');
 });
 
@@ -3428,3 +3432,156 @@ test('Life: loading a new automaton clears the undo history', async ({ page }) =
 });
 
 
+
+
+
+// ────────────────────────────────────────────────────────────────────────
+// Compose's undo was a naive notes.pop() -- correct only for "the last note I just recorded",
+// silently wrong (or a no-op) after delete/rotate/translate/paste-group. Extended to the same
+// UndoStack mechanism (js/undo-stack.js) as Sandbox/Blast/Life, per issue #17 follow-up.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Compose: Undo reverses a recorded chord (multiple simultaneous notes) as ONE action', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [];
+    ComposeMode.state.chordBuffer = [
+      { midi: 60, p: 0, q: 0 },
+      { midi: 64, p: 1, q: 0 },
+    ];
+    ComposeMode.state.chordBufferTime = 0;
+    ComposeMode.flushChordBuffer();
+  });
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(2);
+  await page.locator('#compose-undo').click();
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(0); // both notes gone, one undo
+});
+
+test('Compose: Undo reverses Delete, restoring the exact prior notes and selection', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const before = await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [1];
+    ComposeMode.deleteSelected();
+    return null;
+  });
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(1);
+  await page.locator('#compose-undo').click();
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes).toEqual([
+    { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+    { midi: 64, p: 1, q: 0, time: 0.5, duration: 0.4 },
+  ]);
+  expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([1]);
+});
+
+test('Compose: Undo reverses Insert, including the time-shift it applied to LATER notes', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  // Inserting between two existing notes (not at the end) -- the inserted note ends up in the
+  // MIDDLE of the array, and a later note (not the inserted one) is what's last. A naive
+  // notes.pop() would incorrectly remove that later note instead of the one actually inserted,
+  // and would leave its time-shift unreverted -- this scenario is what actually distinguishes
+  // real inversion from a coincidentally-matching pop().
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 2, q: 0, time: 1.0, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [0];
+    ComposeMode.insertAfterSelected(1, 0);
+  });
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(3);
+  await page.locator('#compose-undo').click();
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes).toEqual([
+    { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+    { midi: 64, p: 2, q: 0, time: 1.0, duration: 0.4 },
+  ]);
+});
+
+test('Compose: Undo reverses a translate (drag) of the selection', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.state.selectedIndices = [0];
+    ComposeMode.translateSelection(1, 0);
+  });
+  expect(await page.evaluate(() => ComposeMode.state.notes[0].p)).toBe(1);
+  await page.locator('#compose-undo').click();
+  const note = await page.evaluate(() => ComposeMode.state.notes[0]);
+  expect(note).toEqual({ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 });
+});
+
+test('Compose: Undo reverses a rotate of the selection around its pivot', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 67, p: 1, q: 0, time: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.state.selectedIndices = [0, 1];
+    ComposeMode.rotateSelection(1);
+  });
+  const rotated = await page.evaluate(() => ({ p: ComposeMode.state.notes[1].p, q: ComposeMode.state.notes[1].q }));
+  expect(rotated).not.toEqual({ p: 1, q: 0 });
+  await page.locator('#compose-undo').click();
+  const restored = await page.evaluate(() => ({ p: ComposeMode.state.notes[1].p, q: ComposeMode.state.notes[1].q, midi: ComposeMode.state.notes[1].midi }));
+  expect(restored).toEqual({ p: 1, q: 0, midi: 67 });
+});
+
+test('Compose: Undo reverses a paste-group (#82) of MULTIPLE notes as one action, restoring notes and selection', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  // Pre-existing note PLUS a 2-note paste -- a naive notes.pop() would remove only the very last
+  // pasted note, leaving one pasted note behind; a real inversion removes both and nothing else.
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 55, p: -1, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.state.selectedIndices = [];
+    ComposeMode.state.groupClipboard = [
+      { midi: 60, p: 0, q: 0, relTime: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, relTime: 0.5, duration: 0.4 },
+    ];
+    ComposeMode.pasteGroup();
+  });
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(3);
+  await page.locator('#compose-undo').click();
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes).toEqual([{ midi: 55, p: -1, q: 0, time: 0, duration: 0.4 }]);
+  expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([]);
+});
+
+test('Compose: Undo reverses Clear', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => { ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]; });
+  await page.locator('#compose-clear').click();
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(0);
+  await page.locator('#compose-undo').click();
+  const notes = await page.evaluate(() => ComposeMode.state.notes);
+  expect(notes).toEqual([{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }]);
+});
+
+test('Compose: loading a file clears the undo history', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.state.selectedIndices = [0];
+    ComposeMode.deleteSelected(); // pushes an undo entry
+  });
+  const bytes = await page.evaluate(() => Array.from(new Uint8Array(MelodyMode.writeMIDI([{ midi: 62, time: 0, duration: 0.4 }]))));
+  await page.evaluate((bytes) => {
+    ComposeMode.loadMelodyFromArrayBuffer(new Uint8Array(bytes).buffer, 'test.mid');
+  }, bytes);
+  const sizeBeforeUndo = await page.evaluate(() => ComposeMode.state.notes.length);
+  await page.locator('#compose-undo').click();
+  expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op
+});

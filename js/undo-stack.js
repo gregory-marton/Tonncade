@@ -21,7 +21,7 @@ through which recipients can access the Corresponding Source.
 @licend  The above is the entire license notice
 for the JavaScript code in this file.
 */
-// undo-stack.js - a plain LIFO stack of inversion closures, shared by Sandbox/Blast/Life (#17).
+// undo-stack.js - a plain LIFO stack of inversion closures, shared by Sandbox/Blast/Life/Compose (#17).
 // Each mode's own mutator pushes a closure that undoes exactly what it just did (not a typed
 // entry + a switch-statement inverter elsewhere -- the mutator itself is what knows how to
 // invert its own change, so that's where the inversion logic lives). Follows this project's own

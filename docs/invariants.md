@@ -1588,13 +1588,15 @@ from the container-area effect, since the viewport itself is never resized in th
 
 Issue #17 asked for Undo, scoped explicitly per mode rather than uniformly: Sandbox and Blast get
 it (placement mistakes are the whole point of the request — "one user tried to move and
-accidentally placed a lot"); Compose already had its own (`js/compose.js`'s `undo()`, unchanged
-here); Life gets it for **human edits only, never simulation effects** (running the automaton
-forward isn't a mistake to correct — it's the whole point of watching one run); Melody, Snake, and
-Gravity deliberately don't (Melody tolerates wrong notes instead of rewinding them; Snake and
-Gravity are continuous real-time play with no discrete, reversible "placement moment" the way
-Blast has one — Gravity's pieces settle and keep free-falling every tick indefinitely, never
-locking into a single undo-able event).
+accidentally placed a lot"); Compose already had a narrow one (`js/compose.js`'s `undo()`, a plain
+`notes.pop()` — extended below, not left as-is, since it only correctly reversed "the last note I
+just recorded" and silently did the wrong thing after Delete/rotate/translate/paste-group); Life
+gets it for **human edits only, never simulation effects** (running the automaton forward isn't a
+mistake to correct — it's the whole point of watching one run); Melody, Snake, and Gravity
+deliberately don't (Melody tolerates wrong notes instead of rewinding them; Snake and Gravity are
+continuous real-time play with no discrete, reversible "placement moment" the way Blast has one —
+Gravity's pieces settle and keep free-falling every tick indefinitely, never locking into a single
+undo-able event).
 
 **Shared mechanism**: `js/undo-stack.js`'s `UndoStack.create()` — a plain LIFO stack of inversion
 closures, one per mode (`state.undoStack`), following this project's established factory
@@ -1602,8 +1604,7 @@ convention (`createBoard(shape)`, `FileFolder.create(config)`, `DifficultyBarbel
 Each mutator pushes a closure that reverses exactly what it just did, at the moment it changes
 state — the mutator itself is what knows how to invert its own change, not a typed entry plus a
 switch-statement inverter living somewhere else. `undo()` pops and runs the most recent one, then
-redraws once; an empty stack is a silent no-op (matching Compose's own existing `notes.pop()`
-undo, which likewise does nothing on an empty array).
+redraws once; an empty stack is a silent no-op.
 
 - **Sandbox** (`js/sandbox.js`): `placePiece`, both pickup call sites (`handleAction`'s pickup
   branch and `pickupPieceAt`), and `pasteClipboard` each push their own inversion. Pickup and
@@ -1638,17 +1639,34 @@ undo, which likewise does nothing on an empty array).
   the step itself — `state.generation` is never decremented by `undo()`. `loadAutomaton` clears
   the undo history (a new automaton's rule/live cells is a fresh start, not a correction to make).
 
+- **Compose** (`js/compose.js`): the most mutators of any mode — `tapCell`'s record branch and
+  `flushChordBuffer` (a whole recorded chord is ONE undo action, not one per note, since all its
+  notes landed together), `deleteSelected` and `clear` (both wholesale-*replace* `state.notes`, so
+  the prior array reference is simply snapshotted and restored, same shape as Life's `clear`/
+  `reset`), and `insertAfterSelected`/`translateSelection`/`rotateSelection`/`pasteGroup` (all
+  mutate existing note objects **in place** — `n.time`/`n.p`/`n.q`/`n.midi` — so each snapshots
+  the *prior* values of every note it's about to touch, before touching it, and restores those
+  exact values on undo, rather than trying to recompute an inverse transform). `selectedIndices`
+  is restored alongside `notes` by every closure that changes it, so the UI selection stays
+  coherent after an undo, not just the note data. `loadMelodyFromArrayBuffer` clears the undo
+  history (a freshly-loaded file is a fresh start, matching Blast/Life's own boundary).
+
 **Test:** `tests/desktop.spec.js` — "Sandbox: Undo reverses a placement/pickup/paste", "Sandbox:
 Undo on an empty history is a silent no-op", "Blast: Undo reverses a placement" (plain, and the
 line-clear-cascade case, asserting the board's exact pre-placement `Map` contents round-trip),
 "Blast: Undo reverses a paste", "Blast: New Game clears the undo history", "Life: Undo reverses a
 single cell toggle", "Life: Undo reverses Clear and Reset", "Life: a simulation step is never
 undo-able" (asserts `generation` is unaffected by `undo()` after a Step), "Life: Undo reverses a
-paste", "Life: loading a new automaton clears the undo history". `tests/invariants.spec.js` —
-"INV-48: Sandbox/Blast/Life's undo history survives a switch away and back untouched" (each
-mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as Melody's
-own `cleanStreak`, INV-51 — asserted directly since `paintedFingerprint`'s black-box DOM check has
-no visible representation of undo history to catch a regression here).
+paste", "Life: loading a new automaton clears the undo history", "Compose: Undo reverses a
+recorded chord/Delete/Insert/translate/rotate/paste-group/Clear" (the Insert and paste-group cases
+deliberately use scenarios where a naive `notes.pop()` would coincidentally produce the same
+result as a real inversion for a *simpler* scenario — multi-note, non-trailing-position setups —
+so the test actually discriminates between the two, confirmed red against the old `pop()` code
+before landing), "Compose: loading a file clears the undo history". `tests/invariants.spec.js` —
+"INV-48: Sandbox/Blast/Life/Compose's undo history survives a switch away and back untouched"
+(each mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as
+Melody's own `cleanStreak`, INV-51 — asserted directly since `paintedFingerprint`'s black-box DOM
+check has no visible representation of undo history to catch a regression here).
 
 ---
 

@@ -25,11 +25,10 @@ for the JavaScript code in this file.
  * compose.js - Compose Mode: record a melody by tapping cells in real time, play it back, and
  * save it as a Standard MIDI File -- or load an existing one to keep working on.
  *
- * v1 scope is deliberately narrow (see docs/invariants.md and next_steps.md #27): Undo (remove
- * the most recently added note) and Clear are the only editing primitives. Per-note drag-to-
- * reposition/retime, a timeline/piano-roll view, multi-select, and inserting a note into the
- * middle of an existing sequence are all real interaction-design work saved for later, not
- * silently expanded into here.
+ * Undo (js/undo-stack.js, #17) reverses record/delete/insert/translate/rotate/paste-group/Clear,
+ * each via its own inversion closure -- see docs/invariants.md's INV-54. A full timeline/
+ * piano-roll view and true per-note drag gestures (as opposed to the discrete translate/rotate
+ * controls that already exist) remain real interaction-design work saved for later.
  */
 
 const ComposeMode = {
@@ -61,7 +60,10 @@ const ComposeMode = {
         metronomeTimer: null,
         chordBuffer: [],       // touches pending a shared time value -- see recordTouch
         chordBufferTime: 0,
-        chordBufferTimer: null
+        chordBufferTimer: null,
+        undoStack: UndoStack.create(), // #17: reverses the last edit -- see undo(). Cleared on
+                                        // Clear/loading a file, since undoing past that boundary
+                                        // into whatever existed before doesn't mean anything.
     },
 
     DEFAULT_DURATION: 0.4,
@@ -271,7 +273,12 @@ const ComposeMode = {
             Render.highlightByMidi(midi, 250);
             Synth.playNote(midi);
             const time = (performance.now() - this.state.recordStartTime) / 1000;
-            this.state.notes.push({ midi, p, q, time, duration: this.DEFAULT_DURATION });
+            const note = { midi, p, q, time, duration: this.DEFAULT_DURATION };
+            this.state.notes.push(note);
+            this.state.undoStack.push(() => { // #17
+                const idx = this.state.notes.indexOf(note);
+                if (idx >= 0) this.state.notes.splice(idx, 1);
+            });
             this.updateStats();
             return;
         }
@@ -330,9 +337,17 @@ const ComposeMode = {
         const time = this.state.chordBufferTime;
         this.state.chordBuffer = [];
         this.state.chordBufferTimer = null;
-        buffer.forEach(({ midi, p, q }) => {
-            this.state.notes.push({ midi, p, q, time, duration: this.DEFAULT_DURATION });
+        const added = buffer.map(({ midi, p, q }) => {
+            const note = { midi, p, q, time, duration: this.DEFAULT_DURATION };
+            this.state.notes.push(note);
+            return note;
         });
+        // #17: the whole chord is ONE undo action (all fingers landed together), not one per note.
+        if (added.length) {
+            this.state.undoStack.push(() => {
+                this.state.notes = this.state.notes.filter((n) => !added.includes(n));
+            });
+        }
         this.updateStats();
     },
 
@@ -373,8 +388,14 @@ const ComposeMode = {
             }
         });
 
-        this.state.notes = kept;
+        const prevNotes = this.state.notes; // #17: notes is REPLACED below, never mutated in
+        const prevSelected = this.state.selectedIndices; // place, so the old array/reference is
+        this.state.notes = kept;             // safe to snapshot and restore wholesale.
         this.state.selectedIndices = [];
+        this.state.undoStack.push(() => {
+            this.state.notes = prevNotes;
+            this.state.selectedIndices = prevSelected;
+        });
         this.updateStats();
         this.updateEditControls();
         this.refreshBoard();
@@ -390,9 +411,20 @@ const ComposeMode = {
         const insertTime = anchor.time + anchor.duration;
         const newNote = { midi, p, q, time: insertTime, duration: anchor.duration };
 
+        // #17: every later note shifts in place (mutated, not replaced) -- snapshot exactly which
+        // ones and their prior .time BEFORE shifting, so undo can put each back precisely.
+        const shifted = this.state.notes.filter(n => n.time >= insertTime).map(n => ({ note: n, prevTime: n.time }));
+        const prevSelected = this.state.selectedIndices;
+
         this.state.notes.forEach(n => { if (n.time >= insertTime) n.time += newNote.duration; });
         this.state.notes.splice(idx + 1, 0, newNote);
         this.state.selectedIndices = [idx + 1];
+        this.state.undoStack.push(() => {
+            const i = this.state.notes.indexOf(newNote);
+            if (i >= 0) this.state.notes.splice(i, 1);
+            shifted.forEach(({ note, prevTime }) => { note.time = prevTime; });
+            this.state.selectedIndices = prevSelected;
+        });
 
         Render.highlightByMidi(midi, 250);
         Synth.playNote(midi);
@@ -406,11 +438,19 @@ const ComposeMode = {
     // clean transposition, not a per-note special case.
     translateSelection: function(dp, dq) {
         if (dp === 0 && dq === 0) return;
+        // #17: mutates existing note objects in place -- snapshot each one's prior p/q/midi first.
+        const prior = this.state.selectedIndices.map(i => {
+            const n = this.state.notes[i];
+            return { note: n, p: n.p, q: n.q, midi: n.midi };
+        });
         this.state.selectedIndices.forEach(i => {
             const n = this.state.notes[i];
             n.p += dp;
             n.q += dq;
             n.midi = Tonnetz.getMidi(n.p, n.q);
+        });
+        this.state.undoStack.push(() => {
+            prior.forEach(({ note, p, q, midi }) => { note.p = p; note.q = q; note.midi = midi; });
         });
         this.updateStats();
         this.refreshBoard();
@@ -423,6 +463,10 @@ const ComposeMode = {
         if (this.state.selectedIndices.length === 0) return;
         const pivotIdx = this.state.selectedIndices[0];
         const pivot = this.state.notes[pivotIdx];
+        // #17: mutates existing note objects in place -- snapshot each one's prior p/q/midi first.
+        const prior = this.state.selectedIndices
+            .filter(i => i !== pivotIdx)
+            .map(i => { const n = this.state.notes[i]; return { note: n, p: n.p, q: n.q, midi: n.midi }; });
         this.state.selectedIndices.forEach(i => {
             if (i === pivotIdx) return;
             const n = this.state.notes[i];
@@ -432,6 +476,11 @@ const ComposeMode = {
             n.q = pivot.q + rotated.q;
             n.midi = Tonnetz.getMidi(n.p, n.q);
         });
+        if (prior.length) {
+            this.state.undoStack.push(() => {
+                prior.forEach(({ note, p, q, midi }) => { note.p = p; note.q = q; note.midi = midi; });
+            });
+        }
         this.updateStats();
         this.refreshBoard();
     },
@@ -473,11 +522,19 @@ const ComposeMode = {
         if (this.state.groupClipboard.length === 0) return;
         const playhead = this.state.notes.reduce((t, n) => Math.max(t, n.time + n.duration), 0);
         const newIndices = [];
+        const added = [];
         this.state.groupClipboard.forEach(c => {
             newIndices.push(this.state.notes.length);
-            this.state.notes.push({ midi: c.midi, p: c.p, q: c.q, time: playhead + c.relTime, duration: c.duration });
+            const note = { midi: c.midi, p: c.p, q: c.q, time: playhead + c.relTime, duration: c.duration };
+            this.state.notes.push(note);
+            added.push(note);
         });
+        const prevSelected = this.state.selectedIndices; // #17
         this.state.selectedIndices = newIndices;
+        this.state.undoStack.push(() => {
+            this.state.notes = this.state.notes.filter((n) => !added.includes(n));
+            this.state.selectedIndices = prevSelected;
+        });
         this.updateStats();
         this.refreshBoard();
         this.updateEditControls();
@@ -574,15 +631,24 @@ const ComposeMode = {
         this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
     },
 
+    // #17: reverses the most recent edit -- record/chord/delete/insert/translate/rotate/paste/
+    // Clear -- see js/undo-stack.js. Was a plain notes.pop() before, which only correctly
+    // reversed "the last note I just recorded"; silently did the wrong thing (or nothing useful)
+    // after delete/rotate/translate/paste-group. Silently does nothing on an empty stack.
     undo: function() {
-        this.state.notes.pop();
-        this.state.selectedIndices = [];
+        if (!this.state.undoStack.undo()) return;
         this.updateStats();
         this.updateEditControls();
         this.refreshBoard();
     },
 
     clear: function() {
+        const prevNotes = this.state.notes; // #17
+        const prevSelected = this.state.selectedIndices;
+        this.state.undoStack.push(() => {
+            this.state.notes = prevNotes;
+            this.state.selectedIndices = prevSelected;
+        });
         this.stopPlayback();
         this.stopRecording();
         this.state.notes = [];
@@ -634,6 +700,7 @@ const ComposeMode = {
                 return { midi: note.midi, p: coord.p, q: coord.q, time: note.time, duration: note.duration };
             });
             this.state.selectedIndices = [];
+            this.state.undoStack.clear(); // #17: a freshly-loaded file is a fresh start
 
             this.stopPlayback();
             this.stopRecording();

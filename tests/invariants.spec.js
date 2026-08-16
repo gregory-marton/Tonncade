@@ -2141,12 +2141,13 @@ test.describe('Invariant tests', () => {
   });
 
   // Issue #17's undo history (state.undoStack, js/undo-stack.js) is untouched by cleanup()/
-  // init()'s resume branch in Sandbox/Blast/Life -- only an explicit New Game (Blast's reset())
-  // or loading a new automaton (Life's loadAutomaton()) clears it, same INV-48 shape as
-  // Melody's cleanStreak above. paintedFingerprint() can't see it (no DOM representation), so
-  // asserted directly: place/toggle something, switch away and back, undo, confirm it still
-  // reverses the pre-switch action rather than being silently reset to empty.
-  test('INV-48: Sandbox/Blast/Life\'s undo history survives a switch away and back untouched', async ({ page }) => {
+  // init()'s resume branch in Sandbox/Blast/Life/Compose -- only an explicit New Game (Blast's
+  // reset()) or loading a new automaton/file (Life's loadAutomaton(), Compose's
+  // loadMelodyFromArrayBuffer()) clears it, same INV-48 shape as Melody's cleanStreak above.
+  // paintedFingerprint() can't see it (no DOM representation), so asserted directly: place/toggle/
+  // record something, switch away and back, undo, confirm it still reverses the pre-switch action
+  // rather than being silently reset to empty.
+  test('INV-48: Sandbox/Blast/Life/Compose\'s undo history survives a switch away and back untouched', async ({ page }) => {
     await page.goto('/');
 
     await switchTo(page, 'sandbox');
@@ -2167,6 +2168,14 @@ test.describe('Invariant tests', () => {
     await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
     await page.evaluate(() => LifeMode.toggleCell(20, 20));
 
+    await switchTo(page, 'compose');
+    await page.evaluate(() => {
+      ComposeMode.state.notes = [];
+      ComposeMode.state.isRecording = true;
+      ComposeMode.tapCell(0, 0);
+      ComposeMode.state.isRecording = false;
+    });
+
     await switchTo(page, 'sandbox');
     await page.evaluate(() => SandboxMode.undo());
     expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
@@ -2179,5 +2188,9 @@ test.describe('Invariant tests', () => {
     await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
     await page.evaluate(() => LifeMode.undo());
     expect(await page.evaluate(() => LifeMode.state.live.has('20,20'))).toBe(false);
+
+    await switchTo(page, 'compose');
+    await page.evaluate(() => ComposeMode.undo());
+    expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(0);
   });
 });
