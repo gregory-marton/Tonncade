@@ -46,5 +46,9 @@
   {
     "name": "Consonant Bloom",
     "file": "consonant-bloom.yaml"
+  },
+  {
+    "name": "Turing Eater Demo",
+    "file": "turing-eater-demo.yaml"
   }
 ]
