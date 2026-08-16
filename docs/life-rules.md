@@ -173,15 +173,29 @@ Such a file uses `states`, `transition`, and `order` instead of `rule`:
 
 ```yaml
 states: 3            # number of states (0 = empty, then 1..states-1)
-order: "21"          # table index order: "21" = transition[count2][count1], "12" = the reverse
-transition:          # a ragged matrix; entry = the cell's next state
-  - [0, 1, 2, 1, 2, 0, 0]
-  - [0, 2, 2, 2, 1, 1]
-  - [0, 0, 2, 2, 0]
-  - [0, 2, 2, 0]
-  - [0, 0, 2]
-  - [2, 0]
-  - [0]
+order: "21"          # table index order: "21" = transition[count2][count1]
+# The `order` property dictates the axes of the matrix below.
+# If "21", the ROW index (outer array) is the count of neighbors in State 2.
+# The COLUMN index (inner array) is the count of neighbors in State 1.
+transition:          
+  - [0, 1, 2, 1, 2, 0, 0] # 0 neighbors in State 2
+  - [0, 2, 2, 2, 1, 1]    # 1 neighbor in State 2
+  - [0, 0, 2, 2, 0]       # 2 neighbors in State 2
+  - [0, 2, 2, 0]          # 3 neighbors in State 2
+  - [0, 0, 2]             # 4 neighbors in State 2
+  - [2, 0]                # 5 neighbors in State 2
+  - [0]                   # 6 neighbors in State 2
+```
+
+### Expanding the Transition Space (Tones and Semitones)
+Currently, the `transition` matrix above only accounts for the 6 adjacent hexes (the "consonant ring"). 
+However, because the Tonnetz explicitly models extended intervals (tones and semitones as secondary neighbors), 
+the multi-state transition space *can* mathematically be expanded to consider them.
+
+If a rule were to consider all 12 closest neighbors (6 adjacent consonants + 6 secondary tones/semitones), 
+the state machine would need either a 4-dimensional matrix (e.g., `transition[adj_s2][adj_s1][sec_s2][sec_s1]`) 
+or a flattened rule-list evaluation system similar to the `birth`/`survival` clauses in 2-state rules. 
+This expansion would allow completely novel automata that compute based on dissonant proximity!
 sounds:              # OPTIONAL per-state sound specs; each cell still sounds its own getMidi(p,q)
   - { state: 1, velocity: 95, duration: 0.35 }   # head: bright and short
   - { state: 2, velocity: 55, duration: 0.7 }    # tail: softer and longer
