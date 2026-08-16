@@ -38,5 +38,9 @@
   {
     "name": "Beehive Glider Burster",
     "file": "glider-burster.yaml"
+  },
+  {
+    "name": "Beehive Glider Eater",
+    "file": "beehive-eater.yaml"
   }
 ]
