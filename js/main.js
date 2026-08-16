@@ -248,21 +248,22 @@ const App = {
             this.setupMobileControls();
         });
 
-        // Pannable modes (Sandbox/Melody/Compose) refit their aspect-matched viewBox only when
-        // redrawn, and -- unlike the restricted modes, which each run their own ResizeObserver on
-        // #game-container -- nothing else redraws them on a resize. Without this their viewBox
-        // stays matched to the size at mode entry and letterboxes after any resize (see
-        // Render.panView / INV-44). A ResizeObserver (not the synchronous window 'resize' event)
-        // for the same reason the restricted modes use one: it fires AFTER layout settles, so it
-        // measures the final container size rather than a mid-transition one (a real bug on
-        // mobile-landscape, where the drawer's own reflow lands a frame after the resize event).
-        // Scoped to the pannable modes so the restricted modes aren't refreshed on top of their
-        // own observers.
+        // Pannable modes (everything not in Render.RESTRICTED_MODES -- Sandbox/Melody/Compose/Life)
+        // refit their aspect-matched viewBox only when redrawn, and -- unlike the restricted modes,
+        // which each run their own ResizeObserver on #game-container -- nothing else redraws them
+        // on a resize. Without this their viewBox stays matched to the size at mode entry and
+        // letterboxes after any resize (see Render.panView / INV-44). A ResizeObserver (not the
+        // synchronous window 'resize' event) for the same reason the restricted modes use one: it
+        // fires AFTER layout settles, so it measures the final container size rather than a
+        // mid-transition one (a real bug on mobile-landscape, where the drawer's own reflow lands
+        // a frame after the resize event). Checked against Render.RESTRICTED_MODES rather than a
+        // second hardcoded mode list, so a new pannable mode (like Life was) is covered
+        // automatically instead of silently missing its resize refit the way Life's own did.
         if (typeof ResizeObserver !== 'undefined') {
             const gc = document.getElementById('game-container');
             if (gc) {
                 this._panResizeObserver = new ResizeObserver(() => {
-                    if (['sandbox', 'melody', 'compose'].includes(this.currentMode)) {
+                    if (typeof Render !== 'undefined' && !Render.RESTRICTED_MODES.includes(this.currentMode)) {
                         const refresh = this.modeRefreshFns[this.currentMode];
                         if (refresh) refresh();
                     }
@@ -1428,6 +1429,7 @@ const App = {
         melody: () => MelodyMode.refreshBoard(),
         snake: () => SnakeMode.refreshBoard(),
         compose: () => ComposeMode.refreshBoard(),
+        life: () => LifeMode.refreshLattice(),
     },
 
     // A hexagon has 60-degree self-symmetry, so a hex lattice looks like a clean, uniformly-

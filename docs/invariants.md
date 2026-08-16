@@ -813,7 +813,9 @@ found via the same audit, not new instances.
   first time as a direct result.
 - **Mode-triplet interaction** ("switching Sandbox -> Gravity -> Sandbox...", "...-> Blast -> ...")
   only ever checked two specific paths, both starting and ending at Sandbox. Generalized to a
-  sweep over all 6x6x6=216 possible mode triplets: whatever the *final* mode is, `#palette`/
+  sweep over all N³ possible mode triplets (N = however many modes actually exist, fetched from
+  the live UI, not a fixed number written into the test -- N³ was 216 at 6 modes, became 343 the
+  moment Life shipped as the 7th, with no test edit required): whatever the *final* mode is, `#palette`/
   `#piece-list` (a single shared DOM element repopulated differently per mode — Sandbox's
   carousel, Blast/Gravity's next-piece queue, hidden entirely for Melody/Snake/Compose) must show
   that mode's own correct content, regardless of which two modes were visited to get there.
@@ -824,7 +826,7 @@ never got the aspect-matched-fit treatment Gravity/Blast already had).
 
 **Test:** `tests/mobile.spec.js` — `${mode} board is centered...` and `every playable ${mode}
 board cell is visible...` (looping `RESTRICTED_BOARD_CELLS`), and "switching through any 3-mode
-sequence leaves the shared palette/piece-list correct for the final mode (6^3=216 triplets)".
+sequence leaves the shared palette/piece-list correct for the final mode (N^3 triplets)".
 
 ---
 
@@ -1162,7 +1164,8 @@ INV-40/41's aspect/edge-reach checks -- all four still hold for Snake under the 
 ### INV-44: pannable modes fill the game-container -- viewBox aspect matches the container
 
 The restricted modes (INV-40) size themselves to their own fixed board. The **pannable** modes
-(Sandbox/Melody/Compose) have an effectively infinite, pannable lattice, so their *visible window*
+(Sandbox/Melody/Compose/Life -- everything not in `Render.RESTRICTED_MODES`) have an effectively
+infinite, pannable lattice, so their *visible window*
 should instead match the game-container's aspect ratio and fill it edge-to-edge. They used to call
 `Render.updateView` with the historical fixed 800×600 (4:3) reference box, which `preserveAspectRatio`
 then letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop window (a wide
@@ -1182,6 +1185,15 @@ tall/near-square containers, that the viewBox aspect ratio matches the container
 letterbox). INV-9/INV-12's view-persistence check was correspondingly updated to compare the view
 *center* rather than the aspect-dependent top-left. Confirmed failing on the pre-fix fixed-4:3 code
 before implementing, per red-green discipline.
+
+Found live by this same test, later: when Life shipped it was correctly kept out of
+`Render.RESTRICTED_MODES` (so INV-44 legitimately applies to it), but `js/main.js`'s resize-refit
+`ResizeObserver` and its `modeRefreshFns` lookup both hardcoded the pre-Life pannable mode list
+(`['sandbox', 'melody', 'compose']`) instead of deriving from `Render.RESTRICTED_MODES` /
+including Life's own refresh function -- so Life's viewBox refit correctly on mode entry but never
+again on a subsequent resize. The `ResizeObserver` guard now reads
+`!Render.RESTRICTED_MODES.includes(mode)` instead of a second hand-maintained list, so a future
+pannable mode can't silently repeat this.
 
 ### INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing
 

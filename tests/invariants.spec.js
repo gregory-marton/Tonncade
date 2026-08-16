@@ -1623,14 +1623,14 @@ test.describe('Invariant tests', () => {
     }
   });
 
-  test('INV-44: pannable modes (Sandbox/Melody/Compose) fill the game-container -- viewBox aspect matches the container, no letterbox', async ({ page }) => {
+  test('INV-44: pannable modes (Sandbox/Melody/Compose/Life) fill the game-container -- viewBox aspect matches the container, no letterbox', async ({ page }) => {
     // A pannable board is effectively infinite, so its visible window should match the
     // game-container's aspect ratio and fill it edge-to-edge. The old fixed 800x600 (4:3) viewBox
     // instead letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop
     // window (Melody at ~2:1 showed the board squished into a 4:3 center band). Restricted modes
     // already aspect-match (INV-40); this extends the same "fill the space" property to the
     // pannable modes.
-    const modes = ['sandbox', 'melody', 'compose'];
+    const modes = ['sandbox', 'melody', 'compose', 'life'];
     const viewports = [
       { width: 1400, height: 600 },  // wide (2.33)
       { width: 700, height: 1100 },  // tall (0.64)
@@ -1666,7 +1666,7 @@ test.describe('Invariant tests', () => {
     // is what actually reproduces it.)
     await page.setViewportSize({ width: 390, height: 844 });
     for (const restricted of ['gravity', 'blast', 'snake']) {
-      for (const pannable of ['sandbox', 'melody', 'compose']) {
+      for (const pannable of ['sandbox', 'melody', 'compose', 'life']) {
         await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), restricted);
         await page.waitForTimeout(300); // let the restricted ResizeObserver settle its inline fit
         const restrictedInline = await page.evaluate(() => Render.svg.style.width);
@@ -1747,7 +1747,7 @@ test.describe('Invariant tests', () => {
   });
 
   test('INV-24: rotating the view keeps every playable cell visible and unobscured', async ({ page }) => {
-    for (const mode of ['sandbox', 'melody', 'snake', 'blast']) {
+    for (const mode of ['sandbox', 'melody', 'compose', 'snake', 'blast', 'life']) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       await clickRotateButton(page, 3); // 90 degrees
       const { unobscured } = await measureBoardOcclusion(page);
@@ -1999,12 +1999,20 @@ test.describe('Invariant tests', () => {
 
   const switchTo = (page, mode) => page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
 
+  // Every mode gets an entry here, unconditionally -- there's no such thing as a "stateless"
+  // mode to legitimately exempt (previously named STATEFUL_MODES, implying an opt-in category
+  // that doesn't actually exist: every mode in this app holds real state a player would notice
+  // losing, and even a hypothetical mode with nothing worth preserving couldn't fail "state
+  // survives a switch" either -- that holds vacuously when there's nothing to lose). Checked
+  // against the live mode list below (INV-48 coverage), so a newly added mode with no entry
+  // here fails loud instead of silently going unchecked, the way Melody's own did for a while.
+  //
   // Each mutate() is a genuine UI interaction (a click, a keypress, or -- for Snake, whose board
   // advances on its own -- simply letting time pass), never a direct call into a mode's internal
   // API. It must leave the mode's fingerprint different from its own baseline; the test asserts
   // that itself, so a mutate() that silently stops doing anything (e.g. a piece that no longer
   // fits) would be caught rather than passing vacuously.
-  const STATEFUL_MODES = [
+  const MODE_MUTATIONS = [
     { mode: 'sandbox', mutate: async (page) => {
       // A plain board tap never places a NEW piece on touch devices (sandbox.js's handleAction
       // deliberately excludes that case -- touch relies on the carousel's own place-wedge,
@@ -2045,14 +2053,28 @@ test.describe('Invariant tests', () => {
     } },
   ];
 
-  for (let i = 0; i < STATEFUL_MODES.length; i++) {
-    const { mode, mutate } = STATEFUL_MODES[i];
+  // INV-48 coverage: MODE_MUTATIONS and COUNTER_ID_FOR_MODE are both hand-maintained (a genuine
+  // per-mode mutate() interaction and a genuine "which counter is this mode's own" decision
+  // can't be derived from the DOM), but WHETHER every mode has an entry at all can be -- checked
+  // here against the same live getModes() every other invariant test already trusts. Unlike
+  // INV-13's PRIMARY_ELEMENTS/SECONDARY_ELEMENTS split, there's no legitimate exemption bucket
+  // here: this is a plain equality check, not a classify-or-exempt one, since no mode is ever
+  // correctly absent from either map (see the comment on MODE_MUTATIONS above for why).
+  test('INV-48 coverage: every mode has a registered mutate() and counter, none forgotten', async ({ page }) => {
+    await page.goto('/');
+    const MODES = await getModes(page);
+    expect(MODE_MUTATIONS.map((m) => m.mode).sort(), 'MODE_MUTATIONS').toEqual([...MODES].sort());
+    expect(Object.keys(COUNTER_ID_FOR_MODE).sort(), 'COUNTER_ID_FOR_MODE').toEqual([...MODES].sort());
+  });
+
+  for (let i = 0; i < MODE_MUTATIONS.length; i++) {
+    const { mode, mutate } = MODE_MUTATIONS[i];
     // Paired with the NEXT mode in the list (wrapping around) rather than every possible pair --
     // round-robin still puts every mode through both roles (the one switched away from, and the
     // one switched to) across the full suite, at 1/5th the runtime of a full pairwise sweep.
     // sandbox->blast->gravity->snake->life->compose->(sandbox) deliberately puts the two modes
     // known to have shared a single global Board (Blast, Gravity) back-to-back.
-    const other = STATEFUL_MODES[(i + 1) % STATEFUL_MODES.length];
+    const other = MODE_MUTATIONS[(i + 1) % MODE_MUTATIONS.length];
 
     test(`INV-48: ${mode}'s state survives a switch to ${other.mode} and back untouched`, async ({ page }) => {
       const errors = [];
