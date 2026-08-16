@@ -1584,6 +1584,74 @@ from the container-area effect, since the viewport itself is never resized in th
 
 ---
 
+### INV-54: Undo reverses the last human action, scoped per-mode to where it actually makes sense
+
+Issue #17 asked for Undo, scoped explicitly per mode rather than uniformly: Sandbox and Blast get
+it (placement mistakes are the whole point of the request — "one user tried to move and
+accidentally placed a lot"); Compose already had its own (`js/compose.js`'s `undo()`, unchanged
+here); Life gets it for **human edits only, never simulation effects** (running the automaton
+forward isn't a mistake to correct — it's the whole point of watching one run); Melody, Snake, and
+Gravity deliberately don't (Melody tolerates wrong notes instead of rewinding them; Snake and
+Gravity are continuous real-time play with no discrete, reversible "placement moment" the way
+Blast has one — Gravity's pieces settle and keep free-falling every tick indefinitely, never
+locking into a single undo-able event).
+
+**Shared mechanism**: `js/undo-stack.js`'s `UndoStack.create()` — a plain LIFO stack of inversion
+closures, one per mode (`state.undoStack`), following this project's established factory
+convention (`createBoard(shape)`, `FileFolder.create(config)`, `DifficultyBarbell.create(config)`).
+Each mutator pushes a closure that reverses exactly what it just did, at the moment it changes
+state — the mutator itself is what knows how to invert its own change, not a typed entry plus a
+switch-statement inverter living somewhere else. `undo()` pops and runs the most recent one, then
+redraws once; an empty stack is a silent no-op (matching Compose's own existing `notes.pop()`
+undo, which likewise does nothing on an empty array).
+
+- **Sandbox** (`js/sandbox.js`): `placePiece`, both pickup call sites (`handleAction`'s pickup
+  branch and `pickupPieceAt`), and `pasteClipboard` each push their own inversion. Pickup and
+  placement are symmetric (pickup already re-arms the palette; its own undo closure does nothing
+  more than push the exact same piece object back onto `placedPieces`). Paste only undoes the
+  cells *that specific paste actually added* (some may have been skipped as already-occupied
+  duplicates) — tracked by pushing the exact objects `pasteClipboard` itself pushed into
+  `placedCells`, and filtering by reference identity on undo, not by re-deriving from the pasted
+  coordinates. No New-Game-equivalent exists for Sandbox (there's no Clear button), so its history
+  is never explicitly cleared — it simply accumulates for the session.
+
+- **Blast** (`js/blast.js`): the interesting case, since a single `placePiece` call can
+  synchronously trigger a line-clear cascade (`processClears`) that removes cells belonging to
+  *earlier* placements too, not just the one just made — `findFullLines()` scans the whole board.
+  `processClears` now returns exactly what it removed (`{cells: [{key, value}], linesCleared}`),
+  and `placePiece`'s own undo closure restores those cells **before** deleting the cells this
+  placement added — correct even when a just-placed cell was itself part of the cleared line (it
+  gets restored, then immediately deleted again, netting to "not present," which is right: it
+  never existed before this placement). Also restores `activePiece`/`nextQueue` (a one-way random
+  draw — the queue's tail can't be reconstructed any other way), `rotation`, `linesCleared`, and
+  `isGameOver`, all snapshotted before the mutation. `pasteClipboard` gets its own, simpler
+  closure (paste never triggers `processClears`). `reset()` (New Game) clears the undo history —
+  undoing past that boundary back into a previous game doesn't mean anything.
+
+- **Life** (`js/life.js`): `toggleCell` (one tap = one undo; confirmed no drag-multi-toggle
+  gesture exists to batch), `clear`, `reset`, and `pasteClipboard` each push a closure restoring
+  `state.live` (a full `Map` snapshot — simplest correct approach, and cheap at this board's
+  `HARD_BOUNDS` scale) and `state.generation`. Critically, `stepOnce()` — the sole generation-
+  advance function, called identically by both the Step button and continuous Play's own
+  interval — pushes **nothing**, and shares no code path with any human-edit function. Undo after
+  a Step reverses whatever the last *edit* was (wherever the board currently sits, post-step), not
+  the step itself — `state.generation` is never decremented by `undo()`. `loadAutomaton` clears
+  the undo history (a new automaton's rule/live cells is a fresh start, not a correction to make).
+
+**Test:** `tests/desktop.spec.js` — "Sandbox: Undo reverses a placement/pickup/paste", "Sandbox:
+Undo on an empty history is a silent no-op", "Blast: Undo reverses a placement" (plain, and the
+line-clear-cascade case, asserting the board's exact pre-placement `Map` contents round-trip),
+"Blast: Undo reverses a paste", "Blast: New Game clears the undo history", "Life: Undo reverses a
+single cell toggle", "Life: Undo reverses Clear and Reset", "Life: a simulation step is never
+undo-able" (asserts `generation` is unaffected by `undo()` after a Step), "Life: Undo reverses a
+paste", "Life: loading a new automaton clears the undo history". `tests/invariants.spec.js` —
+"INV-48: Sandbox/Blast/Life's undo history survives a switch away and back untouched" (each
+mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as Melody's
+own `cleanStreak`, INV-51 — asserted directly since `paintedFingerprint`'s black-box DOM check has
+no visible representation of undo history to catch a regression here).
+
+---
+
 ## Primary Elements
 
 A **primary element** is a top-level interactive affordance a player can point to and name —
@@ -1605,12 +1673,12 @@ pieces or chord-guide results, are not listed separately):
 | Mode | Primary elements |
 |---|---|
 | Gravity | Tonnetz, each of the 5 (portrait) / 6 (landscape) D-pad buttons individually, the next-piece preview, Pause, Restart, Stats, Drawer pull |
-| Blast | Tonnetz, the preview/place control, Restart, Stats, Drawer pull |
+| Blast | Tonnetz, the preview/place control, Restart, Undo, Stats, Drawer pull |
 | Snake | Tonnetz, each of the 6 D-pad arrows individually, Pause, Restart, Stats, Drawer pull |
 | Melody | Tonnetz, Drawer pull, Song source, Play, Restart, Stats, Sequence message |
-| Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker |
+| Sandbox | Tonnetz, Drawer pull, Carousel, Chord picker, Undo |
 | Compose | Tonnetz, Drawer pull, Song source, Record, Play, Undo, Clear, Save, Stats |
-| Life | Tonnetz, Drawer pull, Automaton source, Play/Pause, Step, Reset, Clear, Save, Generation counter |
+| Life | Tonnetz, Drawer pull, Automaton source, Play/Pause, Step, Reset, Clear, Undo, Save, Generation counter |
 
 This inventory is the reference list INV-13 (below) checks against, and the vocabulary the
 rest of this doc and its tests should stay consistent with.

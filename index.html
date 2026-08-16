@@ -89,6 +89,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 <div id="blast-stats" style="display: none;">
                     <div class="control-buttons">
                         <button id="blast-reset" class="icon-btn" title="New game" aria-label="New game">↻</button>
+                        <button id="blast-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
                     </div>
                     <div id="blast-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"></div>
                     <div class="stats-panel">
@@ -299,6 +300,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button>
                         <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↺</button>
                         <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button>
+                        <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
                         <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button>
                     </div>
                     <div class="stats-panel">
@@ -306,6 +308,9 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     </div>
                 </div>
 
+                <div class="control-buttons">
+                    <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
+                </div>
                 <div id="palette">
                     <div id="piece-list"></div>
                 </div>
@@ -407,6 +412,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/pieces.js"></script>
     <script src="js/board.js"></script>
     <script src="js/render.js"></script>
+    <script src="js/undo-stack.js"></script>
     <script src="js/sandbox.js"></script>
     <script src="js/difficulty-barbell.js"></script>
     <script src="js/blast.js"></script>

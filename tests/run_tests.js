@@ -126,6 +126,7 @@ loadScript('synth.js');
 loadScript('pieces.js');
 loadScript('board.js');
 loadScript('render.js');
+loadScript('undo-stack.js'); // sandbox.js/blast.js/life.js's UndoStack.create(...) needs this loaded first
 loadScript('sandbox.js');
 loadScript('difficulty-barbell.js'); // blast.js/gravity.js/melody.js's DifficultyBarbell.create(...) needs this loaded first
 loadScript('blast.js');

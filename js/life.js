@@ -414,6 +414,11 @@ const LifeMode = {
         // zoom picks the responsive default. Once the player zooms (wheel/pinch, see main.js's
         // applyZoomDelta) it must persist across redraws, not reset to a fixed value.
         viewX: null, viewY: null, zoom: null,
+        undoStack: UndoStack.create(), // #17: reverses the last human edit (toggle/clear/reset/
+                                        // paste) -- never a simulation step, see undo(). Cleared
+                                        // whenever a new automaton loads (loadAutomaton), since
+                                        // undoing past that boundary into a different automaton's
+                                        // rule/live cells doesn't mean anything.
     },
 
     // The first automaton, used until one is loaded from the life/ folder or a local file. Also
@@ -492,6 +497,7 @@ const LifeMode = {
         this.state.initial = cells.map((c) => [c[0] + ',' + c[1], c.length > 2 ? c[2] : 1]);
         this.state.live = new Map(this.state.initial);
         this.state.generation = 0;
+        this.state.undoStack.clear(); // #17: a new automaton is a fresh start, not something to undo into
         if (Render.svg) { this.refreshLattice(); this.updateControls(); }
     },
 
@@ -564,12 +570,18 @@ const LifeMode = {
     toggleCell: function(p, q) {
         const key = p + ',' + q;
         const states = this.state.multi ? this.state.multi.states : 2;
-        const next = ((this.state.live.get(key) || 0) + 1) % states;
+        const hadKey = this.state.live.has(key);
+        const prevVal = this.state.live.get(key);
+        const next = ((prevVal || 0) + 1) % states;
         if (next === 0) this.state.live.delete(key);
         else {
             this.state.live.set(key, next);
             Synth.playNote(Tonnetz.getMidi(p, q), 0, 0.3); // audible feedback while composing
         }
+        this.state.undoStack.push(() => { // #17 -- one tap is one undo (no drag-multi-toggle gesture)
+            if (hadKey) this.state.live.set(key, prevVal);
+            else this.state.live.delete(key);
+        });
         this.paintLive();
     },
 
@@ -659,8 +671,26 @@ const LifeMode = {
         this.updateControls();
     },
     togglePlay: function() { this.state.running ? this.stop() : this.play(); },
-    clear: function() { this.stop(); this.state.live = new Map(); this.state.generation = 0; this.paintLive(); this.updateControls(); },
-    reset: function() { this.stop(); this.state.live = new Map(this.state.initial); this.state.generation = 0; this.paintLive(); this.updateControls(); },
+    // #17: both a human edit (undo-able), not a simulation effect -- pushed the same way
+    // toggleCell/pasteClipboard are, restoring the whole live Map + generation as they were.
+    clear: function() {
+        this.stop();
+        const prevLive = this.state.live, prevGen = this.state.generation;
+        this.state.live = new Map();
+        this.state.generation = 0;
+        this.state.undoStack.push(() => { this.state.live = prevLive; this.state.generation = prevGen; });
+        this.paintLive();
+        this.updateControls();
+    },
+    reset: function() {
+        this.stop();
+        const prevLive = this.state.live, prevGen = this.state.generation;
+        this.state.live = new Map(this.state.initial);
+        this.state.generation = 0;
+        this.state.undoStack.push(() => { this.state.live = prevLive; this.state.generation = prevGen; });
+        this.paintLive();
+        this.updateControls();
+    },
 
     // Serializes the CURRENT automaton -- rule (or multi-state transition table), sound spec(s),
     // tempo, and the LIVE cells right now (not the original seed -- a hand-tapped or mid-evolution
@@ -780,6 +810,7 @@ const LifeMode = {
         bind('life-step', this.stepOnce);
         bind('life-clear', this.clear);
         bind('life-reset', this.reset);
+        bind('life-undo', this.undo);
         bind('life-save', this.save);
 
         // Open a LOCAL automaton file -- e.g. one previously written by Save As, or shared by
@@ -816,14 +847,25 @@ const LifeMode = {
         });
     },
     pasteClipboard: function(cells) {
+        const prevLive = new Map(this.state.live); // #17: whole-map snapshot -- simplest correct
+                                                     // restore, and Life's board is small enough
+                                                     // (HARD_BOUNDS -64..64) for this to be cheap.
         const midis = [];
         cells.forEach((c) => {
             this.state.live.set(c.p + ',' + c.q, 1);
             midis.push(Tonnetz.getMidi(c.p, c.q));
         });
+        if (midis.length) this.state.undoStack.push(() => { this.state.live = prevLive; });
         this.paintLive();
         this.updateControls();
         if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
+    // #17: reverses the most recent human edit (toggle/clear/reset/paste) -- never a simulation
+    // step (stepOnce/Play never touch state.undoStack) -- see js/undo-stack.js. Silently does
+    // nothing on an empty stack.
+    undo: function() {
+        if (this.state.undoStack.undo()) this.refreshLattice();
     },
 
     cleanup: function() {

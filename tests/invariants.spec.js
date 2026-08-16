@@ -841,20 +841,20 @@ test.describe('Invariant tests', () => {
       '#tonnetz-svg', '#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right',
       '#palette', '#gravity-start-pause', '#gravity-reset', '#gravity-controls .stats-panel', '#drawer-handle',
     ],
-    blast: ['#tonnetz-svg', '#blast-reset', '#blast-stats .stats-panel', '#drawer-handle'],
+    blast: ['#tonnetz-svg', '#blast-reset', '#blast-undo', '#blast-stats .stats-panel', '#drawer-handle'],
     snake: [
       '#tonnetz-svg', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right',
       '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '#drawer-handle',
     ],
     melody: ['#tonnetz-svg', '#drawer-handle', '#melody-source', '#melody-play-preview', '#melody-game-restart', '#melody-stats-group', '#melody-game-status'],
-    sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select'],
+    sandbox: ['#tonnetz-svg', '#drawer-handle', '#piece-list', '#chord-guide-select', '#sandbox-undo'],
     compose: [
       '#tonnetz-svg', '#drawer-handle', '#compose-source', '#compose-record', '#compose-play',
       '#compose-undo', '#compose-clear', '#compose-save', '#compose-stats-group',
     ],
     life: [
       '#tonnetz-svg', '#drawer-handle', '#life-source', '#life-play-pause', '#life-step',
-      '#life-reset', '#life-clear', '#life-save', '#life-generation',
+      '#life-reset', '#life-clear', '#life-undo', '#life-save', '#life-generation',
     ],
   };
 
@@ -2138,5 +2138,46 @@ test.describe('Invariant tests', () => {
 
     const streak = await page.evaluate(() => MelodyMode.state.cleanStreak);
     expect(streak).toBe(2);
+  });
+
+  // Issue #17's undo history (state.undoStack, js/undo-stack.js) is untouched by cleanup()/
+  // init()'s resume branch in Sandbox/Blast/Life -- only an explicit New Game (Blast's reset())
+  // or loading a new automaton (Life's loadAutomaton()) clears it, same INV-48 shape as
+  // Melody's cleanStreak above. paintedFingerprint() can't see it (no DOM representation), so
+  // asserted directly: place/toggle something, switch away and back, undo, confirm it still
+  // reverses the pre-switch action rather than being silently reset to empty.
+  test('INV-48: Sandbox/Blast/Life\'s undo history survives a switch away and back untouched', async ({ page }) => {
+    await page.goto('/');
+
+    await switchTo(page, 'sandbox');
+    await page.evaluate(() => {
+      SandboxMode.state.selectedPiece = '.';
+      SandboxMode.state.rotation = 0;
+      SandboxMode.placePiece(2, 2);
+    });
+
+    await switchTo(page, 'blast');
+    await page.evaluate(() => {
+      BlastMode.state.activePiece = '.';
+      BlastMode.state.rotation = 0;
+      BlastMode.placePiece(1, 1);
+    });
+
+    await switchTo(page, 'life');
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+    await page.evaluate(() => LifeMode.toggleCell(20, 20));
+
+    await switchTo(page, 'sandbox');
+    await page.evaluate(() => SandboxMode.undo());
+    expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+
+    await switchTo(page, 'blast');
+    await page.evaluate(() => BlastMode.undo());
+    expect(await page.evaluate(() => Board.cells.size)).toBe(0);
+
+    await switchTo(page, 'life');
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+    await page.evaluate(() => LifeMode.undo());
+    expect(await page.evaluate(() => LifeMode.state.live.has('20,20'))).toBe(false);
   });
 });

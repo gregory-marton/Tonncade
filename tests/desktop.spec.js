@@ -3238,3 +3238,193 @@ test('screenshots/index.html: an entry from before cellCount existed is excluded
   const caption = await page.locator('figcaption').first().textContent();
   expect(caption).not.toContain('cells');
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Issue #17: Undo, scoped per-mode exactly as requested -- Sandbox/Blast/Life get it here;
+// Compose already had its own (js/compose.js's undo(), unchanged); Melody/Snake/Gravity
+// deliberately don't (tolerate wrong notes / no undo makes sense / continuous real-time play).
+// Shared mechanism: js/undo-stack.js's UndoStack.create() -- each mutator pushes a closure that
+// reverses exactly what it just did; undo() pops and runs the last one, then redraws once.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Sandbox: Undo reverses a placement', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    SandboxMode.state.selectedPiece = '.';
+    SandboxMode.state.rotation = 0;
+    SandboxMode.placePiece(2, 2);
+  });
+  expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(1);
+  await page.locator('#sandbox-undo').click();
+  expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+});
+
+test('Sandbox: Undo reverses a pickup (puts the picked-up piece back)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    SandboxMode.state.placedPieces.push({ type: '.', p: 3, q: 3, rotation: 0 });
+    SandboxMode.handleAction(3, 3); // picks it up (an existing piece occupies that cell)
+  });
+  expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+  await page.locator('#sandbox-undo').click();
+  const restored = await page.evaluate(() => SandboxMode.state.placedPieces);
+  expect(restored).toEqual([{ type: '.', p: 3, q: 3, rotation: 0 }]);
+});
+
+test('Sandbox: Undo reverses a paste, but only the cells that paste actually added', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    SandboxMode.state.placedCells = [{ p: 10, q: 10 }]; // already on the board before the paste
+    SandboxMode.pasteClipboard([{ p: 10, q: 10 }, { p: 11, q: 11 }]); // one dup, one new
+  });
+  expect(await page.evaluate(() => SandboxMode.state.placedCells.length)).toBe(2);
+  await page.locator('#sandbox-undo').click();
+  const remaining = await page.evaluate(() => SandboxMode.state.placedCells);
+  expect(remaining).toEqual([{ p: 10, q: 10 }]); // the pre-existing cell survives; the pasted one doesn't
+});
+
+test('Sandbox: Undo on an empty history is a silent no-op', async ({ page }) => {
+  await page.goto('/');
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.locator('#sandbox-undo').click();
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+});
+
+test('Blast: Undo reverses a placement', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+  await page.evaluate(() => {
+    BlastMode.state.activePiece = '.';
+    BlastMode.state.rotation = 0;
+    BlastMode.placePiece(2, 2);
+  });
+  expect(await page.evaluate(() => Board.cells.size)).toBe(1);
+  await page.locator('#blast-undo').click();
+  expect(await page.evaluate(() => Board.cells.size)).toBe(0);
+});
+
+test('Blast: Undo reverses a placement that triggered a line-clear cascade, restoring exactly what was cleared', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+  const result = await page.evaluate(() => {
+    BlastMode.reset();
+    // Fill the whole q=0 line except p=0, then place a single-cell piece there to complete it.
+    for (let p = -5; p <= 5; p++) {
+      if (p !== 0) Board.cells.set(`${p},0`, { type: 'X', color: '#fff' });
+    }
+    const before = JSON.stringify([...Board.cells.entries()].sort());
+    const linesBefore = BlastMode.state.linesCleared;
+
+    BlastMode.state.activePiece = '.';
+    BlastMode.state.rotation = 0;
+    BlastMode.placePiece(0, 0);
+    const linesAfterPlace = BlastMode.state.linesCleared;
+    const emptyAfterClear = Board.cells.size === 0;
+
+    BlastMode.undo();
+    const after = JSON.stringify([...Board.cells.entries()].sort());
+    return {
+      before, after,
+      linesBefore, linesAfterPlace,
+      linesAfterUndo: BlastMode.state.linesCleared,
+      emptyAfterClear,
+    };
+  });
+  expect(result.linesBefore).toBe(0);
+  expect(result.linesAfterPlace).toBe(1); // the placement completed the line and cleared it
+  expect(result.emptyAfterClear).toBe(true); // the whole line (including the just-placed cell) is gone
+  expect(result.after).toBe(result.before); // undo restored the board to exactly its pre-placement state
+  expect(result.linesAfterUndo).toBe(0);
+});
+
+test('Blast: Undo reverses a paste', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+  await page.evaluate(() => BlastMode.pasteClipboard([{ p: 1, q: 1 }]));
+  expect(await page.evaluate(() => Board.cells.size)).toBe(1);
+  await page.locator('#blast-undo').click();
+  expect(await page.evaluate(() => Board.cells.size)).toBe(0);
+});
+
+test('Blast: New Game clears the undo history -- undo cannot reach back into a previous game', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
+  await page.evaluate(() => {
+    BlastMode.state.activePiece = '.';
+    BlastMode.state.rotation = 0;
+    BlastMode.placePiece(2, 2);
+  });
+  await page.locator('#blast-reset').click();
+  const sizeBeforeUndo = await page.evaluate(() => Board.cells.size);
+  await page.locator('#blast-undo').click();
+  expect(await page.evaluate(() => Board.cells.size)).toBe(sizeBeforeUndo); // undo was a no-op
+});
+
+test('Life: Undo reverses a single cell toggle', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  const before = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
+  await page.evaluate(() => LifeMode.toggleCell(20, 20));
+  expect(await page.evaluate(() => LifeMode.state.live.has('20,20'))).toBe(true);
+  await page.locator('#life-undo').click();
+  const after = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
+  expect(after).toEqual(before);
+});
+
+test('Life: Undo reverses Clear and Reset (human edits), restoring the exact prior board + generation', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  await page.evaluate(() => { LifeMode.state.live = new Map([['5,5', 1], ['6,6', 2]]); LifeMode.state.generation = 7; });
+  const before = await page.evaluate(() => ({ live: [...LifeMode.state.live.entries()].sort(), gen: LifeMode.state.generation }));
+
+  await page.locator('#life-clear').click();
+  expect(await page.evaluate(() => LifeMode.state.live.size)).toBe(0);
+  await page.locator('#life-undo').click();
+  const afterClearUndo = await page.evaluate(() => ({ live: [...LifeMode.state.live.entries()].sort(), gen: LifeMode.state.generation }));
+  expect(afterClearUndo).toEqual(before);
+});
+
+test('Life: a simulation step is never undo-able -- undo after Step reverses the last EDIT, not the step', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  await page.evaluate(() => LifeMode.toggleCell(21, 21)); // a human edit, pushed to the undo stack
+  const genBeforeStep = await page.evaluate(() => LifeMode.state.generation);
+  await page.locator('#life-step').click();
+  const genAfterStep = await page.evaluate(() => LifeMode.state.generation);
+  expect(genAfterStep).toBe(genBeforeStep + 1);
+
+  await page.locator('#life-undo').click();
+  const genAfterUndo = await page.evaluate(() => LifeMode.state.generation);
+  expect(genAfterUndo).toBe(genAfterStep); // undo did NOT roll back the step
+  expect(await page.evaluate(() => LifeMode.state.live.has('21,21'))).toBe(false); // it undid the toggle instead
+});
+
+test('Life: Undo reverses a paste', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  const before = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
+  await page.evaluate(() => LifeMode.pasteClipboard([{ p: 30, q: 30 }, { p: 31, q: 31 }]));
+  expect(await page.evaluate(() => LifeMode.state.live.size)).toBeGreaterThan(before.length);
+  await page.locator('#life-undo').click();
+  const after = await page.evaluate(() => [...LifeMode.state.live.entries()].sort());
+  expect(after).toEqual(before);
+});
+
+test('Life: loading a new automaton clears the undo history', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  await page.evaluate(() => LifeMode.toggleCell(20, 20));
+  await page.evaluate(() => LifeMode.loadAutomaton(LifeMode.DEFAULT_AUTOMATON));
+  const sizeBeforeUndo = await page.evaluate(() => LifeMode.state.live.size);
+  await page.locator('#life-undo').click();
+  expect(await page.evaluate(() => LifeMode.state.live.size)).toBe(sizeBeforeUndo); // undo was a no-op
+});
+
+

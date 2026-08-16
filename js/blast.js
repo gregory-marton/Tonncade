@@ -35,7 +35,10 @@ const BlastMode = {
         difficulty: DifficultyBarbell.migrateLevel('tonncade_blast_difficulty', 3),
         hoverCell: { p: 0, q: 0 },
         lastChordKey: null,     // sorted-pitch signature of the last MIDI chord played
-        chordCandidateIndex: 0  // which of that chord's matching placements is currently shown
+        chordCandidateIndex: 0, // which of that chord's matching placements is currently shown
+        undoStack: UndoStack.create(), // #17: reverses the last placement -- see undo(); cleared
+                                        // on New Game (reset()), since undoing PAST that boundary
+                                        // back into a previous game doesn't mean anything.
     },
 
     init: function() {
@@ -110,8 +113,17 @@ const BlastMode = {
         });
         if (!placed.length) return;
         Board.fillCells(placed, 'paste', '#6fae9b');
+        this.state.undoStack.push(() => { // #17
+            placed.forEach((c) => Board.cells.delete(`${c.p},${c.q}`));
+        });
         this.refreshBoard();
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
+    // #17: reverses the most recent placement (including any line-clear it triggered) or paste --
+    // see js/undo-stack.js. Silently does nothing on an empty stack.
+    undo: function() {
+        if (this.state.undoStack.undo()) this.refreshUI();
     },
 
     reset: function() {
@@ -121,7 +133,8 @@ const BlastMode = {
         this.state.nextQueue = [this.randomPiece(), this.randomPiece(), this.randomPiece()];
         this.state.activePiece = this.state.nextQueue.shift();
         this.state.nextQueue.push(this.randomPiece());
-        
+        this.state.undoStack.clear(); // #17: New Game is a fresh start, not something to undo into
+
         this.refreshUI();
     },
 
@@ -261,6 +274,8 @@ const BlastMode = {
                 this.reset();
             };
         }
+        const undoBtn = document.getElementById('blast-undo');
+        if (undoBtn) undoBtn.onclick = () => this.undo();
 
         // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js): click the Nth weight to
         // set the piece-size level.
@@ -478,36 +493,70 @@ const BlastMode = {
 
     placePiece: function(p, q) {
         const cells = Pieces.getAbsoluteCells(this.state.activePiece, p, q, this.state.rotation);
+        const placedKeys = cells.map(c => `${c.p},${c.q}`);
+
+        // #17: snapshot everything this placement is about to change, so undo() can restore it
+        // exactly -- a single placement can also trigger a synchronous line-clear cascade
+        // (below), which can remove cells belonging to EARLIER placements too, not just this
+        // one's own cells.
+        const prevActivePiece = this.state.activePiece;
+        const prevNextQueue = [...this.state.nextQueue];
+        const prevRotation = this.state.rotation;
+        const prevIsGameOver = this.state.isGameOver;
+
         Board.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
-        
+
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         Synth.playChord(midis);
-        
-        this.processClears();
-        
+
+        const clearedEntries = this.processClears();
+
         // Next piece
         this.state.activePiece = this.state.nextQueue.shift();
         this.state.nextQueue.push(this.randomPiece());
-        
+
         if (Board.checkGameOver(this.state.activePiece)) {
             this.state.isGameOver = true;
             setTimeout(() => alert(`Game Over! Cannot place piece: ${this.state.activePiece}\nLines cleared: ${this.state.linesCleared}`), 100);
         }
-        
+
+        this.state.undoStack.push(() => { // #17
+            this.state.activePiece = prevActivePiece;
+            this.state.nextQueue = prevNextQueue;
+            this.state.rotation = prevRotation;
+            this.state.isGameOver = prevIsGameOver;
+            this.state.linesCleared -= clearedEntries.linesCleared;
+            // Restore any cells a triggered clear removed FIRST, then delete this placement's own
+            // cells -- correct even if a just-placed cell was ALSO part of a cleared line (it gets
+            // restored, then immediately deleted again, netting to "not present", which is right:
+            // it never existed before this placement).
+            clearedEntries.cells.forEach(({ key, value }) => Board.cells.set(key, value));
+            placedKeys.forEach((key) => Board.cells.delete(key));
+        });
+
         this.refreshUI();
     },
 
+    // Returns { cells: [{key, value}, ...], linesCleared: n } describing exactly what was
+    // removed, so placePiece's own undo closure can restore it -- see the comment there.
     processClears: function() {
         const lines = Board.findFullLines();
+        const removed = { cells: [], linesCleared: 0 };
         if (lines.length > 0) {
             const allNotes = [];
             lines.forEach(line => {
-                line.forEach(c => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
+                line.forEach(c => {
+                    allNotes.push(Tonnetz.getMidi(c.p, c.q));
+                    const key = `${c.p},${c.q}`;
+                    removed.cells.push({ key, value: Board.cells.get(key) });
+                });
                 Board.clearCells(line);
                 this.state.linesCleared++;
+                removed.linesCleared++;
             });
             // Simultaneous playback of all cleared notes
             Synth.playChord([...new Set(allNotes)], false);
         }
+        return removed;
     }
 };

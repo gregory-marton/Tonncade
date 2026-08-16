@@ -41,7 +41,8 @@ const SandboxMode = {
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
         hoverCell: { p: 0, q: 0 },
-        highlightedCells: [] // { p, q, midi } -- task #24's tap-and-hold same-note highlight
+        highlightedCells: [], // { p, q, midi } -- task #24's tap-and-hold same-note highlight
+        undoStack: UndoStack.create(), // #17: reverses the last place/pickup/paste -- see undo()
     },
 
     HOLD_DURATION_MS: 400,
@@ -97,6 +98,8 @@ const SandboxMode = {
         this.refreshLattice();
         this.setupEvents();
         this.setupGuide();
+        const undoBtn = document.getElementById('sandbox-undo');
+        if (undoBtn) undoBtn.onclick = () => this.undo();
         this.setupDragToCandidate('piece-list', '.piece-item', item => ({
             key: item.getAttribute('data-key'),
             rotation: 0
@@ -356,13 +359,32 @@ const SandboxMode = {
     pasteClipboard: function(cells) {
         const have = new Set(this.state.placedCells.map((c) => c.p + ',' + c.q));
         const midis = [];
+        const added = []; // #17 undo: only the cells THIS paste actually added, not the whole
+                           // clipboard -- some may already exist on the board and get skipped.
         cells.forEach((c) => {
             const key = c.p + ',' + c.q;
-            if (!have.has(key)) { this.state.placedCells.push({ p: c.p, q: c.q }); have.add(key); }
+            if (!have.has(key)) {
+                const cell = { p: c.p, q: c.q };
+                this.state.placedCells.push(cell);
+                added.push(cell);
+                have.add(key);
+            }
             midis.push(Tonnetz.getMidi(c.p, c.q));
         });
+        if (added.length) {
+            this.state.undoStack.push(() => {
+                this.state.placedCells = this.state.placedCells.filter((c) => !added.includes(c));
+            });
+        }
         this.refreshLattice();
         if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
+    // #17: reverses the most recent placement, pickup, or paste -- see js/undo-stack.js. Each of
+    // those mutators pushes its own inversion closure at the moment it changes state; this just
+    // pops and runs it, then redraws once. Silently does nothing on an empty stack.
+    undo: function() {
+        if (this.state.undoStack.undo()) this.refreshLattice();
     },
 
     setupEvents: function() {
@@ -503,6 +525,7 @@ const SandboxMode = {
 
         if (pieceIndex !== -1) {
             const piece = this.state.placedPieces.splice(pieceIndex, 1)[0];
+            this.state.undoStack.push(() => { this.state.placedPieces.push(piece); }); // #17
             this.selectPiece(piece.type);
             this.state.rotation = piece.rotation;
             this.refreshLattice();
@@ -560,6 +583,7 @@ const SandboxMode = {
 
         if (pieceIndex !== -1) {
             const piece = this.state.placedPieces.splice(pieceIndex, 1)[0];
+            this.state.undoStack.push(() => { this.state.placedPieces.push(piece); }); // #17
             this.selectPiece(piece.type);
             this.state.rotation = piece.rotation;
             this.refreshLattice();
@@ -650,7 +674,11 @@ const SandboxMode = {
             rotation: this.state.rotation
         };
         this.state.placedPieces.push(piece);
-        
+        this.state.undoStack.push(() => { // #17
+            const idx = this.state.placedPieces.indexOf(piece);
+            if (idx >= 0) this.state.placedPieces.splice(idx, 1);
+        });
+
         const cells = Pieces.getAbsoluteCells(piece.type, p, q, piece.rotation);
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         Synth.playChord(midis);
