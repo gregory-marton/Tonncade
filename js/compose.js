@@ -162,9 +162,13 @@ const ComposeMode = {
             fileInput.onchange = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
+                // See js/melody.js's identical fix for why this can't just hard-code
+                // loadMelodyFromArrayBuffer -- reuses MidiFolder's own fileTypes dispatch.
+                const { readAs, loadMethod } = MidiFolder.resolveFileType(file.name);
                 const reader = new FileReader();
-                reader.onload = (event) => this.loadMelodyFromArrayBuffer(event.target.result, file.name);
-                reader.readAsArrayBuffer(file);
+                reader.onload = (event) => this[loadMethod](event.target.result, file.name);
+                if (readAs === 'text') reader.readAsText(file);
+                else reader.readAsArrayBuffer(file);
             };
         }
 

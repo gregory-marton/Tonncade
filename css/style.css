@@ -323,12 +323,24 @@ svg {
     word-break: break-all;
 }
 
+/* #melody-notation-scroll/#compose-notation-scroll: the ONE horizontal scroll container shared by
+   a staff, its labels, and the note-list/timeline below it (index.html) -- each used to have its
+   own independent overflow-x:auto, so scrolling one didn't move the others and a wide song's
+   staff drifted out of alignment with its own labels/timeline (Codex review finding). A scrolling
+   ancestor's scrollWidth is the union of every descendant's content box regardless of the
+   ancestor's own declared width, so this one wrapper is sufficient -- no JS scroll-sync needed. */
+.notation-scroll {
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
 /* #melody-note-list's timeline layout (#46 redesign): real flex+gap gives every pair of adjacent
    tokens the same visual spacing, replacing the old literal " - " text-node separators that
    `positionScrubMarker` used to insert between tokens (asymmetric right at the marker itself,
-   which is what read as "spacing collapses there" -- see docs/invariants.md's INV-26). Scrollable
-   so a real song's full timeline (rendered up front, not a small sliding window) can be panned
-   horizontally; Random's short window just never overflows. */
+   which is what read as "spacing collapses there" -- see docs/invariants.md's INV-26). Overflows
+   its OWN box when wider than the viewport rather than scrolling independently -- the shared
+   .notation-scroll ancestor above is what actually scrolls, keeping this in sync with the staff
+   and labels stacked alongside it. */
 .melody-note-list {
     display: flex;
     align-items: center;
@@ -338,9 +350,7 @@ svg {
     margin-top: 4px;
     min-height: 18px;
     font-weight: bold;
-    overflow-x: auto;
     white-space: nowrap;
-    scrollbar-width: thin;
     position: relative; /* .scrub-marker's absolute-positioning anchor */
 }
 .note-token { flex: 0 0 auto; }

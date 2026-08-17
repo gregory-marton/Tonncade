@@ -3188,14 +3188,17 @@ test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-sc
     MelodyMode.updateDifficultyUI();
   });
 
+  // #melody-notation-scroll (not #melody-note-list itself) is the actual clipping/scrolling
+  // viewport -- one shared scroll container for the staff/labels/timeline stack (Codex review
+  // finding: they used to scroll independently and drift out of alignment).
   const overflow = await page.evaluate(() => {
-    const el = document.getElementById('melody-note-list');
+    const el = document.getElementById('melody-notation-scroll');
     return el.scrollWidth > el.clientWidth;
   });
   expect(overflow, 'a 32-note song should overflow the visible timeline width').toBe(true);
 
   const markerBox = await page.locator('.scrub-marker').boundingBox();
-  const containerBox = await page.locator('#melody-note-list').boundingBox();
+  const containerBox = await page.locator('#melody-notation-scroll').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
   await page.mouse.down();
   const edgeX = containerBox.x + containerBox.width - 5; // inside the 40px edge-scroll zone
@@ -3203,7 +3206,7 @@ test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-sc
   for (let i = 0; i < 10; i++) {
     await page.mouse.move(edgeX, edgeY);
   }
-  const scrollLeft = await page.evaluate(() => document.getElementById('melody-note-list').scrollLeft);
+  const scrollLeft = await page.evaluate(() => document.getElementById('melody-notation-scroll').scrollLeft);
   await page.mouse.up();
   expect(scrollLeft).toBeGreaterThan(0);
 });
@@ -4722,4 +4725,40 @@ test('Compose: loading a real .mxl file unzips it, loads the notes, and picks up
   }, Array.from(zipBuffer));
   expect(result.midis).toEqual([65, 70]);
   expect(result.keySignature).toBe(-1);
+});
+
+// The plain <input type=file> fallback picker (Safari/Firefox, or Chrome before a folder's been
+// chosen) used to hard-code loadMelodyFromArrayBuffer regardless of the chosen file's extension --
+// selecting a .musicxml/.mxl file there would force-feed non-MIDI bytes into the MIDI parser and
+// fail, even though the folder-browsing tier (js/file-folder.js) already knew how to route them
+// correctly. Caught by Codex's review, not by these tests, since nothing exercised this picker at
+// all before now. page.setInputFiles fires a REAL native 'change' event, not a synthetic
+// page.evaluate call into the mode's own JS -- this is testing the actual DOM wiring.
+test('Melody: the direct file-input picker routes a .musicxml file to loadMelodyFromMusicXML, not the MIDI parser', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  const xmlText = await page.evaluate(() => MusicXML.write([{ midi: 71, time: 0, duration: 1 }], { bpm: 100 }));
+  await page.setInputFiles('#melody-file-input', {
+    name: 'direct-picker-test.musicxml',
+    mimeType: 'application/vnd.recordare.musicxml+xml',
+    buffer: Buffer.from(xmlText, 'utf8'),
+  });
+  // loadMelodyFromMusicXML re-centers the melody into a comfortable octave range (centerMelody),
+  // so the exact MIDI value can shift by whole octaves -- pitch class is the real invariant here
+  // (confirming the MusicXML path was actually taken, not that the MIDI parser silently produced
+  // garbage: a raw MIDI-parser misparse of XML text wouldn't reliably preserve pitch class at all).
+  await expect.poll(() => page.evaluate(() => MelodyMode.state.melody.map((n) => ((n.midi % 12) + 12) % 12))).toEqual([71 % 12]);
+});
+
+test('Compose: the direct file-input picker routes a .mxl file to loadMelodyFromMxl, not the MIDI parser', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const xmlText = await page.evaluate(() => MusicXML.write([{ midi: 73, time: 0, duration: 1 }], { bpm: 100 }));
+  const zipBuffer = buildMxlFixture(xmlText);
+  await page.setInputFiles('#compose-file-input', {
+    name: 'direct-picker-test.mxl',
+    mimeType: 'application/vnd.recordare.musicxml',
+    buffer: zipBuffer,
+  });
+  await expect.poll(() => page.evaluate(() => ComposeMode.state.notes.map((n) => n.midi))).toEqual([73]);
 });

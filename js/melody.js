@@ -202,11 +202,21 @@ const MelodyMode = {
                 const file = e.target.files[0];
                 if (!file) return;
 
+                // Same fileTypes dispatch js/file-folder.js's own folder-browsing tier already
+                // uses (MidiFolder.resolveFileType) -- this fallback picker (Safari/Firefox, or
+                // Chrome before a folder's been chosen) needs to route .musicxml/.xml/.mxl to
+                // their own loaders too, not just .mid. Reusing it here instead of duplicating the
+                // pattern match is what a fix for "the direct picker only understands MIDI" (an
+                // earlier gap in this file, caught by Codex's review) actually requires -- widening
+                // the <input accept> alone wouldn't have been enough, since this handler still
+                // would have force-fed the wrong bytes into the MIDI parser.
+                const { readAs, loadMethod } = MidiFolder.resolveFileType(file.name);
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    this.loadMelodyFromArrayBuffer(event.target.result, file.name);
+                    this[loadMethod](event.target.result, file.name);
                 };
-                reader.readAsArrayBuffer(file);
+                if (readAs === 'text') reader.readAsText(file);
+                else reader.readAsArrayBuffer(file);
             };
         }
 
@@ -537,8 +547,16 @@ const MelodyMode = {
         const listEl = document.getElementById('melody-note-list');
         const token = listEl && listEl.querySelector(`.note-token[data-note-idx="${idx}"]`);
         if (!token) return;
-        const target = token.offsetLeft - listEl.clientWidth / 2 + token.offsetWidth / 2;
-        listEl.scrollLeft = Math.max(0, target);
+        // #melody-notation-scroll (not listEl itself) is what actually scrolls/clips now -- one
+        // shared scroll container for the staff/labels/timeline stack (Codex review finding: they
+        // used to scroll independently and drift out of alignment). token.offsetLeft is still
+        // correctly relative to listEl (offsetLeft isn't affected by an ancestor's scroll
+        // position), and listEl sits flush against the scroll container's left edge (no
+        // horizontal margin/padding between them), so that part of the math is unchanged --
+        // only WHICH element's clientWidth/scrollLeft this reads/writes needed to move.
+        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
+        const target = token.offsetLeft - scrollEl.clientWidth / 2 + token.offsetWidth / 2;
+        scrollEl.scrollLeft = Math.max(0, target);
     },
 
     updateDifficultyUI: function(overrideIndex) {
@@ -879,14 +897,19 @@ const MelodyMode = {
         // per-mousemove/touchmove firing (no separate rAF loop needed). The closest-token lookup
         // below re-queries live getBoundingClientRect() positions every call, so it already
         // reflects wherever scrollLeft currently is -- no extra plumbing needed there.
-        if (!this.state.isRandom && listEl) {
-            const rect = listEl.getBoundingClientRect();
+        // #melody-notation-scroll (not listEl) is the actual clipping/scrolling viewport now --
+        // see scrollTimelineToCurrent's identical comment. Using listEl's own rect/scrollLeft here
+        // would read the full unclipped CONTENT extent instead of the visible viewport, breaking
+        // edge detection entirely.
+        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
+        if (!this.state.isRandom && scrollEl) {
+            const rect = scrollEl.getBoundingClientRect();
             const EDGE = 40; // px from either edge that triggers auto-scroll
             const MAX_SPEED = 12; // px per tick
             if (clientX < rect.left + EDGE) {
-                listEl.scrollLeft -= MAX_SPEED * (1 - Math.max(0, clientX - rect.left) / EDGE);
+                scrollEl.scrollLeft -= MAX_SPEED * (1 - Math.max(0, clientX - rect.left) / EDGE);
             } else if (clientX > rect.right - EDGE) {
-                listEl.scrollLeft += MAX_SPEED * (1 - Math.max(0, rect.right - clientX) / EDGE);
+                scrollEl.scrollLeft += MAX_SPEED * (1 - Math.max(0, rect.right - clientX) / EDGE);
             }
         }
 
