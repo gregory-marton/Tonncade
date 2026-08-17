@@ -3807,6 +3807,136 @@ test('Compose: the Tonnetz highlights ONE ring per distinct pitch in a time-rang
   expect(ringCount).toBe(2); // ...but only 2 distinct (p,q) cells among them
 });
 
+test('Compose: refreshStaff renders the real grand staff and threads each note\'s state.notes index through as id', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const ids = await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 64, p: 1, q: 0, time: 1.0, duration: 0.4 }, // deliberately out of time order
+      { midi: 60, p: 0, q: 0, time: 0.0, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+    return ComposeMode._staffRender.noteXPositions.map((n) => n.id);
+  });
+  expect(ids).toEqual([1, 0]); // re-sorted by time internally, but each entry still points at ITS OWN state.notes index
+});
+
+test('Compose: addNoteAt inserts a note at an exact pitch/time without shifting any other note, and undo removes it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const result = await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.refreshBoard();
+    ComposeMode.addNoteAt(67, 3.0);
+    const afterAdd = ComposeMode.state.notes.map((n) => ({ midi: n.midi, time: n.time }));
+    ComposeMode.state.undoStack.undo();
+    const afterUndo = ComposeMode.state.notes.map((n) => ({ midi: n.midi, time: n.time }));
+    return { afterAdd, afterUndo };
+  });
+  expect(result.afterAdd).toEqual([{ midi: 60, time: 0 }, { midi: 67, time: 3.0 }]);
+  expect(result.afterUndo).toEqual([{ midi: 60, time: 0 }]); // the OTHER note's time is untouched throughout -- no shift-ripple
+});
+
+test('Compose: clicking empty staff space adds a note there; dragging an existing notehead mostly vertically re-pitches it live and undo restores it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.refreshBoard();
+  });
+  await page.waitForTimeout(200); // let layout/ResizeObserver settle before reading pixel coords
+
+  // Click empty space (far right of the rendered staff, past any note) -> adds a new note.
+  const svgBox = await page.evaluate(() => {
+    const svg = document.querySelector('#compose-staff svg');
+    const r = svg.getBoundingClientRect();
+    return { left: r.left, top: r.top };
+  });
+  const emptyX = svgBox.left + 250;
+  const emptyY = svgBox.top + 20; // roughly on the treble staff
+  await page.mouse.click(emptyX, emptyY);
+  const afterClick = await page.evaluate(() => ComposeMode.state.notes.length);
+  expect(afterClick).toBe(2);
+
+  // Drag the ORIGINAL note (midi 60) vertically to re-pitch it.
+  const before = await page.evaluate(() => {
+    const n = ComposeMode._staffRender.noteXPositions.find((p) => p.id === 0);
+    return { x: n.x, y: n.y, midi: ComposeMode.state.notes[0].midi };
+  });
+  await page.mouse.move(svgBox.left + before.x, svgBox.top + before.y);
+  await page.mouse.down();
+  await page.mouse.move(svgBox.left + before.x, svgBox.top + before.y - 30, { steps: 5 }); // up 30px -- several diatonic steps
+  await page.mouse.up();
+  const afterDrag = await page.evaluate(() => {
+    const n = ComposeMode.state.notes[0];
+    return { midi: n.midi, pqMidiMatches: Tonnetz.getMidi(n.p, n.q) === n.midi };
+  });
+  expect(afterDrag.midi).not.toBe(before.midi); // pitch actually changed
+  expect(afterDrag.midi).toBeGreaterThan(before.midi); // dragged UP -> higher pitch
+  expect(afterDrag.pqMidiMatches).toBe(true); // p/q stayed in sync with the new midi (live Tonnetz sync)
+
+  await page.evaluate(() => ComposeMode.state.undoStack.undo());
+  const afterUndo = await page.evaluate(() => ComposeMode.state.notes[0].midi);
+  expect(afterUndo).toBe(before.midi);
+});
+
+test('Compose: dragging an existing notehead mostly horizontally retimes it (staff-exclusive -- no Tonnetz equivalent)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+  });
+  await page.waitForTimeout(200); // let layout/ResizeObserver settle before reading pixel coords
+  const svgBox = await page.evaluate(() => {
+    const r = document.querySelector('#compose-staff svg').getBoundingClientRect();
+    return { left: r.left, top: r.top };
+  });
+  const before = await page.evaluate(() => {
+    const n = ComposeMode._staffRender.noteXPositions.find((p) => p.id === 0);
+    return { x: n.x, y: n.y, time: ComposeMode.state.notes[0].time, midi: ComposeMode.state.notes[0].midi };
+  });
+  await page.mouse.move(svgBox.left + before.x, svgBox.top + before.y);
+  await page.mouse.down();
+  await page.mouse.move(svgBox.left + before.x + 120, svgBox.top + before.y, { steps: 5 }); // mostly horizontal
+  await page.mouse.up();
+  const after = await page.evaluate(() => ({ time: ComposeMode.state.notes[0].time, midi: ComposeMode.state.notes[0].midi }));
+  expect(after.time).toBeGreaterThan(before.time); // dragged right -> later
+  expect(after.midi).toBe(before.midi); // pitch untouched -- this gesture is time-only
+});
+
+test('Compose: leaving the staff mid-drag abandons the gesture and restores the note\'s pre-drag pitch (no stranded live-mutated state)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+    ComposeMode.refreshBoard();
+  });
+  await page.waitForTimeout(200); // let layout/ResizeObserver settle before reading pixel coords
+  const svgBox = await page.evaluate(() => {
+    const r = document.querySelector('#compose-staff svg').getBoundingClientRect();
+    return { left: r.left, top: r.top };
+  });
+  const before = await page.evaluate(() => {
+    const n = ComposeMode._staffRender.noteXPositions.find((p) => p.id === 0);
+    return { x: n.x, y: n.y, midi: ComposeMode.state.notes[0].midi };
+  });
+  await page.mouse.move(svgBox.left + before.x, svgBox.top + before.y);
+  await page.mouse.down();
+  await page.mouse.move(svgBox.left + before.x, svgBox.top + before.y - 30, { steps: 5 });
+  // Confirm the drag DID mutate live before leaving (otherwise this test can't distinguish
+  // "correctly restored" from "never changed in the first place").
+  const midDrag = await page.evaluate(() => ComposeMode.state.notes[0].midi);
+  expect(midDrag).not.toBe(before.midi);
+  await page.dispatchEvent('#compose-staff', 'mouseleave');
+  const after = await page.evaluate(() => ComposeMode.state.notes[0].midi);
+  expect(after).toBe(before.midi);
+  await page.mouse.up(); // release the OS-level mouse-down so it doesn't leak into the next test
+});
+
 test('Compose: transforming a time-range selection changes pitch, leaves time/duration exactly as it was', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
@@ -4003,6 +4133,70 @@ test('Notation.renderLabels: one note-name/octave label per note, positioned at 
   });
   expect(labels.map((l) => l.text)).toEqual(['C4', 'E4']);
   expect(parseFloat(labels[1].left)).toBeGreaterThan(parseFloat(labels[0].left)); // same x-order as the staff
+});
+
+test('Notation.pitchFromY: round-trips every rendered note\'s own reported y back to its exact midi', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-7';
+    document.body.appendChild(container);
+    const notes = [
+      { midi: 43, time: 0, duration: 0.5 },   // G2, bass clef bottom line
+      { midi: 60, time: 0.5, duration: 0.5 }, // C4
+      { midi: 64, time: 1, duration: 0.5 },   // E4, treble clef bottom line
+      { midi: 76, time: 1.5, duration: 0.5 }, // E5
+    ];
+    const r = Notation.render('notation-test-container-7', notes, { bpm: 120 });
+    return notes.map((n) => {
+      const rendered = r.noteXPositions.find((p) => p.midi === n.midi);
+      return { expected: n.midi, got: Notation.pitchFromY(rendered.y, r.staveBounds, null) };
+    });
+  });
+  for (const { expected, got } of result) {
+    expect(got).toBe(expected);
+  }
+});
+
+test('Notation.pitchFromY: respects a sharp key signature\'s spelling when landing on an altered letter', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-8';
+    document.body.appendChild(container);
+    // F#4 (midi 66) in G major (fifths=1, F is sharped) -- render at that key so the notehead
+    // itself sits on the F line/space (VexFlow draws the accidental via the key sig, not a
+    // per-note one), then confirm pitchFromY reconstructs the same midi from that y.
+    const notes = [{ midi: 66, time: 0, duration: 0.5 }];
+    const r = Notation.render('notation-test-container-8', notes, { bpm: 120, keySignature: 1 });
+    return { got: Notation.pitchFromY(r.noteXPositions[0].y, r.staveBounds, 1) };
+  });
+  expect(result.got).toBe(66);
+});
+
+test('Notation.beatFromX: round-trips every rendered note\'s own reported x back to a beat inside its own measure', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-9';
+    document.body.appendChild(container);
+    const notes = [
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 2, duration: 0.5 }, // measure 2 at 120bpm/4-4
+    ];
+    const r = Notation.render('notation-test-container-9', notes, { bpm: 120 });
+    return r.noteXPositions.map((n) => ({
+      beatStart: n.beatStart,
+      recovered: Notation.beatFromX(n.x, r.barlineXPositions, 4),
+    }));
+  });
+  // Exact pixel->beat alignment isn't guaranteed (Formatter spaces noteheads, not raw beat
+  // fractions), but each note must recover a beat within its OWN measure, monotonically
+  // increasing with beatStart -- the actual guarantee click-to-add/drag-to-retime need.
+  expect(result[0].recovered).toBeGreaterThanOrEqual(0);
+  expect(result[0].recovered).toBeLessThan(4);
+  expect(result[1].recovered).toBeGreaterThanOrEqual(4);
+  expect(result[1].recovered).toBeLessThan(8);
 });
 
 test('Melody: the grand staff renders real notes once a song is loaded, matching the Random-vs-song timeline it mirrors', async ({ page }) => {

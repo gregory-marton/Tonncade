@@ -61,6 +61,9 @@ const ComposeMode = {
         chordBuffer: [],       // touches pending a shared time value -- see recordTouch
         chordBufferTime: 0,
         chordBufferTimer: null,
+        keySignature: null,    // fifths (-7..7), set by loadMelodyFromMusicXML's authored key or
+                                // detected from notes on load; null (sharps-only spelling) for a
+                                // piece composed from scratch with no load.
         undoStack: UndoStack.create(), // #17: reverses the last edit -- see undo(). Cleared on
                                         // Clear/loading a file, since undoing past that boundary
                                         // into whatever existed before doesn't mean anything.
@@ -91,6 +94,7 @@ const ComposeMode = {
         this.refreshBoard();
         this.setupEvents();
         this.setupDOMEvents();
+        this.setupStaffDOMEvents();
         this.updateStats();
     },
 
@@ -796,7 +800,25 @@ const ComposeMode = {
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
         this.renderSelectionMarkers();
+        this.refreshStaff();
         this.refreshTimeline();
+    },
+
+    // The real grand staff (Task #9, docs/melody-notation-design.md), driving click-to-add/
+    // drag-to-re-pitch/drag-to-retime. Each note gets `id: i` (its OWN state.notes index) BEFORE
+    // Notation.render internally re-sorts by time -- notesToBeatSpace/toMeasures/render all thread
+    // that id straight through to noteXPositions, so _hitTestNote can map a click back to a
+    // specific state.notes entry even when several notes share a pitch or a time. The render
+    // result (x/y positions, staveBounds, barlineXPositions) is stashed on `this._staffRender` --
+    // setupStaffDOMEvents' hit-testing/pitchFromY/beatFromX calls all read it from there, since
+    // it's rebuilt on every redraw (drawLattice-style: no incremental diffing).
+    refreshStaff: function() {
+        const notesWithId = this.state.notes.map((n, i) => Object.assign({}, n, { id: i }));
+        this._staffRender = Notation.render('compose-staff', notesWithId, {
+            bpm: this.state.tempoBPM,
+            keySignature: this.state.keySignature,
+        });
+        Notation.renderLabels('compose-staff-labels', this._staffRender ? this._staffRender.noteXPositions : [], this.state.keySignature);
     },
 
     // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash
@@ -889,6 +911,169 @@ const ComposeMode = {
         midis.forEach((m) => Render.highlightByMidi(m, 250));
         this.updateStats();
         if (midis.length) Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
+    },
+
+    // ---- Staff editing (Task #9, docs/melody-notation-design.md) ----
+    // "Click-to-add on the staff (exact pitch+time, fills the gap Tonnetz-tap can't), drag-to-
+    // re-pitch (live-synced with the Tonnetz), drag-to-retime (staff-exclusive) -- all routed
+    // through the existing mutators/undo stack, not a second independent document."
+
+    // Adds a brand-new note at an EXACT (midi, time) -- unlike insertAfterSelected, nothing else
+    // shifts: the player placed this note at a specific point they chose on the staff, not "right
+    // after this other note." near defaults to the origin the same way pasteClipboard/a
+    // from-scratch tap would.
+    addNoteAt: function(midi, time) {
+        const coord = Tonnetz.nearestCoordFor(midi);
+        const note = { midi, p: coord.p, q: coord.q, time: Math.max(0, time), duration: this.DEFAULT_DURATION };
+        this.state.notes.push(note);
+        const idx = this.state.notes.length - 1;
+        const prevSelected = this.state.selectedIndices;
+        this.state.selectedIndices = [idx];
+        this.state.undoStack.push(() => {
+            const i = this.state.notes.indexOf(note);
+            if (i >= 0) this.state.notes.splice(i, 1);
+            this.state.selectedIndices = prevSelected;
+            this.refreshBoard();
+        });
+        Render.highlightByMidi(midi, 250);
+        Synth.playNote(midi);
+        this.updateStats();
+        this.updateEditControls();
+        this.refreshBoard();
+    },
+
+    // Nearest rendered notehead to (x, y) within a fixed pixel radius, returned as a state.notes
+    // index (via the `id` Notation.render threads through -- see refreshStaff) -- or null if
+    // nothing's close enough, meaning "empty staff space" to setupStaffDOMEvents.
+    HIT_RADIUS_PX: 14,
+    _hitTestStaffNote: function(x, y) {
+        const r = this._staffRender;
+        if (!r || !r.noteXPositions) return null;
+        let best = null;
+        let bestDist = this.HIT_RADIUS_PX;
+        r.noteXPositions.forEach((n) => {
+            const dist = Math.hypot(n.x - x, n.y - y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = n.id;
+            }
+        });
+        return best;
+    },
+
+    // Pixels of movement below which a mousedown+mouseup counts as a plain click (add/select),
+    // not a drag (re-pitch/retime) -- distinguishes an intentional drag from a slightly shaky tap.
+    DRAG_DEAD_ZONE_PX: 4,
+
+    setupStaffDOMEvents: function() {
+        const container = document.getElementById('compose-staff');
+        if (!container) return;
+        let drag = null; // { noteIndex, kind: null|'pitch'|'time', startX, startY, moved, origMidi, origTime, origP, origQ }
+
+        const posFromEvent = (e) => {
+            const svg = container.querySelector('svg');
+            if (!svg) return null;
+            const rect = svg.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        };
+        const beatToTime = (beat) => beat * (60 / this.state.tempoBPM);
+
+        container.addEventListener('mousedown', (e) => {
+            const pos = posFromEvent(e);
+            if (!pos) return;
+            const hitIndex = this._hitTestStaffNote(pos.x, pos.y);
+            const hit = hitIndex != null ? this.state.notes[hitIndex] : null;
+            drag = {
+                noteIndex: hitIndex,
+                kind: null,
+                startX: pos.x,
+                startY: pos.y,
+                moved: false,
+                origMidi: hit ? hit.midi : null,
+                origTime: hit ? hit.time : null,
+                origP: hit ? hit.p : null,
+                origQ: hit ? hit.q : null,
+            };
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!drag) return;
+            const pos = posFromEvent(e);
+            if (!pos || !this._staffRender) return;
+            const dx = pos.x - drag.startX;
+            const dy = pos.y - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < this.DRAG_DEAD_ZONE_PX) return;
+            drag.moved = true;
+            if (drag.noteIndex == null) return; // dragging empty space: no live effect, only click-to-add on release
+            if (!drag.kind) drag.kind = Math.abs(dx) > Math.abs(dy) ? 'time' : 'pitch';
+            const note = this.state.notes[drag.noteIndex];
+            if (!note) return;
+            if (drag.kind === 'pitch') {
+                const midi = Notation.pitchFromY(pos.y, this._staffRender.staveBounds, this.state.keySignature);
+                if (midi !== note.midi) {
+                    const coord = Tonnetz.nearestCoordFor(midi, { p: note.p, q: note.q });
+                    note.midi = midi;
+                    note.p = coord.p;
+                    note.q = coord.q;
+                    this.refreshBoard();
+                }
+            } else {
+                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4);
+                const time = Math.max(0, beatToTime(beat));
+                if (Math.abs(time - note.time) > 1e-6) {
+                    note.time = time;
+                    this.refreshBoard();
+                }
+            }
+        });
+
+        const finishDrag = (e) => {
+            if (!drag) return;
+            const d = drag;
+            drag = null;
+            if (d.noteIndex != null) {
+                const note = this.state.notes[d.noteIndex];
+                if (d.moved && note) {
+                    // #17: commit ONE undo entry for the whole gesture, restoring the PRE-drag
+                    // values captured at mousedown -- not a per-mousemove entry each.
+                    const noteIndex = d.noteIndex;
+                    const origMidi = d.origMidi, origTime = d.origTime, origP = d.origP, origQ = d.origQ;
+                    const prevSelected = this.state.selectedIndices;
+                    this.state.selectedIndices = [noteIndex];
+                    this.state.undoStack.push(() => {
+                        const n = this.state.notes[noteIndex];
+                        if (n) { n.midi = origMidi; n.time = origTime; n.p = origP; n.q = origQ; }
+                        this.state.selectedIndices = prevSelected;
+                        this.refreshBoard();
+                    });
+                    this.updateStats();
+                    this.updateEditControls();
+                    this.refreshBoard();
+                } else if (!d.moved) {
+                    this.state.selectedIndices = [d.noteIndex];
+                    this.updateEditControls();
+                    this.refreshBoard();
+                }
+            } else if (!d.moved) {
+                const pos = posFromEvent(e);
+                if (!pos || !this._staffRender) return;
+                const midi = Notation.pitchFromY(pos.y, this._staffRender.staveBounds, this.state.keySignature);
+                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4);
+                this.addNoteAt(midi, beatToTime(beat));
+            }
+        };
+        container.addEventListener('mouseup', finishDrag);
+        container.addEventListener('mouseleave', () => {
+            // Abandon rather than commit if the pointer leaves mid-drag -- but a 'pitch'/'time'
+            // drag already mutated the note LIVE during mousemove (see above), so leaving without
+            // restoring it would strand that change with no undo entry ever pushed for it.
+            if (drag && drag.moved && drag.noteIndex != null) {
+                const n = this.state.notes[drag.noteIndex];
+                if (n) { n.midi = drag.origMidi; n.time = drag.origTime; n.p = drag.origP; n.q = drag.origQ; }
+                this.refreshBoard();
+            }
+            drag = null;
+        });
     },
 
     cleanup: function() {

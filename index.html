@@ -236,13 +236,18 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="compose-clear" class="icon-btn" title="Clear" aria-label="Clear">✕</button>
                         <button id="compose-save" class="icon-btn" title="Save" aria-label="Save">💾</button>
                     </div>
+                    <!-- The real grand staff (Task #9, docs/melody-notation-design.md): click empty
+                         space to add a note there (exact pitch+time), drag an existing notehead mostly
+                         VERTICALLY to re-pitch it (live-synced with the Tonnetz as you drag) or mostly
+                         HORIZONTALLY to retime it (staff-exclusive -- there's no time on the Tonnetz to
+                         drag against). See ComposeMode.refreshStaff/setupStaffDOMEvents. -->
+                    <div id="compose-staff" style="overflow-x: auto; margin-top: 4px; cursor: crosshair;"></div>
+                    <div id="compose-staff-labels" class="melody-note-list" style="height: 1.2em;"></div>
                     <!-- A time-ordered row of note tokens (docs/melody-notation-design.md's central
                          workflow): click one to select it, click-drag across several to select every
                          note in that TIME range regardless of pitch -- the selection then flattens onto
                          the Tonnetz (ComposeMode.renderSelectionMarkers) where the existing translate/
-                         rotate controls transform it, leaving time/duration untouched. A minimal
-                         stand-in for the real grand-staff view still to come; reuses Melody's own
-                         .melody-note-list/.note-token layout for visual consistency. -->
+                         rotate controls transform it, leaving time/duration untouched. -->
                     <div id="compose-timeline" class="melody-note-list" style="margin-top: 10px;"></div>
                     <!-- Shown only once at least one note is selected (see ComposeMode.updateEditControls).
                          Selection: shift-tap a note on the board to add/remove it; a plain tap on an

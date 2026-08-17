@@ -51,6 +51,13 @@ const Notation = {
     MEASURE_WIDTH: 180,
     STAVE_HEIGHT: 80,
 
+    // Diatonic (letter, not chromatic) bottom-line reference for each clef -- standard convention:
+    // treble's bottom line is E4, bass's is G2. Used by pitchFromY to walk UP from a click's Y
+    // position by whole diatonic steps (half a line-spacing each), the same way a real staff
+    // position works, then spell that landed letter per the current key signature.
+    CLEF_BOTTOM_LINE: { treble: { letter: 'E', octave: 4 }, bass: { letter: 'G', octave: 2 } },
+    LETTERS: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+
     // Rounds `beats` to the nearest 16th-note grid step.
     quantizeToGrid: function(beats) {
         return Math.round(beats * 4) / 4;
@@ -59,9 +66,16 @@ const Notation = {
     // Converts a note array (time/duration in SECONDS) into beat-space (quarter-note beats,
     // quantized to a 16th-note grid) at the given tempo. Sorted by beatStart -- callers already
     // producing sorted notes get a cheap no-op sort, not an assumption relied on silently.
+    // `id` (opaque, caller-assigned -- e.g. the caller's own array index, before this re-sorts by
+    // time) passes through unchanged into toMeasures/render's noteXPositions, so a caller that
+    // wants to hit-test a click back to ITS OWN note array (Compose's click-to-add/drag gestures)
+    // has a stable handle, since content alone (midi+beatStart) doesn't disambiguate a chord or a
+    // repeated pitch. Defaults to the input array's own index when omitted -- existing callers
+    // that don't care about it are unaffected.
     notesToBeatSpace: function(notes, bpm) {
         const secondsPerBeat = 60 / (bpm || 120);
-        return notes.map((n) => ({
+        return notes.map((n, i) => ({
+            id: n.id != null ? n.id : i,
             midi: n.midi,
             beatStart: this.quantizeToGrid(n.time / secondsPerBeat),
             beatDuration: Math.max(0.25, this.quantizeToGrid(n.duration / secondsPerBeat)),
@@ -110,7 +124,7 @@ const Notation = {
             inMeasure.forEach((n) => {
                 if (n.beatStart > cursor) items.push({ rest: true, beatDuration: n.beatStart - cursor });
                 const clippedDuration = Math.min(n.beatDuration, mEnd - n.beatStart);
-                items.push({ midi: n.midi, beatStart: n.beatStart, beatDuration: clippedDuration });
+                items.push({ id: n.id, midi: n.midi, beatStart: n.beatStart, beatDuration: clippedDuration });
                 cursor = n.beatStart + clippedDuration;
             });
             if (cursor < mEnd) items.push({ rest: true, beatDuration: mEnd - cursor });
@@ -127,11 +141,66 @@ const Notation = {
         return new VexFlow.StaveNote({ keys, duration: this.durationCode(beatDuration) + 'r', clef });
     },
 
+    // Given a fifths key signature, whether `letter` is altered by it, and by how much (0, +1, or
+    // -1 semitones) -- the letter-indexed mirror of Tonnetz._diatonicSpelling's own pitch-class-
+    // indexed table, reusing the SAME SHARP_ORDER/FLAT_ORDER/NATURAL_SEMITONE Tonnetz already
+    // exposes rather than duplicating them.
+    _letterAccidental: function(letter, fifths) {
+        if (fifths == null) return 0;
+        const order = fifths >= 0 ? Tonnetz.SHARP_ORDER : Tonnetz.FLAT_ORDER;
+        if (!order.slice(0, Math.abs(fifths)).includes(letter)) return 0;
+        return fifths >= 0 ? 1 : -1;
+    },
+
+    // Inverse of rendering: given a Y pixel (in the same coordinate space Notation.render's SVG
+    // uses) and the {trebleTop, trebleBottom, bassTop, bassBottom, spacing} staveBounds it
+    // returns, finds the nearest clef by distance to that stave's own vertical middle, then walks
+    // UP from that clef's bottom line by whole diatonic steps (half a line-spacing per step,
+    // confirmed empirically against VexFlow's own StaveNote.getYs() -- see the smoke test this was
+    // built from) to land on a letter, spelled per keySignature. This is genuinely diatonic-
+    // accurate (matches real staff-position math), not a coarse linear MIDI-range approximation --
+    // it just doesn't yet snap to ledger lines beyond a couple of steps past the staff, which
+    // isn't needed for a first cut (docs/melody-notation-design.md).
+    pitchFromY: function(y, staveBounds, keySignature) {
+        if (!staveBounds) return this.CLEF_SPLIT_MIDI;
+        const trebleMid = (staveBounds.trebleTop + staveBounds.trebleBottom) / 2;
+        const bassMid = (staveBounds.bassTop + staveBounds.bassBottom) / 2;
+        const useTreble = Math.abs(y - trebleMid) <= Math.abs(y - bassMid);
+        const bottom = useTreble ? this.CLEF_BOTTOM_LINE.treble : this.CLEF_BOTTOM_LINE.bass;
+        const bottomY = useTreble ? staveBounds.trebleBottom : staveBounds.bassBottom;
+        const halfSpacing = staveBounds.spacing / 2;
+        const steps = Math.round((bottomY - y) / halfSpacing);
+        const baseIndex = this.LETTERS.indexOf(bottom.letter);
+        const idx = ((baseIndex + steps) % 7 + 7) % 7;
+        const octave = bottom.octave + Math.floor((baseIndex + steps) / 7);
+        const letter = this.LETTERS[idx];
+        const semitone = Tonnetz.NATURAL_SEMITONE[letter] + this._letterAccidental(letter, keySignature);
+        return (octave + 1) * 12 + semitone;
+    },
+
+    // Inverse of beat->x layout: given an x pixel and the barlineXPositions Notation.render
+    // returns, finds which measure x falls in and interpolates linearly across that measure's
+    // width to a beat position. Used by click-to-add/drag-to-retime to turn a staff click back
+    // into a beat (then a time, via the caller's own bpm).
+    beatFromX: function(x, barlineXPositions, beatsPerMeasure) {
+        beatsPerMeasure = beatsPerMeasure || 4;
+        if (!barlineXPositions || barlineXPositions.length === 0) return 0;
+        let mi = 0;
+        for (let i = 0; i < barlineXPositions.length; i++) {
+            if (barlineXPositions[i] <= x) mi = i;
+        }
+        const measureStartX = barlineXPositions[mi];
+        const measureEndX = measureStartX + this.MEASURE_WIDTH;
+        const frac = Math.max(0, Math.min(1, (x - measureStartX) / (measureEndX - measureStartX)));
+        return Math.max(0, mi * beatsPerMeasure + frac * beatsPerMeasure);
+    },
+
     // Renders `notes` into #<containerId> as a grand staff. Returns null if there's nothing to
     // draw (empty container, matches every other mode's "nothing to show yet" convention) or
-    // {width, height, noteXPositions} -- noteXPositions is [{midi, beatStart, x}], the x-position
-    // readback later work (barline/label/timeline sync, docs/melody-notation-design.md) needs,
-    // via VexFlow's own getAbsoluteX() -- not reconstructed separately.
+    // {width, height, noteXPositions, barlineXPositions, staveBounds} -- noteXPositions is
+    // [{midi, beatStart, x, y, clef}] (x/y via VexFlow's own getAbsoluteX()/getYs(), not
+    // reconstructed separately), staveBounds is the {trebleTop/Bottom, bassTop/Bottom, spacing}
+    // pitchFromY needs for hit-testing clicks on EMPTY staff space (not on an existing note).
     render: function(containerId, notes, opts) {
         opts = opts || {};
         const container = document.getElementById(containerId);
@@ -156,6 +225,7 @@ const Notation = {
 
         const noteXPositions = [];
         const barlineXPositions = [];
+        let staveBounds = null;
         let x = 10;
         measures.forEach((items, mi) => {
             barlineXPositions.push(x);
@@ -175,6 +245,15 @@ const Notation = {
             treble.setContext(ctx).draw();
             bass.setContext(ctx).draw();
             if (mi === 0) {
+                staveBounds = {
+                    trebleTop: treble.getYForLine(0),
+                    trebleBottom: treble.getYForLine(4),
+                    bassTop: bass.getYForLine(0),
+                    bassBottom: bass.getYForLine(4),
+                    spacing: treble.getSpacingBetweenLines(),
+                };
+            }
+            if (mi === 0) {
                 new VexFlow.StaveConnector(treble, bass).setType('brace').setContext(ctx).draw();
                 new VexFlow.StaveConnector(treble, bass).setType('singleLeft').setContext(ctx).draw();
             }
@@ -192,7 +271,7 @@ const Notation = {
                 const { key, accidental } = this.midiToVexKey(item.midi, keySignature);
                 const vexNote = new VexFlow.StaveNote({ keys: [key], duration: this.durationCode(item.beatDuration), clef });
                 if (accidental) vexNote.addModifier(new VexFlow.Accidental(accidental), 0);
-                noteXPositions.push({ midi: item.midi, beatStart: item.beatStart, clef, vexNote });
+                noteXPositions.push({ id: item.id, midi: item.midi, beatStart: item.beatStart, clef, vexNote });
                 if (isTreble) {
                     trebleItems.push(vexNote);
                     bassItems.push(this._ghostRest('bass', item.beatDuration));
@@ -217,8 +296,16 @@ const Notation = {
         return {
             width,
             height,
-            noteXPositions: noteXPositions.map((n) => ({ midi: n.midi, beatStart: n.beatStart, clef: n.clef, x: n.vexNote.getAbsoluteX() })),
+            noteXPositions: noteXPositions.map((n) => ({
+                id: n.id,
+                midi: n.midi,
+                beatStart: n.beatStart,
+                clef: n.clef,
+                x: n.vexNote.getAbsoluteX(),
+                y: n.vexNote.getYs()[0],
+            })),
             barlineXPositions: barlineXPositions,
+            staveBounds: staveBounds,
         };
     },
 
