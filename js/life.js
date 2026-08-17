@@ -404,6 +404,7 @@ const LifeMode = {
         live: new Map(),          // "p,q" -> state (>=1); absent = dead/empty (state 0)
         initial: [],              // [key, state] seed pairs, for reset
         name: 'automaton',        // the loaded file's own name (or filename), for the rule display and download link's filename
+        rawYaml: null,            // the exact source text last loaded from, for the rule display -- see updateRuleDisplay
         rule: { survival: [], birth: [] },
         multi: null,              // multi-state config {states, table, order} or null for 2-state
         sound: { when: 'born', duration: 0.4, velocity: 80 },
@@ -467,7 +468,7 @@ const LifeMode = {
         try {
             const parsed = Life.parseYaml(text);
             if (!parsed.name && filename) parsed.name = filename.replace(/\.ya?ml$/i, '');
-            this.loadAutomaton(parsed);
+            this.loadAutomaton(parsed, text);
             const filenameEl = document.getElementById('life-filename');
             if (filenameEl) filenameEl.textContent = filename || '';
         } catch (err) {
@@ -480,8 +481,14 @@ const LifeMode = {
     //   * 2-state (birth/survival rule): `rule`, cells [[p,q],...] all seeded to state 1.
     //   * multi-state (transition table, e.g. beehive): `states`/`transition`/`order`, cells
     //     [[p,q,state],...]. Optional per-state `sounds` (a list of {state, velocity, duration}).
-    loadAutomaton: function(a) {
+    // `rawText`, optional: the exact source text this automaton was loaded from (loadAutomatonFromText
+    // passes it through), kept verbatim for updateRuleDisplay -- toYaml() re-serializes only the
+    // flat/shorthand rule shape it knows how to write and would silently mangle a richer one
+    // (isotropy/require/forbid clauses, see docs/life-rules.md), so showing the player the real
+    // source text is the only honest option once a file with those is loaded.
+    loadAutomaton: function(a, rawText) {
         this.stop();
+        this.state.rawYaml = rawText || null;
         this.state.name = a.name || this.state.name || 'automaton';
         this.state.rule = a.rule || { survival: [], birth: [] };
         this.state.sound = a.sound || { when: 'born', duration: 0.4, velocity: 80 };
@@ -863,17 +870,22 @@ const LifeMode = {
         this.updateRuleDisplay();
     },
 
-    // Requested live: the current rule, visible right under the generation counter, not only
-    // discoverable by opening the loaded .yaml. Two-state rules show as Survival/Birth (matching
-    // this schema's own field names, docs/life-rules.md); multi-state rules have no such rule --
-    // they're a transition table instead, so this shows their shape (state count + evaluation
-    // order) rather than something Survival/Birth can't express.
+    // Requested live: the current automaton's real YAML, visible right under the generation
+    // counter, not only discoverable by opening the loaded file. A first version paraphrased this
+    // as "Survival: 3, 5 · Birth: 2" -- which silently drops everything the schema actually
+    // supports beyond a flat ring-count list: isotropy, require/forbid neighbor clauses, and the
+    // musical axis/tone/semitone selector names that are the whole point of a Tonnetz-based rule
+    // (docs/life-rules.md). Rather than growing that paraphrase to keep up, this shows the real
+    // source text verbatim -- state.rawYaml, set by loadAutomaton whenever a file was actually
+    // loaded. With no file loaded (the built-in default, or a rule assembled directly rather than
+    // parsed), toYaml() is a reasonable stand-in: it's exact for the flat/shorthand rule shape
+    // that path always uses, and only lossy for the richer clause forms a real loaded file can
+    // have (a real YAML parser replacing Life.parseYaml's own hand-rolled one, tracked
+    // separately, would let toYaml() close that gap too).
     updateRuleDisplay: function() {
         const el = document.getElementById('life-rule-display');
         if (!el) return;
-        el.textContent = this.state.multi
-            ? `${this.state.multi.states} states, order ${this.state.multi.order}`
-            : `Survival: ${this.state.rule.survival.join(', ') || '—'} · Birth: ${this.state.rule.birth.join(', ') || '—'}`;
+        el.textContent = this.state.rawYaml || this.toYaml(this.state.name);
     },
 
     // ---- Cross-mode copy/paste (App.copy/App.paste; see js/main.js, docs/invariants.md INV-47) ----

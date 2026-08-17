@@ -3658,8 +3658,11 @@ test('Life: the automaton source menu offers an "Upload File…" entry that open
 });
 
 // Requested live: the current rule should be visible underneath the generation counter, not only
-// discoverable by opening the loaded .yaml file.
-test('Life: the current rule is displayed underneath the generation counter', async ({ page }) => {
+// discoverable by opening the loaded .yaml file. First shipped as a one-line "Survival: 3, 5 ·
+// Birth: 2" paraphrase -- rejected live as hiding exactly the rule vocabulary that matters most
+// for a Tonnetz-based rule (isotropy, require/forbid neighbor clauses, the musical axis/tone/
+// semitone selector names), so it shows the real YAML now instead.
+test('Life: the current rule is displayed underneath the generation counter (falls back to toYaml when no file was loaded)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
   await page.evaluate(() => LifeMode.loadAutomaton({
@@ -3670,6 +3673,43 @@ test('Life: the current rule is displayed underneath the generation counter', as
   expect(text).toContain('3');
   expect(text).toContain('5');
   expect(text).toContain('2');
+});
+
+test('Life: loading a real file shows its exact source YAML, not a re-summarized/re-serialized version', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  // A rule using the richer clause form (isotropy/require) that toYaml() -- which only knows how
+  // to write the flat survival/birth shorthand -- would mangle if this were re-serialized instead
+  // of shown verbatim.
+  const yaml = [
+    'name: "Leading-tone bloom"',
+    'rule:',
+    '  birth:',
+    '    - ring_count: [2]',
+    '      isotropy: [para]',
+    '  survival:',
+    '    - ring_count: [3, 4]',
+    '    - ring_count: [2]',
+    '      require: [semitone_up]',
+    'sound: { when: born, duration: 0.4 }',
+    'initial:',
+    '  cells: [[0, 0]]',
+    'tempo: 180',
+    '',
+  ].join('\n');
+  await page.evaluate((text) => LifeMode.loadAutomatonFromText(text, 'leading-tone-bloom.yaml'), yaml);
+  const text = await page.evaluate(() => document.getElementById('life-rule-display').textContent);
+  expect(text).toBe(yaml);
+});
+
+test('Life: a link to the deployed rule-format reference sits next to the rule display', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  const href = await page.evaluate(() => {
+    const el = document.querySelector('#life-controls a[href*="life-rules.md"]');
+    return el ? el.getAttribute('href') : null;
+  });
+  expect(href).toBe('https://gregory-marton.github.io/Tonncade/docs/life-rules.md');
 });
 
 // Requested live: a download link for the current (possibly hand-edited/mid-evolution) automaton,

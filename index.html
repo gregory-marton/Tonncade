@@ -327,7 +327,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     </div>
                     <div class="stats-panel">
                         <p title="Generation">gen <span id="life-generation">0</span></p>
-                        <p id="life-rule-display" title="Current rule" style="font-size: 11px; color: var(--dim); margin: 4px 0 0 0;"></p>
+                        <!-- The raw YAML as loaded (or, with no file loaded, LifeMode.toYaml()'s own
+                             equivalent) -- not a re-summarized subset. The rule vocabulary (isotropy,
+                             require/forbid neighbor clauses, the musical axis/tone/semitone selector
+                             names) is too rich for a one-line paraphrase to represent honestly; showing
+                             the real source is what actually lets a player understand and reuse it. -->
+                        <pre id="life-rule-display" title="Current automaton (YAML)" style="font-size: 11px; color: var(--dim); margin: 4px 0 0 0; max-height: 220px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; padding: 6px;"></pre>
+                        <p style="margin: 4px 0 0 0;"><a href="https://gregory-marton.github.io/Tonncade/docs/life-rules.md" target="_blank" rel="noopener" style="font-size: 11px; color: var(--accent);">Rule format reference &#8599;</a></p>
                     </div>
                 </div>
 
