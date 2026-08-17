@@ -345,6 +345,16 @@ svg {
 }
 .note-token { flex: 0 0 auto; }
 
+/* Compose's timeline selection (#compose-timeline reuses .melody-note-list/.note-token) -- the
+   time-range-selection half of docs/melody-notation-design.md's central workflow. Matches
+   .compose-selected-note's accent-colored dashed-ring convention on the Tonnetz side, so a
+   selection reads as the same thing on both surfaces. */
+.note-token.selected {
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-style: dashed;
+}
+
 /* A low-contrast tick between two adjacent notes whose computed measure differs (#46 part 4,
    4/4 assumed -- see MelodyMode.measureOf). Never gets a data-note-idx, so it's naturally
    invisible to positionScrubMarker's/updateScrubDragTarget's .note-token-only queries. */

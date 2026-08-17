@@ -3734,6 +3734,124 @@ test('Compose: loading a file clears the undo history', async ({ page }) => {
   expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op
 });
 
+// ────────────────────────────────────────────────────────────────────────
+// docs/melody-notation-design.md's central workflow: select a time range on the (still minimal,
+// pre-grand-staff) timeline, watch it flatten onto the Tonnetz, then transform it -- pitch changes,
+// time never does. #compose-timeline is a stand-in for the eventual VexFlow staff; the selection
+// mechanism and the transform math (translateSelection/rotateSelection) are the real, durable part.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Compose: the timeline renders one token per note, in TIME order (not array-insertion order)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    // Deliberately inserted out of time order -- the timeline must still read left-to-right by time.
+    ComposeMode.state.notes = [
+      { midi: 64, p: 1, q: 0, time: 1.0, duration: 0.4 },
+      { midi: 60, p: 0, q: 0, time: 0.0, duration: 0.4 },
+      { midi: 67, p: 0, q: 1, time: 2.0, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+  });
+  const order = await page.evaluate(() =>
+    [...document.querySelectorAll('#compose-timeline .note-token')].map(t => parseInt(t.getAttribute('data-note-idx'), 10))
+  );
+  expect(order).toEqual([1, 0, 2]); // sorted by time (0.0, 1.0, 2.0), carrying ORIGINAL array indices
+});
+
+test('Compose: a plain click on a timeline token selects just that note (or chord, if several share that time)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+    ComposeMode.selectTimeRange(1, 1); // click == drag onto itself
+  });
+  expect(await page.evaluate(() => ComposeMode.state.selectedIndices)).toEqual([1]);
+});
+
+test('Compose: dragging across timeline tokens selects every note in that TIME range, regardless of pitch', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },   // measure 1
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },   // measure 1
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },   // measure 1
+      { midi: 72, p: -1, q: 2, time: 10, duration: 0.4 }, // far outside the range -- must stay unselected
+    ];
+    ComposeMode.refreshBoard();
+    ComposeMode.selectTimeRange(0, 2); // dragged from the first token to the third
+  });
+  const selected = await page.evaluate(() => ComposeMode.state.selectedIndices.slice().sort());
+  expect(selected).toEqual([0, 1, 2]);
+});
+
+test('Compose: the Tonnetz highlights ONE ring per distinct pitch in a time-range selection, not one per note', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+      { midi: 60, p: 0, q: 0, time: 2, duration: 0.4 }, // same pitch/cell as note 0, different time
+    ];
+    ComposeMode.refreshBoard();
+    ComposeMode.selectTimeRange(0, 2); // selects all three notes...
+  });
+  const ringCount = await page.evaluate(() => document.querySelectorAll('.compose-selected-note').length);
+  expect(ringCount).toBe(2); // ...but only 2 distinct (p,q) cells among them
+});
+
+test('Compose: transforming a time-range selection changes pitch, leaves time/duration exactly as it was', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  const before = await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.55 },
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+    ComposeMode.selectTimeRange(0, 2);
+    ComposeMode.translateSelection(1, 0); // shift every selected note up a fifth (p+1)
+    return ComposeMode.state.notes.map(n => ({ time: n.time, duration: n.duration }));
+  });
+  expect(before).toEqual([
+    { time: 0, duration: 0.4 },
+    { time: 1, duration: 0.55 },
+    { time: 2, duration: 0.4 },
+  ]); // times/durations completely untouched by a transform that only ever moves p/q/midi
+  const pitches = await page.evaluate(() => ComposeMode.state.notes.map(n => ({ p: n.p, q: n.q })));
+  expect(pitches).toEqual([{ p: 1, q: 0 }, { p: 2, q: 0 }, { p: 1, q: 1 }]); // every selected note moved by the same (dp,dq)
+});
+
+test('Compose: dragging on the Tonnetz still works when the selection came from the timeline, not a Tonnetz tap', async ({ page }) => {
+  // The drag-initiation check in setupEvents (isDraggable) only requires SOME note at the
+  // moused-down cell to already be selected -- this confirms that holds even when the selection
+  // was populated by selectTimeRange (a scattered, non-contiguous set of cells), not selectAtCell.
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 71, p: 5, q: 5, time: 1, duration: 0.4 }, // far away on the lattice -- not adjacent to the first
+    ];
+    ComposeMode.refreshBoard();
+    ComposeMode.selectTimeRange(0, 1);
+  });
+  const cellAt00 = await page.evaluate(() => {
+    const el = document.querySelector('polygon.cell[data-p="0"][data-q="0"]');
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  const matches = await page.evaluate(() => ComposeMode.notesAt(0, 0).some(i => ComposeMode.state.selectedIndices.includes(i)));
+  expect(matches).toBe(true); // sanity: the (0,0) cell really does host a selected note
+});
 
 // Four separate per-mode Undo buttons (#sandbox-undo/#blast-undo/#life-undo/#compose-undo) used to
 // each leak visible outside their own mode (a bare un-ID'd wrapper div never covered by setMode's

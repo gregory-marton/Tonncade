@@ -164,6 +164,27 @@ const ComposeMode = {
             };
         }
 
+        // Time-range selection (docs/melody-notation-design.md's central workflow): mousedown on a
+        // token remembers its ORIGINAL note index; mouseup on a (possibly different) token selects
+        // every note between the two in TIME, regardless of pitch. A plain click (down and up on
+        // the same token) is just the idxA===idxB case of the same call.
+        const timelineEl = document.getElementById('compose-timeline');
+        if (timelineEl) {
+            let dragStartIdx = null;
+            timelineEl.addEventListener('mousedown', (e) => {
+                const token = e.target.closest('.note-token');
+                if (!token) return;
+                dragStartIdx = parseInt(token.getAttribute('data-note-idx'), 10);
+            });
+            timelineEl.addEventListener('mouseup', (e) => {
+                if (dragStartIdx === null) return;
+                const token = e.target.closest('.note-token');
+                const endIdx = token ? parseInt(token.getAttribute('data-note-idx'), 10) : dragStartIdx;
+                this.selectTimeRange(dragStartIdx, endIdx);
+                dragStartIdx = null;
+            });
+        }
+
         // Shares Melody's exact remembered folder (both work with .mid files) -- see
         // js/file-folder.js's `ids` parameter, which is what lets the same MidiFolder instance
         // serve two different modes' own DOM elements. No `hasRandom`: Compose has no starting-
@@ -741,15 +762,25 @@ const ComposeMode = {
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
         this.renderSelectionMarkers();
+        this.refreshTimeline();
     },
 
     // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash
     // -- drawLattice wipes the whole <svg>, so these have to be re-added after every redraw
-    // rather than surviving as a diff.
+    // rather than surviving as a diff. One ring per DISTINCT (p,q), not one per note -- a
+    // time-range selection (see selectTimeRange) can span several notes that share a cell (a
+    // repeated pitch within the range), and the Tonnetz is pitch-only: it has nothing to show
+    // for "two different times, same pitch" beyond one highlighted cell. This IS the
+    // "flattening" docs/melody-notation-design.md describes -- a simplification of this VIEW
+    // only, never of state.notes itself.
     renderSelectionMarkers: function() {
+        const seen = new Set();
         this.state.selectedIndices.forEach(i => {
             const n = this.state.notes[i];
             if (!n) return;
+            const key = n.p + ',' + n.q;
+            if (seen.has(key)) return;
+            seen.add(key);
             const pos = Render.getScreenPos(n.p, n.q);
             const ring = document.createElementNS(Render.NS, 'circle');
             ring.setAttribute('cx', pos.x);
@@ -758,6 +789,45 @@ const ComposeMode = {
             ring.setAttribute('class', 'compose-selected-note');
             Render.appendToLattice(ring);
         });
+    },
+
+    // A minimal time-ordered stand-in for the real grand-staff view (docs/melody-notation-design.md)
+    // -- one token per note, sorted by time (not raw array order, which insert/translate/rotate
+    // don't necessarily preserve), each carrying its ORIGINAL state.notes index so a click/drag can
+    // reference it. Rebuilt on every refreshBoard() the same way the Tonnetz itself is -- no diffing.
+    refreshTimeline: function() {
+        const el = document.getElementById('compose-timeline');
+        if (!el) return;
+        el.innerHTML = '';
+        const ordered = this.state.notes.map((n, i) => ({ n, i })).sort((a, b) => a.n.time - b.n.time);
+        ordered.forEach(({ n, i }) => {
+            const span = document.createElement('span');
+            span.className = 'note-token' + (this.state.selectedIndices.includes(i) ? ' selected' : '');
+            span.setAttribute('data-note-idx', i);
+            span.textContent = Tonnetz.getNoteName(n.midi) + Tonnetz.getOctave(n.midi);
+            el.appendChild(span);
+        });
+    },
+
+    // The time-range-selection half of the central workflow: every note whose TIME falls within
+    // [min(a.time, b.time), max(a.time, b.time)] gets selected, regardless of pitch -- a plain
+    // click (idxA === idxB) selects just that time point (which may be more than one note, if
+    // it's a chord). REPLACES the selection outright (v1 -- no shift-to-extend yet, unlike
+    // selectAtCell's Tonnetz-tap shiftKey toggle). translateSelection/rotateSelection then apply
+    // to exactly this set with zero changes of their own: they already only ever touch each
+    // selected note's p/q/midi, never time/duration.
+    selectTimeRange: function(idxA, idxB) {
+        const a = this.state.notes[idxA];
+        const b = this.state.notes[idxB];
+        if (!a || !b) return;
+        const t0 = Math.min(a.time, b.time);
+        const t1 = Math.max(a.time, b.time);
+        this.state.selectedIndices = [];
+        this.state.notes.forEach((n, i) => {
+            if (n.time >= t0 && n.time <= t1) this.state.selectedIndices.push(i);
+        });
+        this.updateEditControls();
+        this.refreshBoard();
     },
 
     // ---- Cross-mode copy/paste (App.copy/App.paste; docs/invariants.md INV-47) ----
