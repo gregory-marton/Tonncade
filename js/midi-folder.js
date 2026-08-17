@@ -33,10 +33,17 @@ for the JavaScript code in this file.
 const MidiFolder = FileFolder.create({
     onlineIndexUrl: './midi/index.json',
     bundledPathPrefix: './midi/',
-    extensionPattern: /\.midi?$/i,
-    readAs: 'arrayBuffer',
+    // Both extensions listable/browsable in the SAME folder -- MusicXML is the canonical format
+    // going forward (docs/melody-notation-design.md), MIDI stays a fully-supported import for
+    // files that already exist. extensionPattern governs the LOCAL FOLDER listing filter; the
+    // bundled online tier's own files are whatever midi/index.json says regardless of this regex.
+    extensionPattern: /\.(midi?|musicxml|xml)$/i,
+    readAs: 'arrayBuffer',              // default for anything NOT matched by fileTypes below (.mid)
     mimeType: 'audio/midi',
     loadMethod: 'loadMelodyFromArrayBuffer',
+    fileTypes: [
+        { pattern: /\.(musicxml|xml)$/i, readAs: 'text', loadMethod: 'loadMelodyFromMusicXML' },
+    ],
     autoLoadFirstBundled: false,
 });
 

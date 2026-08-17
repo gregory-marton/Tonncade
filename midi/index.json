@@ -1,26 +1,26 @@
 [
   {
     "name": "Hot Cross Buns",
-    "file": "hot-cross-buns.mid"
+    "file": "hot-cross-buns.musicxml"
   },
   {
     "name": "Frère Jacques",
-    "file": "frere-jacques.mid"
+    "file": "frere-jacques.musicxml"
   },
   {
     "name": "Happy Birthday",
-    "file": "happy-birthday.mid"
+    "file": "happy-birthday.musicxml"
   },
   {
     "name": "Alphabet Song (Twinkle Twinkle)",
-    "file": "alphabet.mid"
+    "file": "alphabet.musicxml"
   },
   {
     "name": "Mary Had a Little Lamb",
-    "file": "mary-had-a-little-lamb.mid"
+    "file": "mary-had-a-little-lamb.musicxml"
   },
   {
     "name": "Row Row Row Your Boat",
-    "file": "row-row-row-your-boat.mid"
+    "file": "row-row-row-your-boat.musicxml"
   }
 ]

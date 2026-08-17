@@ -4311,3 +4311,68 @@ test('Melody: the Tonnetz\'s own cell labels spell notes per the loaded song\'s 
   expect(anyBbLabel).toBe(true);
   expect(anySharpMislabel).toBe(false);
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Bundled songs (midi/index.json) are now .musicxml, authored -- not derived from MIDI
+// (docs/melody-notation-design.md, task #8: scripts/generate-bundled-musicxml.js). Confirms the
+// real end-to-end path: MelodyFolder's bundled tier -> loadMelodyFromMusicXML -> a playable melody,
+// through the actual app UI, not just the parser directly.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Bundled songs: midi/index.json now lists .musicxml files', async ({ page }) => {
+  const res = await page.request.get('/midi/index.json');
+  const index = await res.json();
+  expect(index.length).toBeGreaterThan(0);
+  index.forEach((song) => expect(song.file).toMatch(/\.musicxml$/));
+});
+
+test('Melody: loading the first bundled (.musicxml) song produces a real, playable melody', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  // Melody's MidiFolder instance has autoLoadFirstBundled: false BY DESIGN (it already has its
+  // own Random offline-degrade default, js/midi-folder.js) -- explicitly select the first bundled
+  // song, same as a real player picking it from the dropdown, rather than waiting for an
+  // auto-load that deliberately doesn't happen here.
+  await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex && MidiFolder.onlineIndex.length > 0, { timeout: 5000 });
+  await page.evaluate(() => MidiFolder.loadOnlineFile(0));
+  const result = await page.evaluate(() => ({
+    noteCount: MelodyMode.state.melody.length,
+    allValidMidi: MelodyMode.state.melody.every((n) => Number.isFinite(n.midi) && n.midi >= 0 && n.midi <= 127),
+    allPositiveDurations: MelodyMode.state.melody.every((n) => n.duration > 0),
+    monotonicTime: MelodyMode.state.melody.every((n, i, arr) => i === 0 || n.time >= arr[i - 1].time),
+    keySignature: MelodyMode.state.keySignature,
+  }));
+  expect(result.noteCount).toBeGreaterThan(0);
+  expect(result.allValidMidi).toBe(true);
+  expect(result.allPositiveDurations).toBe(true);
+  expect(result.monotonicTime).toBe(true);
+  expect(result.keySignature).toBe(0); // every bundled song detected as C major (all-natural pitches)
+});
+
+test('Melody: EVERY bundled song loads without error and produces a sane melody', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex, { timeout: 5000 });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  const results = await page.evaluate(async () => {
+    const out = [];
+    for (let i = 0; i < MidiFolder.onlineIndex.length; i++) {
+      await MidiFolder.loadOnlineFile(i);
+      out.push({
+        name: MidiFolder.onlineIndex[i].name,
+        noteCount: MelodyMode.state.melody.length,
+        allValidMidi: MelodyMode.state.melody.every((n) => Number.isFinite(n.midi)),
+      });
+    }
+    return out;
+  });
+
+  expect(results.length).toBe(6);
+  results.forEach((r) => {
+    expect(r.noteCount, `${r.name} should have notes`).toBeGreaterThan(0);
+    expect(r.allValidMidi, `${r.name} should have valid MIDI pitches throughout`).toBe(true);
+  });
+  expect(errors).toEqual([]);
+});

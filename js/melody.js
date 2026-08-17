@@ -284,6 +284,38 @@ const MelodyMode = {
         }
     },
 
+    // MusicXML counterpart to loadMelodyFromArrayBuffer -- js/file-folder.js's fileTypes dispatch
+    // (js/midi-folder.js) routes any .musicxml/.xml file here instead. Unlike MIDI, the key
+    // signature is AUTHORED (parsed straight from the file's own <key><fifths>), not detected --
+    // detectKeySignature is only a fallback for files that genuinely never declared one. No
+    // extractMonophonicMelody step: this app's own MusicXML (js/musicxml.js's writer) is already
+    // single-voice-plus-chords by construction, the same shape Compose already produces -- a real
+    // multi-part external file with genuine polyphony is out of scope (docs/melody-notation-design.md's
+    // "Explicitly excluded" list).
+    loadMelodyFromMusicXML: function(text, displayName) {
+        const filenameSpan = document.getElementById('melody-filename');
+        try {
+            const parsed = MusicXML.parse(text);
+            if (!parsed || parsed.notes.length === 0) {
+                alert('No notes found in the MusicXML file.');
+                return;
+            }
+            const melodySeq = this.centerMelody(parsed.notes);
+            this.state.melody = melodySeq;
+            this.state.isRandom = false;
+            this.state.melodyBPM = parsed.bpm;
+            this.state.keySignature = parsed.keySignature != null
+                ? parsed.keySignature
+                : Tonnetz.detectKeySignature(melodySeq.map((n) => n.midi));
+            if (filenameSpan && displayName) filenameSpan.textContent = displayName;
+            this.resetGame();
+            this.refreshBoard();
+        } catch (err) {
+            console.error(err);
+            alert('Error parsing MusicXML file: ' + err.message);
+        }
+    },
+
     setupKeyboardEvents: function() {
         const svg = Render.svg;
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;

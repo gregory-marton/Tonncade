@@ -59,6 +59,15 @@ const FileFolder = {
             readAs: config.readAs || 'arrayBuffer',          // 'arrayBuffer' | 'text'
             mimeType: config.mimeType || 'application/octet-stream',
             loadMethod: config.loadMethod || 'loadMelodyFromArrayBuffer',
+            // Per-extension overrides of readAs/loadMethod above, checked in filename order --
+            // e.g. MelodyFolder's own bundled/local listing can mix .mid (arrayBuffer,
+            // loadMelodyFromArrayBuffer) and .musicxml (text, loadMelodyFromMusicXML) in the SAME
+            // folder (docs/melody-notation-design.md: MusicXML is canonical going forward, MIDI
+            // stays import-only -- both need to keep working side by side, not a hard cutover).
+            // [{ pattern: RegExp, readAs, loadMethod }] -- first match wins; no match falls back
+            // to the plain readAs/loadMethod above, so a single-file-type mode (Life, Compose)
+            // never needs to know this exists at all.
+            fileTypes: config.fileTypes || null,
             // Adds an "Upload File…" entry to the select itself (Life only, so far -- see
             // js/life.js), which just clicks the mode's own hidden <input type=file> (ids.uploadInput)
             // -- one menu item instead of a separate button that's only ever shown on SOME browsers
@@ -180,10 +189,22 @@ const FileFolder = {
             this.renderOptions();
         },
 
+        // {readAs, loadMethod} for a given filename -- the first matching entry in fileTypes
+        // (checked in order), or this instance's own plain readAs/loadMethod if fileTypes isn't
+        // set or nothing matches. See fileTypes' own comment above (create()).
+        resolveFileType: function(filename) {
+            if (this.fileTypes) {
+                const match = this.fileTypes.find((t) => t.pattern.test(filename));
+                if (match) return { readAs: match.readAs, loadMethod: match.loadMethod };
+            }
+            return { readAs: this.readAs, loadMethod: this.loadMethod };
+        },
+
         _fetchBundled: async function(file) {
             const res = await fetch(this.bundledPathPrefix + file);
             if (!res.ok) throw new Error(String(res.status));
-            return this.readAs === 'text' ? res.text() : res.arrayBuffer();
+            const { readAs } = this.resolveFileType(file);
+            return readAs === 'text' ? res.text() : res.arrayBuffer();
         },
 
         // Populates the bundled online tier from onlineIndexUrl -- a plain relative fetch, works on
@@ -214,7 +235,8 @@ const FileFolder = {
             try {
                 const content = await this._fetchBundled(song.file);
                 if (token !== undefined && token !== this._token) return;
-                this.mode[this.loadMethod](content, song.file);
+                const { loadMethod } = this.resolveFileType(song.file);
+                this.mode[loadMethod](content, song.file);
                 this.currentValue = 'bundled:' + index;
             } catch (err) {
                 console.warn(`Could not load bundled file "${song.name}":`, err);
@@ -354,9 +376,10 @@ const FileFolder = {
             const entry = this.fileHandles && this.fileHandles[index];
             if (!entry) return;
             const file = await entry.getFile();
-            const content = this.readAs === 'text' ? await file.text() : await file.arrayBuffer();
+            const { readAs, loadMethod } = this.resolveFileType(file.name);
+            const content = readAs === 'text' ? await file.text() : await file.arrayBuffer();
             if (token !== undefined && token !== this._token) return;
-            this.mode[this.loadMethod](content, file.name);
+            this.mode[loadMethod](content, file.name);
             this.currentValue = 'local:' + index;
             this.renderOptions();
         },

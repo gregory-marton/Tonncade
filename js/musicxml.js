@@ -256,6 +256,7 @@ ${measuresXml.join('\n')}
 
         let divisions = this.DIVISIONS;
         let bpm = 120;
+        let keySignature = null; // fifths, from the file's own <key><fifths> if it has one -- authored, never inferred
         const notes = [];
         let openTies = {}; // "midi" -> the in-progress note object still being extended
         let beatCursor = 0;
@@ -270,6 +271,8 @@ ${measuresXml.join('\n')}
             if (divisionsEl) divisions = parseInt(divisionsEl.textContent, 10) || divisions;
             const tempoEl = measure.querySelector('sound[tempo]');
             if (tempoEl) bpm = parseFloat(tempoEl.getAttribute('tempo')) || bpm;
+            const fifthsEl = measure.querySelector('attributes > key > fifths');
+            if (fifthsEl) keySignature = parseInt(fifthsEl.textContent, 10);
 
             [...measure.children].forEach((el) => {
                 if (el.tagName !== 'note') return;
@@ -316,6 +319,7 @@ ${measuresXml.join('\n')}
         return {
             notes: notes.map((n) => ({ midi: n.midi, time: n.time * secondsPerBeat, duration: n.duration * secondsPerBeat })),
             bpm,
+            keySignature, // null if the file never declared one -- callers fall back to their own detection
         };
     },
 };

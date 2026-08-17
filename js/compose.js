@@ -733,6 +733,40 @@ const ComposeMode = {
         }
     },
 
+    // MusicXML counterpart to loadMelodyFromArrayBuffer -- js/file-folder.js's fileTypes dispatch
+    // (js/midi-folder.js) routes any .musicxml/.xml file here. No extractMonophonicMelody step:
+    // this app's own MusicXML is already single-voice-plus-chords, the same shape Compose itself
+    // produces. Compose's own Save is expected to move onto MusicXML.write directly (js/musicxml.js)
+    // rather than round-tripping through this load path -- that's docs/melody-notation-design.md's
+    // Compose-editing work, not this one.
+    loadMelodyFromMusicXML: function(text, displayName) {
+        try {
+            const parsed = MusicXML.parse(text);
+            if (!parsed || parsed.notes.length === 0) {
+                alert('No notes found in the MusicXML file.');
+                return;
+            }
+            let prev = { p: 0, q: 0 };
+            this.state.notes = parsed.notes.map((note) => {
+                const coord = Tonnetz.nearestCoordFor(note.midi, prev);
+                prev = coord;
+                return { midi: note.midi, p: coord.p, q: coord.q, time: note.time, duration: note.duration };
+            });
+            this.state.selectedIndices = [];
+            this.state.undoStack.clear(); // #17: a freshly-loaded file is a fresh start
+
+            this.stopPlayback();
+            this.stopRecording();
+            this.updateStats();
+            this.updateEditControls();
+            this.setStatus(`Loaded "${displayName}" -- ready to play, edit, or save.`);
+            this.refreshBoard();
+        } catch (err) {
+            console.error(err);
+            alert('Error parsing MusicXML file: ' + err.message);
+        }
+    },
+
     setStatus: function(text) {
         const el = document.getElementById('compose-status');
         if (el) el.textContent = text;
