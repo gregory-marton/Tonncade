@@ -915,26 +915,34 @@ const MelodyMode = {
                 }
             }
 
+            // The idle-replay reminder must fire regardless of whether the player is at the
+            // frontier or still mid-segment: a real song's end now grows immediately on every
+            // correct play (see above), so "at the frontier" (userIndex > endIndex) is no longer
+            // a distinct, occasional state the way it was before that change -- it's the norm
+            // after every single correct note. Scheduling the reminder only in that branch, as
+            // before, silently made it unreachable for any real song: nothing ever re-prompted
+            // the player again after their first correct note, exactly the regression reported
+            // live ("not timing out ... consequently not showing me what to do next").
             if (this.state.userIndex > this.state.endIndex) {
                 // At the frontier -- either about to extend into brand-new territory (a real
                 // song's end already grows live above, so this is just the prompt) or waiting on
                 // Random's own timeout-driven growth below.
                 this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
-
-                this.state.userRepeatTimeoutId = setTimeout(() => {
-                    // Timeout fired: player stopped playing ahead. Random has no measure concept
-                    // -- grow by however far they got, same as always. A real song's end has
-                    // already advanced live above; this just re-drills the current segment.
-                    if (this.state.isRandom) {
-                        this.state.endIndex = this.state.userIndex;
-                    }
-                    this.playTargetSequence();
-                }, 2000);
             } else {
                 // Still repeating already-established territory
                 const remaining = this.state.endIndex - this.state.userIndex + 1;
                 this.setStatus(`Correct! Repeat ${remaining} more note${remaining > 1 ? 's' : ''}...`, "progress");
             }
+
+            this.state.userRepeatTimeoutId = setTimeout(() => {
+                // Timeout fired: player paused. Random has no measure concept -- grow by however
+                // far they got, same as always. A real song's end already advances live above;
+                // this just re-drills the current segment as a reminder of what comes next.
+                if (this.state.isRandom && this.state.userIndex > this.state.endIndex) {
+                    this.state.endIndex = this.state.userIndex;
+                }
+                this.playTargetSequence();
+            }, 2000);
         } else {
             // Mistake!
             this.setStatus("Oops! Let's listen again...", "error");

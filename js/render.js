@@ -174,18 +174,29 @@ const Render = {
     highlightByMidi: function(midi, duration = 300) {
         const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
         polygons.forEach(p => {
-            p.classList.remove('active-note');
-            void p.offsetWidth; // Force layout flush
-            p.classList.add('active-note');
-
             if (p.activeTimeoutId) {
                 clearTimeout(p.activeTimeoutId);
-            }
-
-            p.activeTimeoutId = setTimeout(() => {
-                p.classList.remove('active-note');
                 p.activeTimeoutId = null;
-            }, duration);
+            }
+            p.classList.remove('active-note');
+            // Two rAFs, not a synchronous forced-reflow (`void p.offsetWidth`) -- a reflow forces
+            // a LAYOUT recalc, but two classList writes in the same synchronous pass never yield
+            // to an actual PAINT in between, so an observer (a human eye, or a real test polling
+            // between real timer ticks) never sees the "off" frame at all. Two notes at the SAME
+            // pitch played back to back (e.g. Happy Birthday's opening "Happy Happy," both G) then
+            // just look like ONE continuous highlight across both notes even though two distinct
+            // sounds played -- INV-5, reported live. Two rAFs (not one) is the standard "wait for
+            // the next real paint" pattern: a single rAF callback can still land before the
+            // browser has actually painted the intervening frame in some browsers.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    p.classList.add('active-note');
+                    p.activeTimeoutId = setTimeout(() => {
+                        p.classList.remove('active-note');
+                        p.activeTimeoutId = null;
+                    }, duration);
+                });
+            });
         });
     },
 

@@ -297,6 +297,34 @@ test.describe('Invariant tests', () => {
     await expect(cell).toHaveClass(/active-note/);
   });
 
+  // Reported live: playing Melody's practice sequence for a song whose first two notes share a
+  // pitch (Happy Birthday's opening "Happy Happy," both the same note) sounded two distinct
+  // notes but only ever showed ONE continuous highlight across both -- Render.highlightByMidi
+  // used to remove then immediately re-add the class within one synchronous pass (a forced
+  // `void p.offsetWidth` reflow, not an actual yield to the browser's paint), so an observer --
+  // including the human eye -- never saw the "off" frame at all between two back-to-back calls
+  // for the SAME cell.
+  test('INV-5: Render.highlightByMidi re-pulses visibly (a real paint frame with the class OFF) when called twice for the same pitch in quick succession', async ({ page }) => {
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+
+    const sawOffFrame = await page.evaluate(async () => {
+      const midi = Tonnetz.getMidi(0, 0);
+      const cell = document.querySelector(`polygon[data-midi="${midi}"]`);
+      Render.highlightByMidi(midi, 400);
+      await new Promise((r) => setTimeout(r, 150)); // well within the first call's own 400ms window
+      Render.highlightByMidi(midi, 400); // a second, same-pitch call, as two same-pitch notes in a row would produce
+      const rightAfter = cell.classList.contains('active-note');
+      await new Promise((r) => requestAnimationFrame(r));
+      const after1Raf = cell.classList.contains('active-note');
+      await new Promise((r) => requestAnimationFrame(r));
+      const after2Rafs = cell.classList.contains('active-note');
+      return { rightAfter, after1Raf, after2Rafs };
+    });
+    expect(sawOffFrame.rightAfter, 'removed immediately on the second call').toBe(false);
+    expect(sawOffFrame.after2Rafs, 're-added again after yielding to a real paint').toBe(true);
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-23: live MIDI hardware input behaves exactly like the equivalent tap. No real MIDI
   // hardware is available in CI, so navigator.requestMIDIAccess is mocked with a fake input

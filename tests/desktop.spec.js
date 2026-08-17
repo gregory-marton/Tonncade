@@ -3340,6 +3340,45 @@ test('Melody: the end of the drilled segment grows immediately with each correct
   expect(endAfterEach).toEqual([1, 2, 3, 4]);
 });
 
+// Reported live: since the end now grows immediately on every correct play (the fix above),
+// "at the frontier" (userIndex > endIndex) stopped being an occasional state and became the norm
+// after every single note -- and the idle-replay reminder was only ever scheduled from inside
+// that branch, so it silently became unreachable for any real song. The player got no more
+// audible/visual re-prompt after their very first correct note: no timeout, no replay, no way to
+// recall what came next without already remembering the whole song by ear.
+test('Melody: pausing after a correct note still replays the segment after 2s, even though the end now grows on every play (this was a second regression from the first fix)', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.clock.fastForward(2000); // clear the mode-entry auto-kickoff intro
+  await loadFrereJacques(page);
+  await page.clock.fastForward(2000); // clear loadMelodyFromArrayBuffer's own second auto-kickoff
+
+  await page.evaluate(() => {
+    window.__played = [];
+    Synth.playNote = (midi) => window.__played.push(midi);
+    MelodyMode.cleanupPlayback();
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 0;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.segmentHadMistake = false;
+    MelodyMode.handleUserInputNote(MelodyMode.state.melody[0].midi); // the only correct note so far
+  });
+
+  expect(await page.evaluate(() => !!MelodyMode.state.userRepeatTimeoutId)).toBe(true);
+
+  await page.clock.fastForward(2100); // past the 2s idle-replay timeout
+  await page.clock.fastForward(2000); // playTargetSequence's own internal scheduling delay, as a separate jump
+  const playedSegment = await page.evaluate(() => {
+    // endIndex already grew to 1 (the fix from the first regression) when note 0 was played, so
+    // the reminder replays the now-two-note segment [0,1], not just note 0 again.
+    const expected = MelodyMode.state.melody.slice(0, 2).map((n) => n.midi);
+    return JSON.stringify(window.__played) === JSON.stringify(expected);
+  });
+  expect(playedSegment).toBe(true);
+});
+
 test('Melody: a mistake resets the clean-streak', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
