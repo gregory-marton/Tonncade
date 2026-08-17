@@ -51,19 +51,27 @@ const MelodyMode = {
         // directly and unconditionally) resets progress; a mere re-entry after switching away
         // resumes exactly where the player left off instead.
         gameStarted: false,
-        targetLength: 1,       // Current number of notes to play/repeat
+        // INV-26: the drilled segment is [startIndex, endIndex], BOTH INCLUSIVE -- endIndex IS
+        // the last included note's index (not a count/exclusive bound the way the old
+        // targetLength was), symmetric with startIndex and matching how the Timeline's end
+        // marker visually sits on a specific note, same as the start marker.
+        endIndex: 0,
         userIndex: 0,          // Current progress of user in repeating the sequence
-        startIndex: 0,         // Where the drilled segment begins (see #46 scrub control) --
-                                // always <= targetLength - 1, letting a player replay from any
-                                // note already reached instead of always from note 0.
-        isDraggingScrub: false, // Live-drag state for the inline scrub marker (see setupScrubMarker)
-        scrubDragIndex: 0,      // The marker's candidate position while mid-drag, before it's committed
-        // Spaced-repetition auto-advance (#46, songs only -- see isRandom). cleanStreak counts
-        // consecutive full clean playthroughs of the current segment; segmentHadMistake is
-        // transient, tracking whether the in-progress pass has had a mistake yet. Neither is
-        // touched by cleanup()/init()'s resume branch, so both survive a mode switch away and
-        // back for free (INV-48), same as targetLength/userIndex/startIndex already do.
+        startIndex: 0,         // Where the drilled segment begins -- always <= endIndex, letting
+                                // a player replay from any note already reached instead of
+                                // always from note 0.
+        // INV-26/53: the two ends auto-advance independently. endIndex grows immediately on
+        // every correct play that reaches new territory (see handleUserInputNote) -- no streak
+        // involved. startIndex only jumps forward, by a whole measure, once the player has
+        // cleanly played THAT MEASURE (the one startIndex currently sits in, not the whole,
+        // possibly-longer-by-now segment) `cleanStreak` reaches 3 times in a row.
+        // measureStreakCounted guards against counting the same pass's measure-crossing twice;
+        // segmentHadMistake is transient, tracking whether the in-progress pass has had a
+        // mistake yet. None of these three are touched by cleanup()/init()'s resume branch, so
+        // they survive a mode switch away and back for free (INV-48), same as
+        // endIndex/userIndex/startIndex already do.
         cleanStreak: 0,
+        measureStreakCounted: false,
         segmentHadMistake: false,
         isPlayingPreview: false,
         isPlayingSequence: false,
@@ -180,7 +188,7 @@ const MelodyMode = {
             // Resuming after a mode switch (INV-48): repaint exactly where the player left off --
             // no reset, no auto-playing the target sequence. cleanup() (run when Melody was left)
             // already cleared the note-list markup and Tonnetz glow classes without touching
-            // targetLength/userIndex/startIndex/the streak or #melody-game-status's text, so
+            // endIndex/userIndex/startIndex/the streak or #melody-game-status's text, so
             // rebuilding the note list/ghost/streak bar from that untouched progress is enough to
             // make the resume look exactly like nothing happened.
             this.updateStreakUI();
@@ -236,7 +244,22 @@ const MelodyMode = {
             };
         }
 
-        this.setupScrubMarker();
+        // The shared Timeline (INV-55, js/timeline.js) -- Melody's own practice-strip decoration
+        // (color hints, Tonnetz glow) is layered on in updateDifficultyUI via the decorate hook,
+        // not here. onStartCommit mirrors the old scrub marker's seekTo commit; onEndCommit lets
+        // the player drag the end forward directly, same as the existing auto-advance does
+        // (INV-26 -- no gate on either).
+        this.timeline = Timeline.create({
+            staffContainerId: 'melody-staff',
+            labelsContainerId: 'melody-staff-labels',
+            scrollContainerId: 'melody-notation-scroll',
+            onStartCommit: (idx) => this.seekTo(idx),
+            onEndCommit: (idx) => {
+                this.state.endIndex = Math.max(this.state.startIndex, idx);
+                this.updateDifficultyUI();
+            },
+        });
+        this.timeline.setupDrag();
 
         // Dumbbell-barbell difficulty picker (js/difficulty-barbell.js, shared with Blast/Gravity)
         // -- click the Nth weight to set the practice-hint level.
@@ -540,27 +563,12 @@ const MelodyMode = {
         return Math.floor(timeSec / secondsPerMeasure);
     },
 
-    // Scrolls the timeline so the current note stays visible -- real songs only (Random's short
-    // sliding window never overflows). Not called mid-drag; updateScrubDragTarget's own
-    // edge-scroll owns scrollLeft while a drag is live, so the two don't fight over it.
-    scrollTimelineToCurrent: function(idx) {
-        const listEl = document.getElementById('melody-note-list');
-        const token = listEl && listEl.querySelector(`.note-token[data-note-idx="${idx}"]`);
-        if (!token) return;
-        // #melody-notation-scroll (not listEl itself) is what actually scrolls/clips now -- one
-        // shared scroll container for the staff/labels/timeline stack (Codex review finding: they
-        // used to scroll independently and drift out of alignment). token.offsetLeft is still
-        // correctly relative to listEl (offsetLeft isn't affected by an ancestor's scroll
-        // position), and listEl sits flush against the scroll container's left edge (no
-        // horizontal margin/padding between them), so that part of the math is unchanged --
-        // only WHICH element's clientWidth/scrollLeft this reads/writes needed to move.
-        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
-        const target = token.offsetLeft - scrollEl.clientWidth / 2 + token.offsetWidth / 2;
-        scrollEl.scrollLeft = Math.max(0, target);
-    },
-
+    // Melody's practice strip (docs/invariants.md INV-25/55): the shared Timeline (staff +
+    // aligned pitch row + two draggable markers) plus this mode's own past/current/upcoming
+    // color hints and Tonnetz glow-linkage, layered on via Notation.renderLabels' decorate hook
+    // (js/notation.js) instead of building a second, separate HTML list the way the old
+    // #melody-note-list did.
     updateDifficultyUI: function(overrideIndex) {
-        const listEl = document.getElementById('melody-note-list');
         const diff = this.state.difficulty;
 
         // Clear old glows (past, generic future, and the three coloured upcoming glows)
@@ -570,186 +578,115 @@ const MelodyMode = {
             document.querySelectorAll('.glow-next-' + r).forEach(el => el.classList.remove('glow-next-' + r));
         }
 
-        if (!listEl) return;
-
         if (diff === 3 || this.state.melody.length === 0) {
-            listEl.innerHTML = '';
+            this.timeline.refresh([], { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
             return;
         }
 
         const melody = this.state.melody;
         const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
         const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
-
-        // Octave-qualified (e.g. "E4", not just "E") -- a big board renders the same note NAME
-        // at several different octaves at once (see INV-25), so the bare letter name alone
-        // doesn't say which specific cell/pitch is meant. Real bug report: playing the "wrong E"
-        // -- an understandable mix-up between two different E's, not a matching-logic bug (exact
-        // MIDI equality is the correct rule for a melody, where octave is part of the tune).
-        const qualifiedName = (midi) => `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
-
         // The next THREE to play each get their own colour, mirrored on the Tonnetz by
         // glow-next-0/1/2 (see css/style.css), so the upcoming notes read as linked between
-        // board and timeline. No frequency here -- it isn't useful on the timeline, and the
-        // octave-qualified names already disambiguate pitch (INV-25).
+        // board and pitch row.
         const UPCOMING_COLORS = ['var(--accent)', '#e6b23c', '#d16a8f']; // next, 2nd, 3rd
 
-        // {idx, html} per entry, oldest to newest -- kept as structured entries (not a flat
-        // string) so each note token can carry a data-note-idx the drag/marker logic reads.
-        // idx is null for a measure-tick entry (part 4), which is never a drag/marker target.
-        let displayNotes = [];
+        // decorations[melody index] = the {className, style, data} Notation.renderLabels' own
+        // decorate hook applies to that note's pitch-row label -- built in the same per-note
+        // loop this function always used, just feeding the shared Timeline instead of building a
+        // second HTML list.
+        const decorations = {};
+        const decorate = (entry) => decorations[entry.id];
+        let notesForTimeline;
+        let startIndex = this.state.startIndex;
+        let endIndex = this.state.endIndex;
 
         if (this.state.isRandom) {
             // Random is a memory-quiz sliding window forever -- no measures, no full timeline,
-            // this isn't a piece to progress through (#46). Byte-for-byte the original behavior.
+            // this isn't a piece to progress through (#46). Byte-for-byte the original windowing
+            // (pastWindow=3, futureWindow=4 at Easy) -- just fed through the shared Timeline
+            // instead of a separate list. Each entry's own `id` stays its ABSOLUTE melody index
+            // (not its position within this window slice), so decorations/glow lookups and any
+            // marker positioning line up correctly regardless of the slice.
             const pastWindow = 3;
-            const futureWindow = diff === 1 ? 4 : 0; // Current + 3 ahead
-
-            for (let i = Math.max(0, current - pastWindow); i < current; i++) {
-                const midi = melody[i].midi;
-                const name = qualifiedName(midi);
-                const distance = current - i;
-                const opacity = pastOpacityByDistance[distance] || 0.3;
-                displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
-                document.querySelectorAll(`polygon[data-midi="${midi}"]`).forEach(p => p.classList.add('glow-past'));
+            const futureWindow = diff === 1 ? 4 : 0;
+            const windowStart = Math.max(0, current - pastWindow);
+            const windowEnd = diff === 1 ? Math.min(melody.length, current + futureWindow) : current;
+            notesForTimeline = [];
+            for (let i = windowStart; i < windowEnd; i++) {
+                notesForTimeline.push(Object.assign({}, melody[i], { id: i }));
             }
 
+            for (let i = windowStart; i < current; i++) {
+                const midi = melody[i].midi;
+                const distance = current - i;
+                const opacity = pastOpacityByDistance[distance] || 0.3;
+                decorations[i] = { style: { opacity: String(opacity) }, data: { 'note-role': 'past', distance: String(distance) } };
+                document.querySelectorAll(`polygon[data-midi="${midi}"]`).forEach(p => p.classList.add('glow-past'));
+            }
             if (diff === 1) {
                 for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
                     const midi = melody[i].midi;
-                    const name = qualifiedName(midi);
                     const rank = i - current; // 0 = next, 1 = 2nd, 2 = 3rd, 3+ = further out
                     const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
                     if (rank <= 2) {
-                        const color = UPCOMING_COLORS[rank];
-                        const size = rank === 0 ? '1.1em' : '1em';
-                        const weight = rank === 0 ? '900' : '700';
                         const role = rank === 0 ? 'current' : 'future';
-                        displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="${role}" data-upcoming="${rank}" style="color: ${color}; font-size: ${size}; font-weight: ${weight};">${name}</span>` });
+                        decorations[i] = {
+                            style: { color: UPCOMING_COLORS[rank], fontSize: rank === 0 ? '1.1em' : '1em', fontWeight: rank === 0 ? '900' : '700' },
+                            data: { 'note-role': role, upcoming: String(rank) },
+                        };
                         polygons.forEach(p => p.classList.add('glow-next-' + rank));
                     } else {
-                        displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.8;">${name}</span>` });
+                        decorations[i] = { style: { opacity: '0.8' }, data: { 'note-role': 'future' } };
                         polygons.forEach(p => p.classList.add('glow-future'));
                     }
                 }
             }
+            // No meaningful boundary markers for a forever-sliding window.
+            startIndex = null;
+            endIndex = null;
         } else {
-            // #46: a real song renders EVERY note up front, not a small window -- a true
-            // seek-bar, scrollable (css/style.css), with measure ticks (part 4) inserted between
-            // notes whose computed measure differs. The current note is always highlighted
-            // regardless of difficulty; only the "next 2" colored hints are difficulty-gated
-            // (Easy/diff===1 only) -- Medium still shows every future note, just as plain dim
-            // text with no hint, since the whole timeline is now always visible.
-            let lastMeasure = null;
+            // #46: a real song renders EVERY note up front, not a small window -- the whole
+            // piece, scrollable (css/style.css). Measure boundaries are the barline overlay's
+            // job now (Task #12), not a separate tick entry threaded through this list. The
+            // current note is always highlighted regardless of difficulty; only the "next 2"
+            // colored hints are difficulty-gated (Easy/diff===1 only).
+            notesForTimeline = melody.map((n, i) => Object.assign({}, n, { id: i }));
             for (let i = 0; i < melody.length; i++) {
-                const measure = this.measureOf(melody[i].time);
-                if (lastMeasure !== null && measure !== lastMeasure) {
-                    displayNotes.push({ idx: null, html: '<span class="measure-tick" aria-hidden="true"></span>' });
-                }
-                lastMeasure = measure;
-
                 const midi = melody[i].midi;
-                const name = qualifiedName(midi);
                 const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
                 if (i < current) {
                     const distance = current - i;
                     const opacity = pastOpacityByDistance[distance] || 0.3;
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="past" data-distance="${distance}" style="opacity: ${opacity};">${name}</span>` });
+                    decorations[i] = { style: { opacity: String(opacity) }, data: { 'note-role': 'past', distance: String(distance) } };
                     polygons.forEach(p => p.classList.add('glow-past'));
                 } else if (i === current) {
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="current" data-upcoming="0" style="color: ${UPCOMING_COLORS[0]}; font-size: 1.1em; font-weight: 900;">${name}</span>` });
+                    decorations[i] = {
+                        style: { color: UPCOMING_COLORS[0], fontSize: '1.1em', fontWeight: '900' },
+                        data: { 'note-role': 'current', upcoming: '0' },
+                    };
                     polygons.forEach(p => p.classList.add('glow-next-0'));
                 } else if (diff === 1 && i - current <= 2) {
                     const rank = i - current;
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" data-upcoming="${rank}" style="color: ${UPCOMING_COLORS[rank]}; font-size: 1em; font-weight: 700;">${name}</span>` });
+                    decorations[i] = {
+                        style: { color: UPCOMING_COLORS[rank], fontSize: '1em', fontWeight: '700' },
+                        data: { 'note-role': 'future', upcoming: String(rank) },
+                    };
                     polygons.forEach(p => p.classList.add('glow-next-' + rank));
                 } else {
-                    displayNotes.push({ idx: i, html: `<span class="note-token" data-note-idx="${i}" data-note-role="future" style="opacity: 0.5;">${name}</span>` });
+                    decorations[i] = { style: { opacity: '0.5' }, data: { 'note-role': 'future' } };
                 }
             }
         }
 
-        // Note tokens (+ measure ticks) only here -- the marker is positioned separately.
-        // positionScrubMarker (below) repositions the SAME marker node afterward, since it also
-        // runs mid-drag on its own, WITHOUT rebuilding these note-token spans (rebuilding them
-        // via innerHTML here happens once per render; rebuilding the scrub marker's own DOM node
-        // specifically must not happen mid-drag, or a real touchstart's captured target goes
-        // stale -- see positionScrubMarker's own comment).
-        listEl.innerHTML = displayNotes.map(n => n.html).join('');
-
-        const markerIdx = this.state.isDraggingScrub ? this.state.scrubDragIndex : this.state.startIndex;
-        this.positionScrubMarker(markerIdx);
-        if (!this.state.isRandom && !this.state.isDraggingScrub) this.scrollTimelineToCurrent(current);
-
-        // Grand-staff view (docs/melody-notation-design.md) -- renders exactly whatever's showing
-        // in the timeline above (displayNotes, minus measure-tick entries which carry no idx),
-        // so Random's small sliding window and a real song's whole timeline are handled uniformly
-        // by construction, without duplicating either one's own windowing logic here.
-        this.refreshStaff(displayNotes.filter((n) => n.idx !== null).map((n) => melody[n.idx]));
-    },
-
-    // A deliberately minimal first pass (docs/melody-notation-design.md) -- the lightweight
-    // quantizer/speller/measure-inference is a separate, later piece; this just proves the
-    // rendering pipeline against whatever's currently on the timeline.
-    refreshStaff: function(notes) {
-        if (typeof Notation === 'undefined') return;
-        const result = Notation.render('melody-staff', notes, { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
-        Notation.renderLabels('melody-staff-labels', result ? result.noteXPositions : [], this.state.keySignature);
-        // Spans the whole staff+labels+timeline stack (#melody-notation-scroll), not just the
-        // staff's own drawn barlines -- docs/melody-notation-design.md's "Barline-overlay
-        // mechanics" open item.
-        Notation.renderBarlineOverlay('melody-notation-scroll', result ? result.barlineXPositions : []);
-    },
-
-    // The scrub marker: a real I-beam (see css/style.css) absolutely positioned over the target
-    // note, so it's visually clear which two notes you'd start between -- not a separate,
-    // disconnected slider (see INV-26's original version). Only shown if that target note is
-    // actually rendered AND there's more than one note reached so far (targetLength > 1) --
-    // nothing to scrub to yet on the very first note.
-    //
-    // Reuses the SAME marker DOM node across calls (created once via appendChild, only ever
-    // repositioned via style.left afterward -- never recreated) specifically so a live
-    // touch-drag capture on it survives every reposition during the gesture -- found the hard
-    // way via this project's own real-touch-event testing discipline: a full re-render
-    // (innerHTML) mid-drag would detach whatever a real touchstart captured as its event target,
-    // silently breaking the rest of the gesture. Mutating style.left on the same element
-    // reference a capture already holds is safe; only innerHTML replacement of the marker
-    // itself (never done here) would be the actual hazard.
-    positionScrubMarker: function(targetIdx) {
-        const listEl = document.getElementById('melody-note-list');
-        if (!listEl) return;
-        // Parented under #melody-notation-scroll (the shared scroll wrapper), not listEl itself --
-        // its CSS (top:0;bottom:0) spans the WHOLE staff+labels+timeline stack that way, per
-        // docs/melody-notation-design.md's "the scrub marker spans the whole grand staff and note
-        // names/octaves" requirement, rather than just the timeline row alone.
-        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
-
-        const tokens = Array.from(listEl.querySelectorAll('.note-token'));
-
-        let marker = scrollEl.querySelector('.scrub-marker');
-        const targetToken = tokens.find(t => parseInt(t.getAttribute('data-note-idx'), 10) === targetIdx);
-        const showMarker = tokens.length > 0 && this.getMaxStartIndex() > 0 && !!targetToken;
-
-        if (!showMarker) {
-            if (marker) marker.remove();
-            return;
-        }
-        if (!marker) {
-            marker = document.createElement('span');
-            marker.className = 'scrub-marker';
-            marker.title = 'Drag to replay from here';
-            scrollEl.appendChild(marker);
-        }
-
-        // offsetLeft is relative to listEl's own content box, not the viewport -- stable across
-        // scroll position, unlike getBoundingClientRect() (see #46's scrollable timeline). Still
-        // correctly usable as the marker's position within scrollEl too: listEl sits flush
-        // against scrollEl's left edge (no horizontal margin/padding between them), so a position
-        // relative to one is a position relative to the other.
-        // Clamped to 0 -- a negative left would sit outside the scroll container's clipped
-        // content box (overflow-x: auto implicitly clips overflow-y too), making the marker
-        // unclickable/invisible for the very first token (offsetLeft 0).
-        marker.style.left = Math.max(0, targetToken.offsetLeft - 5) + 'px';
+        this.timeline.refresh(notesForTimeline, {
+            bpm: this.state.melodyBPM,
+            keySignature: this.state.keySignature,
+            startIndex,
+            endIndex,
+            decorate,
+            showBarlines: !this.state.isRandom,
+        });
     },
 
     // Marks the drill as genuinely started -- checked by init() so a mere mode SWITCH (away and
@@ -760,10 +697,11 @@ const MelodyMode = {
     resetGame: function() {
         this.state.gameStarted = true;
         this.cleanup();
-        this.state.targetLength = 1;
+        this.state.endIndex = 0;
         this.state.userIndex = 0;
         this.state.startIndex = 0;
         this.state.cleanStreak = 0;
+        this.state.measureStreakCounted = false;
         this.state.segmentHadMistake = false;
         this.updateStreak(0);
         this.updateGhost();
@@ -779,6 +717,7 @@ const MelodyMode = {
         this.cleanupPlayback();
         this.state.isPlayingSequence = true;
         this.state.segmentHadMistake = false; // fresh pass at this segment -- see handleUserInputNote
+        this.state.measureStreakCounted = false; // fresh pass -- see handleUserInputNote
         this.setStatus("Listen to the notes...", "info");
 
         // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
@@ -788,7 +727,7 @@ const MelodyMode = {
 
         let delayOffset = 0.5; // Initial delay before sequence starts playing
 
-        for (let i = start; i < this.state.targetLength; i++) {
+        for (let i = start; i <= this.state.endIndex; i++) {
             const note = this.state.melody[i];
             if (!note) break;
 
@@ -807,7 +746,7 @@ const MelodyMode = {
         }
 
         // Calculate when the sequence finishes playing
-        const lastNote = this.state.melody[this.state.targetLength - 1];
+        const lastNote = this.state.melody[this.state.endIndex];
         const lastRelativeTime = lastNote ? (lastNote.time - this.state.melody[start].time + lastNote.duration) : 1;
         const totalDuration = (lastRelativeTime * 1000) + (delayOffset * 1000);
 
@@ -822,10 +761,10 @@ const MelodyMode = {
     },
 
     // #46 scrub control: replay the drilled segment starting from any note already reached.
-    // Clamped to [0, targetLength - 1] -- "anywhere you've already played," never ahead into
-    // notes not yet drilled.
+    // Clamped to [0, endIndex] -- "anywhere you've already played," never ahead into notes not
+    // yet drilled.
     getMaxStartIndex: function() {
-        return Math.max(0, this.state.targetLength - 1);
+        return Math.max(0, this.state.endIndex);
     },
 
     seekTo: function(index) {
@@ -849,104 +788,6 @@ const MelodyMode = {
 
         this.state.startIndex = clamped;
         this.playTargetSequence();
-    },
-
-    // Drag disambiguation for the scrub marker (setupScrubMarker below) -- mirrors the
-    // mousedown-tracks-then-mousemove-updates-then-mouseup-commits shape every other drag
-    // gesture in this project already uses (Sandbox's ghost drag, Melody's own pan/pinch fix).
-    setupScrubMarker: function() {
-        // The marker itself now lives under #melody-notation-scroll, not #melody-note-list (see
-        // positionScrubMarker) -- these listeners need to move with it, since a mousedown/
-        // touchstart on the marker no longer bubbles through listEl at all once it's not an
-        // ancestor of the marker anymore.
-        const scrollEl = document.getElementById('melody-notation-scroll');
-        if (!scrollEl) return;
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-        const startDrag = (clientX) => {
-            this.state.isDraggingScrub = true;
-            this.state.scrubDragIndex = this.state.startIndex;
-            this.updateScrubDragTarget(clientX);
-        };
-        const moveDrag = (clientX) => {
-            if (!this.state.isDraggingScrub) return;
-            this.updateScrubDragTarget(clientX);
-        };
-        const endDrag = () => {
-            if (!this.state.isDraggingScrub) return;
-            this.state.isDraggingScrub = false;
-            this.seekTo(this.state.scrubDragIndex);
-        };
-
-        scrollEl.addEventListener('mousedown', (e) => {
-            if (isTouch) return;
-            if (!e.target.classList.contains('scrub-marker')) return;
-            e.preventDefault();
-            startDrag(e.clientX);
-        });
-        window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
-        window.addEventListener('mouseup', endDrag);
-
-        scrollEl.addEventListener('touchstart', (e) => {
-            if (!e.target.classList.contains('scrub-marker')) return;
-            e.preventDefault();
-            startDrag(e.touches[0].clientX);
-        }, { passive: false });
-        scrollEl.addEventListener('touchmove', (e) => {
-            if (!this.state.isDraggingScrub) return;
-            e.preventDefault();
-            moveDrag(e.touches[0].clientX);
-        }, { passive: false });
-        scrollEl.addEventListener('touchend', endDrag);
-    },
-
-    // While dragging, finds whichever rendered note token's horizontal center is closest to the
-    // pointer and repositions the marker there via positionScrubMarker -- a live preview of
-    // where the drag would land, WITHOUT a full note-list re-render (see that function's own
-    // comment for why: it would detach whatever a real touchstart captured as its event target
-    // mid-gesture). seekTo() on release re-renders for real once the drag is over.
-    updateScrubDragTarget: function(clientX) {
-        const listEl = document.getElementById('melody-note-list');
-
-        // Edge-scroll (#46, real songs only -- Random's short window never overflows): nudge
-        // scrollLeft while the pointer sits near either edge, driven by this function's own
-        // per-mousemove/touchmove firing (no separate rAF loop needed). The closest-token lookup
-        // below re-queries live getBoundingClientRect() positions every call, so it already
-        // reflects wherever scrollLeft currently is -- no extra plumbing needed there.
-        // #melody-notation-scroll (not listEl) is the actual clipping/scrolling viewport now --
-        // see scrollTimelineToCurrent's identical comment. Using listEl's own rect/scrollLeft here
-        // would read the full unclipped CONTENT extent instead of the visible viewport, breaking
-        // edge detection entirely.
-        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
-        if (!this.state.isRandom && scrollEl) {
-            const rect = scrollEl.getBoundingClientRect();
-            const EDGE = 40; // px from either edge that triggers auto-scroll
-            const MAX_SPEED = 12; // px per tick
-            if (clientX < rect.left + EDGE) {
-                scrollEl.scrollLeft -= MAX_SPEED * (1 - Math.max(0, clientX - rect.left) / EDGE);
-            } else if (clientX > rect.right - EDGE) {
-                scrollEl.scrollLeft += MAX_SPEED * (1 - Math.max(0, rect.right - clientX) / EDGE);
-            }
-        }
-
-        const tokens = Array.from(document.querySelectorAll('#melody-note-list .note-token'));
-        if (tokens.length === 0) return;
-
-        let closest = tokens[0];
-        let closestDist = Infinity;
-        tokens.forEach(token => {
-            const rect = token.getBoundingClientRect();
-            const center = rect.left + rect.width / 2;
-            const dist = Math.abs(clientX - center);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = token;
-            }
-        });
-
-        const candidateIdx = parseInt(closest.getAttribute('data-note-idx'), 10);
-        this.state.scrubDragIndex = Math.max(0, Math.min(candidateIdx, this.getMaxStartIndex()));
-        this.positionScrubMarker(this.state.scrubDragIndex);
     },
 
     // Icon-only transport: ▶ when stopped (click plays the preview), ⏹ while playing (click
@@ -1012,11 +853,20 @@ const MelodyMode = {
         const targetNote = this.state.melody[this.state.userIndex];
         if (!targetNote) return;
 
-        // Compare exact MIDI note pitch
+        // Compare exact pitch
         if (midi === targetNote.midi) {
             // Correct note!
             this.state.userIndex++;
             this.updateStreak(this.state.userIndex);
+
+            // INV-53: the end advances immediately with every correct play that reaches new
+            // territory -- no streak gate. (The old coupled version, where the end waited on
+            // the same streak the start needed, was a real regression: nothing visibly advanced
+            // between reps.) Random keeps its own separate, timeout-driven growth below.
+            if (!this.state.isRandom && this.state.userIndex - 1 > this.state.endIndex) {
+                this.state.endIndex = this.state.userIndex - 1;
+            }
+
             this.updateDifficultyUI();
 
             // Clear any existing "going ahead" timeout
@@ -1028,63 +878,55 @@ const MelodyMode = {
             if (this.state.userIndex >= this.state.melody.length) {
                 // Completed the entire song!
                 this.setStatus("Congratulations! You completed the song! 🎉", "success");
-                document.getElementById('melody-note-list').innerHTML = '';
                 document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
                 document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
                 this.celebrate();
                 return;
             }
 
-            if (this.state.userIndex >= this.state.targetLength) {
-                // User has repeated the target sequence and can keep going ahead!
-                this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
-
-                // #46 spaced-repetition auto-advance (songs only): reaching here with no mistake
-                // since playTargetSequence's own last call is a complete clean pass of the
-                // current segment. After 3 in a row, advance the drilled segment to the next
-                // measure instead of just +1 note, and reset the streak.
-                if (!this.state.isRandom && !this.state.segmentHadMistake) {
+            // INV-26/53: the start's own measure-mastery streak -- scoped to the ONE measure
+            // startIndex currently sits in, not the whole (possibly much longer, now that the
+            // end advances continuously) segment. Detected once per pass: the first correct
+            // note that lands past that measure's own boundary.
+            if (!this.state.isRandom && !this.state.segmentHadMistake && !this.state.measureStreakCounted) {
+                const startMeasure = this.measureOf(this.state.melody[this.state.startIndex].time);
+                if (this.measureOf(this.state.melody[this.state.userIndex - 1].time) > startMeasure) {
+                    this.state.measureStreakCounted = true;
                     this.state.cleanStreak++;
                     if (this.state.cleanStreak >= 3) {
-                        const startMeasure = this.measureOf(this.state.melody[this.state.startIndex].time);
                         let nextIdx = this.state.startIndex;
                         while (nextIdx < this.state.melody.length && this.measureOf(this.state.melody[nextIdx].time) <= startMeasure) {
                             nextIdx++;
                         }
                         if (nextIdx < this.state.melody.length) {
-                            // Advancing INTO the next measure moves startIndex past whatever's
-                            // currently drilled -- unlike a scrub (which only ever moves the
-                            // start EARLIER within already-established territory), this needs
-                            // targetLength to grow to cover it too, or the existing "startIndex
-                            // always <= targetLength - 1" invariant (see state.startIndex) breaks.
                             this.state.startIndex = nextIdx;
-                            if (this.state.targetLength <= nextIdx) {
-                                this.state.targetLength = nextIdx + 1;
-                            }
+                            // endIndex should already be ahead of nextIdx (it tracks live), but
+                            // guard the startIndex <= endIndex invariant regardless.
+                            if (this.state.endIndex < nextIdx) this.state.endIndex = nextIdx;
                         }
                         this.state.cleanStreak = 0;
                     }
                 }
+            }
+
+            if (this.state.userIndex > this.state.endIndex) {
+                // At the frontier -- either about to extend into brand-new territory (a real
+                // song's end already grows live above, so this is just the prompt) or waiting on
+                // Random's own timeout-driven growth below.
+                this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
 
                 this.state.userRepeatTimeoutId = setTimeout(() => {
-                    // Timeout fired: User stopped playing ahead.
-                    // Random has no spaced-repetition concept (#46 scopes cleanStreak to songs
-                    // only) -- grow by however far they got, same as always. For a song, growth
-                    // ONLY ever happens via the cleanStreak>=3 block above (a whole measure); below
-                    // that threshold, targetLength/startIndex are deliberately left untouched here
-                    // so playTargetSequence() below re-drills the SAME segment again. Previously
-                    // this unconditionally grew by one note after every single clean pass
-                    // regardless of cleanStreak, silently advancing the whole time and defeating
-                    // the point of counting a streak at all (reported live: "the number of times
-                    // you have to get it right to advance seems to be 1").
+                    // Timeout fired: player stopped playing ahead. Random has no measure concept
+                    // -- grow by however far they got, same as always. A real song's end has
+                    // already advanced live above; this just re-drills the current segment.
                     if (this.state.isRandom) {
-                        this.state.targetLength = this.state.userIndex + 1;
+                        this.state.endIndex = this.state.userIndex;
                     }
                     this.playTargetSequence();
                 }, 2000);
             } else {
-                // Still repeating the target sequence
-                const remaining = this.state.targetLength - this.state.userIndex;
+                // Still repeating already-established territory
+                const remaining = this.state.endIndex - this.state.userIndex + 1;
                 this.setStatus(`Correct! Repeat ${remaining} more note${remaining > 1 ? 's' : ''}...`, "progress");
             }
         } else {
@@ -1092,11 +934,13 @@ const MelodyMode = {
             this.setStatus("Oops! Let's listen again...", "error");
             this.state.segmentHadMistake = true;
             this.state.cleanStreak = 0;
+            this.state.measureStreakCounted = false;
 
-            // If the user made progress up to or beyond the current target,
-            // advance the target to show the correct version of the note they missed.
-            if (this.state.userIndex >= this.state.targetLength) {
-                this.state.targetLength = this.state.userIndex + 1;
+            // Random's end only grows via the timeout above, so a mistake can still land past it
+            // -- show the correct version of the note they missed. (For a real song this is a
+            // no-op: the end already tracks userIndex live, so userIndex can never exceed it here.)
+            if (this.state.userIndex > this.state.endIndex) {
+                this.state.endIndex = this.state.userIndex;
             }
             this.state.userIndex = this.state.startIndex;
             this.updateDifficultyUI();
@@ -1165,8 +1009,6 @@ const MelodyMode = {
         document.querySelectorAll('.active-note').forEach(el => el.classList.remove('active-note'));
         document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
         document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
-        const listEl = document.getElementById('melody-note-list');
-        if (listEl) listEl.innerHTML = '';
     },
 
     refreshBoard: function() {

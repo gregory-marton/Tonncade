@@ -163,31 +163,15 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             <span class="stat-bar-best">/<span id="melody-best-streak">0</span></span>
                         </div>
                         <p id="melody-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
-                        <!-- #46 low-hanging fruit: lets a player replay from any note already
-                             reached, instead of always restarting the drilled segment from its
-                             own beginning. Rendered inline as a small draggable marker sitting
-                             IN the note list itself, between two note tokens, rather than a
-                             separate range slider below it (tried first -- see INV-26 -- but it
-                             read as an abstract, disconnected control; a marker between the
-                             actual notes shows directly which two notes you're starting between).
-                             Range is clamped in js/melody.js to [0, targetLength-1] -- "anywhere
-                             you've already played," never into unplayed territory. -->
-                        <!-- Grand-staff view (docs/melody-notation-design.md), rendered via
-                             js/notation.js (VexFlow) -- sits ABOVE the note-timeline, not in place
-                             of it; the timeline keeps doing the interactive job (scrub, drag-to-seek,
-                             tri-coloured upcoming notes). Empty/hidden until MelodyMode.refreshStaff
-                             has something to draw (Random's tiny sliding window included). -->
-                        <!-- One shared horizontal scroll container for the staff, its labels, and the
-                             note-timeline below it -- each used to scroll independently (its own
-                             overflow-x:auto), so a wide song's staff and its labels/timeline drifted
-                             out of alignment with each other as soon as either was scrolled (caught
-                             by Codex's review). Nesting them under one overflow-x:auto ancestor keeps
-                             all three moving together: the wrapper's own scrollWidth is the union of
-                             every child's content box, so scrolling it scrolls all three as one unit. -->
+                        <!-- The Timeline (INV-55, js/timeline.js): grand staff + aligned pitch row
+                             + two draggable boundary markers, shared with Compose. Melody's own
+                             practice strip (past/current/upcoming color hints, Tonnetz glow-linkage)
+                             decorates the pitch row via Notation.renderLabels' decorate hook -- see
+                             MelodyMode.updateDifficultyUI. Empty/hidden until MelodyMode.timeline has
+                             something to draw (Random's tiny sliding window included). -->
                         <div id="melody-notation-scroll" class="notation-scroll">
                             <div id="melody-staff" style="margin-top: 4px;"></div>
-                            <div id="melody-staff-labels" class="melody-note-list" style="height: 1.2em;"></div>
-                            <p id="melody-note-list" class="melody-note-list"></p>
+                            <div id="melody-staff-labels" class="pitch-row" style="height: 1.2em;"></div>
                         </div>
                     </div>
                     <div id="melody-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
@@ -452,6 +436,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/repeat-navigation.js"></script>
     <script src="js/musicxml.js"></script>
     <script src="js/mxl.js"></script>
+    <script src="js/timeline.js"></script>
     <script src="js/undo-stack.js"></script>
     <script src="js/sandbox.js"></script>
     <script src="js/difficulty-barbell.js"></script>

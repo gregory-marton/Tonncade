@@ -590,8 +590,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   test('Melody mode: a real single-finger touch drag moves the scrub marker to the touched note', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     await page.evaluate(() => {
-      MelodyMode.state.targetLength = 4;
-      MelodyMode.state.startIndex = 2;
+      MelodyMode.state.isRandom = false; // Random forces both markers null -- see INV-26
+      MelodyMode.state.endIndex = 3;
+      MelodyMode.state.startIndex = 1;
       MelodyMode.updateDifficultyUI();
 
       // Targets whichever element the touch actually STARTED on (real "implicit capture"
@@ -617,7 +618,20 @@ test.describe('Mobile Viewport and Layout Tests', () => {
       };
     });
 
-    const markerBox = await page.locator('.scrub-marker').boundingBox();
+    // .notation-scroll's own overflow-x clips content past its visible width -- boundingBox()
+    // still reports a clipped-out element's raw geometry, so a real touch there would target
+    // whatever's behind it instead. On this narrow a viewport, scrollIntoViewIfNeeded's own
+    // "nearest edge" scrolling can leave the marker OUTSIDE the visible window even after
+    // bringing the target in (they're close together but the container is only ~105px wide) --
+    // set scrollLeft explicitly instead, from the real Notation x-coordinates both boxes are
+    // positioned from, so both notes are guaranteed to land inside the same visible window.
+    await page.evaluate(() => {
+      const scrollEl = document.getElementById('melody-notation-scroll');
+      const positions = MelodyMode.timeline._lastRender.noteXPositions;
+      const targetX = positions.find((n) => n.id === 0).x;
+      scrollEl.scrollLeft = Math.max(0, targetX - 30);
+    });
+    const markerBox = await page.locator('.timeline-marker-start').boundingBox();
     const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
     const startX = markerBox.x + markerBox.width / 2;
     const startY = markerBox.y + markerBox.height / 2;

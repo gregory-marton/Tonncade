@@ -349,14 +349,14 @@ svg {
     pointer-events: none;
 }
 
-/* #melody-note-list's timeline layout (#46 redesign): real flex+gap gives every pair of adjacent
-   tokens the same visual spacing, replacing the old literal " - " text-node separators that
-   `positionScrubMarker` used to insert between tokens (asymmetric right at the marker itself,
-   which is what read as "spacing collapses there" -- see docs/invariants.md's INV-26). Overflows
-   its OWN box when wider than the viewport rather than scrolling independently -- the shared
-   .notation-scroll ancestor above is what actually scrolls, keeping this in sync with the staff
-   and labels stacked alongside it. */
-.melody-note-list {
+/* .pitch-row: the Timeline's own aligned note-name/octave row (INV-55) -- real flex+gap gives
+   every pair of adjacent tokens the same visual spacing. Overflows its OWN box when wider than
+   the viewport rather than scrolling independently -- the shared .notation-scroll ancestor is
+   what actually scrolls, keeping this in sync with the staff stacked alongside it.
+   .melody-note-list is Compose's own not-yet-migrated timeline row (Task #16 -- will be removed
+   once Compose moves onto the shared Timeline component too); kept as an alias of the same rules
+   in the meantime, not a separate design. */
+.pitch-row, .melody-note-list {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -366,7 +366,7 @@ svg {
     min-height: 18px;
     font-weight: bold;
     white-space: nowrap;
-    position: relative; /* .scrub-marker's absolute-positioning anchor */
+    position: relative; /* .timeline-marker's absolute-positioning anchor */
 }
 .note-token { flex: 0 0 auto; }
 
@@ -392,21 +392,20 @@ svg {
     align-self: center;
 }
 
-/* #46 scrub marker: a real I-beam (CSS-drawn vertical stem + a top serif, no glyph text),
-   absolutely positioned at the target token's offsetLeft -- so it's visually clear which two
-   notes a replay would start between, unlike the plain range-slider version this replaced, and
-   unlike the easy-to-miss ▾ glyph it replaced after that (see INV-26/docs/invariants.md). The
-   SAME <span> is created once and only ever repositioned via style.left afterward -- never
-   recreated -- so a live touch/mouse capture stays valid mid-drag.
-   Parented under .notation-scroll (not #melody-note-list) and spans top:0;bottom:0 -- the whole
-   staff+labels+timeline stack, not just the timeline row -- per docs/melody-notation-design.md's
-   "the scrub marker spans the whole grand staff and note names/octaves" requirement (Codex
-   review: this was still only spanning the timeline). Only ONE serif (top) now, not top+bottom:
-   the old bottom serif was drawn via box-shadow with a HARDCODED pixel offset (the marker's
-   fixed 1.4em height) -- box-shadow's offset can't track a height that's now dynamic (the stack's
-   own height varies by viewport/song), so that trick stopped being expressible at all once the
-   marker had to span it instead of a fixed short row. */
-.scrub-marker {
+/* The Timeline's two boundary markers (INV-55, js/timeline.js): a real I-beam (CSS-drawn
+   vertical stem + a top serif, no glyph text), absolutely positioned at the target note's own x
+   -- so it's visually clear which note a drag would land on, unlike the plain range-slider
+   version this replaced long ago, and unlike the easy-to-miss ▾ glyph it replaced after that
+   (see INV-26/docs/invariants.md). The SAME <span> is created once per marker and only ever
+   repositioned via style.left afterward -- never recreated -- so a live touch/mouse capture
+   stays valid mid-drag.
+   Parented under .notation-scroll and spans top:0;bottom:0 -- the whole staff+labels+timeline
+   stack, not just the pitch row. Only ONE serif (top) per marker, not top+bottom: a bottom serif
+   would need box-shadow with a HARDCODED pixel offset, which can't track a height that's
+   dynamic (the stack's own height varies by viewport/song).
+   .timeline-marker-start/.timeline-marker-end get distinct colors so the two are
+   distinguishable at a glance; which color means which isn't otherwise load-bearing. */
+.timeline-marker {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -416,26 +415,28 @@ svg {
     cursor: grab;
     touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
 }
-.scrub-marker::before {
+.timeline-marker::before {
     /* the vertical stem -- spans the marker's own full (now dynamic) height */
     content: '';
     position: absolute;
     left: 50%; top: 0; bottom: 0;
     width: 2px;
-    background: var(--accent);
+    background: currentColor;
     transform: translateX(-50%);
 }
-.scrub-marker::after {
+.timeline-marker::after {
     /* top serif */
     content: '';
     position: absolute;
     left: 50%; top: 0;
     width: 6px; height: 2px;
-    background: var(--accent);
+    background: currentColor;
     transform: translateX(-50%);
 }
+.timeline-marker-start { color: var(--accent); }
+.timeline-marker-end { color: #e6b23c; }
 
-.scrub-marker:active {
+.timeline-marker:active {
     cursor: grabbing;
 }
 

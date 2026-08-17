@@ -226,7 +226,7 @@ test('midi note list fades past notes progressively by recency', async ({ page }
   });
 
   const opacities = await page.evaluate(() => {
-    const spans = Array.from(document.querySelectorAll('#melody-note-list [data-note-role="past"]'));
+    const spans = Array.from(document.querySelectorAll('#melody-staff-labels [data-note-role="past"]'));
     const byDistance = {};
     spans.forEach(s => { byDistance[s.getAttribute('data-distance')] = parseFloat(s.style.opacity); });
     return byDistance;
@@ -244,7 +244,7 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0; // would normally show melody[0] as current
     MelodyMode.updateDifficultyUI(5); // override to pivot on index 5 instead
-    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
+    const el = document.querySelector('#melody-staff-labels [data-note-role="current"]');
     return el ? el.textContent : null;
   });
 
@@ -275,7 +275,7 @@ test('playing the full melody preview live-updates the note list as it plays', a
   await page.clock.fastForward(1300);
 
   const currentName = await page.evaluate(() => {
-    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
+    const el = document.querySelector('#melody-staff-labels [data-note-role="current"]');
     return el ? el.textContent : null;
   });
   // Octave-qualified since INV-25 -- see the comment on the preceding test.
@@ -306,7 +306,7 @@ test('stopping preview restores the note list to reflect actual game progress', 
   await page.locator('#melody-play-preview').click();
 
   const currentName = await page.evaluate(() => {
-    const el = document.querySelector('#melody-note-list [data-note-role="current"]');
+    const el = document.querySelector('#melody-staff-labels [data-note-role="current"]');
     return el ? el.textContent : null;
   });
   // Octave-qualified since INV-25 -- see the comment on the earlier "pivots the window" test.
@@ -1297,37 +1297,30 @@ test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead 
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// Melody mode replay-from scrub control (#46 low-hanging fruit): lets a player replay the
-// drilled segment starting from any note already reached, instead of always restarting from
-// note 0 -- useful both to relisten to an earlier stretch and to skip past notes already
-// mastered. Clamped to [0, targetLength - 1].
+// Melody's Timeline start marker doubles as the replay-from scrub control (#46 low-hanging
+// fruit, then migrated onto the shared Timeline component -- see docs/invariants.md INV-26/55):
+// lets a player replay the drilled segment starting from any position, instead of always
+// restarting from note 0 -- useful both to relisten to an earlier stretch and to skip past
+// notes already mastered. Clamped to [0, endIndex] (inclusive).
 // ────────────────────────────────────────────────────────────────────────
 
-test('Melody mode: the replay-from scrub marker stays hidden until more than one note has been reached', async ({ page }) => {
-  await page.clock.install();
-  await page.goto('/');
-  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await page.clock.fastForward(2000); // let the auto-kickoff intro finish; targetLength stays 1
-
-  await expect(page.locator('.scrub-marker')).toHaveCount(0);
-});
-
-test('Melody mode: the scrub marker appears once the drilled segment grows, sitting right before the note it targets', async ({ page }) => {
+test('Melody mode: the start marker sits right before the note it targets', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.isRandom = false; // Random forces both markers null -- see INV-26
+    MelodyMode.state.endIndex = 3;
     MelodyMode.state.startIndex = 2;
     MelodyMode.updateDifficultyUI();
   });
 
-  await expect(page.locator('.scrub-marker')).toHaveCount(1);
+  await expect(page.locator('.timeline-marker-start')).toHaveCount(1);
   // The marker is absolutely positioned at the target token's own offsetLeft (see
-  // positionScrubMarker, #46), not inserted adjacent to it in DOM order -- assert its style.left
+  // Timeline._positionMarker), not inserted adjacent to it in DOM order -- assert its style.left
   // matches the target token's offsetLeft (within the marker's own small offset), not adjacency.
   const isAtTarget = await page.evaluate(() => {
-    const marker = document.querySelector('.scrub-marker');
+    const marker = document.querySelector('.timeline-marker-start');
     const target = document.querySelector(`.note-token[data-note-idx="${MelodyMode.state.startIndex}"]`);
     if (!target) return false;
     const markerLeft = parseFloat(marker.style.left);
@@ -1336,37 +1329,46 @@ test('Melody mode: the scrub marker appears once the drilled segment grows, sitt
   expect(isAtTarget).toBe(true);
 });
 
-test('Melody mode: the scrub control clamps to notes already reached, never past targetLength', async ({ page }) => {
+test('Melody mode: the scrub control clamps to notes already reached, never past endIndex', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 3; // inclusive -- notes 0..3 reached
     MelodyMode.updateDifficultyUI();
   });
 
   const clamped = await page.evaluate(() => {
-    MelodyMode.seekTo(99); // far beyond targetLength - 1
+    MelodyMode.seekTo(99); // far beyond endIndex
     return MelodyMode.state.startIndex;
   });
   expect(clamped).toBe(3);
 });
 
-test('Melody mode: dragging the scrub marker back replays the skipped-over earlier notes', async ({ page }) => {
+test('Melody mode: dragging the start marker back replays the skipped-over earlier notes', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await page.clock.fastForward(2000); // clear the auto-kickoff intro
+  await page.clock.fastForward(2000); // clear the mode-entry auto-kickoff intro
+  await loadFrereJacques(page);
+  await page.clock.fastForward(2000); // loadMelodyFromArrayBuffer's own resetGame() schedules a SECOND untracked auto-kickoff -- clear that one too
 
   await page.evaluate(() => {
     window.__played = [];
     Synth.playNote = (midi) => window.__played.push(midi);
-    MelodyMode.state.targetLength = 4;
-    MelodyMode.state.startIndex = 2; // simulate having already drilled through note 2
+    MelodyMode.state.endIndex = 5;
+    MelodyMode.state.startIndex = 4; // simulate having already drilled through note 4
     MelodyMode.updateDifficultyUI();
   });
 
-  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  // .notation-scroll's own overflow-x clips content past its visible width -- boundingBox()
+  // still reports a clipped-out element's raw geometry, so a real click there would land on
+  // whatever's behind it instead. scrollIntoViewIfNeeded (which locator.click() does
+  // automatically, but raw page.mouse coordinates don't) brings the marker into the visible
+  // area first, matching how a real drag actually starts.
+  await page.locator('.timeline-marker-start').scrollIntoViewIfNeeded();
+  const markerBox = await page.locator('.timeline-marker-start').boundingBox();
+  await page.locator('.note-token[data-note-idx="0"]').scrollIntoViewIfNeeded();
   const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
   await page.mouse.down();
@@ -1374,30 +1376,41 @@ test('Melody mode: dragging the scrub marker back replays the skipped-over earli
   await page.mouse.up();
   expect(await page.evaluate(() => MelodyMode.state.startIndex)).toBe(0);
 
-  await page.clock.fastForward(5000); // let the whole replayed segment (notes 0..3) finish
+  await page.clock.fastForward(8000); // let the whole replayed segment (notes 0..5) finish
 
   const playedFromZero = await page.evaluate(() => {
-    const expected = MelodyMode.state.melody.slice(0, 4).map(n => n.midi);
+    const expected = MelodyMode.state.melody.slice(0, 6).map(n => n.midi);
     return JSON.stringify(window.__played) === JSON.stringify(expected);
   });
   expect(playedFromZero).toBe(true);
   expect(await page.evaluate(() => MelodyMode.state.userIndex)).toBe(0);
 });
 
-test('Melody mode: dragging the scrub marker forward skips already-mastered notes on replay', async ({ page }) => {
+test('Melody mode: dragging the start marker forward skips already-mastered notes on replay', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.clock.fastForward(2000);
+  await loadFrereJacques(page);
+  await page.clock.fastForward(2000); // see the comment on the previous test -- a second untracked auto-kickoff
 
   await page.evaluate(() => {
     window.__played = [];
     Synth.playNote = (midi) => window.__played.push(midi);
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 5;
     MelodyMode.updateDifficultyUI();
   });
 
-  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  // scrollIntoViewIfNeeded avoids clicking a clipped-out-of-view element via a stale
+  // boundingBox() -- see the comment on the previous test. Target index 2, not the measure
+  // boundary (3/4): even with real, unambiguous diatonic notes and no accidentals, measure 0's
+  // formatted content naturally uses nearly its FULL available width (clef+key+time-sig eat
+  // into its budget), so its last note (id 3) and measure 1's first bare note (id 4) can render
+  // under 2px apart -- genuinely ambiguous for _nearestIndex's closest-by-x match. Index 2 sits
+  // safely mid-measure, clear of that boundary.
+  await page.locator('.timeline-marker-start').scrollIntoViewIfNeeded();
+  const markerBox = await page.locator('.timeline-marker-start').boundingBox();
+  await page.locator('.note-token[data-note-idx="2"]').scrollIntoViewIfNeeded();
   const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
   await page.mouse.down();
@@ -1407,7 +1420,7 @@ test('Melody mode: dragging the scrub marker forward skips already-mastered note
   await page.clock.fastForward(5000);
 
   const playedFromTwo = await page.evaluate(() => {
-    const expected = MelodyMode.state.melody.slice(2, 4).map(n => n.midi);
+    const expected = MelodyMode.state.melody.slice(2, 6).map(n => n.midi);
     return JSON.stringify(window.__played) === JSON.stringify(expected);
   });
   expect(playedFromTwo).toBe(true);
@@ -1422,7 +1435,7 @@ test('Melody mode: a wrong note resets progress back to the scrub position, not 
 
   const resetIndex = await page.evaluate(() => {
     MelodyMode.state.isPlayingSequence = false;
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 3;
     MelodyMode.state.startIndex = 2; // player scrubbed to replay from note 2
     MelodyMode.state.userIndex = 3;  // got note 2 right, currently on note 3
     MelodyMode.handleUserInputNote(-1); // guaranteed wrong pitch
@@ -2988,14 +3001,14 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0;
     MelodyMode.updateDifficultyUI();
-    const tokens = [...document.querySelectorAll('#melody-note-list .note-token[data-upcoming]')];
+    const tokens = [...document.querySelectorAll('#melody-staff-labels .note-token[data-upcoming]')];
     return {
       upcomingRanks: tokens.map((t) => t.getAttribute('data-upcoming')),
       tokenColors: tokens.map((t) => t.style.color),
       glow0: document.querySelectorAll('polygon.glow-next-0').length,
       glow1: document.querySelectorAll('polygon.glow-next-1').length,
       glow2: document.querySelectorAll('polygon.glow-next-2').length,
-      hasHz: /\d+Hz/.test(document.getElementById('melody-note-list').textContent),
+      hasHz: /\d+Hz/.test(document.getElementById('melody-staff-labels').textContent),
     };
   });
   expect(out.upcomingRanks).toEqual(['0', '1', '2']);            // the next three, ranked
@@ -3159,12 +3172,12 @@ test('Melody: a real song renders its entire timeline up front, not a sliding wi
   await loadFrereJacques(page);
 
   const result = await page.evaluate(() => {
-    MelodyMode.state.targetLength = 8;
+    MelodyMode.state.endIndex = 7;
     MelodyMode.state.userIndex = 5;
     MelodyMode.updateDifficultyUI();
     return {
       isRandom: MelodyMode.state.isRandom,
-      tokenCount: document.querySelectorAll('#melody-note-list .note-token').length,
+      tokenCount: document.querySelectorAll('#melody-staff-labels .note-token').length,
       melodyLength: MelodyMode.state.melody.length,
     };
   });
@@ -3181,13 +3194,16 @@ test('Melody: Random keeps its small sliding window even with the song-timeline 
   // Default entry (loadDefault/Random), no song loaded -- explicit re-verification per the
   // plan's own scope boundary: none of parts 3-5 should leak into Random.
   const result = await page.evaluate(() => {
-    MelodyMode.state.targetLength = 8;
+    MelodyMode.state.endIndex = 7;
     MelodyMode.state.userIndex = 5;
     MelodyMode.updateDifficultyUI();
     return {
       isRandom: MelodyMode.state.isRandom,
-      tokenCount: document.querySelectorAll('#melody-note-list .note-token').length,
-      tickCount: document.querySelectorAll('#melody-note-list .measure-tick').length,
+      tokenCount: document.querySelectorAll('#melody-staff-labels .note-token').length,
+      // Random passes showBarlines: false to Timeline.refresh -- a forever-sliding memory-quiz
+      // window isn't a piece being progressed through measure by measure, even though the
+      // underlying melody data technically has measures.
+      tickCount: document.querySelectorAll('#melody-notation-scroll .notation-barline').length,
     };
   });
   expect(result.isRandom).toBe(true);
@@ -3201,11 +3217,11 @@ test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-sc
   await loadFrereJacques(page);
 
   await page.evaluate(() => {
-    MelodyMode.state.targetLength = MelodyMode.state.melody.length;
+    MelodyMode.state.endIndex = MelodyMode.state.melody.length - 1;
     MelodyMode.updateDifficultyUI();
   });
 
-  // #melody-notation-scroll (not #melody-note-list itself) is the actual clipping/scrolling
+  // #melody-notation-scroll (not #melody-staff-labels itself) is the actual clipping/scrolling
   // viewport -- one shared scroll container for the staff/labels/timeline stack (Codex review
   // finding: they used to scroll independently and drift out of alignment).
   const overflow = await page.evaluate(() => {
@@ -3214,7 +3230,7 @@ test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-sc
   });
   expect(overflow, 'a 32-note song should overflow the visible timeline width').toBe(true);
 
-  const markerBox = await page.locator('.scrub-marker').boundingBox();
+  const markerBox = await page.locator('.timeline-marker-start').boundingBox();
   const containerBox = await page.locator('#melody-notation-scroll').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
   await page.mouse.down();
@@ -3234,9 +3250,9 @@ test('Melody: measure ticks appear exactly where the computed measure changes (#
   await loadFrereJacques(page);
 
   const result = await page.evaluate(() => {
-    MelodyMode.state.targetLength = MelodyMode.state.melody.length;
+    MelodyMode.state.endIndex = MelodyMode.state.melody.length - 1;
     MelodyMode.updateDifficultyUI(MelodyMode.state.melody.length - 1);
-    const tickCount = document.querySelectorAll('#melody-note-list .measure-tick').length;
+    const tickCount = document.querySelectorAll('#melody-notation-scroll .notation-barline').length;
     let expected = 0, lastMeasure = null;
     MelodyMode.state.melody.forEach((n) => {
       const m = MelodyMode.measureOf(n.time);
@@ -3249,25 +3265,35 @@ test('Melody: measure ticks appear exactly where the computed measure changes (#
   expect(result.tickCount).toBe(result.expected);
 });
 
-test('Melody: 3 clean playthroughs auto-advance the segment into the next measure (#46 part 5)', async ({ page }) => {
+// INV-26/53: the start's measure-mastery streak is scoped to the ONE measure startIndex sits
+// in, not the whole segment -- a clean pass means playing from startIndex through to (and
+// including) the first note that crosses into the NEXT measure, three times in a row.
+test('Melody: 3 clean playthroughs of the current measure auto-advance the start into the next measure (#46 part 5)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
 
   const result = await page.evaluate(() => {
-    // frere-jacques is 120bpm/4-4 -- 2s/measure -- notes 0-3 (times 0/0.5/1/1.5) are measure 0.
+    // frere-jacques is 120bpm/4-4 -- 2s/measure -- notes 0-3 (times 0/0.5/1/1.5) are measure 0,
+    // note 4 (time 2.0) is the first note of measure 1.
     MelodyMode.state.startIndex = 0;
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 3; // notes 0..3 already established (measure 0), inclusive
     MelodyMode.state.cleanStreak = 0;
 
     const streaks = [];
     for (let pass = 0; pass < 3; pass++) {
       MelodyMode.state.userIndex = MelodyMode.state.startIndex;
       MelodyMode.state.segmentHadMistake = false;
+      MelodyMode.state.measureStreakCounted = false;
       MelodyMode.state.isPlayingSequence = false;
-      const segEnd = MelodyMode.state.targetLength;
-      for (let i = MelodyMode.state.startIndex; i < segEnd; i++) {
-        MelodyMode.handleUserInputNote(MelodyMode.state.melody[i].midi);
+      const startMeasure = MelodyMode.measureOf(MelodyMode.state.melody[MelodyMode.state.startIndex].time);
+      let i = MelodyMode.state.startIndex;
+      let crossed = false;
+      while (!crossed) {
+        const note = MelodyMode.state.melody[i];
+        crossed = MelodyMode.measureOf(note.time) > startMeasure;
+        MelodyMode.handleUserInputNote(note.midi);
+        i++;
       }
       streaks.push(MelodyMode.state.cleanStreak);
     }
@@ -3284,41 +3310,33 @@ test('Melody: 3 clean playthroughs auto-advance the segment into the next measur
   expect(result.startMeasure).toBeGreaterThan(0); // landed in a later measure, not just +1 note
 });
 
-// Reported live: "the number of times you have to get it right to advance seems to be 1" -- the
-// synchronous cleanStreak>=3 block above already correctly gates the BIG (whole-measure) jump, but
-// the separate 2s-idle setTimeout unconditionally grew targetLength by one note after every SINGLE
-// clean pass regardless of cleanStreak, silently marching the drilled segment forward the whole
-// time and defeating the point of counting a streak at all. A clean pass now has to happen 3 times
-// in a row (matching the measure-jump's own threshold) before the segment moves at all -- below
-// that, the idle timeout just re-drills the exact same segment again.
-test('Melody: the drilled segment does not grow after a single clean pass -- it takes 3 in a row (like the measure-jump)', async ({ page }) => {
-  await page.clock.install();
+// INV-53: real regression, reported live -- playing a note correctly stopped visibly advancing
+// practice. Root cause: the end used to stay frozen after every correct note, only jumping (a
+// whole measure) once the START's own 3-rep streak completed on an unrelated gate. That coupling
+// was the bug -- correct play should visibly, immediately extend how far you can go. Decoupled:
+// the end now grows by exactly one note on every SINGLE correct play, with no streak, no waiting.
+test('Melody: the end of the drilled segment grows immediately with each correct play -- no streak required (this was the regression)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
-  await page.clock.fastForward(2000); // clear resetGame's own auto-kickoff intro first (like the existing scrub tests do)
 
-  await page.evaluate(() => {
-    // resetGame's kickoff (targetLength was still 1 then) may still have its OWN "sequence
-    // finished" timeout pending (js/melody.js's tId2, which sets userIndex back to its start) --
-    // left alone it can fire later and stomp this test's own userIndex out from under it. Flush
-    // every pending playback timer before setting up this test's own scenario.
+  const endAfterEach = await page.evaluate(() => {
     MelodyMode.cleanupPlayback();
     MelodyMode.state.startIndex = 0;
-    MelodyMode.state.targetLength = 4;
-    MelodyMode.state.cleanStreak = 0;
+    MelodyMode.state.endIndex = 0; // only note 0 known so far
     MelodyMode.state.userIndex = 0;
     MelodyMode.state.segmentHadMistake = false;
     MelodyMode.state.isPlayingSequence = false;
-    for (let i = 0; i < 4; i++) MelodyMode.handleUserInputNote(MelodyMode.state.melody[i].midi);
+    const ends = [];
+    for (let i = 0; i < 4; i++) {
+      MelodyMode.handleUserInputNote(MelodyMode.state.melody[i].midi);
+      ends.push(MelodyMode.state.endIndex);
+    }
+    return ends;
   });
-  const afterOnePass = await page.evaluate(() => ({ targetLength: MelodyMode.state.targetLength, startIndex: MelodyMode.state.startIndex }));
-
-  await page.clock.fastForward(2500); // let the idle timeout fire
-  const afterTimeout = await page.evaluate(() => ({ targetLength: MelodyMode.state.targetLength, startIndex: MelodyMode.state.startIndex }));
-
-  expect(afterOnePass).toEqual({ targetLength: 4, startIndex: 0 });
-  expect(afterTimeout, 'one clean pass should not have grown the segment').toEqual({ targetLength: 4, startIndex: 0 });
+  // Playing note 0 (already known) grows nothing; each subsequent correct note -- genuinely new
+  // territory -- immediately extends the end by exactly one, on that same single play.
+  expect(endAfterEach).toEqual([0, 1, 2, 3]);
 });
 
 test('Melody: a mistake resets the clean-streak', async ({ page }) => {
@@ -3328,7 +3346,7 @@ test('Melody: a mistake resets the clean-streak', async ({ page }) => {
 
   const result = await page.evaluate(() => {
     MelodyMode.state.startIndex = 0;
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 3;
     MelodyMode.state.cleanStreak = 2; // simulate 2 clean passes already banked
     MelodyMode.state.userIndex = 0;
     MelodyMode.state.segmentHadMistake = false;
@@ -3346,7 +3364,7 @@ test('Melody: a player-initiated scrub resets the clean-streak', async ({ page }
 
   const result = await page.evaluate(() => {
     MelodyMode.state.startIndex = 2;
-    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.endIndex = 3;
     MelodyMode.state.cleanStreak = 2;
     MelodyMode.seekTo(0); // a different startIndex -- player-initiated
     return MelodyMode.state.cleanStreak;
@@ -4305,7 +4323,33 @@ test('Notation.renderLabels: one note-name/octave label per note, positioned at 
   expect(parseFloat(labels[1].left)).toBeGreaterThan(parseFloat(labels[0].left)); // same x-order as the staff
 });
 
-test('Notation.renderBarlineOverlay: one .notation-barline per barlineXPositions entry, at that measure\'s own x', async ({ page }) => {
+test('Notation.renderLabels: an optional decorate(entry) hook can add a class/style per pitch-row label', async ({ page }) => {
+  await page.goto('/');
+  const labels = await page.evaluate(() => {
+    const staffContainer = document.createElement('div');
+    staffContainer.id = 'notation-test-container-decorate';
+    const labelContainer = document.createElement('div');
+    labelContainer.id = 'notation-test-labels-decorate';
+    document.body.appendChild(staffContainer);
+    document.body.appendChild(labelContainer);
+    const result = Notation.render('notation-test-container-decorate', [
+      { id: 5, midi: 60, time: 0, duration: 0.5 },
+      { id: 9, midi: 64, time: 0.5, duration: 0.5 },
+    ], { bpm: 120 });
+    Notation.renderLabels('notation-test-labels-decorate', result.noteXPositions, null, (entry) => (
+      entry.id === 5 ? { className: 'glow-past', style: { opacity: '0.5' } } : null
+    ));
+    return [...labelContainer.querySelectorAll('.note-token')].map((el) => ({
+      className: el.className,
+      opacity: el.style.opacity,
+      noteIdx: el.getAttribute('data-note-idx'),
+    }));
+  });
+  expect(labels[0]).toMatchObject({ className: 'note-token glow-past', opacity: '0.5', noteIdx: '5' });
+  expect(labels[1]).toMatchObject({ className: 'note-token', noteIdx: '9' }); // no decoration returned -- default only
+});
+
+test('Notation.renderBarlineOverlay: one .notation-barline per REAL measure boundary -- skips the leading edge of measure 1, at that measure\'s own x', async ({ page }) => {
   await page.goto('/');
   const lines = await page.evaluate(() => {
     const staffContainer = document.createElement('div');
@@ -4319,7 +4363,10 @@ test('Notation.renderBarlineOverlay: one .notation-barline per barlineXPositions
     Notation.renderBarlineOverlay('notation-test-overlay-barline', result.barlineXPositions);
     return [...overlayContainer.querySelectorAll('.notation-barline')].map((el) => el.style.left);
   });
-  expect(lines.length).toBe(3);
+  // 3 measures means 2 REAL boundaries (between 1&2, and 2&3) -- no barline drawn at the very
+  // start of measure 1 (nothing precedes it to separate from; real sheet music doesn't draw one
+  // there either).
+  expect(lines.length).toBe(2);
   expect(lines.map(parseFloat)).toEqual(lines.map(parseFloat).slice().sort((a, b) => a - b)); // in x order
 });
 
@@ -4340,33 +4387,33 @@ test('Melody: the barline overlay lands in the shared stack wrapper, not just th
   expect(info.parentIsWrapper).toBe(true);
 });
 
-// The scrub marker's CSS (top:0;bottom:0, css/style.css) makes it span whatever height its
-// POSITIONED ANCESTOR has -- moving it from #melody-note-list (one row tall) to
-// #melody-notation-scroll (the whole stack) is what actually makes it span the stack, per
-// docs/melody-notation-design.md's "the scrub marker spans the whole grand staff and note
-// names/octaves" requirement (Codex review: it only spanned the timeline row).
-test('Melody: the scrub marker spans the full staff+labels+timeline stack height, not just the timeline row', async ({ page }) => {
+// The start marker's CSS (top:0;bottom:0, css/style.css) makes it span whatever height its
+// POSITIONED ANCESTOR has -- #melody-notation-scroll (the whole staff+labels+timeline stack),
+// per docs/melody-notation-design.md's "the scrub marker spans the whole grand staff and note
+// names/octaves" requirement (Codex review: it only spanned the timeline row, back when it was
+// a one-row-tall element inside the old #melody-note-list).
+test('Melody: the start marker spans the full staff+labels+timeline stack height, not just the pitch row', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
   await page.evaluate(() => {
-    MelodyMode.state.targetLength = 3;
+    MelodyMode.state.endIndex = 2;
     MelodyMode.updateDifficultyUI();
   });
   const heights = await page.evaluate(() => {
-    const marker = document.querySelector('.scrub-marker');
+    const marker = document.querySelector('.timeline-marker-start');
     const wrapper = document.getElementById('melody-notation-scroll');
-    const list = document.getElementById('melody-note-list');
+    const labels = document.getElementById('melody-staff-labels');
     return {
       markerParentIsWrapper: marker.parentElement === wrapper,
       markerHeight: marker.getBoundingClientRect().height,
       wrapperHeight: wrapper.getBoundingClientRect().height,
-      listHeight: list.getBoundingClientRect().height,
+      labelsHeight: labels.getBoundingClientRect().height,
     };
   });
   expect(heights.markerParentIsWrapper).toBe(true);
   // The marker should span roughly the WHOLE wrapper (staff + labels + timeline), not just the
-  // one-row-tall note-list -- a generous lower-bound threshold (70% of the wrapper) avoids being
+  // one-row-tall pitch row -- a generous lower-bound threshold (70% of the wrapper) avoids being
   // brittle against exact pixel rounding while still clearly distinguishing "spans the stack"
   // from "spans one row." An UPPER bound matters just as much: .notation-scroll's own
   // position:relative (its anchor for top:0;bottom:0) only takes effect via a CSS CLASS that
@@ -4378,7 +4425,87 @@ test('Melody: the scrub marker spans the full staff+labels+timeline stack height
   // the (much smaller) wrapper height.
   expect(heights.markerHeight).toBeGreaterThan(heights.wrapperHeight * 0.7);
   expect(heights.markerHeight).toBeLessThan(heights.wrapperHeight * 1.3);
-  expect(heights.markerHeight).toBeGreaterThan(heights.listHeight * 2);
+  expect(heights.markerHeight).toBeGreaterThan(heights.labelsHeight * 2);
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Timeline (js/timeline.js, INV-55): the shared staff+pitch-row+two-marker component both
+// Melody's practice strip and Compose use. Tested standalone here, against synthetic containers,
+// independent of either mode's own migration.
+// ────────────────────────────────────────────────────────────────────────
+
+// position:fixed pins the container to the visible viewport regardless of wherever the rest of
+// the real page's own content (Sandbox's board, etc.) happens to push things -- otherwise a
+// plain appendChild(document.body) can land the container far below the fold, where real mouse
+// coordinates computed from its getBoundingClientRect() don't correspond to anything
+// elementFromPoint can actually see.
+const setupTimelineContainers = (prefix) => `
+  const staff = document.createElement('div'); staff.id = '${prefix}-staff';
+  const labels = document.createElement('div'); labels.id = '${prefix}-labels';
+  const scroll = document.createElement('div'); scroll.id = '${prefix}-scroll'; scroll.className = 'notation-scroll';
+  scroll.style.position = 'fixed'; scroll.style.top = '0'; scroll.style.left = '0'; scroll.style.zIndex = '9999'; scroll.style.background = '#14161c';
+  scroll.appendChild(staff); scroll.appendChild(labels);
+  document.body.appendChild(scroll);
+`;
+
+test('Timeline.refresh: renders the staff, pitch row, and both markers at the right notes', async ({ page }) => {
+  await page.goto('/');
+  const info = await page.evaluate((setupCode) => {
+    eval(setupCode);
+    const tl = Timeline.create({ staffContainerId: 'tl-staff', labelsContainerId: 'tl-labels', scrollContainerId: 'tl-scroll' });
+    const notes = [
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 0.5, duration: 0.5 },
+      { midi: 64, time: 1, duration: 0.5 },
+    ];
+    tl.refresh(notes, { bpm: 120, startIndex: 0, endIndex: 1 });
+    const startMarker = document.querySelector('.timeline-marker-start');
+    const endMarker = document.querySelector('.timeline-marker-end');
+    return {
+      labelCount: document.querySelectorAll('#tl-labels .note-token').length,
+      startLeft: startMarker ? startMarker.style.left : null,
+      endLeft: endMarker ? endMarker.style.left : null,
+    };
+  }, setupTimelineContainers('tl'));
+  expect(info.labelCount).toBe(3);
+  expect(info.startLeft).not.toBeNull();
+  expect(info.endLeft).not.toBeNull();
+  expect(parseFloat(info.endLeft)).toBeGreaterThan(parseFloat(info.startLeft)); // end (note 1) is right of start (note 0)
+});
+
+test('Timeline: dragging the start marker to a different note calls onStartCommit with that note\'s id, exactly once, on release', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate((setupCode) => { eval(setupCode); }, setupTimelineContainers('tld'));
+  await page.evaluate(() => {
+    window.__starts = [];
+    window.__tl = Timeline.create({
+      staffContainerId: 'tld-staff', labelsContainerId: 'tld-labels', scrollContainerId: 'tld-scroll',
+      onStartCommit: (idx) => window.__starts.push(idx),
+    });
+    window.__tl.setupDrag();
+    window.__tl.refresh([
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 0.5, duration: 0.5 },
+      { midi: 64, time: 1, duration: 0.5 },
+    ], { bpm: 120, startIndex: 0, endIndex: 2 });
+  });
+  await page.waitForTimeout(200); // let layout/ResizeObserver settle before reading pixel coords
+  const positions = await page.evaluate(() => {
+    const scrollRect = document.getElementById('tld-scroll').getBoundingClientRect();
+    const target = window.__tl._lastRender.noteXPositions[2]; // drag start onto note 2
+    const startMarker = document.querySelector('.timeline-marker-start');
+    const mr = startMarker.getBoundingClientRect();
+    return {
+      markerX: mr.x + mr.width / 2, markerY: mr.y + mr.height / 2,
+      targetX: scrollRect.left + target.x, targetY: mr.y + mr.height / 2,
+    };
+  });
+  await page.mouse.move(positions.markerX, positions.markerY);
+  await page.mouse.down();
+  await page.mouse.move(positions.targetX, positions.targetY, { steps: 5 });
+  await page.mouse.up();
+  const starts = await page.evaluate(() => window.__starts);
+  expect(starts).toEqual([2]);
 });
 
 test('Notation.pitchFromY: round-trips every rendered note\'s own reported y back to its exact midi', async ({ page }) => {
@@ -4448,8 +4575,8 @@ test('Notation.beatFromX: round-trips every rendered note\'s own reported x back
 test('Melody: the grand staff renders real notes once a song is loaded, matching the Random-vs-song timeline it mirrors', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await page.waitForFunction(() => document.querySelectorAll('#melody-staff svg').length > 0 || document.getElementById('melody-note-list').children.length > 0, { timeout: 3000 });
-  const notesOnTimeline = await page.evaluate(() => document.querySelectorAll('#melody-note-list .note-token').length);
+  await page.waitForFunction(() => document.querySelectorAll('#melody-staff svg').length > 0 || document.querySelectorAll('#melody-staff-labels .note-token').length > 0, { timeout: 3000 });
+  const notesOnTimeline = await page.evaluate(() => document.querySelectorAll('#melody-staff-labels .note-token').length);
   const staffHasContent = await page.evaluate(() => document.querySelectorAll('#melody-staff svg').length > 0);
   expect(notesOnTimeline).toBeGreaterThan(0);
   expect(staffHasContent).toBe(true);

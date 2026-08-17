@@ -607,8 +607,8 @@ test.describe('Invariant tests', () => {
         case 'sandbox': return { placedPieces: SandboxMode.state.placedPieces };
         // userIndex/startIndex are deliberately excluded here -- a pan gesture in Melody also
         // plays whatever note is under the initial click (by design, see INV-5), which can
-        // legitimately advance/reset progress. targetLength is untouched by any of that.
-        case 'melody': return { targetLength: MelodyMode.state.targetLength };
+        // legitimately advance/reset progress. endIndex is untouched by any of that.
+        case 'melody': return { endIndex: MelodyMode.state.endIndex };
         case 'compose': return { notes: ComposeMode.state.notes, selectedIndices: ComposeMode.state.selectedIndices };
         case 'life': return { live: [...LifeMode.state.live.entries()], generation: LifeMode.state.generation };
         default: return {};
@@ -1884,11 +1884,11 @@ test.describe('Invariant tests', () => {
       return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`; // octave-qualified, e.g. "E4"
     });
 
-    const currentSpan = page.locator('#melody-note-list [data-note-role="current"]');
+    const currentSpan = page.locator('#melody-staff-labels [data-note-role="current"]');
     await expect(currentSpan).toBeVisible();
     const currentText = (await currentSpan.textContent()).trim();
     expect(currentText, `the current note should read "${name}"`).toBe(name); // qualified name...
-    const listText = (await page.locator('#melody-note-list').textContent()).replace(/\s+/g, ' ');
+    const listText = (await page.locator('#melody-staff-labels').textContent()).replace(/\s+/g, ' ');
     expect(listText, 'the timeline no longer shows a frequency').not.toMatch(/\d+Hz/); // ...and no Hz
   });
 

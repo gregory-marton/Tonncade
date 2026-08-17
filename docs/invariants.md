@@ -11,9 +11,69 @@ first — with the reasoning — then update the corresponding test to match, in
 A test going red here is a signal to fix the product, not the test. `tests/invariants.spec.js`
 carries a copy of this policy in its header comment for the same reason.
 
+
+Below are TBR notes: this means To-Be-Renamed. Numbers are fine for
+genai assistants, but names help humans keep track of which invariant
+is which. When convenient, global search-and-replace the numeric
+version with the identifier suggested.  Until that is performed, genai
+assistants should try to refer to the invariant with both its number
+and its named identifier.
+
 ---
+### INV-4: A cell always sounds its own pitch — the founding invariant
+TBR: INV-Pitch
+
+Every sound the app plays corresponds exactly to the Tonnetz note(s) of the cell(s) actually
+responsible for it — tapping an empty cell plays that cell's note, picking up a placed piece
+plays a chord of precisely that piece's own cells, nothing more or less. This also means every
+hex within a piece is an equally valid pickup handle: which specific cell you tap must never
+change where the picked-up ghost lands — it's always the piece's true position, not wherever
+`hoverCell` happened to be. `getAbsoluteCells`/`rotate` treat every cell in a piece uniformly by
+construction (each piece's `cells` array happens to include a literal `(0,0)` entry, which is
+the only cell with any special status at all, purely as a coordinate-system convenience — not a
+privileged cell in any collision, rendering, or audio logic, all of which iterate every cell of
+a piece equally). The one place this was actually violated was pickup: `hoverCell` wasn't reset
+to the picked-up piece's own anchor before re-rendering its ghost, so tapping a non-anchor cell
+of a multi-cell piece could leave the ghost wherever `hoverCell` last was — fixed in
+`SandboxMode.handleAction`/`pickupPieceAt`.
+
+This is the founding invariant of the whole project, stated at its strongest: a cell at `(p, q)`
+sounds **exactly** `Tonnetz.getFrequency(getMidi(p, q))` — its own pitch — *everywhere, always, in
+every mode*. What may vary per context (mode, cell state, event) is timbre/instrument, volume, and
+attack/decay/duration. What may **never** vary is the **pitch**. The Tonnetz position *is* the
+pitch; that mapping is inviolable. There is no per-mode exception: the restricted modes
+(Snake/Blast/Gravity) aren't a different rule, they're simply *restricted* to fewer cells, each of
+which still sounds its own pitch.
+
+Consequences that follow directly:
+- **No octave-folding.** The synth must never shift a note into a "comfortable" register to make
+  it audible — that plays a *different pitch*. It commands the note's true frequency across the
+  whole range of human hearing and beyond; whether a given device can reproduce an extreme
+  frequency is the device's business, not a license to change the note. (`js/synth.js` used to
+  fold everything into MIDI 21–108; that was a long-standing violation, removed when this
+  invariant was codified.)
+- **The lattice reaches human hearing.** Pannable modes draw out to the top of hearing
+  (`Tonnetz.audibleMaxMidi()` ≈ MIDI 135 ≈ 20 kHz), not the old MIDI-protocol ceiling of 127.
+- **The only sounds are real cells doing something — anywhere.** A sound comes only from a real
+  cell/piece actively acting on the Tonnetz, but *not* only from on-screen ones: it's fine to hear
+  an off-viewport glider recede. What's forbidden is a **phantom or stale** note — a cell sounding
+  a pitch from a position it has left. Since a cell always sounds its own *current* `getMidi`, a
+  moving pattern never smears pitch (see Life #13).
+
+**Tests:** `tests/invariants.spec.js` — the three "INV-4: ..." tests, plus "INV-4: the synth
+sounds each note at its own true getFrequency(midi), never octave-shifted" (sweeps a range of MIDI
+values, including the extremes the old fold used to relocate). The lattice-reach half is covered
+in `tests/desktop.spec.js` ("Tonnetz draws cells up to the top of human hearing").
+
+**Accepted trade-off:** Gravity's board tuning (`35 − 3p + 4q`) spans ~130 semitones (MIDI 23–153),
+so with the fold gone its top rows are genuinely ultrasonic and go unheard, and its low end is
+comparatively high. On review (2026-07-28) the honest-pitch result sounded good enough in play that
+a retune wasn't worth it — the top was judged fine and, at most, the bottom could drop an octave
+someday. So this is a known, accepted characteristic, not an open task. This invariant is what
+surfaced it.
 
 ### INV-1: Every mode is reachable from every screen, in every orientation
+TBR: INV-ModesReachable
 
 You can always navigate from any mode to any other mode (Sandbox, Melody, Snake, Blast,
 Gravity), regardless of current viewport size or orientation. On mobile/tablet widths the mode
@@ -27,7 +87,47 @@ row on mobile means reopening the drawer each time.
 **Test:** `tests/invariants.spec.js` — "INV-1: every mode is reachable from every other mode,
 in portrait and landscape"
 
+### INV-13: Primary elements are reachable in every orientation
+TBR: INV-ElementsReachable
+
+The same guarantee as INV-1, one level down: every primary element listed in the "Primary
+Elements" table above must be reachable (present, non-zero size, not hidden behind a collapsed
+drawer once opened) in both portrait and landscape — not just whichever orientation someone
+happened to test by hand. The one documented exception is Gravity's duplicate down-button
+(`#m-btn-action-2`), which only exists as a distinct primary element in landscape (5 D-pad
+buttons in portrait, 6 in landscape); the test checks that one specifically, in both directions,
+instead of just excluding it.
+
+**Test:** `tests/invariants.spec.js` — "INV-13: every mode's primary elements are reachable in
+both portrait and landscape"
+
+**Coverage gap, found live:** `PRIMARY_ELEMENTS` (the test's own copy of the table above) is
+hand-maintained, and both copies missed real controls before anyone noticed — Melody's own song
+source dropdown (this week's regression) and, discovered while fixing that, Blast's Restart
+button (`#blast-reset`) had apparently never been listed at all, unlike Gravity/Snake's own
+Restart buttons. Full auto-discovery isn't possible here: "primary element" is a semantic
+judgment call, not a structural one — Compose's tempo/subdivision/Quantize/Metronome inputs sit
+at the exact same DOM depth as its Record/Play/Save buttons but are deliberately NOT primary
+(settings, not top-level actions), and a naive "every visible control counts" scan would
+misclassify them.
+
+What CAN be automated is noticing when the classification call was never made at all: a second
+test walks every interactive element inside each mode's own `#<mode>-controls`/`#<mode>-stats`
+container and fails if it's neither in `PRIMARY_ELEMENTS` nor in `SECONDARY_ELEMENTS` (the
+explicit "yes, deliberately not primary" list, with a reason) nor nested inside a sub-container
+the static markup itself starts `display:none` (the existing signal for "conditional, shown
+only in some state," e.g. `#compose-edit-group`). A `SECONDARY_ELEMENTS` entry may also name a
+wrapping container's own id (not just a leaf control's) — Blast/Gravity's Easy/Medium/Hard
+difficulty buttons have no ids of their own at all, only `class="weight-icon"`, so the whole
+group is classified via its own `#blast-difficulty`/`#gravity-difficulty` wrapper. A newly
+added control that fits none of these buckets now fails loud immediately, instead of silently
+having zero reachability coverage the way `#melody-source` did.
+
+**Test:** `tests/invariants.spec.js` — "INV-13 coverage: every interactive control in a mode's
+panel is classified as primary or secondary, none forgotten"
+
 ### INV-2: Anything you can summon, you can dismiss
+TBR: INV-SummonDismiss
 
 Any interactive element or state the player can open/invoke must have a way to close/undo it:
 the mobile drawer opens and closes, the chord guide populates and clears, a candidate piece
@@ -37,6 +137,7 @@ can be picked up and put back down without being forced to place it.
 candidate piece)
 
 ### INV-3: No dead click targets
+TBR: Merge with INV-ElementsReachable. 
 
 The converse of INV-2: nothing that JS explicitly relocates into an "always visible" area is
 ever left unreachable because it (or something JS forgot to move alongside it) ends up behind
@@ -77,25 +178,8 @@ whether a runtime test happens to exercise that exact code path. `scripts/check-
 `js/*.js` looks up against every id `index.html` (or JS itself) actually defines, and would
 have caught this at edit time rather than days later, live.
 
-### INV-4: Audio comes from exactly the notes it claims to
-
-Every sound the app plays corresponds exactly to the Tonnetz note(s) of the cell(s) actually
-responsible for it — tapping an empty cell plays that cell's note, picking up a placed piece
-plays a chord of precisely that piece's own cells, nothing more or less. This also means every
-hex within a piece is an equally valid pickup handle: which specific cell you tap must never
-change where the picked-up ghost lands — it's always the piece's true position, not wherever
-`hoverCell` happened to be. `getAbsoluteCells`/`rotate` treat every cell in a piece uniformly by
-construction (each piece's `cells` array happens to include a literal `(0,0)` entry, which is
-the only cell with any special status at all, purely as a coordinate-system convenience — not a
-privileged cell in any collision, rendering, or audio logic, all of which iterate every cell of
-a piece equally). The one place this was actually violated was pickup: `hoverCell` wasn't reset
-to the picked-up piece's own anchor before re-rendering its ghost, so tapping a non-anchor cell
-of a multi-cell piece could leave the ghost wherever `hoverCell` last was — fixed in
-`SandboxMode.handleAction`/`pickupPieceAt`.
-
-**Tests:** `tests/invariants.spec.js` — the three "INV-4: ..." tests
-
 ### INV-5: Audio and visuals stay in sync
+TBR: INV-VisibleSound
 
 When a cell sounds, that exact cell shows visible feedback (the `active-note` class) — not a
 neighboring cell, not all of them.
@@ -104,9 +188,10 @@ neighboring cell, not all of them.
 note AND visibly highlights that exact cell"
 
 ### INV-6: Tonnetz translational isomorphism
+TBR: INV-Tonnetz
 
 The lattice is a true Tonnetz: translating by one step along any axis shifts the resulting
-MIDI pitch by the same fixed interval everywhere on the lattice, for both the Standard tuning
+pitch by the same fixed interval everywhere on the lattice, for both the Standard tuning
 (p: +7 semitones, q: +3, resultant: -4) and the Gravity tuning (p: -3, q: +4, resultant: +7).
 
 **Test:** `tests/run_tests.js` — "Tonnetz isomorphism tests" (pure logic, no DOM — lives in the
@@ -210,43 +295,6 @@ actually usable at once, regardless of how tightly the rest of the layout is squ
 
 **Test:** `tests/invariants.spec.js` — "INV-11: at least 20 distinct Tonnetz cells are visible
 and controllable, in every mode/orientation"
-
-### INV-13: Primary elements are reachable in every orientation
-
-Every primary element listed in the "Primary Elements" table above must be reachable (present,
-non-zero size, not hidden behind a collapsed drawer once opened) in both portrait and
-landscape — not just whichever orientation someone happened to test by hand. The one documented
-exception is Gravity's duplicate down-button (`#m-btn-action-2`), which only exists as a
-distinct primary element in landscape (5 D-pad buttons in portrait, 6 in landscape); the test
-checks that one specifically, in both directions, instead of just excluding it.
-
-**Test:** `tests/invariants.spec.js` — "INV-13: every mode's primary elements are reachable in
-both portrait and landscape"
-
-**Coverage gap, found live:** `PRIMARY_ELEMENTS` (the test's own copy of the table above) is
-hand-maintained, and both copies missed real controls before anyone noticed — Melody's own song
-source dropdown (this week's regression) and, discovered while fixing that, Blast's Restart
-button (`#blast-reset`) had apparently never been listed at all, unlike Gravity/Snake's own
-Restart buttons. Full auto-discovery isn't possible here: "primary element" is a semantic
-judgment call, not a structural one — Compose's tempo/subdivision/Quantize/Metronome inputs sit
-at the exact same DOM depth as its Record/Play/Save buttons but are deliberately NOT primary
-(settings, not top-level actions), and a naive "every visible control counts" scan would
-misclassify them.
-
-What CAN be automated is noticing when the classification call was never made at all: a second
-test walks every interactive element inside each mode's own `#<mode>-controls`/`#<mode>-stats`
-container and fails if it's neither in `PRIMARY_ELEMENTS` nor in `SECONDARY_ELEMENTS` (the
-explicit "yes, deliberately not primary" list, with a reason) nor nested inside a sub-container
-the static markup itself starts `display:none` (the existing signal for "conditional, shown
-only in some state," e.g. `#compose-edit-group`). A `SECONDARY_ELEMENTS` entry may also name a
-wrapping container's own id (not just a leaf control's) — Blast/Gravity's Easy/Medium/Hard
-difficulty buttons have no ids of their own at all, only `class="weight-icon"`, so the whole
-group is classified via its own `#blast-difficulty`/`#gravity-difficulty` wrapper. A newly
-added control that fits none of these buckets now fails loud immediately, instead of silently
-having zero reachability coverage the way `#melody-source` did.
-
-**Test:** `tests/invariants.spec.js` — "INV-13 coverage: every interactive control in a mode's
-panel is classified as primary or secondary, none forgotten"
 
 ### INV-14: Every ghost motion sounds its own cells
 
@@ -402,22 +450,22 @@ label's on-screen aspect ratio stays constant across rotation, and Gravity's imm
 
 ### INV-25: A melody note's octave is part of its identity, and the UI must say so
 
-Melody mode's matching (`MelodyMode.handleUserInputNote`) compares exact MIDI pitch, not just
-note NAME — two different-octave "E"s are genuinely different notes to it, and that's the
-correct rule: a melody's octave is part of the tune, not an incidental detail a player should be
-free to substitute. Real report: a player found it possible to play "the wrong E" against a real
-MIDI keyboard, which is an understandable mix-up, not a matching-logic bug — a big board (or a
-keyboard with several octaves of physical keys) puts more than one cell with the exact same
-bare note-name letter within easy reach, and the letter alone doesn't say which one is meant.
+Melody mode's matching (`MelodyMode.handleUserInputNote`) compares exact pitch, not just pitch
+class — two different-octave "E"s are genuinely different notes to it, and that's the correct
+rule: a melody's octave is part of the tune, not an incidental detail a player should be free to
+substitute. Real report: a player found it possible to play "the wrong E" against a real
+keyboard, which is an understandable mix-up, not a matching-logic bug — a big board (or a
+keyboard with several octaves of physical keys) puts more than one cell with the same bare pitch
+class within easy reach, and pitch class alone doesn't say which one is meant.
 
-Fixed at the legibility layer rather than by relaxing the match: `MelodyMode.updateDifficultyUI`'s
-current-target readout (`#melody-note-list`) shows an **octave-qualified name** (e.g. "E4", not just
-"E") for every displayed note — that octave qualification is what resolves the "wrong E," since it
-says exactly which cell/pitch is meant. (Updated 2026-07-28: the timeline no longer shows the note's
-frequency — it isn't useful there, and the octave-qualified name already disambiguates. The next
-three notes to play are each shown in a distinct colour that matches the Tonnetz's glow on the
-corresponding cells, linking board and timeline. `Tonnetz.getFrequency` remains for other readouts,
-e.g. Sandbox's tap-and-hold, INV-24.)
+Fixed at the legibility layer rather than by relaxing the match: the pitch row (part of the
+shared Timeline — INV-55) shows each note's octave-qualified pitch (e.g. "E4", not just "E") —
+that's what resolves the "wrong E," since it says exactly which cell/pitch is meant. The practice
+strip (Melody's decorated Timeline) additionally colors the next three notes to play in a
+distinct hue matching the Tonnetz's glow on the corresponding cells; that coloring is
+practice-strip-specific, not part of the base Timeline Compose also uses. `Tonnetz.getFrequency`
+remains for other readouts, e.g. Sandbox's tap-and-hold, INV-24 — a pitch's frequency isn't shown
+here at all, since the octave-qualified pitch already disambiguates without it.
 
 **Test:** `tests/invariants.spec.js` — "INV-25: Melody mode rejects a different-octave note with
 the same name, and accepts the exact pitch" and "INV-25: Melody's current-target readout shows
@@ -426,152 +474,56 @@ getFrequency tests" (pure MIDI-to-Hz correctness, independent of any UI).
 
 ---
 
-### INV-26: Melody's drilled segment can be replayed from any note already reached, not just note 0
+### INV-26: Melody's drilled segment is user-selectable and tries to be helpful and fun
 
-The "Simon says" drill (`MelodyMode.playTargetSequence`) always used to replay the whole growing
-segment starting at note 0, and a wrong note always reset practice back to note 0 too — fine for
-a short song, but a real scaling problem for a long one (task #46): every extension re-listens to
-an ever-longer prefix before the player gets to attempt the new note, and a single mistake near
-the end throws away the whole segment's progress.
+The drilled segment starts at the left (start) scrubber and ends at the right (end) scrubber,
+`state.startIndex`/`state.endIndex` — both inclusive (`endIndex` IS the last included note's
+index, symmetric with `startIndex`), starting at `[0, 0]`. The end scrubber auto-advances with
+correct play, once per correct play (or the user can move it directly) — continuous, no streak
+required. The beginning scrubber auto-advances by a measure once the player has cleanly played
+*that specific measure* (the one `startIndex` currently sits in, not the whole possibly-longer
+segment up to `endIndex`) `k` correct plays in a row, where `k` is currently 3 (or the user can
+move it directly); a mistake resets that streak to 0. Scoping the streak to one measure rather
+than the whole segment keeps the mastery bar constant as the segment grows.
 
-`MelodyMode.state.startIndex` now tracks where the drilled segment begins, clamped to
-`[0, targetLength - 1]` — never past the notes already reached. `MelodyMode.seekTo(index)` clears
-any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`,
-which now schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A
-wrong note resets `userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an
-earlier stretch also becomes the new starting point for mistake-recovery within that practice
-pass. Scrubbing forward (within the already-reached range) lets a player skip replaying notes
-they've already mastered; scrubbing back replays an earlier stretch they want to relisten to.
-`seekTo` is a no-op while a full-melody preview (`isPlayingPreview`) is playing, since that's a
-different, position-independent playback path.
-
-**UI, v2**: the original control was a plain HTML `<input type=range>` slider next to the note
-list. The user's own feedback: it read as an abstract, disconnected control — dragging it gave no
-sense of *which two notes* you were about to start between. Replaced with a small draggable
-marker (`▾`, `.scrub-marker`) rendered *inline, inside* `#melody-note-list` itself, in the gap
-right before whichever note it targets.
-
-**UI, v3 (#46)**: v2's inline positioning had two compounding problems, found live recording a
-playthrough. First, the gap right at the marker read visually narrower than every other gap
-between notes — root cause: spacing between tokens was entirely literal `" - "` text nodes
-(`.note-sep`) inserted by `positionScrubMarker`, *except* immediately before the marker's own
-target token, where the marker's `padding: 0 2px` stood in instead — an inherent asymmetry, not a
-CSS bug to tweak. Second, the `▾` glyph itself was easy to miss. Both are fixed together:
-`#melody-note-list` (now `.melody-note-list`) is a real `display: flex` layout with a uniform
-`gap`, and `.note-sep` is gone entirely — CSS supplies uniform spacing directly, no text-node
-hack. The marker is a CSS-drawn I-beam (`::before`/`::after` stem + serifs, `var(--accent)`), the
-conventional text-cursor/seek-handle shape, `position: absolute` over the (now scrollable)
-container rather than `insertBefore`'d into token flow — its `style.left` is set to the target
-token's `offsetLeft` (stable across scroll position, unlike `getBoundingClientRect()`), clamped to
-`>= 0` so the very first token (offsetLeft 0) doesn't push it outside the container's clipped
-content box.
-
-`MelodyMode.positionScrubMarker(targetIdx)` still only shows the marker if its target note is
-currently rendered and there's more than one note reached yet. For Random (the memory-quiz sliding
-window, unchanged — see below) that's still a small window; for a real loaded song it's now every
-note in the timeline (see INV-50), so "off-screen" no longer means "not rendered," only "scrolled
-out of the visible portion of the timeline" — `scrollTimelineToCurrent` keeps the current note in
-view on each render, and `updateScrubDragTarget` edge-scrolls the container while a drag nears
-either edge.
-
-Dragging is `mousedown`/`touchstart` on `.scrub-marker` → `mousemove`/`touchmove` calls
-`updateScrubDragTarget`, which finds whichever rendered note token's center is closest to the
-pointer and repositions the marker there live (`state.scrubDragIndex`, not yet committed) →
-`mouseup`/`touchend` commits via `seekTo`. Critically, live repositioning during the drag reuses
-the *same* marker DOM node every time (created once via `appendChild`, only ever repositioned via
-`style.left` afterward — never recreated, never re-`insertBefore`'d) instead of going through a
-full `updateDifficultyUI()` re-render on every move — found necessary via a real
-touchstart/touchmove/touchend test (not a synthetic `.click()`, per this project's standing
-touch-testing discipline): a full re-render replaces the marker's own element via `innerHTML`,
-which detaches whatever the original `touchstart` captured as its event target, silently breaking
-the rest of the gesture on a real device. Mutating `style.left` on the same element reference a
-capture already holds is safe; only `innerHTML` replacement of the marker itself (never done)
-would be the actual hazard.
+`MelodyMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets `startIndex`, and
+calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of
+always `melody[0].time`. A wrong note resets `userIndex` back to `startIndex`, not always 0.
+`seekTo` is a no-op during a full-melody preview (`isPlayingPreview`), a different,
+position-independent playback path. Dragging either scrubber directly is ungated — no
+proof-of-mastery required, matching this project's general stance (e.g. copy/paste into Blast is
+unrestricted too).
 
 **Test:** `tests/desktop.spec.js` — "Melody mode: ... scrub marker/control ..." / "a wrong note
-resets progress back to the scrub position" tests (visibility, correct `style.left` placement at
-the target token's own `offsetLeft`, clamping, real mouse-drag back/forward, mistake-branch reset
-landing on `startIndex`), plus "dragging the marker near the timeline edge scrolls it" (#46
-edge-scroll). `tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to
-the touched note", using genuine dispatched `Touch`/`TouchEvent` objects (this is the test that
-caught the detached-touch-target bug above — a mouse-only test wouldn't have).
+resets progress back to the scrub position" tests, "dragging the marker near the timeline edge
+scrolls it" (#46 edge-scroll), "the end of the drilled segment grows immediately with each
+correct play", "3 clean playthroughs of the current measure auto-advance the start into the next
+measure" (#46 part 5). `tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub
+marker to the touched note", using genuine dispatched `Touch`/`TouchEvent` objects.
 
 ---
 
-### INV-50: a real loaded song renders its entire timeline up front and shows measure boundaries; Random never does
+### INV-55: The Timeline component's two markers always reuse the same DOM nodes across a drag
 
-Random (`MelodyMode.state.isRandom`, always true for the offline-degrade/dropdown "Random" entry,
-false once a real song loads via `loadMelodyFromArrayBuffer`) is a memory-quiz sliding window
-forever — it isn't a piece to progress through, so it keeps exactly its original small
-`pastWindow`/`futureWindow` rendering, no measures, no auto-advance (see INV-51). A **real song**
-(#46) instead renders **every** note in `state.melody` up front as a true, horizontally scrollable
-seek-bar (`.melody-note-list`'s `overflow-x: auto`) — the whole point of showing "where you are in
-the piece," which a small sliding window can't. `isRandom` is set explicitly at both load sites
-(`loadDefault()`/`loadMelodyFromArrayBuffer()`), never inferred from `#melody-filename`'s text or
-`MidiFolder.currentValue` (fragile, and would couple `melody.js` to `file-folder.js` internals).
+`js/timeline.js`'s `Timeline` component (shared by Melody's practice strip and Compose — see
+"Why Compose exists" in docs/melody-notation-design.md) draws two draggable boundary markers
+over the aligned pitch row. Each marker is created once and only ever repositioned via
+`style.left` afterward — never recreated, never removed and re-added mid-drag. Found necessary
+the hard way (a full re-render mid-gesture detaches whatever a real `touchstart` captured as its
+event target, silently breaking the rest of a real touch drag) and still binding: any future
+change to marker rendering must preserve this, not just get it right by accident.
 
-Rendering the whole song rather than a smaller window also sidesteps a real touch-target-stability
-hazard: if tokens were re-rendered mid-drag (as a windowed approach would need to, to reveal more
-content as the drag neared an edge), every token's position would shift out from under the drag's
-own closest-token lookup (`updateScrubDragTarget`). With everything already in the DOM, dragging
-near an edge only changes `scrollLeft` — no re-render, no jump.
+Positioning uses each note's own x-position as `Notation.render` itself reports it (stable
+regardless of scroll position), not `getBoundingClientRect()`. Dragging near either edge of the
+scroll container auto-scrolls it. `Timeline.refresh(notes, opts)` re-renders the staff, the
+pitch row (with an optional per-mode `decorate` hook — Melody's practice strip uses it for its
+color hints, Compose's Timeline omits it), and the barline overlay together each time; a mode's
+own decision of WHAT `startIndex`/`endIndex` currently are lives entirely outside this component,
+passed in fresh on every `refresh()` call.
 
-At Medium difficulty (level 2) a real song's not-yet-reached notes render as plain dim text
-(`opacity: 0.5`), visible but with no colored hint — a deliberate difference from Random's own
-Medium, which shows no future notes at all; the whole point of a seek-bar is to always show where
-the piece goes, difficulty only gates the colored "next 3" hints (Easy only), not the notes'
-existence. Easy's colored next-2 hint and the current-note highlight both render as before.
-
-Measure tick marks (`.measure-tick`, low-contrast, no `data-note-idx` so drag/marker logic
-naturally ignores them) are inserted between any two adjacent notes whose `MelodyMode.measureOf`
-differs, assuming 4/4 throughout (no time-signature parsing exists in this codebase — genuinely
-out of scope). `measureOf` divides by `state.melodyBPM * 4 / 60` seconds-per-measure;
-`state.melodyBPM` is set from `parseMIDI`'s new `bpm` return field (first tempo event if the file
-has one, else the same shared 120bpm default `parseMIDI`'s `tickToSec` already used —
-`DEFAULT_TEMPO_USEC_PER_BEAT`, hoisted from two independently-hardcoded `500000` literals kept in
-sync only by comment, same consolidation pattern as the difficulty-barbell hoist).
-
-**Test:** `tests/desktop.spec.js` — "a real song renders its entire timeline up front, not a
-sliding window", "Random keeps its small sliding window even with the song-timeline code present"
-(explicit re-verification that none of this leaks into Random), "measure ticks appear exactly
-where the computed measure changes" — all loading the real bundled `midi/frere-jacques.mid`
-(32 notes, 120bpm/4-4) rather than a synthetic fixture.
-
----
-
-### INV-51: after 3 clean playthroughs in a row, Melody auto-advances the drilled segment to the next measure
-
-The first concrete mechanic of a spaced-repetition design (#46), built on INV-48's mode-switch
-pause/resume guarantee — state must survive stepping away for spaced repetition to mean anything.
-Real songs only (`!state.isRandom`); Random has no measures to advance into.
-
-`state.cleanStreak` counts consecutive clean passes of the current segment (`[startIndex,
-targetLength)`); `state.segmentHadMistake` is transient, reset to `false` at the top of every
-`playTargetSequence()` call and set `true` by `handleUserInputNote`'s Mistake branch (which also
-immediately zeroes `cleanStreak`). Reaching the existing "Correct! Go ahead!" branch
-(`userIndex >= targetLength`) with no mistake since the last `playTargetSequence()` call *is* a
-complete clean pass — `cleanStreak` increments there, before the branch's own 2s idle timeout.
-At 3, `MelodyMode.measureOf` finds the first note whose measure is strictly past the segment
-start's own measure and moves `startIndex` there — advancing a full measure, not just one note —
-and resets `cleanStreak` to 0. Because this can move `startIndex` *past* whatever's currently
-drilled (unlike a scrub, which only ever moves the start *earlier* within already-reached
-territory), `targetLength` grows to cover the new `startIndex` too, preserving the existing
-"`startIndex` always `<= targetLength - 1`" invariant (INV-26) rather than getting silently
-clamped back into the same measure.
-
-A player-initiated scrub (`seekTo`, committed by releasing a marker drag) to a different
-`startIndex` also resets `cleanStreak` — it's now drilling a different stretch than the one the
-streak counted. The auto-advance's own `startIndex` change is exempt, since it sets the field
-directly rather than going through `seekTo`. Loading a new song resets it too, via the existing
-`resetGame()` field-reset list (`loadMelodyFromArrayBuffer` already calls `resetGame()`
-unconditionally).
-
-**Test:** `tests/desktop.spec.js` — "3 clean playthroughs auto-advance the segment into the next
-measure", "a mistake resets the clean-streak", "a player-initiated scrub resets the clean-streak",
-"loading a new song resets the clean-streak". `tests/invariants.spec.js` — "INV-48: Melody's
-clean-streak survives a switch away and back untouched" (asserted directly against
-`MelodyMode.state`, since `paintedFingerprint`'s black-box DOM check has no visible on-screen
-representation of `cleanStreak` to catch a regression here).
+**Test:** `tests/desktop.spec.js` — "Timeline.refresh: renders the staff, pitch row, and both
+markers at the right notes", "Timeline: dragging the start marker to a different note calls
+onStartCommit with that note's id, exactly once, on release".
 
 ---
 
@@ -647,13 +599,41 @@ chosen cell — rather than a valid but visually arbitrary/disconnected scatter.
 ids, so its existing call site is unaffected) so both Melody and Compose can browse the *same*
 remembered folder while each keeps its own upload/folder/select/status DOM elements.
 
+The local-folder mechanism itself later generalized into `js/file-folder.js`'s
+`FileFolder.create(config)`, the single shared implementation behind both `MidiFolder`
+(Melody/Compose, `.mid` files) and `LifeFolder` (Life, `.yaml` files). Two real guarantees this
+shared code must hold, found violated live against Life's own Save As:
+- **Writes actually reach the folder, never silently downgrade to a download.**
+  `showDirectoryPicker()`/`queryPermission`/`requestPermission` must all request `'readwrite'`
+  (not `'read'`, which is enough to *list* the folder but not to write into it) at every call site
+  (`chooseFolder`, `restore`, `reconnect`) — a folder granted under a stale read-only permission
+  queries as not-granted on the next `restore()`, correctly surfacing the "Reconnect Folder" flow
+  rather than silently falling back to `saveFileAs`'s `<a download>` forever.
+- **The dropdown re-lists live, not just at a few fixed trigger points.** `handle.values()`
+  genuinely re-reads the OS on every call (the data is never stale — only the trigger to re-read
+  it can be missing), so opening the dropdown itself (`refreshFileList`, on `mousedown`/`focus`)
+  must re-list, picking up a file moved/renamed/added on disk outside the app. This is
+  deliberately a separate method from the full `listFiles` (restore/reconnect/chooseFolder/
+  post-save) path, which unconditionally loads index 0 — hovering the dropdown must never
+  silently replace the player's in-progress content. Since the listing re-sorts alphabetically on
+  every read, `refreshFileList` re-finds the currently-loaded file by *name* in the fresh listing
+  and corrects its index, rather than trusting a numeric index that can now point elsewhere.
+
 **Test:** `tests/run_tests.js` — "Tonnetz.nearestCoordFor" (every returned coord actually
 produces the requested pitch; prefers a genuinely adjacent solution over a more distant one in
 the same family; keeps a short melody's path connected) and "MelodyMode.writeMIDI round-trip"
 (reproduces midi/time/duration through `parseMIDI` within one tick's tolerance, including the
 empty-melody edge case). `tests/desktop.spec.js` — six "Compose: ..." tests covering recording,
 playback ordering, Undo, Clear, a Save round-trip through a faked folder handle, and loading an
-existing file into a connected on-lattice path.
+existing file into a connected on-lattice path; plus "MidiFolder: choosing/restoring/reconnecting
+... requests readwrite permission, not just read" (three call sites), "MidiFolder: opening the
+dropdown re-lists the folder, picking up an externally added file" (also asserts the
+currently-loaded file's content is untouched — `parseMIDI` called exactly once), and "LifeFolder:
+choosing a folder requests readwrite permission, not just read" (confirms Life inherits the same
+shared-code fix). The permission tests assert on *what was requested* via a recorded `{fn, mode}`
+call log on the fake's `queryPermission`/`requestPermission`, since a real
+`FileSystemDirectoryHandle` never grants more than requested — exactly how the bug went uncaught
+originally.
 
 ---
 
@@ -719,48 +699,18 @@ a real viewport resize to confirm nothing calls it with that mode's own options 
 
 ---
 
-### INV-31: Melody's overlay controls stay a small corner HUD, not an unconstrained floating panel
+### INV-32: Live MIDI hardware input is supported in every mode
 
-Real report (issue #12, the same ChromeOS play session): at a landscape width under 950px,
-Melody's MIDI-folder controls and keyboard-instructions text overlapped much of the Tonnetz,
-leaving too little board to actually play on.
+**Not currently met.** `js/midi-input.js`'s `MidiInput.handleNoteOn` has a real, per-mode-specific
+routing branch for Sandbox, Melody (INV-23), Gravity, Snake, Blast, and Life — but none at all for
+**Compose**, the one remaining mode. A MIDI note-on while Compose is active is silently dropped.
+See next_steps.md for the planned fix; not yet designed in enough detail to schedule.
 
-The `(max-width: 950px) and (orientation: landscape)` breakpoint turns
-`#blast-stats`/`#gravity-controls`/`#snake-controls` into small, corner-anchored
-(`top`/`left: 10px`) HUD overlays capped at `max-width: 200px`, with their own buttons shrunk to
-match. `#melody-controls`'s version of that same rule never got the `top`/`left`/`max-width` triple
-its siblings have — it stayed `position: absolute` but otherwise defaulted to its natural,
-content-driven flow width, so it floated over the board at whatever size "Choose MIDI Folder" +
-the difficulty selector + Play/Restart naturally wanted. Separately,
-`#melody-keyboard-instructions` (`.desktop-only`) is hidden by the touch-pointer rule and the
-`max-width: 767px` rule elsewhere, but *not* this landscape one, so on a device that matches only
-this breakpoint (a laptop-class landscape width without a coarse pointer, e.g. a Chromebook) it
-kept contributing bulk to the overlay too.
-
-Fixed by giving `#melody-controls` the same `top`/`left`/`max-width` treatment (and adding it to
-the shared compact-button selectors its siblings already use), and adding `.desktop-only` to this
-breakpoint's hidden set, matching the other two breakpoints that already hide it.
-
-**Update (task #77 — mode-chrome declutter):** Melody's controls were later restructured to take
-even less of the board. The one-time setup (folder/song pickers, Difficulty) now routes into the
-drawer, and Play/Restart became icon-only. The always-visible Melody HUD is now the mobile dock
-(`#melody-mobile-tools`: streak readout + transport icons); `#melody-controls` itself is emptied and
-hidden on mobile (so it can't float over the board at all). The invariant's intent is unchanged —
-the always-visible controls stay a small corner HUD, never a wide overlay.
-
-**Test:** `tests/desktop.spec.js` — "INV-31: Melody's always-visible controls stay a small corner
-HUD (not a wide overlay) at a landscape width under 950px" — asserts the dock (`#melody-mobile-tools`)
-stays ≤210px wide, that `#melody-controls` is hidden (emptied into the drawer), and that
-`#melody-keyboard-instructions` is hidden, at exactly the width class that reproduced the report.
-
----
-
-### INV-32: Live MIDI hardware input drives Gravity/Snake/Blast too, per issue #11's own spec
-
-`js/midi-input.js`'s `MidiInput.handleNoteOn` previously only routed to Sandbox and Melody
-(INV-23) — "other modes have no 'play a free note' concept" was true at the time, but the user
-asked for real per-mode mappings instead, fully specified in the issue itself. Regular keyboard/
-touch controls are untouched everywhere below; MIDI is purely an additional input.
+`MidiInput.handleNoteOn` originally only routed to Sandbox and Melody — "other modes have no
+'play a free note' concept" was true at the time (issue #11), but the user asked for real
+per-mode mappings instead, fully specified in the issue itself; Life's own mapping (a MIDI note
+toggles the nearest cell, `LifeMode.handleMidiNote`) was added later the same way. Regular
+keyboard/touch controls are untouched everywhere below; MIDI is purely an additional input.
 
 **Gravity**: middle C/D/E/F/G (MIDI 60/62/64/65/67) drive the same 5 actions as the portrait
 D-pad, left-to-right matching the notes' own ascending order — C=left, D=CCW, E=soft-drop,
@@ -810,117 +760,38 @@ the real end-to-end path including the chord-buffering timing.
 
 ---
 
-### INV-33: Compose's note-editing transforms (select/delete/insert/drag/rotate) are exact lattice operations, not approximations
+### INV-33: Compose's note-editing transforms apply the same exact linear shift to every selected note, never per-note approximation
 
-Task #64, the first slice of INV-28's deferred list (multi-select, drag-to-reposition,
-inserting mid-sequence). The key realization, corrected mid-design by the user: translation and
-rotation on the Tonnetz are both *linear* transforms on `(p,q)`, and `Tonnetz.getMidi(p,q) = 60 +
-7p + 3q` is linear too — so applying the same transform to an entire multi-note selection isn't
-separate, harder work from the single-note case, it's the exact same operation applied to a set.
-Multi-select was never the hard part; it just looked that way before working out the math.
+Translation and rotation on the Tonnetz are both *linear* transforms on `(p,q)`, and
+`Tonnetz.getMidi(p,q) = 60 + 7p + 3q` is linear too — so dragging a multi-note selection by
+`(Δp,Δq)` applies that same `(Δp,Δq)` to every selected note, which shifts every selected note's
+pitch by the *same* number of semitones: a clean transposition, not per-note special-casing.
+Rotate reuses `Pieces.rotate`/`Pieces.rotateCCW` — the exact rigid-rotation math already used for
+rotating a piece shape — around the first-selected note as pivot, applied to every selected
+note's offset from it. A future "optimization" that computes each note's new position
+independently (rather than applying one shared transform to the whole set) would risk drifting
+off-lattice or losing this exactness; there's no approximation to introduce here, the math is
+already exact.
 
-- **Selection**: `ComposeMode.notesAt(p,q)` returns every note index at a cell (a melody can
-  repeat a pitch, so this is a list). `selectAtCell` resolves which one a tap targets — the first
-  match not already selected, cycling back to the first once they all are, so repeated taps step
-  through same-cell duplicates instead of getting stuck. A plain tap replaces the selection with
-  just that note; shift-tap toggles it in/out of a growing selection. A persistent ring
-  (`.compose-selected-note`, `renderSelectionMarkers`) marks selected notes on the board,
-  distinct from `highlightByMidi`'s momentary play-flash — it has to be re-added after every
-  `drawLattice()` call, since that wipes the whole `<svg>`.
-- **Delete**: removes every selected note and closes exactly the time each one occupied — later
-  notes shift earlier by the deleted note's own `duration`, not by the full gap to whatever comes
-  next, so any other intentional rests are left alone.
-- **Insert**: tapping an empty cell while exactly one note is selected inserts a new note right
-  after it (default duration = the anchor's own), pushing everything at or after the insertion
-  point later by that same duration — the exact mirror of Delete's gap-closing.
-- **Drag (translate)**: dragging a selected note by `(Δp,Δq)` applies that same `(Δp,Δq)` to
-  every selected note. Because `getMidi` is linear, this shifts every selected note's pitch by
-  the *same* number of semitones — literally a clean transposition, no per-note special-casing.
-  Implemented as a genuine press-move-release drag (`state.dragCandidate`, a 6px movement
-  threshold), landing cell resolved via `document.elementFromPoint` at mouseup — mouse-only for
-  now (matching this app's existing convention that this kind of drag is a desktop gesture; see
-  Deferred below).
-- **Rotate**: `Rotate CW`/`Rotate CCW` buttons (not a two-finger gesture — this app has no
-  existing gesture-based rotate anywhere, only button/key-based, so this matches that convention
-  rather than inventing a new one that would also collide with the existing two-finger-pan
-  gesture on the same board) rotate every selected note around the first-selected note (the
-  pivot), reusing `Pieces.rotate`/`Pieces.rotateCCW` — the *exact* rigid-rotation math already
-  used for rotating a piece shape, applied to a selection's relative offsets instead.
-
-**Deliberately not built**: timing edits (retiming a note, expressing it as a triplet/32nd-note,
-simultaneous-time chord entry). Raised mid-design: MIDI's real timing model is ticks against a
-declared PPQN converted via a tempo meta-event, which `writeMIDI`/`parseMIDI` don't actually use
-today (they assume one fixed 120bpm tempo) — getting real rhythm precision would need a genuine
-tempo/quantization grid, tracked separately as `next_steps.md` #52, not folded in here. Per the
-user's own explicit call: a rough recording is cheap to re-record from scratch, and real
-rhythm-precision editing is better served by a dedicated external MIDI editor working on the
-saved `.mid` file directly than by in-app nudge buttons or a timeline widget (`next_steps.md`
-#53 tracks a possible link to one such tool, Signal, gated on the user trying it firsthand
-first).
-
-**Touch parity (task #65, added after the fact — see below)**: the first pass of this invariant
-shipped with multi-select and drag-to-transpose reachable via mouse only — touch's single tap
-already got select/insert "for free" through `main.js`'s existing `ComposeMode.tapCell` routing,
-but shift-tap and mouse-drag have no touch equivalent, and nothing caught that until it came up
-in conversation, not through any test. Fixed by extending `main.js`'s existing hold-timer
-infrastructure (previously Sandbox/Blast-only, for hold-to-pick-up) into Compose's own
-touchstart/touchmove/touchend branches, gated on `!ComposeMode.state.isRecording` so recording's
-instant tap-to-play-and-append is completely untouched: **long-press an existing note** toggles
-it in/out of the selection (`ComposeMode.tapCell(p, q, { shiftKey: true })` — the touch
-equivalent of shift-tap, reusing the exact same toggle logic rather than inventing a parallel
-one), and **a single-finger drag on a selected note** translates the whole selection
-(`ComposeMode.translateSelection`), mirroring `compose.js`'s own mouse `dragCandidate` pattern:
-touchstart records the start cell and whether it's drag-eligible (an already-selected note),
-touchmove tracks movement past a threshold (clearing the hold timer once real movement occurs),
-and touchend resolves to a note-drag, a hold's already-fired action, or a plain tap accordingly.
-
-This was found and fixed under a broader, explicit standing rule (not just this one instance):
-a bug isn't resolved until the *systematic* test that would catch the whole class exists, not
-just a one-off regression for the reported case. The applicable axis here is input method, and
-this project's existing convention for sweeping it is splitting coverage across
-`tests/desktop.spec.js` (mouse) and `tests/mobile.spec.js` (real touch events) per capability —
-the same pattern Melody's own pan test already used (a mouse-drag test and a real-touch-drag
-test, same underlying property). Before this fix, Compose had zero `tests/mobile.spec.js`
-coverage at all, so this gap couldn't have been caught by anything already in place.
-
-**Test:** `tests/desktop.spec.js` — four "Compose: ..." tests (mouse path): tap-to-select +
-Delete's gap-close math, shift-tap multi-select + mouse-drag transposing the whole selection
-(verified via real `page.mouse` press-move-release, landing-cell resolution included),
-tap-to-insert's shift math (both the new note's placement and the pushed-later note's exact new
-time), and Rotate CW's pivot math (pivot note unchanged, the other note's new `(p,q)` matching
-`Pieces.rotate`'s own formula by hand). `tests/mobile.spec.js` — two "Compose: a real ..." tests
-(touch path, genuine `Touch`/`TouchEvent` dispatch, not `.click()`): a long-press toggling
-selection on and back off (a real toggle, not "always selects"), and a single-finger drag
-transposing a selected note — both written and confirmed failing against the pre-fix code
-first, per this project's own red-green discipline, before the `main.js` changes were made.
+**Test:** `tests/desktop.spec.js` — mouse-drag transposing a multi-note selection (verified via
+real `page.mouse` press-move-release) and Rotate CW's pivot math (pivot note unchanged, the other
+note's new `(p,q)` matching `Pieces.rotate`'s own formula by hand). `tests/mobile.spec.js` — a
+real single-finger touch drag transposing a selected note.
 
 ---
 
-### INV-34: Board-shape and mode-triplet checks are driven by one shared config per file, not one hand-written test per mode/pair
+### INV-34: Board shape is per-mode configuration, and switching modes never leaks state into another mode
 
-A direct continuation of INV-33's own lesson: three more places in `tests/mobile.spec.js` had
-the same "hand-picked pair/list, not a derived sweep" shape that let the touch-parity gap ship —
-found via the same audit, not new instances.
-
-- **Board centering** (`"${mode} board is centered..."`) and **cell-count consistency**
-  (`"every playable ${mode} board cell is visible..."`, task #35) each used to define their own
-  copy of Blast/Gravity's cell-set logic inline, and Snake had no centering test at all despite
-  already being checked for cell-count. Both now iterate a single `RESTRICTED_BOARD_CELLS`
-  config (one cell-generator per restricted-board mode) — adding a new bounded-board mode means
-  adding one entry, not two more hand-written tests, and Snake's centering gets checked for the
-  first time as a direct result.
-- **Mode-triplet interaction** ("switching Sandbox -> Gravity -> Sandbox...", "...-> Blast -> ...")
-  only ever checked two specific paths, both starting and ending at Sandbox. Generalized to a
-  sweep over all N³ possible mode triplets (N = however many modes actually exist, fetched from
-  the live UI, not a fixed number written into the test -- N³ was 216 at 6 modes, became 343 the
-  moment Life shipped as the 7th, with no test edit required): whatever the *final* mode is, `#palette`/
-  `#piece-list` (a single shared DOM element repopulated differently per mode — Sandbox's
-  carousel, Blast/Gravity's next-piece queue, hidden entirely for Melody/Snake/Compose) must show
-  that mode's own correct content, regardless of which two modes were visited to get there.
-
-Building the unified `RESTRICTED_BOARD_CELLS` config surfaced two real bugs in Snake, not
-hypothetical ones — see INV-9/INV-12 above (no `ResizeObserver`, and a hardcoded fixed view that
-never got the aspect-matched-fit treatment Gravity/Blast already had).
+Each restricted-board mode's (Blast/Gravity/Snake) playable cell set is defined by one entry in a
+single shared `RESTRICTED_BOARD_CELLS` config, not mode-specific inline logic — adding a new
+bounded-board mode means adding one config entry, and it's automatically covered by centering and
+cell-visibility checks rather than needing new hand-written ones. Switching between modes must
+never leak one mode's board/UI state into another: `#palette`/`#piece-list` (a single shared DOM
+element repopulated differently per mode — Sandbox's carousel, Blast/Gravity's next-piece queue,
+hidden entirely for Melody/Snake/Compose) must always show the *arriving* mode's own correct
+content, regardless of which modes were visited to get there. Checked across every possible
+3-mode sequence (N³, N = however many modes exist, fetched from the live UI rather than
+hard-coded), not just a couple of hand-picked paths.
 
 **Test:** `tests/mobile.spec.js` — `${mode} board is centered...` and `every playable ${mode}
 board cell is visible...` (looping `RESTRICTED_BOARD_CELLS`), and "switching through any 3-mode
@@ -956,51 +827,24 @@ same bundled list via its own dropdown.
 
 ---
 
-### INV-36: Sandbox's tap-and-hold same-note highlight is reachable via both mouse and touch
+### INV-36: Every gesture reachable by mouse is reachable by touch, and vice versa
 
-Task #24: holding an empty cell while the note-play tool is active (nothing selected — the
-default state) highlights every other on-screen cell sharing the same note NAME, across every
-octave, not just the tapped cell's own pitch — `SandboxMode.showSameNoteHighlight` sweeps the
-full `-15..15` rendered range for any `(p,q)` whose `Tonnetz.getMidi(p,q) % 12` matches. Each
-highlighted cell gets its own label showing its own octave-qualified name and frequency (`${name}
-${octave} · ${Hz}Hz`), reusing `Tonnetz.getNoteName`/`getOctave`/`getFrequency` — the same
-formatting INV-25 already established for Melody, not a second implementation of "how do we
-show an octave-qualified note name."
-
-Built for both input methods from the start, not touch-only or mouse-only: mouse gets its own new
-hold-timer in `sandbox.js`'s own `onmousedown`/`onmousemove`/`onmouseup` (this app has no existing
-mouse-hold pattern anywhere else, so this is the first one — mirroring touch's existing
-`HOLD_DURATION_MS`/hold-timer shape rather than inventing a different one). Touch reuses
-`main.js`'s existing `performHoldAction` (previously Sandbox/Blast pickup-only), adding an `else`
-branch for the empty-cell/nothing-selected case it never had a behavior for before. Both tests
-were written first and confirmed failing against the pre-fix code before any implementation
-changes, per this project's red-green discipline.
+A general standing rule for this codebase, not a per-feature detail: any interaction built for
+one input method (`onmousedown`/`onmousemove`/`onmouseup` vs. `main.js`'s shared touch hold-timer
+and drag-disambiguation infrastructure) must be built for the other too, using that input
+method's own existing idiom rather than a bespoke one-off. Concretely checked today by Sandbox's
+tap-and-hold same-note highlight (task #24): holding an empty cell while the note-play tool is
+active highlights every other on-screen cell sharing the same note NAME, across every octave —
+`SandboxMode.showSameNoteHighlight` sweeps the full rendered range for any `(p,q)` whose
+`Tonnetz.getMidi(p,q) % 12` matches, labeling each with its own octave-qualified name and
+frequency (`Tonnetz.getNoteName`/`getOctave`/`getFrequency`, the same formatting INV-25 uses for
+Melody). Mouse gets its own hold-timer mirroring touch's existing `HOLD_DURATION_MS` shape; touch
+reuses `main.js`'s existing `performHoldAction`.
 
 **Test:** `tests/desktop.spec.js` — "Sandbox: holding an empty cell highlights every same-named
 cell with its own octave+Hz label, and releasing clears it" (mouse, real `page.mouse`
 press-hold-release). `tests/mobile.spec.js` — "holding an empty cell with the note-play tool
 active highlights same-named cells..." (touch, genuine `Touch`/`TouchEvent` dispatch).
-
----
-
-### INV-37: The landscape drawer's width scales with the viewport, not a flat pixel value
-
-Task #57, found live via the random-tap exploratory matrix: `#top-drawer.expanded`'s
-`max-width` (the `max-width: 950px and (orientation: landscape)` media query) was a flat
-`320px` — a small, reasonable fraction of a wide landscape window, but 52% of a narrower one
-(614px). Changed to `min(320px, 40vw)`: unchanged at/above ~800px (40vw already exceeds 320px
-there, so the cap stays 320px), scales down proportionally below that.
-
-Testing this needed reading the CSS's own resolved `max-width` via `getComputedStyle`, not the
-drawer's rendered `boundingBox()` width — `#top-drawer`'s box is content-driven (auto width
-capped by `max-width`), so its actual rendered width can be narrower than the cap regardless of
-this fix, which isn't what #57 is about. Also found: `vw`-based computed styles can lag a tick
-behind `page.setViewportSize()` itself — reading immediately after a resize returned the PRIOR
-viewport's resolved value, so the test polls via `waitForFunction` rather than reading once.
-
-**Test:** `tests/mobile.spec.js` — "the expanded landscape drawer's max-width scales down at
-narrow widths instead of a flat 320px (#57)", confirmed failing against the pre-fix flat value
-before the CSS change, per red-green discipline.
 
 ---
 
@@ -1015,13 +859,15 @@ user's own explicit call earlier this session: a rough recording is cheap to red
 shouldn't silently mangle a capture nobody asked to have quantized.
 
 `MelodyMode.writeMIDI` gained an optional second `tempoBPM` argument to make any of this
-meaningful in the saved file: previously it always assumed a fixed 120bpm and emitted no tempo
-meta event at all. Passing an explicit tempo now emits a real `FF 51 03` tempo meta event at
-tick 0; omitting it (every existing caller, and Compose's own Save when `quantizeEnabled` is
-false) is byte-for-byte identical to before — no behavior change for anything that doesn't ask
-for it. `WRITE_TICKS_PER_BEAT` (480) is divisible by both 32 and 3, so every grid unit
-`QUANTIZE_GRID` supports lands on an exact integer tick count once written, independent of the
-tempo/PPQN choice itself.
+meaningful in a written MIDI file: previously it always assumed a fixed 120bpm and emitted no
+tempo meta event at all. Passing an explicit tempo now emits a real `FF 51 03` tempo meta event
+at tick 0; omitting it is byte-for-byte identical to before. `WRITE_TICKS_PER_BEAT` (480) is
+divisible by both 32 and 3, so every grid unit `QUANTIZE_GRID` supports lands on an exact
+integer tick count once written, independent of the tempo/PPQN choice itself. Note: Compose's own
+Save no longer goes through `writeMIDI` at all — it saves MusicXML (see `ComposeMode.save`),
+which always bakes in its own beat quantization regardless of `quantizeEnabled` (MusicXML has no
+"raw timestamp" mode the way MIDI does). `tempoBPM` is exercised today by Melody's own MIDI
+round-trip and by `scripts/generate-bundled-midi.js`, not by Compose.
 
 **A genuinely vacuous test, caught before it shipped**: the first version of the tempo-emission
 test checked only that `parseMIDI(writeMIDI(notes, 90))` round-tripped to the same times as the
@@ -1035,131 +881,84 @@ computed tempo was actually written.
 Chord entry (multiple notes at one time value, grouping near-simultaneous taps) remains
 explicitly out of scope here, tracked separately.
 
-### INV-39: Compose's real multitouch chord entry never sacrifices pan/rotate/pinch/twist to get it
-
-Real multitouch (several fingers landing on distinct cells while recording) records a chord --
-several notes sharing one `time` value -- without disabling the existing 2-finger pan/rotate
-gesture Melody and Compose already share. The two are told apart exactly the way a tap is told
-apart from a drag everywhere else in this codebase: a finger that never moves past the same
-10px threshold `main.js`'s existing single-touch drag logic already uses is a stationary
-chord-tap; a finger that moves past it promotes the whole gesture to the ordinary pan/rotate,
-discarding any not-yet-committed candidates (never recorded as notes).
-
-A first version disabled pan/rotate/pinch/twist entirely while recording, reasoning it was
-"unavailable mid-take anyway." That trade wasn't actually needed -- the movement-threshold
-disambiguation already used for single-touch drags elsewhere in this same file generalizes
-cleanly to N simultaneous fingers by tracking each one's own start position by `identifier`,
-so it was reverted in favor of preserving full pan/rotate/pinch/twist during recording.
-
-A lone touch has no competing gesture meaning (never has), so it still records instantly, exactly
-as before this feature existed. 2+ touches are held as candidates (`main.js`'s
-`composeChordCandidates`, keyed by touch `identifier`) until resolution: `touchmove` promotes to
-pan/rotate the moment any candidate moves past threshold (using the live event as the new
-baseline, matching how the existing 2-finger gesture already seeds itself); `touchend` commits
-any candidate that never moved, via `ComposeMode.recordTouch(p, q, time)`, using the time it
-actually touched down rather than whenever the disambiguation happened to finish -- a chord's
-timestamp is when it was pressed, not when main.js finished confirming it wasn't a pan.
-
-`recordTouch` buffers commits for `CHORD_WINDOW_MS` (50ms, mirroring Blast's own near-
-simultaneous-note-on buffering from issue #11) before pushing into `state.notes`, so fingers
-landing a few milliseconds apart -- real hands rarely land in the exact same event -- still
-share one `time` value instead of becoming a fast arpeggio of separately-timed notes. Mouse
-input is unaffected (`tapCell` unchanged): a mouse can only ever tap one cell at a time, so it
-has nothing to buffer or disambiguate against.
-
-**Scope note**: true simultaneous-event chords (fingers landing together in one `touchstart`)
-are the well-covered case. Fingers landing in genuinely separate events more than
-`CHORD_WINDOW_MS` apart resolve as separate notes/chords, an accepted limitation matching the
-same tolerance already documented for Blast's own chord-buffering window.
-
-Extending/overdubbing a recording (resuming to append more measures, or layering separate
-mouse-tapped takes into one merged chord-bearing sequence) is a distinct, larger piece of design
-work, tracked separately -- not folded in here.
-
 **Test:** `tests/run_tests.js` — "MelodyMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event
 inspection, plus confirming the no-arg default is unchanged) and "ComposeMode.quantizeNotes
 tests" (grid-snapping math at two different tempo/subdivision combinations, confirming the
 function actually reads current state rather than a hardcoded assumption).
 `tests/desktop.spec.js` — three "Compose: ..." tests: the metronome clicks at the chosen tempo
 while recording and stops the instant recording stops, the Quantize checkbox actually applies on
-stop, and Save emits a real tempo event matching the chosen BPM when quantize was used. All
-confirmed failing against the pre-implementation code first, per red-green discipline.
+stop, and Save emits a real tempo event matching the chosen BPM when quantize was used.
 
-### INV-40: a restricted board's reference box matches ITS OWN shape, not whatever leftover space chrome happened to leave
+### INV-39: Compose's real multitouch chord entry never sacrifices pan/rotate/pinch/twist to get it
 
-Found via a real user request ("breathe away whitespace... at small viewports") that led, through
-several false starts, to a genuinely different bug than the one first suspected. In order:
+Real multitouch (several fingers landing on distinct cells while recording) records a chord --
+several notes sharing one `time` value -- without disabling the existing 2-finger pan/rotate/
+pinch/twist gesture Melody and Compose already share. The two are told apart exactly the way a
+tap is told apart from a drag everywhere else in this codebase: a finger that never moves past
+the same 10px threshold `main.js`'s existing single-touch drag logic uses is a stationary
+chord-tap; a finger that moves past it promotes the whole gesture to the ordinary pan/rotate,
+discarding any not-yet-committed candidates (never recorded as notes). A lone touch has no
+competing gesture meaning, so it still records instantly.
 
-1. **Chrome padding/gap/font/button-size were flat, unconditional pixel values** on mobile, so a
-   Snake/Gravity/Blast stats panel and D-pad reserved the same footprint at a 320px-tall phone as
-   at an 844px-tall one. Fixed with fluid `clamp()`s (`--chrome-*`/`--dpad-*` custom properties in
-   `css/style.css`'s shared mobile media query) tuned as two separate anchor pairs -- padding/gap/
-   button-size shrink first (full size down to a 640px-tall viewport, fully shrunk by 440px);
-   font/button-text only starts shrinking below that (500px down to 340px) -- "breathe first, then
-   shrink text," per the user's own two-stage framing.
-2. **`#tonnetz-svg`'s mobile inset was a flat guess** (`top:210px`/`bottom:150px` etc.), sized to
-   clear the widest possible chrome regardless of how much room it actually needs right now.
-   `Render.measureChromeClearance(mode)` measures the CURRENT mode's actually-visible stats panel,
-   D-pad (including Snake/Gravity's landscape left/right clusters, measured individually since
-   their shared wrapper spans the full width) and, for Blast, its independently-floating
-   next-piece queue (`#palette.floating-queue` -- missing from the first version of this
-   measurement, which caused a real, INV-10-caught overlap once the board was big enough to
-   actually reach the queue's corner, something the old undersized board never did). The result
-   feeds `--chrome-inset-*` CSS custom properties (`Render.updateChromeInsets`) as a fallback path.
-3. **The 80px `--mobile-pad-safe-bottom` floor** (generous margin for real device browser chrome)
-   was, at the shortest viewports, the single largest piece of the reserved space -- given the
-   same two-anchor fluid treatment as the rest of the chrome (unchanged down to 640px tall,
-   shrinks to a 30px floor -- still comfortably above a real home-indicator inset -- by 440px).
-4. **The actual bug, found only once the above measurements were live and a screenshot was
-   compared against the numbers**: even with accurate, minimal chrome clearance, the board still
-   rendered small and centered with visible waste on one axis. `getAspectMatchedRefBox()` derived
-   the fit's reference-box aspect ratio from `#tonnetz-svg`'s own on-screen element box -- whatever
-   shape LEFTOVER SPACE happened to produce -- not from the board's own natural shape. Fitting
-   content into a reference box with the WRONG aspect ratio makes `getFitView`'s "contain" math
-   necessarily waste space on whichever axis isn't the tight constraint: a short, wide leftover
-   strip (portrait, heavy insets) wasted the sides; a tall, narrow one (full-bleed, no insets)
-   wasted top/bottom. Neither "shrink chrome" nor "remove insets entirely" fixes this alone, since
-   it's a shape mismatch, not a size one.
+2+ touches are held as candidates (`main.js`'s `composeChordCandidates`, keyed by touch
+`identifier`) until resolution: `touchmove` promotes to pan/rotate the moment any candidate moves
+past threshold; `touchend` commits any candidate that never moved via
+`ComposeMode.recordTouch(p, q, time)`, using the time it actually touched down, not whenever the
+disambiguation happened to finish. `recordTouch` buffers commits for `CHORD_WINDOW_MS` (50ms,
+mirroring Blast's own near-simultaneous-note-on buffering) before pushing into `state.notes`, so
+fingers landing a few milliseconds apart still share one `time` value rather than becoming a fast
+arpeggio of separately-timed notes. Mouse input is unaffected -- a mouse can only ever tap one
+cell at a time.
 
-   The actual fix: `Render.fitContentBox(cells, padding)` sizes and positions `#tonnetz-svg`
-   itself (inline style, which wins over the CSS `@media` rules) to the LARGEST box matching the
-   cells' own natural aspect ratio (via the new `Render.computeCellBounds`, extracted from
-   `getFitView` so both always agree on exactly what content needs to fit) that fits within the
-   space left after `measureChromeClearance`'s real numbers -- not stretched to fill whatever
-   oddly-shaped leftover space the old insets produced. `getAspectMatchedRefBox()` then reads this
-   correctly-shaped element's own rect, so `getFitView`'s zoom naturally has near-zero waste on
-   either axis. The margin this frees up becomes free space FOR the chrome, rather than being
-   baked into an aspect-mismatched element box or an oversized viewBox.
+**Scope note**: fingers landing in genuinely separate events more than `CHORD_WINDOW_MS` apart
+resolve as separate notes/chords, matching the same tolerance already documented for Blast's own
+chord-buffering window.
 
-**Two real regressions found and fixed before this shipped**, both from the same underlying
-cause -- moving from CSS-percentage sizing (which a browser keeps continuously, automatically,
-correct) to JS-computed pixel sizing (which only updates when something explicitly re-triggers
-it):
-- The mobile drawer's open/close animation left the board's centered offset stuck mid-transition,
-  never settling back to its pre-open position. Each mode's `ResizeObserver` watched `Render.svg`
-  itself, but `fitContentBox`'s OWN output size is often insensitive to the exact container width
-  (a common case here: the board is usually height-bound, so its fitted size doesn't change even
-  though its centered X-offset should) -- meaning the observer could go quiet exactly when a
-  position correction was still needed. Fixed by observing `#game-container` instead: it's the
-  real upstream signal `fitContentBox` depends on, and reliably changes size throughout a CSS
-  transition, including its final settled frame.
-- `INV-10` flaked on rapid mode entry with no settling time between switches. Root cause: Blast's
-  and Gravity's own `refreshUI()` called `refreshBoard()` (which measures the stats panel's real
-  height) BEFORE setting that panel's own score/lines text content -- so the very first fit of a
-  session measured an empty, not-yet-sized panel instead of its true final height. Fixed by
-  reordering each `refreshUI()` to populate its own panel's text first. The test itself also
-  needed the same settling wait `INV-21` already uses for the identical class of issue (a
-  browser's own layout is synchronous; a JS `ResizeObserver` reacting to it is not) --  added
-  consistently rather than treated as a one-off.
+**Test:** `tests/mobile.spec.js` — "Compose: touching 3 distinct cells at once while recording
+appends a real chord -- one shared time, not three arpeggiated notes", "Compose: a genuine
+2-finger drag while recording still pans the view (not a chord)", and "Compose: touching 2
+distinct cells with no movement records a chord even after a genuine pan/rotate drag already
+happened" (gesture-state reset between the two). `tests/desktop.spec.js` — "Compose: Undo
+reverses a recorded chord (multiple simultaneous notes) as ONE action".
+
+### INV-40: A restricted board's on-screen shape matches its own content's aspect ratio, not whatever shape leftover chrome space happens to produce
+
+For Snake/Gravity/Blast, `#tonnetz-svg` is sized (`Render.fitContentBox`, inline style so it wins
+over the CSS `@media` rules) to the largest box matching the board cells' own natural aspect
+ratio (`Render.computeCellBounds`, shared with `getFitView` so both always agree on exactly what
+content needs to fit) that fits within the space left after `Render.measureChromeClearance(mode)`
+— the current mode's actually-visible stats panel, D-pad (including Snake/Gravity's landscape
+left/right clusters, measured individually), and, for Blast, its floating next-piece queue. It is
+never stretched to fill whatever oddly-shaped leftover space a flat chrome-inset guess would
+produce: fitting content into a reference box with the wrong aspect ratio necessarily wastes
+space on whichever axis isn't the tight constraint. `getAspectMatchedRefBox()` derives its
+aspect ratio from this correctly-shaped element's own rect, not from raw leftover space, so
+`getFitView`'s zoom carries near-zero waste on either axis.
+
+The flat rectangular clearance model breaks down for Snake in portrait: its D-pad is two narrow
+columns hugging the left/right edges with an empty gap down the center, and the board's own widest
+point (its hexagon's left/right vertices) sits at that same vertical center — so a correct fit
+reaches full width, tapering flanks sliding into the gap between the columns, which no rectangular
+clearance band can express. `Render.fitBoardShapeAware` (Snake portrait only) instead
+binary-searches the largest board whose actual cells clear each real chrome rectangle
+individually, predicted through the exact `getFitView`→viewBox mapping so the prediction can't
+drift from what renders. Gravity and Blast keep the flat-clearance path — their chrome genuinely
+is full-width bands.
+
+Chrome clearance itself is fluid, not a flat pixel guess: `--chrome-*`/`--dpad-*` and
+`--mobile-pad-safe-bottom` scale down via `clamp()` toward short viewports (padding/gap/
+button-size first, text size only once even shorter) so the measured footprint
+`measureChromeClearance` feeds into the fit stays accurate at any screen height, and a
+`ResizeObserver` on `#game-container` (the real upstream signal `fitContentBox` depends on, not
+`Render.svg` itself, whose own output size can stay unchanged across a resize) keeps the fit
+correct through drawer open/close transitions and rapid mode switches.
 
 **Test:** `tests/invariants.spec.js`'s "INV-40: Snake/Gravity/Blast size #tonnetz-svg to match
 their own board shape, not the leftover chrome space" asserts `#tonnetz-svg`'s own rendered aspect
 ratio matches `Render.computeCellBounds`'s content aspect ratio (within 5%) for each restricted
-mode, in both portrait and landscape -- confirmed failing on the pre-fix code (the function it
-calls didn't exist) before implementing, per red-green discipline. `tests/exploratory.spec.js`'s
-"Random taps (full matrix)" comment was also corrected -- it used to describe this class of
-failure as expected/by-design flakiness to screenshot-and-ignore; it's a real defect, now fixed
-for the restricted-board modes it was actually catching.
+mode, in both portrait and landscape. "INV-43: ..." separately asserts, for Snake portrait across
+a sweep of sizes, that the board's rendered width spans more than 80% of the container width and
+that no cell overlaps chrome (`measureBoardOcclusion`).
 
 ### INV-41: the restricted board reaches within one hex-diameter of two opposite edges of its available space
 
@@ -1189,75 +988,19 @@ transform, so it tracks the current zoom rather than assuming a fixed pixel cons
 failing on the pre-INV-40 code (`Render.measureChromeClearance` didn't exist yet) before writing
 the fix, per red-green discipline.
 
-### INV-42: exactly one of #blast-stats/#gravity-controls/#snake-controls is visible at a time on mobile
+### INV-42: Only the current mode's own mode-specific controls are visible at a time (controls shared across modes are INV-34's concern instead)
 
-A stats-panel single-row redesign (stats/supporting text matter far less than Tonnetz space, so
-these were flattened from a stacked corner card into a single horizontal strip, freeing vertical
-room for the board) surfaced a real, session-old defect that INV-10's occlusion check never
-caught: `js/main.js`'s `App.setMode` toggles each of these three panels' visibility via plain
-inline `element.style.display = 'block'`/`'none'`, but the mobile CSS needs `display: flex` (a row
-layout) when shown. A first fix hardcoded `display: flex !important` in the CSS -- which does beat
-the inline `'block'` when *showing* a panel, but by the same token also beats the inline `'none'`
-used to *hide* the other two, since `!important` wins over an inline style regardless of which
-direction the override needs to go. Net effect: all three panels were visible simultaneously,
-stacked exactly on top of each other (same `position: absolute; top: 10px; left: 10px;`), the
-whole time these panels have existed -- invisible to INV-10 because that check is about board
-*cells* being occluded, not the chrome panels occluding each other. The real fix (see
-`js/main.js`'s own comment on this) has JS clear the inline style (`''`) rather than force a value
-when showing a panel, so the CSS media query's own `display: flex` (no `!important` needed)
-applies on mobile and default block styling applies on desktop, with only `'none'` ever set
-inline.
+Exactly one of `#blast-stats`/`#gravity-controls`/`#snake-controls` is visible at a time on
+mobile — each mode gets its own separate panel element (unlike `#palette`/`#piece-list`, the
+single shared element INV-34 governs). `App.setMode` clears a panel's inline `display` style to
+`''` (never forces a value) when showing it, and sets `'none'` only when hiding it, so the mobile
+CSS media query's own `display: flex` layout applies for the active mode and default styling
+governs the rest — only `'none'` is ever set inline, never a forced `'flex'`/`'block'` that could
+outrank the *other* panels' own `'none'`.
 
 **Test:** `tests/invariants.spec.js`'s "INV-42: ..." switches between Blast/Gravity/Snake on a
 mobile viewport and asserts `getComputedStyle(...).display` is `'flex'` for the active mode's own
-panel and `'none'` for the other two. Confirmed failing (`'block'`, not `'flex'`, for the active
-panel) against the pre-fix code before writing the fix, per red-green discipline.
-
-Two related, narrower follow-ups landed alongside this fix, both in portrait only (a user
-observation: Gravity's board is tall/narrow with real side margin once aspect-fit centers it,
-where Blast's is wide with none -- so this applies to Gravity only, not Blast):
-
-- Gravity's next-piece queue (`#palette.floating-queue`) moves from above the board to a narrow
-  icon-only strip beside it (`js/render.js`'s `measureChromeClearance` now reserves `right`
-  clearance for it in portrait, mirroring the pattern already used for Blast's `top`), freeing the
-  whole top band for `#gravity-controls` to fit Pause/Restart and Lines/Best/Speed on one row
-  instead of wrapping.
-- `fitContentBox` reclaims one hex-row's worth of the flat clearance below Gravity's board (its
-  bottom D-pad), rather than the full margin that would be safe -- since the hex board tapers to a
-  point at its bottom corners, a fingertip on the D-pad doesn't actually land under real cells
-  until closer than the old flat gap assumed, but a full reclaim would leave no touch clearance at
-  all. Covered by INV-10/11's existing occlusion checks (any mode/viewport combination they cover
-  already catches a board/D-pad overlap regression), not a new invariant of its own.
-
-### INV-43: Snake portrait fits the board shape-aware, not by a flat clearance rectangle
-
-The flat `{top, bottom, left, right}` clearance model (`measureChromeClearance`) can only reserve
-rectangular bands, so it necessarily assumes any chrome in the bottom region blocks the *entire*
-width there. That's true for Gravity (a full-width bottom D-pad bar) but badly wrong for Snake in
-portrait: Snake's D-pad is **two narrow columns hugging the left and right edges**, with a wide
-empty gap down the center. And the board is a hexagon whose left/right *vertices* -- its widest
-point -- sit at its vertical center. So the correct fit is nearly full-width: the vertices reach
-the side edges (above the columns' height), and the hexagon's tapering lower flanks slide down
-*into the gap between the columns*. The flat model instead shrank the board to whatever fit above
-the whole D-pad row -- about 67% of the container width, wasting the entire center gap (the
-reported bug: the board looked tiny with vast empty margins).
-
-`Render.fitBoardShapeAware` (Snake portrait only) binary-searches the largest board, at its own
-aspect ratio and horizontally centered, whose **actual cells** clear every real chrome rectangle
-(the stats panel and the two `.snake-pad-cluster` columns, individually -- never their
-full-width `pointer-events:none` wrapper) by the standard GAP. The SVG box's own empty corners
-are free to overlap the columns, since no cell lives there (the board is a hexagon inscribed in
-the box). Cell screen positions are predicted through the *exact* `getFitView`→viewBox mapping
-snake.js applies downstream, so the prediction can't drift from what renders. Placement picks the
-highest feasible vertical position (board tucked just under the stats panel). Gravity and Blast
-keep the flat-clearance path -- their boards genuinely are bounded by full-width chrome bands.
-
-**Test:** `tests/invariants.spec.js`'s "INV-43: ..." asserts, across a sweep of portrait sizes,
-that the board's rendered width spans more than 80% of the container width (a full-width hexagon's
-points reach the side edges) AND that no cell overlaps chrome (`measureBoardOcclusion`). Confirmed
-failing on the pre-fix flat-clearance code (~67% width at 397×537) before implementing, per
-red-green discipline. This is a Tonnetz-space maximization on top of INV-10's no-overlap floor and
-INV-40/41's aspect/edge-reach checks -- all four still hold for Snake under the new fit.
+panel and `'none'` for the other two.
 
 ### INV-44: pannable modes fill the game-container -- viewBox aspect matches the container
 
@@ -1293,64 +1036,25 @@ again on a subsequent resize. The `ResizeObserver` guard now reads
 `!Render.RESTRICTED_MODES.includes(mode)` instead of a second hand-maintained list, so a future
 pannable mode can't silently repeat this.
 
-### INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing
+### INV-45: Every mode's `#tonnetz-svg` sizing is independent — no mode inherits another's leftover inline styling
 
 On a mobile viewport the restricted modes size `#tonnetz-svg` with an inline `width`/`height` +
 `position:absolute` (`fitContentBox`, INV-40) fit to their own board's box. Inline styles beat the
-`svg { width/height:100% }` CSS **and persist even when the viewport later widens**, so a pannable
-mode entered afterwards rendered into that leftover tiny, off-corner box (found live via the
-screenshot fixture: play Gravity, switch to Sandbox, and the lattice stayed stuck at Gravity's
-board size). `Render.panView` clears that inline sizing at the start of every pannable draw, so the
-board falls back to filling the container. (At desktop widths `fitContentBox` no-ops, so this only
-reproduces at mobile viewports.)
+`svg { width/height:100% }` CSS and persist even when the viewport later widens, so entering a
+pannable mode must not render into a restricted mode's leftover inline sizing. `Render.panView`
+clears that inline sizing at the start of every pannable draw, so the board falls back to filling
+the container. (At desktop widths `fitContentBox` no-ops, so this only matters at mobile
+viewports.)
 
 **Test:** `tests/invariants.spec.js`'s "INV-45: ..." enters each restricted mode at a mobile
 viewport (confirming it set an inline SVG width), switches to each pannable mode, and asserts the
 inline `width`/`height`/`position` were cleared. Confirmed failing (inline sizing stuck) on the
 pre-fix code before implementing, per red-green discipline.
 
-### INV-46: a cell always sounds its own pitch — the founding invariant
-
-This is the founding invariant of the whole project. A cell at `(p, q)` sounds **exactly**
-`Tonnetz.getFrequency(getMidi(p, q))` — its own pitch — *everywhere, always, in every mode*. What
-may vary per context (mode, cell state, event) is timbre/instrument, volume, and attack/decay/
-duration. What may **never** vary is the **pitch**. The Tonnetz position *is* the pitch; that
-mapping is inviolable. There is no per-mode exception: the restricted modes (Snake/Blast/Gravity)
-aren't a different rule, they're simply *restricted* to fewer cells, each of which still sounds its
-own pitch.
-
-Consequences that follow directly:
-- **No octave-folding.** The synth must never shift a note into a "comfortable" register to make
-  it audible — that plays a *different pitch*. It commands the note's true frequency across the
-  whole range of human hearing and beyond; whether a given device can reproduce an extreme
-  frequency is the device's business, not a license to change the note. (`js/synth.js` used to
-  fold everything into MIDI 21–108; that was a long-standing violation, removed when this
-  invariant was codified.)
-- **The lattice reaches human hearing.** Pannable modes draw out to the top of hearing
-  (`Tonnetz.audibleMaxMidi()` ≈ MIDI 135 ≈ 20 kHz), not the old MIDI-protocol ceiling of 127.
-- **The only sounds are real cells doing something — anywhere.** A sound comes only from a real
-  cell/piece actively acting on the Tonnetz, but *not* only from on-screen ones: it's fine to hear
-  an off-viewport glider recede. What's forbidden is a **phantom or stale** note — a cell sounding
-  a pitch from a position it has left. Since a cell always sounds its own *current* `getMidi`, a
-  moving pattern never smears pitch (see Life #13).
-
-**Test:** `tests/invariants.spec.js` — "INV-46: the synth sounds each note at its own true
-getFrequency(midi), never octave-shifted" sweeps a range of MIDI values (including the extremes the
-old fold used to relocate) and asserts the synth commands exactly `getFrequency(midi)` for each.
-The lattice-reach half is covered in `tests/desktop.spec.js` ("Tonnetz draws cells up to the top of
-human hearing").
-
-**Accepted trade-off:** Gravity's board tuning (`35 − 3p + 4q`) spans ~130 semitones (MIDI 23–153),
-so with the fold gone its top rows are genuinely ultrasonic and go unheard, and its low end is
-comparatively high. On review (2026-07-28) the honest-pitch result sounded good enough in play that
-a retune wasn't worth it — the top was judged fine and, at most, the bottom could drop an octave
-someday. So this is a known, accepted characteristic, not an open task. This invariant is what
-surfaced it.
-
 ### INV-47: copy/paste preserves true pitch across modes
 
 Cross-mode copy/paste (Ctrl/Cmd+C/V, or the header ⧉/📋 buttons) moves cells between modes and
-must **preserve their true pitch** — the corollary of INV-46 for material that travels. The
+must **preserve their true pitch** — the corollary of INV-4 for material that travels. The
 clipboard stores plain **canonical** (standard-mapping) coordinates: every mode is either the
 standard Tonnetz (`60+7p+3q`) or Gravity, and Gravity's mapping is exactly the standard Tonnetz
 rotated 120° (`Tonnetz.gravityToCanonical`/`canonicalToGravity`, an exact pitch-preserving integer
@@ -1451,7 +1155,7 @@ from internal `state` objects — is unchanged from right after its own mutation
 
 **Melody was a real violation, found live, not just a coverage gap.** The doc previously exempted
 Melody here as "a fixed practice drill [that] doesn't hold placed/scored state, matching its
-exemption from INV-47" — that claim was simply wrong: Melody's drill progress (`targetLength`,
+exemption from INV-47" — that claim was simply wrong: Melody's drill progress (`endIndex`,
 `userIndex`, `startIndex`, the streak) is exactly the kind of state every other mode's own
 exemption-from-exemption already covers. `MelodyMode.init()` called `resetGame()`
 **unconditionally** on every entry, including mere re-entry after switching away — silently
@@ -1469,52 +1173,6 @@ with nothing to catch it. There's no automatable check to prevent an *incorrect 
 exemption* the way there is for a stale id string — the real defense here is `STATEFUL_MODES`
 covering every mode with any progress worth preserving, so no mode gets to claim an unverified
 exemption from this invariant going forward.
-
----
-
-### INV-52: the shared local-folder tier writes into the folder and re-lists it live, not just once
-
-`js/file-folder.js`'s `FileFolder.create(config)` is the single shared local-folder mechanism
-behind `MidiFolder` (Melody/Compose, `.mid` files) and `LifeFolder` (Life, `.yaml` files) — see
-INV-28. Two bugs, both reported live against Life's own Save As, traced to this shared code
-rather than anything Life-specific:
-
-**Writes silently downgraded to a download.** `showDirectoryPicker()`, `queryPermission`, and
-`requestPermission` were all called with `{ mode: 'read' }` (or no `mode` at all, which defaults
-to `'read'`) — enough to *list* the folder, but `saveFileAs`'s own write
-(`getFileHandle(...).createWritable()`) requires `'readwrite'`. Against a real browser's
-permission model that throws (caught, logged only to `console.warn`, never surfaced to the
-player) and falls through to `saveFileAs`'s `<a download>` fallback — exactly "Save gives me a
-download rather than saving to my local folder." Fixed by requesting `'readwrite'` at all three
-call sites (`chooseFolder`, `restore`, `reconnect`). A folder granted under the old read-only
-default queries as not-granted on the next `restore()`, correctly surfacing the existing
-"Reconnect Folder" one-click flow rather than silently staying downgraded forever.
-
-**The dropdown only re-listed at four fixed trigger points.** `handle.values()` genuinely re-reads
-the OS on every call (Chrome doesn't cache directory contents) — the data was never stale, only
-the *trigger* to re-read it was missing. `listFiles` (the full re-list + auto-load-index-0 path)
-only ran from `restore`/`reconnect`/`chooseFolder`/post-`saveFileAs`, never from opening the
-dropdown itself, so a file moved/renamed/added on disk outside the app stayed invisible until one
-of those four actions happened to fire again. Fixed with a new `refreshFileList` — re-lists
-without touching what's currently loaded, triggered on the select's `mousedown`/`focus` (best
-effort only: a native `<select>` can't be told to await an async refresh before it paints, so the
-CURRENTLY opening dropdown may still show what was cached; the next one won't). Deliberately a
-separate method from `listFiles`, not a reuse of it: `listFiles` unconditionally loads index 0,
-which would have silently replaced the player's in-progress content just from hovering the
-dropdown. Since the listing re-sorts alphabetically on every read, a plain numeric index can point
-at a *different* file after an external rename/add/remove — `refreshFileList` re-finds the
-currently-loaded file by name in the fresh listing and corrects its index rather than trusting the
-old one.
-
-**Test:** `tests/desktop.spec.js` — "MidiFolder: choosing/restoring/reconnecting ... requests
-readwrite permission, not just read" (three call sites), "MidiFolder: opening the dropdown
-re-lists the folder, picking up an externally added file" (also asserts the currently-loaded
-file's content is untouched — `parseMIDI` called exactly once), "LifeFolder: choosing a folder
-requests readwrite permission, not just read" (confirms Life inherits the same shared-code fix).
-The existing fakes in these tests grant whatever permission mode is asked regardless of what's
-requested — by design, real `FileSystemDirectoryHandle`s don't grant more than requested, which is
-exactly how this bug went uncaught; the tests instead assert on *what was requested*, via a
-recorded `{fn, mode}` call log on the fake's `queryPermission`/`requestPermission`.
 
 ---
 
@@ -1682,7 +1340,7 @@ so the test actually discriminates between the two, confirmed red against the ol
 before landing), "Compose: loading a file clears the undo history". `tests/invariants.spec.js` —
 "INV-48: Sandbox/Blast/Life/Compose's undo history survives a switch away and back untouched"
 (each mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as
-Melody's own `cleanStreak`, INV-51 — asserted directly since `paintedFingerprint`'s black-box DOM
+Melody's own `cleanStreak`, INV-26 — asserted directly since `paintedFingerprint`'s black-box DOM
 check has no visible representation of undo history to catch a regression here). Also "Undo (#17):
 the single header button stays disabled everywhere undo has nothing to do, and enables once there
 is something to undo" — covers the always-disabled modes (Melody/Snake/Gravity), the

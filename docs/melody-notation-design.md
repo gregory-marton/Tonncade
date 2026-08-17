@@ -1,20 +1,18 @@
 # Melody/Compose: grand-staff notation (design, not yet implemented)
 
 Show the song (or Random's generated sequence) on an actual grand staff (treble + bass, like
-piano notation), with each note's name+octave printed underneath it, and measure barlines that
-visually span the whole stack -- staff, the name/octave row, and the existing note-token timeline
-below it -- as one connected block per measure. The staff sits ABOVE the existing timeline, not in
-place of it: the timeline keeps doing the interactive job (scrub marker, drag-to-seek,
-tri-coloured upcoming notes, edge-scroll). The two views stay in perfect horizontal sync -- every
-note's staff position, its name/octave label, and its timeline token line up at the same
-x-coordinate, with barlines connecting straight through all three.
-
-Two distinct vertical elements span the whole stack, not one: measure barlines (above), AND the
-existing timing scrub I-beam (`positionScrubMarker`, INV-26 -- today spans only the note-timeline)
-extends upward through the staff and the name/octave row too. Dragging it needs to show exactly
-which staff note and which name/octave label it's currently pointing at, not just which timeline
-token -- same "everything lines up at one x-coordinate" requirement as the barlines, applied to a
-second, independently-positioned element.
+piano notation), with each note's pitch (name+octave) printed underneath it, and measure barlines
+that visually span the whole stack -- staff, pitch row, and the two draggable boundary markers --
+as one connected block per measure. This whole stack is the **Timeline** (INV-55, `js/timeline.js`),
+shared by Melody and Compose -- not a staff sitting alongside a separate note-token list; an
+earlier version of this design kept them as two things (the staff above, the interactive job --
+scrub, drag-to-seek, tri-coloured upcoming notes, edge-scroll -- in a separate list below), but
+that read as redundant once both existed and got consolidated into one. Melody's own **practice
+strip** decorates the Timeline's pitch row with its past/current/upcoming color hints and
+Tonnetz glow-linkage (INV-25); Compose's Timeline stays undecorated, since its two markers ARE
+its selection mechanism. Every note's staff position and its pitch-row label line up at the same
+x-coordinate, with barlines connecting straight through both, and the two markers positioned the
+same way.
 
 ## Rendering library: VexFlow
 

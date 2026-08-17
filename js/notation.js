@@ -342,12 +342,19 @@ const Notation = {
         };
     },
 
-    // Renders one note-name/octave label per entry of `noteXPositions` (Notation.render's own
+    // Renders one note-name/octave pitch per entry of `noteXPositions` (Notation.render's own
     // return value -- callers pass it straight through, no separate computation) into
     // #<containerId>, each absolutely positioned at that note's OWN x -- the same x VexFlow itself
     // reported, so this row lines up with the staff above it without a second, independently
-    // -computed layout.
-    renderLabels: function(containerId, noteXPositions, keySignature) {
+    // -computed layout. This is the Timeline's own pitch row (INV-55) -- undecorated by default.
+    //
+    // `decorate`, optional: (entry) => {className, style, data} -- called per entry, letting a
+    // mode layer its own presentation on top without this function needing to know what that
+    // means. `data` sets extra data-* attributes (e.g. {role: 'past'} -> data-role="past"),
+    // useful for tests/CSS to target without needing a dedicated className per state. Melody's
+    // practice strip (js/melody.js) uses it for past/current/upcoming color hints; Compose's
+    // Timeline omits it, staying plain.
+    renderLabels: function(containerId, noteXPositions, keySignature, decorate) {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.innerHTML = '';
@@ -355,10 +362,18 @@ const Notation = {
         container.style.height = '1.2em';
         (noteXPositions || []).forEach((n) => {
             const span = document.createElement('span');
-            span.className = 'note-token'; // same look as the Melody/Compose timeline tokens
+            const deco = decorate ? (decorate(n) || {}) : {};
+            span.className = 'note-token' + (deco.className ? ' ' + deco.className : ''); // same look as the Melody/Compose timeline tokens
             span.style.position = 'absolute';
             span.style.left = n.x + 'px';
             span.style.transform = 'translateX(-50%)';
+            if (deco.style) {
+                Object.keys(deco.style).forEach((key) => { span.style[key] = deco.style[key]; });
+            }
+            if (deco.data) {
+                Object.keys(deco.data).forEach((key) => { span.setAttribute('data-' + key, deco.data[key]); });
+            }
+            span.setAttribute('data-note-idx', n.id);
             span.textContent = Tonnetz.getNoteName(n.midi, keySignature) + Tonnetz.getOctave(n.midi);
             container.appendChild(span);
         });
@@ -374,7 +389,12 @@ const Notation = {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.querySelectorAll('.notation-barline').forEach((el) => el.remove());
-        (barlineXPositions || []).forEach((x) => {
+        // Skip index 0: it's the leading edge of the FIRST measure (right at the clef), not a
+        // boundary between two measures -- real sheet music doesn't draw a barline there either.
+        // The full array (including index 0) is still returned by Notation.render/kept as-is for
+        // beatFromX's own per-measure indexing, which needs that first entry to place clicks
+        // inside measure 0 correctly; only the drawn overlay skips it.
+        (barlineXPositions || []).slice(1).forEach((x) => {
             const line = document.createElement('div');
             line.className = 'notation-barline';
             line.style.left = x + 'px';

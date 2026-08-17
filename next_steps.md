@@ -23,6 +23,16 @@ so this document is for upcoming feature ideas.
   question (kept as an explicit fallback, not adopted -- there's a real argument the lightweight
   hand-rolled quantizer/speller/measure-inference is closer to correct for this app's actual
   audience, not just cheaper) are both in the doc, not repeated here.
+- **Compose mode has no live MIDI hardware input routing** (docs/invariants.md INV-32's actual
+  invariant is "live MIDI hardware input is supported in every mode" -- Compose is currently the
+  one exception; `js/midi-input.js`'s `MidiInput.handleNoteOn` has a branch for every OTHER mode,
+  including Life, but none for `App.currentMode === 'compose'`). The natural mapping: while
+  recording, a MIDI note-on should record a note the same way `ComposeMode.tapCell`'s recording
+  branch does (or `recordTouch`, for chords -- `MidiInput` already buffers near-simultaneous
+  note-ons the same way Blast's chord handling does, see INV-32); while not recording, it should
+  probably just preview-play the note (matching a tap on an unselected empty cell) rather than
+  mutate the piece. Needs its own design pass on exactly which existing Compose method(s) a MIDI
+  note-on should call — not scoped further here.
 - **#28 Device-rotation as a viewing angle, not just a resize**: in Gravity mode, rotating the device correctly keeps "higher pitch = up" fixed on screen, since falling pieces need a stable notion of "down" — that stays as is. In Blast, Snake, Melody, and Sandbox, none of which have gravity-driven mechanics, device rotation could instead let the Tonnetz visually rotate along with the phone (0°/90°/180°/270°), so physically turning the device reveals a different rotated view of the same fixed lattice, while controls/stats and — critically — each hex's in-grid note-name label counter-rotate individually to stay upright and legible regardless of the overall grid's rotation. Needs a real device-orientation-angle read (`screen.orientation.angle` or equivalent) with early cross-browser verification, since this API has had inconsistent behavior on iOS Safari historically.
 - **#29 i18n export**: any English-language UI text (button labels, status messages, instructions) is a future translation cost and will impact appearance and spacing when translated. Strong bias against adding more text where a non-linguistic alternative (icon, symbol, color) would work just as well. Some text is likely unavoidable — chord type names ("Major 7th", "Sus4", etc.) and note names use standard music-theory notation that doesn't have an obvious non-linguistic substitute, and inventing one isn't something to do without real music-theory expertise informing it. ~~Scope: catalog existing English strings across the UI as a review list, and keep this bias in mind for new features going forward.~~ Done: catalog below. The next concrete step, not yet started, is to separate all such strings into their own js file organized as a dictionary with a primary language key and secondary role key, so it will be easy to augment with another language.
 

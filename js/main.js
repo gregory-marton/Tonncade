@@ -738,13 +738,15 @@ const App = {
                     }
                     // The grand-staff view (docs/melody-notation-design.md) is rich content sized
                     // for a real panel, not a small corner HUD -- #melody-stats-group travels into
-                    // the compact always-visible dock above, but #melody-staff (INV-31: must stay
-                    // small) doesn't belong there the way the streak bar/note-timeline do. Hidden
-                    // here, restored by the desktop branch below.
+                    // the compact always-visible dock above, but #melody-staff itself doesn't
+                    // belong there the way the streak bar/pitch row do. Hidden here, restored by
+                    // the desktop branch below. #melody-staff-labels (the compact one-line pitch
+                    // row, INV-25) stays visible -- it travels along with #melody-stats-group into
+                    // the dock just fine, and it's the ONLY place a mobile player sees which note
+                    // is next, now that Melody's practice-strip decoration lives there instead of
+                    // a separate always-visible list (see INV-25/55).
                     const melodyStaff = document.getElementById('melody-staff');
                     if (melodyStaff) melodyStaff.style.display = 'none';
-                    const melodyStaffLabels = document.getElementById('melody-staff-labels');
-                    if (melodyStaffLabels) melodyStaffLabels.style.display = 'none';
                     // One-time setup + settings live in the drawer, out of the board's way: the
                     // song-source dropdown, the upload fallback, and the Difficulty selector. Only
                     // the transport (Play/Restart icons) and the streak stats stay in the
@@ -809,8 +811,6 @@ const App = {
                     if (melodyStats && melodyStats.parentElement !== melodyControls) melodyControls.appendChild(melodyStats);
                     const melodyStaff = document.getElementById('melody-staff');
                     if (melodyStaff) melodyStaff.style.display = ''; // undo the mobile-dock hide above
-                    const melodyStaffLabels = document.getElementById('melody-staff-labels');
-                    if (melodyStaffLabels) melodyStaffLabels.style.display = '';
                 }
                 
                 // Ensure palette and guide are back in sidebar
