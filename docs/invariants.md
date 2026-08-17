@@ -569,7 +569,7 @@ Chrome (INV-26 sets the same precedent already).
 
 ---
 
-### INV-28: Compose mode's Save round-trips exactly what was recorded or loaded
+### INV-28: Every mode's Save round-trips exactly what was recorded or loaded — currently Compose and Life, the only two with a Save button at all (Melody has none yet)
 
 Compose mode (`js/compose.js`) is v1 of the rest of task #27 ("edit any melody, record a new
 song"), built as its own separate mode rather than bolted onto Melody's practice loop — drag/
@@ -632,8 +632,12 @@ the same family; keeps a short melody's path connected) and "MelodyMode.writeMID
 (reproduces midi/time/duration through `parseMIDI` within one tick's tolerance, including the
 empty-melody edge case). `tests/desktop.spec.js` — six "Compose: ..." tests covering recording,
 playback ordering, Undo, Clear, a Save round-trip through a faked folder handle, and loading an
-existing file into a connected on-lattice path; plus "MidiFolder: choosing/restoring/reconnecting
-... requests readwrite permission, not just read" (three call sites), "MidiFolder: opening the
+existing file into a connected on-lattice path; "Life: Save As writes a YAML file that
+round-trips back to the same rule and live cells" and "Life: Save As round-trips a multi-state
+automaton (transition table + per-cell state)" — both, like Compose's, write through a faked
+folder handle and re-parse the actual captured bytes/text (`MusicXML.parse`/`Life.parseYaml`),
+not just checking that some function ran; plus "MidiFolder: choosing/restoring/reconnecting ...
+requests readwrite permission, not just read" (three call sites), "MidiFolder: opening the
 dropdown re-lists the folder, picking up an externally added file" (also asserts the
 currently-loaded file's content is untouched — `parseMIDI` called exactly once), and "LifeFolder:
 choosing a folder requests readwrite permission, not just read" (confirms Life inherits the same
@@ -641,6 +645,10 @@ shared-code fix). The permission tests assert on *what was requested* via a reco
 call log on the fake's `queryPermission`/`requestPermission`, since a real
 `FileSystemDirectoryHandle` never grants more than requested — exactly how the bug went uncaught
 originally.
+
+This invariant is checked wherever Save currently exists (Compose, Life) — it should be extended
+to cover Melody's own Save the moment that ships (`writeMIDI`/`MidiFolder.saveFileAs` are already
+shared and ready for it, per above), and to any future mode that gains one.
 
 ---
 
@@ -672,7 +680,7 @@ and Space/G/Arrows rotate hints only show for Sandbox and Blast."
 
 ---
 
-### INV-30: Leaving Gravity mode actually stops Gravity from touching the shared board again
+### INV-30: Leaving Gravity mode actually stops Gravity from touching the shared SVG element again
 
 Real report (issue #9, a ChromeOS play session): after finishing a Gravity game and switching to
 another mode, the "done" Gravity board stayed on screen instead of clearing — the new mode's own
@@ -688,7 +696,8 @@ observer was never disconnected: `js/main.js`'s `setMode` only ever cleared
 never did. So the observer kept watching forever, and the next time *anything* resized the game
 area (switching to a mode with different-sized sidebar content is exactly such a layout reflow),
 it fired again and repainted Gravity's stale board directly over whatever the new mode had just
-drawn on that same shared element.
+drawn on that same shared `<svg>` — no game state was ever actually shared between modes; only
+the one DOM element both were drawing into was.
 
 Fixed by giving `GravityMode` a real `cleanup()` (clears the timer *and* disconnects/nulls the
 `ResizeObserver`, matching the pattern `MelodyMode`/`SnakeMode`/`SandboxMode`/`ComposeMode` already
