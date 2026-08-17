@@ -11,6 +11,7 @@ const ASSETS = [
     './js/render.js',
     './js/vendor/vexflow.js',
     './js/notation.js',
+    './js/musicxml.js',
     './js/undo-stack.js',
     './js/sandbox.js',
     './js/difficulty-barbell.js',

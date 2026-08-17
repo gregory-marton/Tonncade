@@ -4014,3 +4014,89 @@ test('Melody: the grand staff renders real notes once a song is loaded, matching
   expect(notesOnTimeline).toBeGreaterThan(0);
   expect(staffHasContent).toBe(true);
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// js/musicxml.js -- MusicXML read/write (docs/melody-notation-design.md). Round-trip fidelity is
+// the load-bearing property: write(parse(x)) and parse(write(notes)) must reproduce the exact
+// original data, not just "look plausible." Ties across measure boundaries are the sharpest edge
+// here -- a note that crosses a barline must come back with its FULL original duration, not
+// silently truncated to whatever fit in its starting measure.
+// ────────────────────────────────────────────────────────────────────────
+
+test('MusicXML: round-trips simple notes exactly (pitch, time, duration)', async ({ page }) => {
+  await page.goto('/');
+  const notes = [
+    { midi: 60, time: 0, duration: 0.5 },
+    { midi: 64, time: 0.5, duration: 0.5 },
+    { midi: 67, time: 1.0, duration: 1.0 },
+  ];
+  const parsed = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120, name: 'Test' });
+    return MusicXML.parse(xml).notes;
+  }, notes);
+  expect(parsed).toEqual(notes);
+});
+
+test('MusicXML: a note tied across a measure boundary round-trips its FULL original duration, not truncated', async ({ page }) => {
+  await page.goto('/');
+  // 120bpm -> 2s/measure. This note starts mid-measure-1 and runs well into measure-2.
+  const notes = [{ midi: 67, time: 1.0, duration: 1.75 }];
+  const result = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120 });
+    return { xml, parsed: MusicXML.parse(xml).notes };
+  }, notes);
+  expect(result.xml).toContain('tie type="start"');
+  expect(result.xml).toContain('tie type="stop"');
+  expect(result.parsed).toEqual(notes); // the whole point: nothing got clipped
+});
+
+test('MusicXML: a note spanning THREE measures (two tie points) round-trips exactly', async ({ page }) => {
+  await page.goto('/');
+  const notes = [{ midi: 72, time: 4.0, duration: 3.0 }]; // 120bpm: measure 3 into measure 4
+  const parsed = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120 });
+    return MusicXML.parse(xml).notes;
+  }, notes);
+  expect(parsed).toEqual(notes);
+});
+
+test('MusicXML: chords (simultaneous notes) round-trip as notes sharing the same time', async ({ page }) => {
+  await page.goto('/');
+  const notes = [
+    { midi: 60, time: 0, duration: 0.5 },
+    { midi: 64, time: 0, duration: 0.5 },
+    { midi: 67, time: 0, duration: 0.5 },
+  ];
+  const result = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120 });
+    return { chordCount: (xml.match(/<chord\/>/g) || []).length, parsed: MusicXML.parse(xml).notes };
+  }, notes);
+  expect(result.chordCount).toBe(2); // first chord note has no <chord/>, the other two do
+  expect(result.parsed.sort((a, b) => a.midi - b.midi)).toEqual(notes.sort((a, b) => a.midi - b.midi));
+});
+
+test('MusicXML: gaps between notes round-trip as silence (rests), not compressed away', async ({ page }) => {
+  await page.goto('/');
+  const notes = [
+    { midi: 60, time: 0, duration: 0.5 },
+    { midi: 64, time: 2.0, duration: 0.5 }, // a 1.5s gap of silence before this one
+  ];
+  const parsed = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120 });
+    return MusicXML.parse(xml).notes;
+  }, notes);
+  expect(parsed).toEqual(notes); // the second note's own `time` IS the gap-preservation check
+});
+
+test('MusicXML: an empty/malformed document throws rather than silently returning nothing', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    try {
+      MusicXML.parse('not xml at all <<<');
+      return { threw: false };
+    } catch (e) {
+      return { threw: true, message: e.message };
+    }
+  });
+  expect(result.threw).toBe(true);
+});
