@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tonncade-v14';
+const CACHE_NAME = 'tonncade-v15';
 const ASSETS = [
     './',
     './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
     './js/notation.js',
     './js/repeat-navigation.js',
     './js/musicxml.js',
+    './js/mxl.js',
     './js/undo-stack.js',
     './js/sandbox.js',
     './js/difficulty-barbell.js',

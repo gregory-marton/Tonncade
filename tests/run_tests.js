@@ -130,6 +130,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'vendor', 'vexf
 loadScript('notation.js');
 loadScript('repeat-navigation.js');
 loadScript('musicxml.js'); // DOMParser is only referenced inside MusicXML.parse()'s body, never called at load time -- safe here despite no real DOM
+loadScript('mxl.js'); // TextDecoder/DecompressionStream/Blob/Response are only referenced inside its own function bodies, same reasoning
 loadScript('undo-stack.js'); // sandbox.js/blast.js/life.js/compose.js's UndoStack.create(...) needs this loaded first
 loadScript('sandbox.js');
 loadScript('difficulty-barbell.js'); // blast.js/gravity.js/melody.js's DifficultyBarbell.create(...) needs this loaded first

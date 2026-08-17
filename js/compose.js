@@ -757,6 +757,12 @@ const ComposeMode = {
                 return { midi: note.midi, p: coord.p, q: coord.q, time: note.time, duration: note.duration };
             });
             this.state.selectedIndices = [];
+            // Authored key wins if the file declared one (see melody.js's own loadMelodyFromMusicXML
+            // for why detectKeySignature is only a fallback, not the primary source) -- drives
+            // both refreshStaff's spelling and any newly-added note's own accidental going forward.
+            this.state.keySignature = parsed.keySignature != null
+                ? parsed.keySignature
+                : Tonnetz.detectKeySignature(this.state.notes.map((n) => n.midi));
             this.state.undoStack.clear(); // #17: a freshly-loaded file is a fresh start
 
             this.stopPlayback();
@@ -768,6 +774,19 @@ const ComposeMode = {
         } catch (err) {
             console.error(err);
             alert('Error parsing MusicXML file: ' + err.message);
+        }
+    },
+
+    // .mxl (compressed MusicXML -- js/mxl.js) counterpart, mirroring melody.js's own
+    // loadMelodyFromMxl: unzip, then hand the extracted text to the existing MusicXML load path
+    // rather than duplicating its note/keySignature handling.
+    loadMelodyFromMxl: async function(arrayBuffer, displayName) {
+        try {
+            const text = await Mxl.extractMusicXML(arrayBuffer);
+            this.loadMelodyFromMusicXML(text, displayName);
+        } catch (err) {
+            console.error(err);
+            alert('Error reading .mxl file. Please make sure it is a valid compressed MusicXML archive.');
         }
     },
 

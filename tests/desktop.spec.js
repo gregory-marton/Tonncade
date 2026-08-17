@@ -330,6 +330,88 @@ test('stopping preview restores the note list to reflect actual game progress', 
 // something to conflate with this feature).
 // ────────────────────────────────────────────────────────────────────────
 
+// Builds a REAL ZIP archive (byte-exact to spec: local file headers, central directory, End Of
+// Central Directory record) from `files` ({name, data: Buffer, method: 0|8}[]) using Node's own
+// zlib for DEFLATE -- no zip library involved. CRC-32 fields are left as 0 throughout: js/mxl.js
+// never reads them back (see its own file header), so an unzip tool that DOES verify them (this
+// is a test fixture, not a real interop file) is the only thing that would ever notice.
+function buildZip(files) {
+  const zlib = require('zlib');
+  const localChunks = [];
+  const centralChunks = [];
+  let offset = 0;
+  files.forEach((f) => {
+    const stored = f.method === 8 ? zlib.deflateRawSync(f.data) : f.data;
+    const nameBuf = Buffer.from(f.name, 'utf8');
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);             // version needed
+    local.writeUInt16LE(0, 6);              // flags
+    local.writeUInt16LE(f.method, 8);       // compression method
+    local.writeUInt16LE(0, 10);             // mod time
+    local.writeUInt16LE(0, 12);             // mod date
+    local.writeUInt32LE(0, 14);             // crc32 (unverified by js/mxl.js -- see above)
+    local.writeUInt32LE(stored.length, 18); // compressed size
+    local.writeUInt32LE(f.data.length, 22); // uncompressed size
+    local.writeUInt16LE(nameBuf.length, 26);
+    local.writeUInt16LE(0, 28);             // extra field length
+    localChunks.push(local, nameBuf, stored);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);           // version made by
+    central.writeUInt16LE(20, 6);           // version needed
+    central.writeUInt16LE(0, 8);            // flags
+    central.writeUInt16LE(f.method, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(0, 16);           // crc32
+    central.writeUInt32LE(stored.length, 20);
+    central.writeUInt32LE(f.data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28);
+    central.writeUInt16LE(0, 30);           // extra field length
+    central.writeUInt16LE(0, 32);           // comment length
+    central.writeUInt16LE(0, 34);           // disk number start
+    central.writeUInt16LE(0, 36);           // internal attrs
+    central.writeUInt32LE(0, 38);           // external attrs
+    central.writeUInt32LE(offset, 42);      // local header offset
+    centralChunks.push(central, nameBuf);
+
+    offset += local.length + nameBuf.length + stored.length;
+  });
+
+  const centralDirStart = offset;
+  const centralDir = Buffer.concat(centralChunks);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(0, 4);
+  eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(files.length, 8);
+  eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(centralDir.length, 12);
+  eocd.writeUInt32LE(centralDirStart, 16);
+  eocd.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...localChunks, centralDir, eocd]);
+}
+
+// A real, spec-shaped .mxl fixture: a STORED META-INF/container.xml pointing at a DEFLATE-
+// compressed root entry -- exercising both compression methods js/mxl.js supports in one fixture.
+function buildMxlFixture(musicXmlText, { rootPath = 'song.musicxml' } = {}) {
+  const containerXml = `<?xml version="1.0" encoding="UTF-8"?><container><rootfiles><rootfile full-path="${rootPath}"/></rootfiles></container>`;
+  return buildZip([
+    { name: 'META-INF/container.xml', data: Buffer.from(containerXml, 'utf8'), method: 0 },
+    { name: rootPath, data: Buffer.from(musicXmlText, 'utf8'), method: 8 },
+  ]);
+}
+
+// A minimal single-entry .mxl with no META-INF/container.xml at all -- exercises
+// Mxl.extractMusicXML's fallback scan for a bare .musicxml entry.
+function buildMxlFixtureSingleEntry(musicXmlText, entryName) {
+  return buildZip([{ name: entryName, data: Buffer.from(musicXmlText, 'utf8'), method: 8 }]);
+}
+
 // Each fake file's "bytes" are just a one-byte tag identifying which fake file it is; the
 // parseMIDI stub reads that tag back out, so a distinct, easily-asserted MIDI note stands in for
 // "this specific file's real content loaded" without needing real Standard MIDI File bytes.
@@ -4569,4 +4651,75 @@ test('Melody: EVERY bundled song loads without error and produces a sane melody'
     expect(r.allValidMidi, `${r.name} should have valid MIDI pitches throughout`).toBe(true);
   });
   expect(errors).toEqual([]);
+});
+
+test('Mxl.extractMusicXML: unzips a real .mxl (STORED container.xml + DEFLATE root entry), following container.xml\'s rootfile path', async ({ page }) => {
+  await page.goto('/');
+  const originalXml = await page.evaluate(() => MusicXML.write(
+    [{ midi: 60, time: 0, duration: 0.5 }, { midi: 64, time: 0.5, duration: 0.5 }],
+    { bpm: 120, name: 'Mxl Fixture' }
+  ));
+  const zipBuffer = buildMxlFixture(originalXml);
+  const extracted = await page.evaluate(async (bytes) => {
+    const buffer = new Uint8Array(bytes).buffer;
+    return Mxl.extractMusicXML(buffer);
+  }, Array.from(zipBuffer));
+  expect(extracted).toBe(originalXml); // byte-for-byte identical after zip -> unzip
+});
+
+test('Mxl.extractMusicXML: falls back to scanning for a .musicxml entry when container.xml is missing', async ({ page }) => {
+  await page.goto('/');
+  const originalXml = await page.evaluate(() => MusicXML.write([{ midi: 67, time: 0, duration: 1 }], { bpm: 100 }));
+  const zipBuffer = buildMxlFixtureSingleEntry(originalXml, 'untitled.musicxml');
+  const extracted = await page.evaluate(async (bytes) => {
+    return Mxl.extractMusicXML(new Uint8Array(bytes).buffer);
+  }, Array.from(zipBuffer));
+  expect(extracted).toBe(originalXml);
+});
+
+test('Mxl.extractMusicXML: a non-ZIP buffer throws rather than silently returning nothing', async ({ page }) => {
+  await page.goto('/');
+  const threw = await page.evaluate(async () => {
+    try {
+      await Mxl.extractMusicXML(new TextEncoder().encode('not a zip file at all').buffer);
+      return false;
+    } catch (err) {
+      return true;
+    }
+  });
+  expect(threw).toBe(true);
+});
+
+test('Melody: loading a real .mxl file unzips it and loads the same melody as the equivalent plain .musicxml would', async ({ page }) => {
+  await page.goto('/');
+  const originalXml = await page.evaluate(() => MusicXML.write(
+    [{ midi: 62, time: 0, duration: 0.5 }, { midi: 65, time: 0.5, duration: 0.5 }, { midi: 69, time: 1, duration: 1 }],
+    { bpm: 120, name: 'Melody Mxl Test' }
+  ));
+  const zipBuffer = buildMxlFixture(originalXml);
+  const midis = await page.evaluate(async (bytes) => {
+    document.querySelector('.mode-option[data-mode="melody"]').click();
+    await MelodyMode.loadMelodyFromMxl(new Uint8Array(bytes).buffer, 'test.mxl');
+    return MelodyMode.state.melody.map((n) => n.midi);
+  }, Array.from(zipBuffer));
+  expect(midis).toEqual([62, 65, 69]);
+});
+
+test('Compose: loading a real .mxl file unzips it, loads the notes, and picks up the authored key signature', async ({ page }) => {
+  await page.goto('/');
+  const originalXml = await page.evaluate(() => MusicXML.write(
+    [{ midi: 65, time: 0, duration: 1 }, { midi: 70, time: 1, duration: 1 }], // Bb4, in F major (fifths=-1)
+    { bpm: 120, keySignatureFifths: -1, name: 'Compose Mxl Test' }
+  ));
+  const zipBuffer = buildMxlFixture(originalXml);
+  const result = await page.evaluate(async (bytes) => {
+    document.querySelector('.mode-option[data-mode="compose"]').click();
+    await ComposeMode.loadMelodyFromMxl(new Uint8Array(bytes).buffer, 'test.mxl');
+    return {
+      midis: ComposeMode.state.notes.map((n) => n.midi),
+      keySignature: ComposeMode.state.keySignature,
+    };
+  }, Array.from(zipBuffer));
+  expect(result.midis).toEqual([65, 70]);
+  expect(result.keySignature).toBe(-1);
 });

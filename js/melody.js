@@ -284,6 +284,21 @@ const MelodyMode = {
         }
     },
 
+    // .mxl (compressed MusicXML -- js/mxl.js) counterpart: unzips the archive to get the same
+    // plain-text MusicXML loadMelodyFromMusicXML already knows how to load, rather than
+    // duplicating any of its parsing/centering/key-detection logic. js/file-folder.js's fileTypes
+    // dispatch (js/midi-folder.js) routes any .mxl file here with readAs:'arrayBuffer', since a
+    // ZIP container is binary.
+    loadMelodyFromMxl: async function(arrayBuffer, displayName) {
+        try {
+            const text = await Mxl.extractMusicXML(arrayBuffer);
+            this.loadMelodyFromMusicXML(text, displayName);
+        } catch (err) {
+            console.error(err);
+            alert('Error reading .mxl file. Please make sure it is a valid compressed MusicXML archive.');
+        }
+    },
+
     // MusicXML counterpart to loadMelodyFromArrayBuffer -- js/file-folder.js's fileTypes dispatch
     // (js/midi-folder.js) routes any .musicxml/.xml file here instead. Unlike MIDI, the key
     // signature is AUTHORED (parsed straight from the file's own <key><fifths>), not detected --
