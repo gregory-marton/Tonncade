@@ -51,6 +51,10 @@ const Notation = {
     MEASURE_WIDTH: 180,
     STAVE_HEIGHT: 80,
 
+    // Matches css/style.css's --text custom property -- see render()'s own comment on why this
+    // needs setting explicitly at all (VexFlow's own default is solid black).
+    NOTE_COLOR: '#e7e9ee',
+
     // Diatonic (letter, not chromatic) bottom-line reference for each clef -- standard convention:
     // treble's bottom line is E4, bass's is G2. Used by pitchFromY to walk UP from a click's Y
     // position by whole diatonic steps (half a line-spacing each), the same way a real staff
@@ -222,6 +226,14 @@ const Notation = {
         const renderer = new VexFlow.Renderer(container, VexFlow.Renderer.Backends.SVG);
         renderer.resize(width, height);
         const ctx = renderer.getContext();
+        // VexFlow defaults every drawn shape's fill/stroke to black -- invisible (or near enough)
+        // against this app's dark theme background, which is exactly what happened before this
+        // line existed (caught by Codex's review: the staff technically rendered, just as solid
+        // black on near-black, effectively invisible in a screenshot). NOTE_COLOR matches
+        // css/style.css's --text custom property; kept in sync by hand since this module has no
+        // access to a live CSS custom property outside a real DOM query.
+        ctx.setFillStyle(this.NOTE_COLOR);
+        ctx.setStrokeStyle(this.NOTE_COLOR);
 
         const noteXPositions = [];
         const barlineXPositions = [];

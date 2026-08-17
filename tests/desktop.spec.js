@@ -802,6 +802,24 @@ test('Compose: tapping cells while recording appends notes with the tapped cell\
   expect(notes[1].time).toBeGreaterThan(notes[0].time);
 });
 
+// Neither tapCell's recording branch nor flushChordBuffer used to call refreshBoard() -- notes
+// were correctly appended to state.notes (the test above), but the staff/timeline (Task #9)
+// stayed showing whatever they'd last rendered (nothing, on a fresh recording) until some
+// UNRELATED later action happened to trigger a redraw. Reported live from real screenshots: the
+// Compose staff looked permanently empty during/right after recording. Confirmed via the actual
+// DOM (Notation.render's own output), not just state.notes, since state was never the broken part.
+test('Compose: the staff updates live as notes are recorded, not just once some other action happens to redraw it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.locator('#compose-record').click();
+  const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
+  await cell.click();
+  const noteCountOnStaff = await page.evaluate(() =>
+    ComposeMode._staffRender ? ComposeMode._staffRender.noteXPositions.length : 0
+  );
+  expect(noteCountOnStaff).toBe(1);
+});
+
 test('Compose: Play schedules every recorded note through Synth.playNote, in time order', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
@@ -4181,6 +4199,26 @@ test('Notation.render: an empty note array renders nothing and returns null (no 
   });
   expect(result.r).toBeNull();
   expect(result.childCount).toBe(0);
+});
+
+// VexFlow defaults every drawn shape to solid black, which is effectively invisible against this
+// app's dark theme background -- the staff technically rendered but couldn't be seen at all
+// (caught by Codex's review, from real screenshots; confirmed here by reading the color actually
+// painted, not by eyeballing a screenshot).
+test('Notation.render: draws in a light color (NOTE_COLOR), not VexFlow\'s invisible-on-dark-theme default black', async ({ page }) => {
+  await page.goto('/');
+  const color = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-color';
+    document.body.appendChild(container);
+    Notation.render('notation-test-container-color', [{ midi: 60, time: 0, duration: 0.5 }], { bpm: 120 });
+    const svg = container.querySelector('svg');
+    const g = svg.querySelector('g');
+    return { groupFill: g.getAttribute('fill'), groupStroke: g.getAttribute('stroke'), noteColor: Notation.NOTE_COLOR };
+  });
+  expect(color.groupFill).toBe(color.noteColor);
+  expect(color.groupStroke).toBe(color.noteColor);
+  expect(color.groupFill).not.toBe('black');
 });
 
 test('Notation.render: returns one barline x-position per measure', async ({ page }) => {

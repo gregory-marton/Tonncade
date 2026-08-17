@@ -307,6 +307,12 @@ const ComposeMode = {
                 if (idx >= 0) this.state.notes.splice(idx, 1);
             });
             this.updateStats();
+            // The staff/timeline (Task #9) need refreshBoard() to show anything new -- unlike the
+            // Tonnetz's own momentary highlight flash above, they don't update themselves. Recording
+            // previously left both stale until some UNRELATED later action (selecting a note,
+            // stopping playback, etc.) happened to trigger a redraw -- reported live as "no chance
+            // to see staffs" once the staff existed to actually notice this on.
+            this.refreshBoard();
             return;
         }
 
@@ -376,6 +382,7 @@ const ComposeMode = {
             });
         }
         this.updateStats();
+        if (added.length) this.refreshBoard(); // see tapCell's identical comment on why this is needed
     },
 
     // Resolves which specific note a tap on a (possibly duplicate-pitch) cell targets: the first
