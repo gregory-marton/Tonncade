@@ -250,6 +250,57 @@ test.describe('Exploratory tests (prototype)', () => {
       if (fns[m]) fns[m]();
     }, mode);
 
+    // Melody/Compose start genuinely empty (Melody's own Random default is a tiny few-note
+    // sliding window; Compose has no starting content at all) -- their grand-staff view
+    // (docs/melody-notation-design.md) has nothing to show in that state, so every screenshot of
+    // either mode showed a bare board with no staff at all, regardless of scenario (reported
+    // live: "I have no chance to see staffs"). Seeded here, through the SAME controls a real
+    // player would use (Melody: picking a song from its source list; Compose: Record + real cell
+    // taps via tapCell, not direct state injection) so the fixture reflects actual usage, not a
+    // synthetic shortcut. Compose's taps are pseudo-random (drawn from this scenario's own seeded
+    // `rand()`, so still exactly reproducible) rather than a fixed phrase -- literally random
+    // pitches don't need to be musical for this purpose, just present.
+    if (mode === 'melody') {
+      // Varies scenario to scenario (seeded, so still reproducible) rather than always the same
+      // state: Random alone is a legitimate, real thing the fixture should also show, but ALWAYS
+      // showing it meant no scenario ever exercised a real loaded song at all. About 2/3 of
+      // scenarios pick a random bundled song and play a few of its notes correctly first (via the
+      // real handleUserInputNote path, not direct state injection -- an actual "game in
+      // progress," streak and all), not just a freshly-loaded, untouched song.
+      if (rand() < 0.67) {
+        const songIndex = Math.floor(rand() * 6); // 6 bundled songs, see midi/index.json
+        // MidiFolder.setup() (called from MelodyMode.init(), itself just triggered by the mode
+        // click above) fetches midi/index.json asynchronously -- onlineIndex isn't populated yet
+        // at this exact point, so checking it immediately and skipping when empty (as an earlier
+        // version of this code did) silently fell through to "leave it on Random" every single
+        // time, regardless of the dice roll above. Wait for it for real instead of guessing a
+        // fixed delay.
+        await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex && MidiFolder.onlineIndex.length > 0);
+        await page.evaluate(async (songIndex) => {
+          await MidiFolder.loadOnlineFile(songIndex % MidiFolder.onlineIndex.length);
+        }, songIndex);
+        await page.waitForFunction(() => !MelodyMode.state.isRandom); // loadOnlineFile's own fetch + parse is async too
+        const notesToPlay = 1 + Math.floor(rand() * 4); // a few notes in, not the whole song
+        await page.evaluate((notesToPlay) => {
+          for (let i = 0; i < notesToPlay && MelodyMode.state.melody[MelodyMode.state.userIndex]; i++) {
+            MelodyMode.handleUserInputNote(MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
+          }
+        }, notesToPlay);
+      }
+      // The remaining ~1/3 of scenarios: leave Melody on its real Random default, untouched --
+      // also a legitimate state the fixture should keep showing sometimes.
+    } else if (mode === 'compose') {
+      const taps = Array.from({ length: 5 }, () => ({
+        p: Math.floor(rand() * 7) - 3,
+        q: Math.floor(rand() * 7) - 3,
+      }));
+      await page.evaluate((taps) => {
+        ComposeMode.startRecording();
+        taps.forEach(({ p, q }) => ComposeMode.tapCell(p, q));
+        ComposeMode.stopRecording();
+      }, taps);
+    }
+
     // Edge-reach: the essential fill metric (applies to EVERY mode). The board's rendered cells
     // should come within ~2 cell-diameters of at least two edges of the play area -- a board
     // floating with a wide margin all around, or reaching only one edge, is under-filling. Measured
