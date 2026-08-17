@@ -126,6 +126,7 @@ loadScript('synth.js');
 loadScript('pieces.js');
 loadScript('board.js');
 loadScript('render.js');
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'vendor', 'vexflow.js'), 'utf8'), context, { filename: 'vendor/vexflow.js' }); // vendored, MIT -- js/vendor/README.md
 loadScript('undo-stack.js'); // sandbox.js/blast.js/life.js/compose.js's UndoStack.create(...) needs this loaded first
 loadScript('sandbox.js');
 loadScript('difficulty-barbell.js'); // blast.js/gravity.js/melody.js's DifficultyBarbell.create(...) needs this loaded first

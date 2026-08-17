@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tonncade-v13';
+const CACHE_NAME = 'tonncade-v14';
 const ASSETS = [
     './',
     './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
     './js/pieces.js',
     './js/board.js',
     './js/render.js',
+    './js/vendor/vexflow.js',
     './js/undo-stack.js',
     './js/sandbox.js',
     './js/difficulty-barbell.js',
