@@ -877,12 +877,12 @@ test('Compose: Clear empties the whole recorded sequence', async ({ page }) => {
   expect(await page.locator('#compose-note-count').textContent()).toBe('0');
 });
 
-test('Compose: Save writes a MIDI file that round-trips back to the same notes', async ({ page }) => {
+test('Compose: Save writes a MusicXML file that round-trips back to the same notes', async ({ page }) => {
   await page.goto('/');
 
-  // A fake remembered folder whose getFileHandle/createWritable capture the written bytes,
-  // so this test can decode them back and confirm Save round-trips real content -- not just
-  // that some function was called.
+  // A fake remembered folder whose getFileHandle/createWritable capture the written content, so
+  // this test can decode it back and confirm Save round-trips real content -- not just that some
+  // function was called.
   await page.evaluate(() => {
     window.__savedFiles = {};
     const fakeHandle = {
@@ -896,7 +896,7 @@ test('Compose: Save writes a MIDI file that round-trips back to the same notes',
       }),
     };
     MidiFolder.folderHandle = fakeHandle;
-    window.prompt = () => 'my-song.mid';
+    window.prompt = () => 'my-song.musicxml';
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
@@ -908,12 +908,12 @@ test('Compose: Save writes a MIDI file that round-trips back to the same notes',
   });
 
   await page.locator('#compose-save').click();
-  await page.waitForFunction(() => window.__savedFiles['my-song.mid'] !== undefined);
+  await page.waitForFunction(() => window.__savedFiles['my-song.musicxml'] !== undefined);
 
   const roundTripped = await page.evaluate(() => {
-    const buf = window.__savedFiles['my-song.mid'];
-    const parsed = MelodyMode.parseMIDI(buf);
-    return MelodyMode.extractMonophonicMelody(parsed).map(n => ({ midi: n.midi, time: n.time }));
+    const xml = window.__savedFiles['my-song.musicxml'];
+    const parsed = MusicXML.parse(xml);
+    return parsed.notes.map((n) => ({ midi: n.midi, time: n.time }));
   });
   expect(roundTripped.length).toBe(2);
   expect(roundTripped[0].midi).toBe(64);
@@ -1196,40 +1196,39 @@ test('Compose: enabling Quantize actually snaps recorded notes onto the grid whe
   expect(time).toBeCloseTo(0.5, 5);
 });
 
-test('Compose: Save emits a real tempo meta event when Quantize was used, matching the chosen BPM', async ({ page }) => {
+// MusicXML.write always embeds a tempo (<sound tempo="...">), unlike writeMIDI's old conditional
+// tempo-meta-event -- MusicXML has no equivalent to "raw ungridded MIDI ticks with no declared
+// tempo," so quantizeEnabled no longer changes whether Save writes one, only (elsewhere) whether
+// state.notes' own recorded times get grid-snapped before saving.
+test('Compose: Save\'s MusicXML always embeds the chosen tempo, regardless of Quantize', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
-    window.__savedBytes = null;
+    window.__savedXml = null;
     MidiFolder.folderHandle = {
       getFileHandle: async () => ({
         createWritable: async () => ({
-          write: async (buf) => { window.__savedBytes = Array.from(new Uint8Array(buf)); },
+          write: async (text) => { window.__savedXml = text; },
           close: async () => {},
         }),
       }),
     };
-    window.prompt = () => 'quantized-song.mid';
+    window.prompt = () => 'quantized-song.musicxml';
   });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
   await page.evaluate(() => {
     ComposeMode.state.tempoBPM = 100;
-    ComposeMode.state.quantizeEnabled = true;
+    ComposeMode.state.quantizeEnabled = false; // tempo still gets written even so -- see above
     ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
   });
 
   await page.locator('#compose-save').click();
-  await page.waitForFunction(() => window.__savedBytes !== null);
+  await page.waitForFunction(() => window.__savedXml !== null);
 
   const foundTempo = await page.evaluate(() => {
-    const bytes = window.__savedBytes;
-    for (let i = 0; i + 5 < bytes.length; i++) {
-      if (bytes[i] === 0xff && bytes[i + 1] === 0x51 && bytes[i + 2] === 0x03) {
-        return (bytes[i + 3] << 16) | (bytes[i + 4] << 8) | bytes[i + 5];
-      }
-    }
-    return null;
+    const match = window.__savedXml.match(/<sound tempo="(\d+)"/);
+    return match ? Number(match[1]) : null;
   });
-  expect(foundTempo).toBe(Math.round(60000000 / 100));
+  expect(foundTempo).toBe(100);
 });
 
 // ────────────────────────────────────────────────────────────────────────

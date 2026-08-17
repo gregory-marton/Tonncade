@@ -458,7 +458,12 @@ const FileFolder = {
         // Writes a file into the remembered shared folder -- falls back to a plain <a download>
         // blob link when no folder is set (Safari/Firefox, or Chrome before a folder's been chosen
         // this session), so Save always works regardless of browser/state.
-        saveFileAs: async function(name, content) {
+        // mimeTypeOverride: this instance's own single this.mimeType (e.g. MidiFolder's
+        // 'audio/midi') is wrong for a save whose FORMAT varies by caller, not just its
+        // extension -- e.g. Compose can save either MusicXML text or a MIDI ArrayBuffer through
+        // this SAME shared MidiFolder instance. Falls back to this.mimeType when omitted, so
+        // every other (single-format) caller is unaffected.
+        saveFileAs: async function(name, content, mimeTypeOverride) {
             if (this.folderHandle && !this.needsReconnect) {
                 try {
                     const fileHandle = await this.folderHandle.getFileHandle(name, { create: true });
@@ -472,7 +477,7 @@ const FileFolder = {
                 }
             }
 
-            const blob = new Blob([content], { type: this.mimeType });
+            const blob = new Blob([content], { type: mimeTypeOverride || this.mimeType });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;

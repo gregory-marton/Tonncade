@@ -693,23 +693,28 @@ const ComposeMode = {
         this.refreshBoard();
     },
 
+    // MusicXML, not MIDI -- docs/melody-notation-design.md's explicit "MusicXML is the
+    // canonical/write format going forward" decision. Unlike MIDI's writeMIDI (which tolerates
+    // raw, non-grid-aligned timestamps just fine, hence the old quantizeEnabled branch above),
+    // MusicXML.write always needs SOME beat/measure quantization to produce legible notated
+    // durations -- it gets that from the exact same Notation.notesToBeatSpace lightweight
+    // quantizer the live staff already renders through (js/notation.js), regardless of whether
+    // this recording's own state.notes.time values are grid-aligned yet. No separate branch
+    // needed here the way writeMIDI had one.
     save: async function() {
         if (this.state.notes.length === 0) {
             alert('Nothing to save yet -- record a melody first.');
             return;
         }
-        const name = prompt('Save as:', 'my-song.mid');
+        const name = prompt('Save as:', 'my-song.musicxml');
         if (!name) return;
-        // Only pass an explicit tempo when quantization was actually used -- an un-quantized,
-        // freely-tapped recording's raw times aren't grid-aligned to any tempo, so writing one
-        // in wouldn't add real information (see task #52; the default, no-tempo-arg path is
-        // exactly today's existing behavior).
-        const buffer = this.state.quantizeEnabled
-            ? MelodyMode.writeMIDI(this.state.notes, this.state.tempoBPM)
-            : MelodyMode.writeMIDI(this.state.notes);
+        const fifths = this.state.keySignature != null
+            ? this.state.keySignature
+            : Tonnetz.detectKeySignature(this.state.notes.map((n) => n.midi));
+        const xml = MusicXML.write(this.state.notes, { bpm: this.state.tempoBPM, keySignatureFifths: fifths, name });
         if (typeof MidiFolder !== 'undefined') {
-            const savedToFolder = await MidiFolder.saveFileAs(name, buffer);
-            this.setStatus(savedToFolder ? `Saved "${name}" to your MIDI folder.` : `Downloaded "${name}".`);
+            const savedToFolder = await MidiFolder.saveFileAs(name, xml, 'application/vnd.recordare.musicxml+xml');
+            this.setStatus(savedToFolder ? `Saved "${name}" to your song folder.` : `Downloaded "${name}".`);
         }
     },
 
