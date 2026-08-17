@@ -188,7 +188,9 @@ the app's nature.
 - **`.mxl` (compressed MusicXML)** on upload, not just plain-text `.musicxml`/`.xml` -- most real
   notation software defaults to `.mxl`. Without it, "export MusicXML from a real editor and
   upload it" (the escape hatch the music21 section above leans on) silently fails for most users
-  of that path. Needs a real zip-fixture in tests, not just XML text.
+  of that path. **Done** -- `js/mxl.js` (native `DecompressionStream`, no vendored zip library),
+  wired into both Melody's and Compose's `loadMelodyFromMxl`, tested against a real generated ZIP
+  fixture.
 
 **Explicitly excluded:**
 - Multiple parts/instruments, multiple independent voices per staff (polyphony beyond chords) --
@@ -239,9 +241,10 @@ is vendored, before considering the feature done.
 - Exact VexFlow API for reading back rendered note x-positions (barline/label/timeline sync, and
   the time-range-selection UI knowing which measures a click/drag spans) and for hit-testing
   clicks/drags against rendered noteheads (staff click-to-add, drag-to-re-pitch, drag-to-retime).
-  Not yet confirmed against VexFlow's real API docs. The live-during-gesture update requirement
-  puts a real performance bar on this -- whatever the readback/hit-test path is, it needs to be
-  cheap enough to run on every `pointermove`.
+  **Done** -- `getAbsoluteX()`/`getYs()` on a rendered `StaveNote`, confirmed empirically against
+  `Stave.getYForLine()`; `Notation.pitchFromY`/`beatFromX` invert the render math for hit-testing,
+  cheap enough to run on every `mousemove` (no incremental VexFlow API needed -- Compose just
+  re-renders the whole staff on each live update, same as every other redraw in this app).
 - The time-range-selection -> Tonnetz-flatten -> transform workflow as the first concrete thing to
   prototype -- can be built against the existing Tonnetz rendering, without waiting on VexFlow.
 - The lightweight quantizer/speller/barline-inference for the MIDI/Random bucket -- next concrete
@@ -260,5 +263,6 @@ is vendored, before considering the feature done.
   matches measure count, correct enharmonic spelling for a few known keys) rather than
   pixel-level rendering, consistent with this project's existing test style. Needs: fixture files
   exercising the navigation state machine (plain repeat, variant endings, D.C. al Fine, D.S. al
-  Coda, at least one combining two of these) asserting the unrolled sequence is exactly right; a
-  genuine `.mxl` (zip) fixture, not just plain XML text.
+  Coda, at least one combining two of these) asserting the unrolled sequence is exactly right;
+  a genuine `.mxl` (zip) fixture, not just plain XML text -- **done**, `tests/desktop.spec.js`'s
+  `buildMxlFixture` builds a real, byte-exact ZIP via Node's own `zlib`.
