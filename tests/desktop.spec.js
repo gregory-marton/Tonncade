@@ -3735,7 +3735,11 @@ test('Life: the download link serves the CURRENT board as YAML, not the original
   const path = await download.path();
   const fs = require('fs');
   const text = fs.readFileSync(path, 'utf8');
-  expect(text).toContain('9, 9');
+  // Structural check, not a raw-text substring match -- js-yaml.dump's own default block-array
+  // style (js/vendor/js-yaml.js) doesn't write cells as an inline "9, 9" the old hand-rolled
+  // writer did, but the file is still valid, round-trippable YAML either way.
+  const cells = await page.evaluate((t) => Life.parseYaml(t).initial.cells, text);
+  expect(cells).toContainEqual([9, 9]);
   expect(download.suggestedFilename()).toMatch(/\.ya?ml$/i);
 });
 

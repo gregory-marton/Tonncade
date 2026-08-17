@@ -1,8 +1,11 @@
 # Vendored third-party code
 
-Tonncade is otherwise entirely hand-rolled, zero external JS dependencies. VexFlow is the one
-deliberate exception (see `docs/melody-notation-design.md`): notation engraving is a genuinely
-hard, well-solved problem, not one worth reinventing.
+Tonncade is otherwise entirely hand-rolled, zero external JS dependencies. VexFlow and js-yaml are
+the deliberate exceptions: notation engraving (see `docs/melody-notation-design.md`) and full YAML
+parsing/serialization (see `docs/life-rules.md`) are both genuinely hard, well-solved problems, not
+worth reinventing -- Life's own YAML support started as a small hand-rolled subset parser, but a
+subtly-wrong parse of a rich rule (nested `require`/`forbid` clauses, etc.) is worse than an extra
+vendored dependency.
 
 ## vexflow.js
 
@@ -24,3 +27,15 @@ license -- verified directly against a sibling `librejs` checkout's
 in this context`, a sandboxing restriction on the test harness's own Firefox-internal-page
 navigation, unrelated to this file. Needs re-running in an environment without that restriction
 before this vendoring is considered fully LibreJS-verified.
+
+## js-yaml.js
+
+Source: the `js-yaml` npm package (`dist/browser/js-yaml.umd.min.js`), verbatim except for the
+same LibreJS wrapper comment vexflow.js uses. MIT/Expat licensed, zero dependencies of its own.
+Full upstream license text: `js-yaml.LICENSE`. Exposes a global `jsyaml` with `.load(text)` (parse)
+/ `.dump(obj)` (serialize) -- Life mode's `Life.parseYaml`/`LifeMode.toYaml` (`js/life.js`) are
+thin wrappers around these, not a reimplementation.
+
+To update: `npm pack js-yaml`, extract, take `dist/browser/js-yaml.umd.min.js`, re-wrap with the
+same `@license`/`@license-end` markers described above for vexflow.js. Re-run `npm run
+test:librejs` after updating (same not-yet-verified caveat as vexflow.js above applies here too).

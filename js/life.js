@@ -223,159 +223,15 @@ const Life = {
     },
 
     // ---- YAML loading -------------------------------------------------------------------------
-    // A deliberately small YAML SUBSET parser for automaton files (docs/life-rules.md): block
-    // mappings (indent-based), block sequences (`- ...`), flow collections (`[...]` / `{...}`),
-    // scalars (numbers, booleans, quoted/bare strings) and `#` comments. Enough for the schema,
-    // with no external dependency (keeps the app free-software-clean, no vendored YAML lib).
-
+    // js/vendor/js-yaml.js (the "js-yaml" npm package -- see js/vendor/README.md) does the actual
+    // parsing/serializing. This used to be a hand-rolled recursive-descent subset parser (block
+    // mappings/sequences, flow collections, scalars, comments) -- enough for the schema's own
+    // examples, but a real YAML file can do more than any hand-rolled subset anticipates, and a
+    // subtly-wrong parse of a rich rule (nested require/forbid clauses, etc.) is worse than an
+    // extra vendored dependency. `parseYaml` is kept as the thin call site every other function in
+    // this file already goes through, so nothing downstream needs to know it changed.
     parseYaml: function(text) {
-        const lines = [];
-        for (const raw of String(text).split(/\r?\n/)) {
-            const noComment = this._stripComment(raw);
-            if (noComment.trim() === '') continue;
-            lines.push({ indent: noComment.match(/^ */)[0].length, text: noComment.trim() });
-        }
-        const state = { lines, i: 0 };
-        return this._parseNode(state, 0);
-    },
-
-    _parseNode: function(st, minIndent) {
-        if (st.i >= st.lines.length || st.lines[st.i].indent < minIndent) return null;
-        const indent = st.lines[st.i].indent;
-        if (st.lines[st.i].text[0] === '-') {
-            const arr = [];
-            while (st.i < st.lines.length && st.lines[st.i].indent === indent && st.lines[st.i].text[0] === '-') {
-                const after = st.lines[st.i].text.slice(1).trim();
-                if (after === '') {
-                    st.i++;
-                    arr.push(this._parseNode(st, indent + 1));
-                } else if (this._isMapEntry(after)) {
-                    // `- key: value` starts an inline map; its entries continue on following lines
-                    // aligned two columns in (past the "- ").
-                    st.lines[st.i] = { indent: indent + 2, text: after };
-                    arr.push(this._parseNode(st, indent + 2));
-                } else {
-                    arr.push(this._scalar(after));
-                    st.i++;
-                }
-            }
-            return arr;
-        }
-        const map = {};
-        while (st.i < st.lines.length && st.lines[st.i].indent === indent && st.lines[st.i].text[0] !== '-') {
-            const kv = this._splitKey(st.lines[st.i].text);
-            if (kv.val === '') {
-                st.i++;
-                map[kv.key] = this._parseNode(st, indent + 1);
-            } else {
-                map[kv.key] = this._scalar(kv.val);
-                st.i++;
-            }
-        }
-        return map;
-    },
-
-    _stripComment: function(line) {
-        let inQ = null;
-        for (let i = 0; i < line.length; i++) {
-            const c = line[i];
-            if (inQ) { if (c === inQ) inQ = null; }
-            else if (c === '"' || c === "'") inQ = c;
-            else if (c === '#' && (i === 0 || line[i - 1] === ' ' || line[i - 1] === '\t')) return line.slice(0, i);
-        }
-        return line;
-    },
-
-    // Split "key: value" at the first top-level colon (outside brackets/quotes, followed by space
-    // or end of line). Returns { key, val }; val is '' when the value is a nested block below.
-    _splitKey: function(text) {
-        let depth = 0, inQ = null;
-        for (let i = 0; i < text.length; i++) {
-            const c = text[i];
-            if (inQ) { if (c === inQ) inQ = null; continue; }
-            if (c === '"' || c === "'") inQ = c;
-            else if (c === '[' || c === '{') depth++;
-            else if (c === ']' || c === '}') depth--;
-            else if (c === ':' && depth === 0 && (i + 1 >= text.length || text[i + 1] === ' ')) {
-                return { key: text.slice(0, i).trim(), val: text.slice(i + 1).trim() };
-            }
-        }
-        return { key: text.trim(), val: '' };
-    },
-
-    _isMapEntry: function(text) {
-        return this._splitKey(text).val !== '' || /:\s*$/.test(text);
-    },
-
-    // A block scalar value: a flow collection, a quoted or bare string, a number or a boolean.
-    _scalar: function(str) {
-        const s = str.trim();
-        if (s === '') return null;
-        if (s[0] === '[' || s[0] === '{') return this._parseFlow(s);
-        if (s[0] === '"' || s[0] === "'") return this._flowQuoted({ s, i: 0 });
-        return this._coerce(s);
-    },
-
-    _coerce: function(tok) {
-        if (tok === 'true') return true;
-        if (tok === 'false') return false;
-        if (tok === 'null' || tok === '~') return null;
-        if (/^-?\d+(\.\d+)?$/.test(tok)) return Number(tok);
-        return tok;
-    },
-
-    // Flow collections: JSON-like [...] / {...} with bare or quoted keys/values.
-    _parseFlow: function(s) {
-        const ctx = { s: s.trim(), i: 0 };
-        return this._flowValue(ctx);
-    },
-    _flowWs: function(ctx) { while (ctx.i < ctx.s.length && /\s/.test(ctx.s[ctx.i])) ctx.i++; },
-    _flowValue: function(ctx) {
-        this._flowWs(ctx);
-        const c = ctx.s[ctx.i];
-        if (c === '[') return this._flowSeq(ctx);
-        if (c === '{') return this._flowMap(ctx);
-        if (c === '"' || c === "'") return this._flowQuoted(ctx);
-        let start = ctx.i;
-        while (ctx.i < ctx.s.length && ',]}'.indexOf(ctx.s[ctx.i]) === -1) ctx.i++;
-        return this._coerce(ctx.s.slice(start, ctx.i).trim());
-    },
-    _flowSeq: function(ctx) {
-        ctx.i++; const arr = []; this._flowWs(ctx);
-        if (ctx.s[ctx.i] === ']') { ctx.i++; return arr; }
-        while (ctx.i < ctx.s.length) {
-            arr.push(this._flowValue(ctx));
-            this._flowWs(ctx);
-            if (ctx.s[ctx.i] === ',') { ctx.i++; continue; }
-            if (ctx.s[ctx.i] === ']') { ctx.i++; break; }
-            break;
-        }
-        return arr;
-    },
-    _flowMap: function(ctx) {
-        ctx.i++; const map = {}; this._flowWs(ctx);
-        if (ctx.s[ctx.i] === '}') { ctx.i++; return map; }
-        while (ctx.i < ctx.s.length) {
-            this._flowWs(ctx);
-            let key;
-            if (ctx.s[ctx.i] === '"' || ctx.s[ctx.i] === "'") key = this._flowQuoted(ctx);
-            else { let s = ctx.i; while (ctx.i < ctx.s.length && ':,}]'.indexOf(ctx.s[ctx.i]) === -1) ctx.i++; key = ctx.s.slice(s, ctx.i).trim(); }
-            this._flowWs(ctx);
-            if (ctx.s[ctx.i] === ':') ctx.i++;
-            map[key] = this._flowValue(ctx);
-            this._flowWs(ctx);
-            if (ctx.s[ctx.i] === ',') { ctx.i++; continue; }
-            if (ctx.s[ctx.i] === '}') { ctx.i++; break; }
-            break;
-        }
-        return map;
-    },
-    _flowQuoted: function(ctx) {
-        const q = ctx.s[ctx.i]; ctx.i++;
-        let start = ctx.i;
-        while (ctx.i < ctx.s.length && ctx.s[ctx.i] !== q) ctx.i++;
-        const str = ctx.s.slice(start, ctx.i); ctx.i++;
-        return str;
+        return jsyaml.load(text);
     },
 };
 
@@ -705,49 +561,52 @@ const LifeMode = {
         this.updateControls();
     },
 
+    // Plain-data object literal, but with an explicit null prototype rather than whatever `{}`
+    // happens to produce. js-yaml's own dump() only accepts a mapping node whose prototype is
+    // EXACTLY its own realm's Object.prototype or null (see js/vendor/js-yaml.js's plain-object
+    // `identify` check) -- an object-literal's real prototype is realm-specific (this matters for
+    // tests/run_tests.js's Node `vm` harness, which runs this file in a different realm than the
+    // one js-yaml itself was loaded into, so a `{}` built here fails that identity check even
+    // though it's a perfectly ordinary plain object). `null` has no realm, so it's the only
+    // prototype guaranteed to satisfy the check everywhere -- including the real browser, where
+    // there's only one realm and this makes no difference at all.
+    _obj: function(props) { return Object.assign(Object.create(null), props); },
+
     // Serializes the CURRENT automaton -- rule (or multi-state transition table), sound spec(s),
     // tempo, and the LIVE cells right now (not the original seed -- a hand-tapped or mid-evolution
     // pattern the player wants to keep is exactly the point of Save As) -- back into this
-    // project's own life/ YAML schema (see docs/life-rules.md). The inverse of parseYaml, but only
-    // as much of the format as this schema actually needs: a hand-rolled minimal writer to match
-    // parseYaml's own hand-rolled minimal parser, not a generic YAML library either direction.
+    // project's own life/ YAML schema (see docs/life-rules.md), via js/vendor/js-yaml.js. The
+    // inverse of parseYaml: builds the plain object the schema describes and lets the library
+    // write it, rather than hand-assembling text.
     toYaml: function(name) {
-        const lines = [];
-        lines.push(`name: "${String(name).replace(/"/g, '\\"')}"`);
+        const automaton = this._obj({ name: String(name) });
         if (this.state.multi) {
-            lines.push(`states: ${this.state.multi.states}`);
-            lines.push(`order: "${this.state.multi.order}"`);
-            lines.push('transition:');
-            this.state.multi.table.forEach((row) => lines.push(`  - [${row.join(', ')}]`));
+            automaton.states = this.state.multi.states;
+            automaton.order = String(this.state.multi.order);
+            automaton.transition = this.state.multi.table;
         } else {
-            lines.push('rule:');
-            lines.push(`  survival: [${this.state.rule.survival.join(', ')}]`);
-            lines.push(`  birth: [${this.state.rule.birth.join(', ')}]`);
+            automaton.rule = this._obj({ survival: this.state.rule.survival, birth: this.state.rule.birth });
         }
-        const soundFlow = (s) => {
-            const parts = [`when: ${s.when}`, `duration: ${s.duration}`];
-            if (s.velocity != null) parts.push(`velocity: ${s.velocity}`);
-            return `{ ${parts.join(', ')} }`;
-        };
-        lines.push(`sound: ${soundFlow(this.state.sound)}`);
+        const sound = this._obj({ when: this.state.sound.when, duration: this.state.sound.duration });
+        if (this.state.sound.velocity != null) sound.velocity = this.state.sound.velocity;
+        automaton.sound = sound;
         if (this.state.sounds) {
-            lines.push('sounds:');
-            Object.keys(this.state.sounds).sort().forEach((st) => {
+            automaton.sounds = Object.keys(this.state.sounds).sort().map((st) => {
                 const spec = this.state.sounds[st] || {};
-                const parts = [`state: ${st}`];
-                if (spec.velocity != null) parts.push(`velocity: ${spec.velocity}`);
-                if (spec.duration != null) parts.push(`duration: ${spec.duration}`);
-                lines.push(`  - { ${parts.join(', ')} }`);
+                const entry = this._obj({ state: Number(st) });
+                if (spec.velocity != null) entry.velocity = spec.velocity;
+                if (spec.duration != null) entry.duration = spec.duration;
+                return entry;
             });
         }
-        lines.push('initial:');
-        lines.push('  cells:');
-        for (const [key, st] of this.state.live) {
-            const [p, q] = key.split(',').map(Number);
-            lines.push(this.state.multi ? `    - [${p}, ${q}, ${st}]` : `    - [${p}, ${q}]`);
-        }
-        lines.push(`tempo: ${this.state.tempo}`);
-        return lines.join('\n') + '\n';
+        automaton.initial = this._obj({
+            cells: [...this.state.live].map(([key, st]) => {
+                const [p, q] = key.split(',').map(Number);
+                return this.state.multi ? [p, q, st] : [p, q];
+            }),
+        });
+        automaton.tempo = this.state.tempo;
+        return jsyaml.dump(automaton);
     },
 
     // "Save As": persist the current automaton to a life/ YAML file -- same icon-button pattern
