@@ -1540,6 +1540,16 @@ window.onload = () => {
     // origin ('null') is not supported"), not just blocked, so there's no useful
     // outcome to wait on.
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+        // Captured BEFORE register() -- true only if some earlier service worker was already
+        // controlling this page (a returning visitor). A brand-new visitor's page loads
+        // uncontrolled, then sw.js's activate handler (self.clients.claim()) claims it for the
+        // first time -- that transition fires 'controllerchange' too, indistinguishable from a
+        // real update UNLESS this is checked first. Reported live: a new visitor would see the
+        // page render once, then get force-reloaded by the (below) 'controllerchange' handler
+        // for no reason at all -- an extra, unnecessary navigation that on a real network (not
+        // this codebase's fast localhost test server) can leave the app visibly uninitialized
+        // for the gap between the two loads, matching "sees emptiness, resolves on reload".
+        const hadController = !!navigator.serviceWorker.controller;
         navigator.serviceWorker.register('./sw.js')
             .then(reg => {
                 if (reg) {
@@ -1556,10 +1566,13 @@ window.onload = () => {
                 }
             });
 
-        // Auto-reload the app immediately when a new service worker finishes activation
+        // Auto-reload the app immediately when a new service worker REPLACES one that was
+        // already controlling this page (a real update) -- but not on a first-ever visit, where
+        // this same event fires from simply going uncontrolled -> controlled and there's no
+        // newer content to pick up by reloading.
         let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
+            if (!refreshing && hadController) {
                 refreshing = true;
                 window.location.reload();
             }

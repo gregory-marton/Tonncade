@@ -1773,8 +1773,9 @@ test.describe('Service worker cache staleness (regression)', () => {
 
   test('a stale precached index.html is never served while online -- network-first wins', async ({ page }) => {
     await page.goto('/');
-    // First-ever visit: the SW installs/activates/claims the client, which fires main.js's own
-    // controllerchange handler and reloads once -- wait that out before touching the cache.
+    // First-ever visit: no longer force-reloads itself (see the regression test right below this
+    // describe block) -- just wait for the SW to finish installing/activating/claiming before
+    // touching its cache.
     await page.waitForLoadState('load');
     await page.waitForTimeout(1500);
     await page.waitForLoadState('load');
@@ -1804,6 +1805,37 @@ test.describe('Service worker cache staleness (regression)', () => {
     const bodyText = await page.evaluate(() => document.body.textContent);
     expect(bodyText).not.toContain('STALE-CACHED-MARKER');
     await expect(page.locator('#mode-slider, .mode-option').first()).toBeVisible();
+  });
+});
+
+// Reported live: a brand-new visitor sometimes sees an empty page that "resolves itself on
+// reload." Root cause: js/main.js's controllerchange listener force-navigates
+// (window.location.reload()) whenever the page transitions from uncontrolled to controlled by a
+// service worker -- but that transition happens on EVERY first-ever visit too (sw.js's activate
+// handler calls self.clients.claim(), which claims the currently-open, previously-uncontrolled
+// page), not only when an old service worker is being replaced by an updated one, which is what
+// the comment above this code actually describes wanting ("Auto-reload... when a NEW service
+// worker finishes activation"). So a first-time visitor's page renders once, then immediately
+// force-reloads itself for no user-visible reason -- an extra, unnecessary navigation that (on a
+// slower connection than this test's localhost) is exactly the kind of gap where the app can be
+// caught still-uninitialized, matching the reported "sees emptiness."
+test.describe('Service worker: first-ever visit must not force a reload (regression)', () => {
+  test.use({ serviceWorkers: 'allow' });
+
+  test('a brand-new visitor (no prior controller) never gets an extra forced navigation', async ({ page }) => {
+    let loadCount = 0;
+    page.on('load', () => { loadCount += 1; });
+
+    await page.goto('/');
+    await page.waitForLoadState('load');
+    // Give the service worker plenty of time to install/activate/claim -- if the bug is present,
+    // this is when the unwanted extra reload would fire.
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForTimeout(500);
+
+    expect(loadCount, 'first-ever visit should paint once, not reload itself').toBe(1);
+    expect(await page.evaluate(() => App.currentMode)).toBe('sandbox');
   });
 });
 
