@@ -4187,6 +4187,29 @@ test('Notation.render: barline count matches measure count for a phrase spanning
   expect(staveCount.staves).toBe(5 * 2);
 });
 
+// The first measure's clef+key+time-signature glyphs eat into the same fixed MEASURE_WIDTH every
+// later bare measure gets in full, so formatting every measure against one flat width budget
+// starved measure 1 specifically -- its last note overflowed past the stave's own right edge,
+// landing on top of measure 2's first note. Reported live from a real screenshot: "odd doubling
+// ... at the beginning of the second measure." Reproduces with a perfectly ordinary 4
+// quarter-notes-per-measure phrase -- no rests, no unusual durations needed.
+test('Notation.render: a measure\'s last note doesn\'t overlap the next measure\'s first note (measure-1 front-matter width)', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-overlap';
+    document.body.appendChild(container);
+    // 8 quarter notes at 120bpm = exactly 2 measures of 4/4, no clipping/rests involved.
+    const notes = [60, 62, 64, 60, 60, 62, 64, 60].map((midi, i) => ({ midi, time: i * 0.5, duration: 0.5 }));
+    return Notation.render('notation-test-container-overlap', notes, { bpm: 120 });
+  });
+  const lastOfMeasure1 = result.noteXPositions[3]; // beatStart 3, still measure 1 (barline at beat 4)
+  const firstOfMeasure2 = result.noteXPositions[4]; // beatStart 4, measure 2
+  const barline2X = result.barlineXPositions[1];
+  expect(lastOfMeasure1.x).toBeLessThan(barline2X); // stays inside measure 1's own stave
+  expect(firstOfMeasure2.x - lastOfMeasure1.x).toBeGreaterThan(15); // visually distinct noteheads, not overlapping
+});
+
 test('Notation.render: an empty note array renders nothing and returns null (no crash)', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
@@ -4218,6 +4241,31 @@ test('Notation.render: draws in a light color (NOTE_COLOR), not VexFlow\'s invis
   expect(color.groupFill).toBe(color.noteColor);
   expect(color.groupStroke).toBe(color.noteColor);
   expect(color.groupFill).not.toBe('black');
+});
+
+// ctx.setFillStyle/setStrokeStyle (the fix above) only covers elements that inherit the
+// RenderContext's ambient color -- a StaveNote's stem and its ledger lines (needed for middle C,
+// which sits below the treble staff) each hardcode their OWN default color internally
+// ("black"/"#444") regardless of the context's style, so both stayed near-invisible on this dark
+// theme even after that fix. Reported live: "the little staff line through the C is barely
+// visible... would do well to be fully white like the note."
+test('Notation.render: middle C\'s ledger line and stem are visible (not VexFlow\'s hardcoded black/#444 defaults)', async ({ page }) => {
+  await page.goto('/');
+  const info = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-ledger-visible';
+    document.body.appendChild(container);
+    Notation.render('notation-test-ledger-visible', [{ midi: 60, time: 0, duration: 1 }], { bpm: 120 }); // C4 needs a ledger line
+    const svg = container.querySelector('svg');
+    const allElements = [...svg.querySelectorAll('path, g')];
+    const hardcodedDark = allElements.filter((el) => {
+      const fill = el.getAttribute('fill');
+      const stroke = el.getAttribute('stroke');
+      return fill === 'black' || fill === '#444' || stroke === 'black' || stroke === '#444';
+    });
+    return { hardcodedDarkCount: hardcodedDark.length };
+  });
+  expect(info.hardcodedDarkCount).toBe(0);
 });
 
 test('Notation.render: returns one barline x-position per measure', async ({ page }) => {
@@ -4318,10 +4366,18 @@ test('Melody: the scrub marker spans the full staff+labels+timeline stack height
   });
   expect(heights.markerParentIsWrapper).toBe(true);
   // The marker should span roughly the WHOLE wrapper (staff + labels + timeline), not just the
-  // one-row-tall note-list -- a generous threshold (70% of the wrapper) avoids being brittle
-  // against exact pixel rounding while still clearly distinguishing "spans the stack" from
-  // "spans one row."
+  // one-row-tall note-list -- a generous lower-bound threshold (70% of the wrapper) avoids being
+  // brittle against exact pixel rounding while still clearly distinguishing "spans the stack"
+  // from "spans one row." An UPPER bound matters just as much: .notation-scroll's own
+  // position:relative (its anchor for top:0;bottom:0) only takes effect via a CSS CLASS that
+  // must actually be applied in index.html -- when it wasn't (real bug, caught live: "the blue
+  // scrubber is... through the entire vertical space including instructions and dropdown and
+  // everything"), the marker's absolute positioning escaped to the nearest ACTUALLY-positioned
+  // ancestor (the whole page), spanning the full viewport height instead. A lower-bound-only
+  // check can't tell "spans the stack" apart from "spans the whole page" -- both are > 70% of
+  // the (much smaller) wrapper height.
   expect(heights.markerHeight).toBeGreaterThan(heights.wrapperHeight * 0.7);
+  expect(heights.markerHeight).toBeLessThan(heights.wrapperHeight * 1.3);
   expect(heights.markerHeight).toBeGreaterThan(heights.listHeight * 2);
 });
 

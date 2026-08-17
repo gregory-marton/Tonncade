@@ -283,6 +283,17 @@ const Notation = {
                 const { key, accidental } = this.midiToVexKey(item.midi, keySignature);
                 const vexNote = new VexFlow.StaveNote({ keys: [key], duration: this.durationCode(item.beatDuration), clef });
                 if (accidental) vexNote.addModifier(new VexFlow.Accidental(accidental), 0);
+                // ctx.setFillStyle/setStrokeStyle (above) only covers elements that inherit the
+                // RenderContext's ambient color -- a StaveNote's stem and ledger lines each set
+                // their OWN hardcoded default color internally ("black" and "#444" respectively)
+                // regardless of the context's current style, so both stayed near-invisible even
+                // after that fix. Reported live: "the little staff line through the C is barely
+                // visible... would do well to be fully white like the note." setStyle/
+                // setLedgerLineStyle override a note's own per-instance color explicitly.
+                vexNote.setStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
+                if (typeof vexNote.setLedgerLineStyle === 'function') {
+                    vexNote.setLedgerLineStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
+                }
                 noteXPositions.push({ id: item.id, midi: item.midi, beatStart: item.beatStart, clef, vexNote });
                 if (isTreble) {
                     trebleItems.push(vexNote);
@@ -298,7 +309,17 @@ const Notation = {
             const bassVoice = new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT);
             bassVoice.addTickables(bassItems);
 
-            new VexFlow.Formatter().joinVoices([trebleVoice, bassVoice]).format([trebleVoice, bassVoice], this.MEASURE_WIDTH - 40);
+            // The ACTUAL usable width for notes, not a flat MEASURE_WIDTH-40 guess: the first
+            // measure's clef+key+time-signature glyphs (added above) eat into the same fixed
+            // MEASURE_WIDTH every later bare measure gets in full, so a flat budget starves
+            // measure 1 specifically -- its formatter, asked to fit the same note count into LESS
+            // real room, overflowed past the stave's own right edge into measure 2's space,
+            // rendering the two measures' adjacent noteheads on top of each other (reported live,
+            // from a real screenshot: "odd doubling... at the beginning of the second measure").
+            // getNoteStartX()/getNoteEndX() read back the stave's own real front-matter width,
+            // whatever it happens to be for THIS measure, rather than assuming one fixed number.
+            const noteAreaWidth = treble.getNoteEndX() - treble.getNoteStartX();
+            new VexFlow.Formatter().joinVoices([trebleVoice, bassVoice]).format([trebleVoice, bassVoice], noteAreaWidth);
             trebleVoice.draw(ctx, treble);
             bassVoice.draw(ctx, bass);
 
