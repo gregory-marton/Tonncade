@@ -35,6 +35,12 @@ const ComposeMode = {
     state: {
         notes: [],              // { midi, p, q, time, duration }
         selectedIndices: [],    // indices into notes currently selected for editing
+        // The shared Timeline's two markers (js/timeline.js, INV-55) -- Compose's OWN selection
+        // mechanism (Task #16), replacing the old click-drag-across-tokens gesture on
+        // #compose-timeline. Both are `state.notes` indices (the Timeline's own `id`, same
+        // indices selectTimeRange already expects), null until at least one note exists.
+        startIndex: null,
+        endIndex: null,
         groupClipboard: [],     // {midi, p, q, relTime, duration} for the last COPIED selection --
                                  // an in-Compose duplicate-a-phrase buffer, distinct from the
                                  // header's cross-mode App.clipboard (which transfers the WHOLE
@@ -91,9 +97,11 @@ const ComposeMode = {
 
     init: function() {
         Render.init('tonnetz-svg');
+        // setupDOMEvents creates this.timeline (INV-55) -- must run before the first
+        // refreshBoard()/refreshStaff() call, which uses it.
+        this.setupDOMEvents();
         this.refreshBoard();
         this.setupEvents();
-        this.setupDOMEvents();
         this.setupStaffDOMEvents();
         this.updateStats();
     },
@@ -172,26 +180,25 @@ const ComposeMode = {
             };
         }
 
-        // Time-range selection (docs/melody-notation-design.md's central workflow): mousedown on a
-        // token remembers its ORIGINAL note index; mouseup on a (possibly different) token selects
-        // every note between the two in TIME, regardless of pitch. A plain click (down and up on
-        // the same token) is just the idxA===idxB case of the same call.
-        const timelineEl = document.getElementById('compose-timeline');
-        if (timelineEl) {
-            let dragStartIdx = null;
-            timelineEl.addEventListener('mousedown', (e) => {
-                const token = e.target.closest('.note-token');
-                if (!token) return;
-                dragStartIdx = parseInt(token.getAttribute('data-note-idx'), 10);
-            });
-            timelineEl.addEventListener('mouseup', (e) => {
-                if (dragStartIdx === null) return;
-                const token = e.target.closest('.note-token');
-                const endIdx = token ? parseInt(token.getAttribute('data-note-idx'), 10) : dragStartIdx;
-                this.selectTimeRange(dragStartIdx, endIdx);
-                dragStartIdx = null;
-            });
-        }
+        // The shared Timeline (INV-55, js/timeline.js): Compose's two markers ARE its selection
+        // mechanism (Task #16), replacing the old click-drag-across-tokens gesture on
+        // #compose-timeline -- both commits call the same selectTimeRange this mode already had,
+        // with the full current pair (whichever marker just moved plus the other's own current
+        // position), since a time range needs both ends regardless of which one changed.
+        this.timeline = Timeline.create({
+            staffContainerId: 'compose-staff',
+            labelsContainerId: 'compose-staff-labels',
+            scrollContainerId: 'compose-notation-scroll',
+            onStartCommit: (idx) => {
+                this.state.startIndex = idx;
+                this.selectTimeRange(this.state.startIndex, this.state.endIndex);
+            },
+            onEndCommit: (idx) => {
+                this.state.endIndex = idx;
+                this.selectTimeRange(this.state.startIndex, this.state.endIndex);
+            },
+        });
+        this.timeline.setupDrag();
 
         // Shares Melody's exact remembered folder (both work with .mid files) -- see
         // js/file-folder.js's `ids` parameter, which is what lets the same MidiFolder instance
@@ -836,27 +843,41 @@ const ComposeMode = {
         this.state.viewY = v.viewY;
         this.renderSelectionMarkers();
         this.refreshStaff();
-        this.refreshTimeline();
     },
 
     // The real grand staff (Task #9, docs/melody-notation-design.md), driving click-to-add/
-    // drag-to-re-pitch/drag-to-retime. Each note gets `id: i` (its OWN state.notes index) BEFORE
-    // Notation.render internally re-sorts by time -- notesToBeatSpace/toMeasures/render all thread
-    // that id straight through to noteXPositions, so _hitTestNote can map a click back to a
-    // specific state.notes entry even when several notes share a pitch or a time. The render
-    // result (x/y positions, staveBounds, barlineXPositions) is stashed on `this._staffRender` --
+    // drag-to-re-pitch/drag-to-retime, now through the shared Timeline (Task #16) -- Compose's
+    // own past/current/upcoming decoration doesn't exist (that's Melody's practice-strip-only
+    // concern), so no `decorate` hook is passed. Each note gets `id: i` (its OWN state.notes
+    // index) BEFORE Notation.render internally re-sorts by time -- notesToBeatSpace/toMeasures/
+    // render all thread that id straight through to noteXPositions, so _hitTestNote can map a
+    // click back to a specific state.notes entry even when several notes share a pitch or a
+    // time. `this._staffRender` is kept as an alias of `this.timeline._lastRender` --
     // setupStaffDOMEvents' hit-testing/pitchFromY/beatFromX calls all read it from there, since
     // it's rebuilt on every redraw (drawLattice-style: no incremental diffing).
     refreshStaff: function() {
-        const notesWithId = this.state.notes.map((n, i) => Object.assign({}, n, { id: i }));
-        this._staffRender = Notation.render('compose-staff', notesWithId, {
+        // Clamp against notes removed/inserted since the markers were last set (Delete/Insert
+        // shift indices -- see INV-33) -- never point past the end of a shrunk array.
+        const maxIdx = this.state.notes.length - 1;
+        if (this.state.startIndex != null) this.state.startIndex = Math.min(this.state.startIndex, maxIdx);
+        if (this.state.endIndex != null) this.state.endIndex = Math.min(this.state.endIndex, maxIdx);
+        if (this.state.notes.length === 0) {
+            this.state.startIndex = null;
+            this.state.endIndex = null;
+        } else if (this.state.startIndex == null || this.state.endIndex == null) {
+            // First note(s) just appeared -- give the markers somewhere real to sit rather than
+            // staying invisible with nothing to grab.
+            this.state.startIndex = this.state.startIndex == null ? 0 : this.state.startIndex;
+            this.state.endIndex = this.state.endIndex == null ? 0 : this.state.endIndex;
+        }
+        this.timeline.refresh(this.state.notes, {
             bpm: this.state.tempoBPM,
             keySignature: this.state.keySignature,
+            startIndex: this.state.startIndex,
+            endIndex: this.state.endIndex,
+            decorate: (entry) => (this.state.selectedIndices.includes(entry.id) ? { className: 'selected' } : null),
         });
-        Notation.renderLabels('compose-staff-labels', this._staffRender ? this._staffRender.noteXPositions : [], this.state.keySignature);
-        // Spans the whole staff+labels+timeline stack (#compose-notation-scroll), not just the
-        // staff's own drawn barlines -- see js/melody.js's identical call.
-        Notation.renderBarlineOverlay('compose-notation-scroll', this._staffRender ? this._staffRender.barlineXPositions : []);
+        this._staffRender = this.timeline._lastRender;
     },
 
     // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash
@@ -882,24 +903,6 @@ const ComposeMode = {
             ring.setAttribute('r', Render.HEX_R * 0.55);
             ring.setAttribute('class', 'compose-selected-note');
             Render.appendToLattice(ring);
-        });
-    },
-
-    // A minimal time-ordered stand-in for the real grand-staff view (docs/melody-notation-design.md)
-    // -- one token per note, sorted by time (not raw array order, which insert/translate/rotate
-    // don't necessarily preserve), each carrying its ORIGINAL state.notes index so a click/drag can
-    // reference it. Rebuilt on every refreshBoard() the same way the Tonnetz itself is -- no diffing.
-    refreshTimeline: function() {
-        const el = document.getElementById('compose-timeline');
-        if (!el) return;
-        el.innerHTML = '';
-        const ordered = this.state.notes.map((n, i) => ({ n, i })).sort((a, b) => a.n.time - b.n.time);
-        ordered.forEach(({ n, i }) => {
-            const span = document.createElement('span');
-            span.className = 'note-token' + (this.state.selectedIndices.includes(i) ? ' selected' : '');
-            span.setAttribute('data-note-idx', i);
-            span.textContent = Tonnetz.getNoteName(n.midi) + Tonnetz.getOctave(n.midi);
-            el.appendChild(span);
         });
     },
 

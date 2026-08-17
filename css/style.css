@@ -352,11 +352,9 @@ svg {
 /* .pitch-row: the Timeline's own aligned note-name/octave row (INV-55) -- real flex+gap gives
    every pair of adjacent tokens the same visual spacing. Overflows its OWN box when wider than
    the viewport rather than scrolling independently -- the shared .notation-scroll ancestor is
-   what actually scrolls, keeping this in sync with the staff stacked alongside it.
-   .melody-note-list is Compose's own not-yet-migrated timeline row (Task #16 -- will be removed
-   once Compose moves onto the shared Timeline component too); kept as an alias of the same rules
-   in the meantime, not a separate design. */
-.pitch-row, .melody-note-list {
+   what actually scrolls, keeping this in sync with the staff stacked alongside it. Shared by
+   Melody and Compose (Task #16), the Timeline's own component. */
+.pitch-row {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -370,26 +368,14 @@ svg {
 }
 .note-token { flex: 0 0 auto; }
 
-/* Compose's timeline selection (#compose-timeline reuses .melody-note-list/.note-token) -- the
-   time-range-selection half of docs/melody-notation-design.md's central workflow. Matches
+/* Compose's own selection highlight on the pitch row (ComposeMode.refreshStaff's decorate hook)
+   -- the time-range-selection half of docs/melody-notation-design.md's central workflow. Matches
    .compose-selected-note's accent-colored dashed-ring convention on the Tonnetz side, so a
    selection reads as the same thing on both surfaces. */
 .note-token.selected {
     color: var(--accent);
     text-decoration: underline;
     text-decoration-style: dashed;
-}
-
-/* A low-contrast tick between two adjacent notes whose computed measure differs (#46 part 4,
-   4/4 assumed -- see MelodyMode.measureOf). Never gets a data-note-idx, so it's naturally
-   invisible to positionScrubMarker's/updateScrubDragTarget's .note-token-only queries. */
-.measure-tick {
-    flex: 0 0 auto;
-    width: 1px;
-    height: 0.9em;
-    background: var(--dim);
-    opacity: 0.35;
-    align-self: center;
 }
 
 /* The Timeline's two boundary markers (INV-55, js/timeline.js): a real I-beam (CSS-drawn
@@ -438,6 +424,17 @@ svg {
 
 .timeline-marker:active {
     cursor: grabbing;
+}
+
+/* Compose ONLY: confine the marker to the pitch row's own height, not the full stack. Compose's
+   staff is itself click-to-add/drag-to-repitch editable (INV-33/Task #9) -- a full-height marker
+   at the same x as a note would sit on top of it, silently swallowing every click meant for that
+   note instead of the staff's own handler (found live: a click landed on the marker, not the
+   notehead, exactly where a fresh piece's default markers and its first note coincide). Melody's
+   own staff has no competing click target, so its markers keep the full-stack span (see above). */
+#compose-notation-scroll .timeline-marker {
+    top: auto;
+    height: 1.2em; /* matches .pitch-row's own height */
 }
 
 #midi-connect-btn.connected {

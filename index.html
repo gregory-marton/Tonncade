@@ -237,15 +237,16 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <!-- One shared horizontal scroll container -- see Melody's identical
                          #melody-notation-scroll comment for why (Codex review finding: staff/
                          labels/timeline used to scroll independently and drift out of alignment). -->
+                    <!-- The Timeline (INV-55, js/timeline.js): grand staff + aligned pitch row +
+                         two draggable boundary markers, shared with Melody. The two markers ARE
+                         Compose's own selection mechanism (Task #16) -- dragging either one
+                         selects every note whose TIME falls within the range, regardless of
+                         pitch (ComposeMode.selectTimeRange), which then flattens onto the Tonnetz
+                         (ComposeMode.renderSelectionMarkers) where the existing translate/rotate
+                         controls transform it, leaving time/duration untouched. -->
                     <div id="compose-notation-scroll" class="notation-scroll">
                         <div id="compose-staff" style="margin-top: 4px; cursor: crosshair;"></div>
-                        <div id="compose-staff-labels" class="melody-note-list" style="height: 1.2em;"></div>
-                        <!-- A time-ordered row of note tokens (docs/melody-notation-design.md's central
-                             workflow): click one to select it, click-drag across several to select every
-                             note in that TIME range regardless of pitch -- the selection then flattens onto
-                             the Tonnetz (ComposeMode.renderSelectionMarkers) where the existing translate/
-                             rotate controls transform it, leaving time/duration untouched. -->
-                        <div id="compose-timeline" class="melody-note-list" style="margin-top: 10px;"></div>
+                        <div id="compose-staff-labels" class="pitch-row" style="height: 1.2em;"></div>
                     </div>
                     <!-- Shown only once at least one note is selected (see ComposeMode.updateEditControls).
                          Selection: shift-tap a note on the board to add/remove it; a plain tap on an

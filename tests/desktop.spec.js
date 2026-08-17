@@ -3334,9 +3334,10 @@ test('Melody: the end of the drilled segment grows immediately with each correct
     }
     return ends;
   });
-  // Playing note 0 (already known) grows nothing; each subsequent correct note -- genuinely new
-  // territory -- immediately extends the end by exactly one, on that same single play.
-  expect(endAfterEach).toEqual([0, 1, 2, 3]);
+  // Playing note 0 -- the ONLY note in the initial [0,0] segment -- immediately extends the end
+  // to 1, since that single play just mastered the entire current segment; every subsequent
+  // correct note extends it by exactly one more, on that same single play.
+  expect(endAfterEach).toEqual([1, 2, 3, 4]);
 });
 
 test('Melody: a mistake resets the clean-streak', async ({ page }) => {
@@ -3855,17 +3856,17 @@ test('Compose: loading a file clears the undo history', async ({ page }) => {
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// docs/melody-notation-design.md's central workflow: select a time range on the (still minimal,
-// pre-grand-staff) timeline, watch it flatten onto the Tonnetz, then transform it -- pitch changes,
-// time never does. #compose-timeline is a stand-in for the eventual VexFlow staff; the selection
-// mechanism and the transform math (translateSelection/rotateSelection) are the real, durable part.
+// docs/melody-notation-design.md's central workflow: select a time range on the shared Timeline
+// (js/timeline.js, Task #16), watch it flatten onto the Tonnetz, then transform it -- pitch
+// changes, time never does. The Timeline's two markers ARE the selection mechanism; the
+// transform math (translateSelection/rotateSelection) is the real, durable part.
 // ────────────────────────────────────────────────────────────────────────
 
-test('Compose: the timeline renders one token per note, in TIME order (not array-insertion order)', async ({ page }) => {
+test('Compose: the pitch row renders one token per note, in TIME order (not array-insertion order)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
   await page.evaluate(() => {
-    // Deliberately inserted out of time order -- the timeline must still read left-to-right by time.
+    // Deliberately inserted out of time order -- the row must still read left-to-right by time.
     ComposeMode.state.notes = [
       { midi: 64, p: 1, q: 0, time: 1.0, duration: 0.4 },
       { midi: 60, p: 0, q: 0, time: 0.0, duration: 0.4 },
@@ -3874,7 +3875,7 @@ test('Compose: the timeline renders one token per note, in TIME order (not array
     ComposeMode.refreshBoard();
   });
   const order = await page.evaluate(() =>
-    [...document.querySelectorAll('#compose-timeline .note-token')].map(t => parseInt(t.getAttribute('data-note-idx'), 10))
+    [...document.querySelectorAll('#compose-staff-labels .note-token')].map(t => parseInt(t.getAttribute('data-note-idx'), 10))
   );
   expect(order).toEqual([1, 0, 2]); // sorted by time (0.0, 1.0, 2.0), carrying ORIGINAL array indices
 });
@@ -3907,6 +3908,33 @@ test('Compose: dragging across timeline tokens selects every note in that TIME r
     ComposeMode.refreshBoard();
     ComposeMode.selectTimeRange(0, 2); // dragged from the first token to the third
   });
+  const selected = await page.evaluate(() => ComposeMode.state.selectedIndices.slice().sort());
+  expect(selected).toEqual([0, 1, 2]);
+});
+
+test('Compose: dragging the end marker on the real Timeline selects every note up to it, via selectTimeRange', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },
+      { midi: 72, p: -1, q: 2, time: 10, duration: 0.4 }, // far outside -- must stay unselected
+    ];
+    ComposeMode.refreshBoard();
+  });
+  // A fresh note set defaults both markers to note 0 (INV-55) -- nothing to drag onto view yet.
+  expect(await page.evaluate(() => [ComposeMode.state.startIndex, ComposeMode.state.endIndex])).toEqual([0, 0]);
+
+  const markerBox = await page.locator('.timeline-marker-end').boundingBox();
+  const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();
+  await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 5 });
+  await page.mouse.up();
+
+  expect(await page.evaluate(() => ComposeMode.state.endIndex)).toBe(2);
   const selected = await page.evaluate(() => ComposeMode.state.selectedIndices.slice().sort());
   expect(selected).toEqual([0, 1, 2]);
 });

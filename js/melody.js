@@ -36,7 +36,8 @@ const MelodyMode = {
         isRandom: true,
         // Effective BPM for the CURRENT state.melody -- only meaningful (and only read) when
         // !isRandom. Assume 4/4 throughout (no time-signature parsing exists in this codebase --
-        // out of scope). Used by measureOf() for the timeline's measure-tick marks (#46).
+        // out of scope). Used by measureOf() for the Timeline's barline overlay (#46) and the
+        // start marker's own measure-mastery streak (INV-26).
         melodyBPM: 120,
         // Auto-detected (Tonnetz.detectKeySignature) whenever a melody loads -- the lightweight
         // key-fit heuristic for the MIDI/Random bucket (docs/melody-notation-design.md), since a
@@ -859,12 +860,17 @@ const MelodyMode = {
             this.state.userIndex++;
             this.updateStreak(this.state.userIndex);
 
-            // INV-53: the end advances immediately with every correct play that reaches new
-            // territory -- no streak gate. (The old coupled version, where the end waited on
-            // the same streak the start needed, was a real regression: nothing visibly advanced
-            // between reps.) Random keeps its own separate, timeout-driven growth below.
-            if (!this.state.isRandom && this.state.userIndex - 1 > this.state.endIndex) {
-                this.state.endIndex = this.state.userIndex - 1;
+            // INV-26: the end advances immediately with every correct play that reaches the
+            // current frontier -- no streak gate. (The old coupled version, where the end waited
+            // on the same streak the start needed, was a real regression: nothing visibly
+            // advanced between reps.) Random keeps its own separate, timeout-driven growth below.
+            // Note the >= (via userIndex > endIndex, not userIndex-1 > endIndex): playing the
+            // LAST note of the current segment (userIndex-1 === endIndex) is exactly the moment
+            // that segment is fully mastered and must grow -- a strict > here was the actual bug
+            // behind the regression: it left endIndex frozen at 0 forever after playing note 0,
+            // since userIndex-1 (0) is never strictly greater than endIndex (0).
+            if (!this.state.isRandom && this.state.userIndex > this.state.endIndex) {
+                this.state.endIndex = this.state.userIndex;
             }
 
             this.updateDifficultyUI();

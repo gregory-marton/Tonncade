@@ -517,9 +517,16 @@ Positioning uses each note's own x-position as `Notation.render` itself reports 
 regardless of scroll position), not `getBoundingClientRect()`. Dragging near either edge of the
 scroll container auto-scrolls it. `Timeline.refresh(notes, opts)` re-renders the staff, the
 pitch row (with an optional per-mode `decorate` hook — Melody's practice strip uses it for its
-color hints, Compose's Timeline omits it), and the barline overlay together each time; a mode's
-own decision of WHAT `startIndex`/`endIndex` currently are lives entirely outside this component,
-passed in fresh on every `refresh()` call.
+color hints, Compose uses it for its own `.selected` highlight), and the barline overlay together
+each time; a mode's own decision of WHAT `startIndex`/`endIndex` currently are lives entirely
+outside this component, passed in fresh on every `refresh()` call.
+
+By default a marker's clickable area spans the whole staff+labels+timeline stack (`top:0;
+bottom:0` in its own positioned ancestor). Compose overrides this to just the pitch row's own
+height (`#compose-notation-scroll .timeline-marker`, css/style.css) — its staff is ITSELF
+click-to-add/drag-to-repitch editable (INV-33/Task #9), so a full-height marker sitting at the
+same x as a note would silently swallow every click meant for that note instead of the staff's
+own handler. Melody has no competing click target on its staff, so it keeps the full-stack span.
 
 **Test:** `tests/desktop.spec.js` — "Timeline.refresh: renders the staff, pitch row, and both
 markers at the right notes", "Timeline: dragging the start marker to a different note calls
