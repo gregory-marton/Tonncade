@@ -59,6 +59,11 @@ const FileFolder = {
             readAs: config.readAs || 'arrayBuffer',          // 'arrayBuffer' | 'text'
             mimeType: config.mimeType || 'application/octet-stream',
             loadMethod: config.loadMethod || 'loadMelodyFromArrayBuffer',
+            // Adds an "Upload File…" entry to the select itself (Life only, so far -- see
+            // js/life.js), which just clicks the mode's own hidden <input type=file> (ids.uploadInput)
+            // -- one menu item instead of a separate button that's only ever shown on SOME browsers
+            // (see setup()'s uploadGroup/uploadLabel handling below).
+            hasUpload: !!config.hasUpload,
             // Life's bundled default auto-loads on first visit (its long-standing behavior);
             // Melody/Compose don't -- Melody already has its own offline-degrade default
             // (randomMelody), and Compose has no "starting content" concept at all.
@@ -154,9 +159,20 @@ const FileFolder = {
             await this.setupOnline(token);
             if (token !== this._token) return;
 
-            if (this.isSupported()) {
+            // hasUpload: the dropdown's own "Upload File…" entry (renderOptions/handleSelect,
+            // below) replaces the separate button on EVERY browser, not just once the folder tier
+            // is available -- so its label is always hidden, regardless of isSupported(). Without
+            // hasUpload, the pre-existing behavior is unchanged: the plain <input type=file>
+            // fallback stays visible until/unless the folder tier supersedes it.
+            const uploadLabel = ids.uploadInput && document.querySelector(`label[for="${ids.uploadInput}"]`);
+            if (this.hasUpload) {
+                if (uploadLabel) uploadLabel.style.display = 'none';
+            } else if (this.isSupported()) {
                 const uploadGroup = document.getElementById(ids.uploadGroup);
                 if (uploadGroup) uploadGroup.style.display = 'none';
+            }
+
+            if (this.isSupported()) {
                 await this.restore(token);
                 if (token !== this._token) return;
             }
@@ -345,9 +361,20 @@ const FileFolder = {
             this.renderOptions();
         },
 
+        // Clicks the mode's own hidden <input type=file> (already wired by that mode itself --
+        // FileFolder doesn't read the chosen file; it just opens the native picker) and snaps the
+        // select back to whatever's actually loaded, the same way choosing/cancelling a folder
+        // does -- "Upload File…" is a momentary action, never a real selected value.
+        triggerUpload: function() {
+            const input = this.ids.uploadInput && document.getElementById(this.ids.uploadInput);
+            if (input) input.click();
+            this.renderOptions();
+        },
+
         handleSelect: function(value) {
             if (value === 'choose-folder') { this.chooseFolder(); return; }
             if (value === 'reconnect-folder') { this.reconnect(); return; }
+            if (value === 'upload-file') { this.triggerUpload(); return; }
             if (value === 'random') {
                 this.currentValue = 'random';
                 if (this.mode && typeof this.mode.loadDefault === 'function') this.mode.loadDefault();
@@ -381,14 +408,17 @@ const FileFolder = {
                 this.onlineIndex.forEach((song, i) => addOption('bundled:' + i, song.name));
             }
 
-            if (this.isSupported()) {
+            if (this.isSupported() || this.hasUpload) {
                 addOption('__sep__', '──────', true);
-                if (this.needsReconnect) {
-                    addOption('reconnect-folder', `Reconnect "${this.folderHandle.name}"`);
-                } else if (this.folderHandle) {
-                    addOption('choose-folder', 'Change Folder…');
-                } else {
-                    addOption('choose-folder', 'Choose Local Folder…');
+                if (this.hasUpload) addOption('upload-file', 'Upload File…');
+                if (this.isSupported()) {
+                    if (this.needsReconnect) {
+                        addOption('reconnect-folder', `Reconnect "${this.folderHandle.name}"`);
+                    } else if (this.folderHandle) {
+                        addOption('choose-folder', 'Change Folder…');
+                    } else {
+                        addOption('choose-folder', 'Choose Local Folder…');
+                    }
                 }
             }
 

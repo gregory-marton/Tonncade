@@ -304,9 +304,11 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↻</button>
                         <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button>
                         <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button>
+                        <a id="life-download-link" class="icon-btn" href="#" download="automaton.yaml" title="Download current automaton as .yaml" aria-label="Download current automaton as .yaml">⬇</a>
                     </div>
                     <div class="stats-panel">
                         <p title="Generation">gen <span id="life-generation">0</span></p>
+                        <p id="life-rule-display" title="Current rule" style="font-size: 11px; color: var(--dim); margin: 4px 0 0 0;"></p>
                     </div>
                 </div>
 

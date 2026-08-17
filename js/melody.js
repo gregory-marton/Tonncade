@@ -957,8 +957,18 @@ const MelodyMode = {
 
                 this.state.userRepeatTimeoutId = setTimeout(() => {
                     // Timeout fired: User stopped playing ahead.
-                    // Immediately transition to playing the new sequence (Silence is golden).
-                    this.state.targetLength = this.state.userIndex + 1;
+                    // Random has no spaced-repetition concept (#46 scopes cleanStreak to songs
+                    // only) -- grow by however far they got, same as always. For a song, growth
+                    // ONLY ever happens via the cleanStreak>=3 block above (a whole measure); below
+                    // that threshold, targetLength/startIndex are deliberately left untouched here
+                    // so playTargetSequence() below re-drills the SAME segment again. Previously
+                    // this unconditionally grew by one note after every single clean pass
+                    // regardless of cleanStreak, silently advancing the whole time and defeating
+                    // the point of counting a streak at all (reported live: "the number of times
+                    // you have to get it right to advance seems to be 1").
+                    if (this.state.isRandom) {
+                        this.state.targetLength = this.state.userIndex + 1;
+                    }
                     this.playTargetSequence();
                 }, 2000);
             } else {

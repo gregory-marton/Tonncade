@@ -854,7 +854,7 @@ test.describe('Invariant tests', () => {
     ],
     life: [
       '#tonnetz-svg', '#drawer-handle', '#life-source', '#life-play-pause', '#life-step',
-      '#life-reset', '#life-clear', '#life-save', '#life-generation',
+      '#life-reset', '#life-clear', '#life-save', '#life-download-link', '#life-generation',
     ],
   };
 

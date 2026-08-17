@@ -3182,6 +3182,43 @@ test('Melody: 3 clean playthroughs auto-advance the segment into the next measur
   expect(result.startMeasure).toBeGreaterThan(0); // landed in a later measure, not just +1 note
 });
 
+// Reported live: "the number of times you have to get it right to advance seems to be 1" -- the
+// synchronous cleanStreak>=3 block above already correctly gates the BIG (whole-measure) jump, but
+// the separate 2s-idle setTimeout unconditionally grew targetLength by one note after every SINGLE
+// clean pass regardless of cleanStreak, silently marching the drilled segment forward the whole
+// time and defeating the point of counting a streak at all. A clean pass now has to happen 3 times
+// in a row (matching the measure-jump's own threshold) before the segment moves at all -- below
+// that, the idle timeout just re-drills the exact same segment again.
+test('Melody: the drilled segment does not grow after a single clean pass -- it takes 3 in a row (like the measure-jump)', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+  await page.clock.fastForward(2000); // clear resetGame's own auto-kickoff intro first (like the existing scrub tests do)
+
+  await page.evaluate(() => {
+    // resetGame's kickoff (targetLength was still 1 then) may still have its OWN "sequence
+    // finished" timeout pending (js/melody.js's tId2, which sets userIndex back to its start) --
+    // left alone it can fire later and stomp this test's own userIndex out from under it. Flush
+    // every pending playback timer before setting up this test's own scenario.
+    MelodyMode.cleanupPlayback();
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.targetLength = 4;
+    MelodyMode.state.cleanStreak = 0;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.segmentHadMistake = false;
+    MelodyMode.state.isPlayingSequence = false;
+    for (let i = 0; i < 4; i++) MelodyMode.handleUserInputNote(MelodyMode.state.melody[i].midi);
+  });
+  const afterOnePass = await page.evaluate(() => ({ targetLength: MelodyMode.state.targetLength, startIndex: MelodyMode.state.startIndex }));
+
+  await page.clock.fastForward(2500); // let the idle timeout fire
+  const afterTimeout = await page.evaluate(() => ({ targetLength: MelodyMode.state.targetLength, startIndex: MelodyMode.state.startIndex }));
+
+  expect(afterOnePass).toEqual({ targetLength: 4, startIndex: 0 });
+  expect(afterTimeout, 'one clean pass should not have grown the segment').toEqual({ targetLength: 4, startIndex: 0 });
+});
+
 test('Melody: a mistake resets the clean-streak', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -3467,6 +3504,78 @@ test('Life: loading a new automaton clears the undo history', async ({ page }) =
   expect(await page.evaluate(() => document.getElementById('undo-btn').disabled)).toBe(true);
   await page.evaluate(() => App.undo());
   expect(await page.evaluate(() => LifeMode.state.live.size)).toBe(sizeBeforeUndo); // undo was a no-op
+});
+
+// Requested live: Life's automaton source select should offer uploading a local .yaml file as one
+// of its own menu entries -- not only the separate always-or-never-visible "Open Automaton File"
+// button (js/file-folder.js's uploadGroup), which disappears entirely once the File System Access
+// API's folder tier is available (Chrome), leaving no way there to load a single one-off file
+// without picking a whole folder to remember. LifeFolder now opts into FileFolder's hasUpload flag
+// (Melody/Compose don't -- this is scoped to Life only, per the request).
+test('Life: the automaton source menu offers an "Upload File…" entry that opens the file picker', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+
+  const optionValues = await page.evaluate(() => [...document.getElementById('life-source').options].map(o => o.value));
+  expect(optionValues).toContain('upload-file');
+
+  // Selecting it should click the real (hidden) file input, not silently do nothing.
+  const clicked = await page.evaluate(() => new Promise((resolve) => {
+    const input = document.getElementById('life-file-input');
+    input.addEventListener('click', () => resolve(true), { once: true });
+    const select = document.getElementById('life-source');
+    select.value = 'upload-file';
+    select.dispatchEvent(new Event('change'));
+    setTimeout(() => resolve(false), 500);
+  }));
+  expect(clicked).toBe(true);
+
+  // The select snaps back to reflect what's actually loaded, rather than sticking on the
+  // momentary "Upload File…" action item.
+  expect(await page.evaluate(() => document.getElementById('life-source').value)).not.toBe('upload-file');
+});
+
+// Requested live: the current rule should be visible underneath the generation counter, not only
+// discoverable by opening the loaded .yaml file.
+test('Life: the current rule is displayed underneath the generation counter', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  await page.evaluate(() => LifeMode.loadAutomaton({
+    name: 'Test Rule', rule: { survival: [3, 5], birth: [2] },
+    sound: { when: 'born', duration: 0.4 }, initial: { cells: [] }, tempo: 180,
+  }));
+  const text = await page.evaluate(() => document.getElementById('life-rule-display').textContent);
+  expect(text).toContain('3');
+  expect(text).toContain('5');
+  expect(text).toContain('2');
+});
+
+// Requested live: a download link for the current (possibly hand-edited/mid-evolution) automaton,
+// separate from "Save As" (which prompts for a filename and either writes into the remembered
+// folder or falls back to a download) -- this is a plain, always-ready <a download> link, no
+// prompt, that always serves whatever's currently on the board.
+test('Life: the download link serves the CURRENT board as YAML, not the original seed', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  // Wait out LifeFolder's own auto-load of the bundled default (js/file-folder.js's
+  // autoLoadFirstBundled) before touching state -- otherwise it can resolve AFTER this test's own
+  // loadAutomaton/toggleCell and silently wipe the hand-placed cell back out.
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  await page.evaluate(() => {
+    LifeMode.loadAutomaton(LifeMode.DEFAULT_AUTOMATON);
+    LifeMode.toggleCell(9, 9); // a hand edit not part of the original seed
+  });
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#life-download-link').click(),
+  ]);
+  const path = await download.path();
+  const fs = require('fs');
+  const text = fs.readFileSync(path, 'utf8');
+  expect(text).toContain('9, 9');
+  expect(download.suggestedFilename()).toMatch(/\.ya?ml$/i);
 });
 
 

@@ -391,6 +391,7 @@ const LifeFolder = FileFolder.create({
     mimeType: 'text/yaml',
     loadMethod: 'loadAutomatonFromText',
     autoLoadFirstBundled: true,
+    hasUpload: true, // "Upload File…" lives in the #life-source menu itself, not a separate button
 });
 
 // ============================================================================================
@@ -402,6 +403,7 @@ const LifeMode = {
     state: {
         live: new Map(),          // "p,q" -> state (>=1); absent = dead/empty (state 0)
         initial: [],              // [key, state] seed pairs, for reset
+        name: 'automaton',        // the loaded file's own name (or filename), for the rule display and download link's filename
         rule: { survival: [], birth: [] },
         multi: null,              // multi-state config {states, table, order} or null for 2-state
         sound: { when: 'born', duration: 0.4, velocity: 80 },
@@ -451,6 +453,7 @@ const LifeMode = {
                 sourceSelect: 'life-source',
                 sourceStatus: 'life-source-status',
                 uploadGroup: 'life-upload-group',
+                uploadInput: 'life-file-input',
             });
         }
     },
@@ -462,7 +465,9 @@ const LifeMode = {
     // bundled/folder selections.
     loadAutomatonFromText: function(text, filename) {
         try {
-            this.loadAutomaton(Life.parseYaml(text));
+            const parsed = Life.parseYaml(text);
+            if (!parsed.name && filename) parsed.name = filename.replace(/\.ya?ml$/i, '');
+            this.loadAutomaton(parsed);
             const filenameEl = document.getElementById('life-filename');
             if (filenameEl) filenameEl.textContent = filename || '';
         } catch (err) {
@@ -477,6 +482,7 @@ const LifeMode = {
     //     [[p,q,state],...]. Optional per-state `sounds` (a list of {state, velocity, duration}).
     loadAutomaton: function(a) {
         this.stop();
+        this.state.name = a.name || this.state.name || 'automaton';
         this.state.rule = a.rule || { survival: [], birth: [] };
         this.state.sound = a.sound || { when: 'born', duration: 0.4, velocity: 80 };
         this.state.tempo = a.tempo || 180;
@@ -813,10 +819,11 @@ const LifeMode = {
         bind('life-save', this.save);
 
         // Open a LOCAL automaton file -- e.g. one previously written by Save As, or shared by
-        // someone else -- distinct from the dropdown above (bundled/remembered-folder tiers,
-        // js/file-folder.js). Mirrors Melody/Compose's own upload input exactly (same pattern,
-        // different file type: YAML text here via readAsText, not an arrayBuffer). Only shown at
-        // all when the folder tier isn't available (see LifeFolder.setup).
+        // someone else -- distinct from the dropdown's bundled/remembered-folder tiers
+        // (js/file-folder.js). Mirrors Melody/Compose's own upload input exactly (same pattern,
+        // different file type: YAML text here via readAsText, not an arrayBuffer). Reached via the
+        // #life-source select's own "Upload File…" entry (LifeFolder.triggerUpload clicks this
+        // same hidden input), not a separate visible button -- see LifeFolder.setup's hasUpload.
         const fileInput = document.getElementById('life-file-input');
         if (fileInput) {
             fileInput.onchange = (e) => {
@@ -827,6 +834,25 @@ const LifeMode = {
                 reader.readAsText(file);
             };
         }
+
+        // A plain <a download> link for the CURRENT board (possibly hand-edited or mid-evolution,
+        // not the original seed) -- distinct from Save As (prompts for a filename, writes into the
+        // remembered folder). href/download are set synchronously inside this click handler,
+        // immediately before the browser's own default navigation for the SAME click runs, so
+        // there's no need to keep an always-current blob URL alive across every generation tick.
+        const downloadLink = document.getElementById('life-download-link');
+        if (downloadLink) {
+            downloadLink.addEventListener('click', (e) => {
+                if (this.state.live.size === 0) { e.preventDefault(); return; }
+                const safeName = (this.state.name || 'automaton').replace(/[^\w.-]+/g, '-');
+                const filename = /\.ya?ml$/i.test(safeName) ? safeName : `${safeName}.yaml`;
+                const text = this.toYaml(this.state.name || 'automaton');
+                const url = URL.createObjectURL(new Blob([text], { type: 'text/yaml' }));
+                downloadLink.href = url;
+                downloadLink.download = filename;
+                setTimeout(() => URL.revokeObjectURL(url), 1000); // after the browser has taken the download
+            });
+        }
     },
 
     updateControls: function() {
@@ -834,6 +860,20 @@ const LifeMode = {
         if (pp) { pp.textContent = this.state.running ? '⏸' : '▶'; pp.title = this.state.running ? 'Pause' : 'Play'; }
         const gen = document.getElementById('life-generation');
         if (gen) gen.textContent = this.state.generation;
+        this.updateRuleDisplay();
+    },
+
+    // Requested live: the current rule, visible right under the generation counter, not only
+    // discoverable by opening the loaded .yaml. Two-state rules show as Survival/Birth (matching
+    // this schema's own field names, docs/life-rules.md); multi-state rules have no such rule --
+    // they're a transition table instead, so this shows their shape (state count + evaluation
+    // order) rather than something Survival/Birth can't express.
+    updateRuleDisplay: function() {
+        const el = document.getElementById('life-rule-display');
+        if (!el) return;
+        el.textContent = this.state.multi
+            ? `${this.state.multi.states} states, order ${this.state.multi.order}`
+            : `Survival: ${this.state.rule.survival.join(', ') || '—'} · Birth: ${this.state.rule.birth.join(', ') || '—'}`;
     },
 
     // ---- Cross-mode copy/paste (App.copy/App.paste; see js/main.js, docs/invariants.md INV-47) ----
