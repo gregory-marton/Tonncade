@@ -32,16 +32,21 @@ for the JavaScript code in this file.
  * "lightweight quantizer/speller/measure-inference" is a separate, later pass; this module just
  * needs SOME correct conversion to prove the rendering pipeline, not the best one yet.
  *
- * Known, deliberate limitations of this first pass (not bugs -- see docs/melody-notation-design.md):
+ * Known, deliberate limitation of this first pass (not a bug -- see docs/melody-notation-design.md):
  *   - No ties: a note whose duration doesn't fit a single legal value, or that would cross a
- *     measure boundary, gets clipped to fit rather than tied across two noteheads.
- *   - Key signature is always whatever's passed in (or none) -- no per-note enharmonic-spelling
- *     heuristic yet (Tonnetz.getNoteName's key-signature param is a separate, later addition).
+ *     measure boundary, gets clipped to fit rather than tied across two noteheads (js/musicxml.js's
+ *     own writer DOES tie correctly -- this renderer hasn't caught up yet).
  */
 const Notation = {
     // MIDI >= this -> treble; below -> bass. A REGISTER split of one monophonic line, not
     // independent two-handed piano voices -- see docs/melody-notation-design.md.
     CLEF_SPLIT_MIDI: 60,
+
+    // VexFlow's addKeySignature wants a key-spec STRING ("G", "Db"), not the fifths integer
+    // (-7..7, MusicXML's own convention) everything else here uses (Tonnetz.getNoteName,
+    // js/musicxml.js) -- one small table to bridge that, rather than two different fifths
+    // conventions living side by side.
+    FIFTHS_TO_VEX_KEY: ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'], // index = fifths + 7
 
     MEASURE_WIDTH: 180,
     STAVE_HEIGHT: 80,
@@ -159,9 +164,10 @@ const Notation = {
             if (mi === 0) {
                 treble.addClef('treble');
                 bass.addClef('bass');
-                if (keySignature) {
-                    treble.addKeySignature(keySignature);
-                    bass.addKeySignature(keySignature);
+                if (keySignature != null && this.FIFTHS_TO_VEX_KEY[keySignature + 7]) {
+                    const vexKeySpec = this.FIFTHS_TO_VEX_KEY[keySignature + 7];
+                    treble.addKeySignature(vexKeySpec);
+                    bass.addKeySignature(vexKeySpec);
                 }
                 treble.addTimeSignature(beatsPerMeasure + '/4');
                 bass.addTimeSignature(beatsPerMeasure + '/4');

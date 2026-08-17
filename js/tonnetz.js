@@ -47,9 +47,70 @@ const Tonnetz = {
         return 60 + (p * 7) + (q * 3);
     },
 
-    getNoteName: function(midi) {
-        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        return names[((midi % 12) + 12) % 12];
+    SHARP_NAMES: ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'],
+    FLAT_NAMES: ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'],
+    NATURAL_SEMITONE: { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 },
+    // Circle-of-fifths order sharps/flats are ADDED in as a key signature's |fifths| count grows
+    // -- e.g. fifths=2 sharpens F and C (in that order), fifths=-2 flattens B and E.
+    SHARP_ORDER: ['F', 'C', 'G', 'D', 'A', 'E', 'B'],
+    FLAT_ORDER: ['B', 'E', 'A', 'D', 'G', 'C', 'F'],
+
+    // This key's own 7-note diatonic pitch-class set, correctly spelled -- {pitchClass: name}.
+    // fifths follows MusicXML's own <fifths> convention (js/musicxml.js): 0 = C/Am, positive =
+    // sharps, negative = flats, -7..7. Same fifths count -> same pitch classes for a major key and
+    // its relative minor, which is all spelling needs (major vs. minor doesn't change WHICH notes
+    // are in the scale, only which one is "home") -- this project has no separate major/minor
+    // concept to thread through here.
+    _diatonicSpelling: function(fifths) {
+        const order = fifths >= 0 ? this.SHARP_ORDER : this.FLAT_ORDER;
+        const altered = new Set(order.slice(0, Math.abs(fifths)));
+        const spelling = {};
+        Object.keys(this.NATURAL_SEMITONE).forEach((letter) => {
+            const delta = altered.has(letter) ? (fifths >= 0 ? 1 : -1) : 0;
+            const pc = ((this.NATURAL_SEMITONE[letter] + delta) % 12 + 12) % 12;
+            const suffix = delta > 0 ? '#' : delta < 0 ? 'b' : '';
+            spelling[pc] = letter + suffix;
+        });
+        return spelling;
+    },
+
+    // Sharps-only by default (keySignature omitted) -- every existing call site keeps its exact
+    // current behavior. With a keySignature (MusicXML <fifths>, -7..7), spells each pitch class
+    // per that key's own diatonic scale; a pitch class OUTSIDE the scale (a chromatic passing
+    // tone) falls back to the same sharps-below/flats-above convention real notation uses --
+    // sharp keys spell chromatic tones as a sharp of the note below, flat keys as a flat of the
+    // note above (docs/melody-notation-design.md's "small key-fit heuristic," not a full
+    // music21-grade speller).
+    getNoteName: function(midi, keySignature) {
+        const pc = ((midi % 12) + 12) % 12;
+        if (keySignature == null) return this.SHARP_NAMES[pc];
+        const diatonic = this._diatonicSpelling(keySignature);
+        if (diatonic[pc]) return diatonic[pc];
+        return keySignature >= 0 ? this.SHARP_NAMES[pc] : this.FLAT_NAMES[pc];
+    },
+
+    // The 24 major/minor key profiles collapse to 15 distinct pitch-class SETS (one per fifths
+    // value, -7..7 -- a major key and its relative minor share the same notes, and spelling is
+    // all this needs, see _diatonicSpelling above). Picks whichever fifths value's diatonic set
+    // covers the most of `midiNotes` -- i.e. needs the fewest chromatic/out-of-key accidentals --
+    // ties broken toward fifths=0 (simpler key signatures preferred when equally good fits). A
+    // small, genuinely hand-rollable heuristic (docs/melody-notation-design.md), not full
+    // Krumhansl-Schmuckler key-finding -- appropriate for this app's actual content (see that
+    // doc's "strong prior on simplicity" reasoning), not a general-purpose key detector.
+    detectKeySignature: function(midiNotes) {
+        if (!midiNotes || midiNotes.length === 0) return 0;
+        const pitchClasses = midiNotes.map((m) => ((m % 12) + 12) % 12);
+        let best = 0;
+        let bestScore = -1;
+        for (let fifths = -7; fifths <= 7; fifths++) {
+            const diatonic = this._diatonicSpelling(fifths);
+            const score = pitchClasses.filter((pc) => diatonic[pc]).length;
+            if (score > bestScore || (score === bestScore && Math.abs(fifths) < Math.abs(best))) {
+                bestScore = score;
+                best = fifths;
+            }
+        }
+        return best;
     },
 
     getOctave: function(midi) {

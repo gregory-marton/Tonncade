@@ -291,7 +291,12 @@ const Render = {
                 // Inaudible gray cells get no note label (they have no sounding pitch to name);
                 // audible cells label as usual.
                 if (opacity > 0.5 && (audible || !options.grayInaudible)) {
-                    const label = this.createLabel(p, q, Tonnetz.getNoteName(midi));
+                    // keySignature: absent for every mode with no key concept (Sandbox/Blast/
+                    // Gravity/Snake/Life) -- Tonnetz.getNoteName's own default (sharps-only,
+                    // unchanged) applies exactly as it always has. Melody/Compose pass their
+                    // current key (docs/melody-notation-design.md) so the Tonnetz's own labels
+                    // spell notes the same way the staff above it does.
+                    const label = this.createLabel(p, q, Tonnetz.getNoteName(midi, options.keySignature));
                     group.appendChild(label);
                     group.appendChild(this.createOctaveLabel(p, q, midi));
 

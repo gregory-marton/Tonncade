@@ -38,6 +38,13 @@ const MelodyMode = {
         // !isRandom. Assume 4/4 throughout (no time-signature parsing exists in this codebase --
         // out of scope). Used by measureOf() for the timeline's measure-tick marks (#46).
         melodyBPM: 120,
+        // Auto-detected (Tonnetz.detectKeySignature) whenever a melody loads -- the lightweight
+        // key-fit heuristic for the MIDI/Random bucket (docs/melody-notation-design.md), since a
+        // MIDI file/Random's generated sequence never carries an authored key signature the way
+        // MusicXML does. null means "no detected key" (falls back to Tonnetz.getNoteName's own
+        // sharps-only default, unchanged) -- set on every load, see loadDefault/
+        // loadMelodyFromArrayBuffer.
+        keySignature: null,
         // INV-48: a mode switch must pause the drill, never discard or restart it. gameStarted
         // gates init()'s own resetGame() call so only a genuinely NEW game (first entry, the
         // explicit Restart button, or loading a new song -- all of which call resetGame()
@@ -132,6 +139,7 @@ const MelodyMode = {
     loadDefault: function() {
         this.state.melody = this.randomMelody();
         this.state.isRandom = true;
+        this.state.keySignature = Tonnetz.detectKeySignature(this.state.melody.map((n) => n.midi));
         const filenameSpan = document.getElementById('melody-filename');
         if (filenameSpan) filenameSpan.textContent = '';
         this.resetGame();
@@ -155,6 +163,7 @@ const MelodyMode = {
         // connection exists; this only persists offline / under file:// (#86).
         if (this.state.melody.length === 0) {
             this.state.melody = this.randomMelody();
+            this.state.keySignature = Tonnetz.detectKeySignature(this.state.melody.map((n) => n.midi));
         }
 
         // Build reverse map for rendering labels
@@ -265,6 +274,7 @@ const MelodyMode = {
             this.state.melody = melodySeq;
             this.state.isRandom = false;
             this.state.melodyBPM = parsed.bpm;
+            this.state.keySignature = Tonnetz.detectKeySignature(melodySeq.map((n) => n.midi));
             if (filenameSpan && displayName) filenameSpan.textContent = displayName;
             this.resetGame();
             this.refreshBoard();
@@ -618,8 +628,8 @@ const MelodyMode = {
     // rendering pipeline against whatever's currently on the timeline.
     refreshStaff: function(notes) {
         if (typeof Notation === 'undefined') return;
-        const result = Notation.render('melody-staff', notes, { bpm: this.state.melodyBPM });
-        Notation.renderLabels('melody-staff-labels', result ? result.noteXPositions : []);
+        const result = Notation.render('melody-staff', notes, { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
+        Notation.renderLabels('melody-staff-labels', result ? result.noteXPositions : [], this.state.keySignature);
     },
 
     // The scrub marker: a real I-beam (see css/style.css) absolutely positioned over the target
@@ -1080,7 +1090,7 @@ const MelodyMode = {
             minP: -26, maxP: 26,
             minQ: -26, maxQ: 26
         };
-        Render.drawLattice(viewport, {});
+        Render.drawLattice(viewport, { keySignature: this.state.keySignature });
         // Reads back the player's own pan position (see setupKeyboardEvents/state.viewX/viewY),
         // not a fixed default -- otherwise every redraw (resetGame, loading a new melody,
         // rotating the view) would silently discard wherever the player last panned to,

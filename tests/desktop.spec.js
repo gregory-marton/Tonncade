@@ -4238,3 +4238,76 @@ test('RepeatNavigation: a document with no repeat/jump markers at all plays thro
   }, notes);
   expect(parsed).toEqual(notes); // MusicXML.write's own output never has repeat markers -- sanity check the plumbing is a no-op when there's nothing to navigate
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// Tonnetz.getNoteName's key-signature-aware speller and Tonnetz.detectKeySignature's key-fit
+// heuristic (docs/melody-notation-design.md's "lightweight quantizer/speller/measure-inference"
+// for the MIDI-upload/Random bucket -- the one place none of this is already authored).
+// ────────────────────────────────────────────────────────────────────────
+
+test('Tonnetz.getNoteName: no keySignature argument -> unchanged sharps-only default', async ({ page }) => {
+  await page.goto('/');
+  const names = await page.evaluate(() => [61, 63, 66, 68, 70].map((m) => Tonnetz.getNoteName(m)));
+  expect(names).toEqual(['C#', 'D#', 'F#', 'G#', 'A#']); // exactly today's existing behavior, no regression
+});
+
+test('Tonnetz.getNoteName: spells the SAME pitch class differently depending on the key (F major -> Bb, not A#)', async ({ page }) => {
+  await page.goto('/');
+  const names = await page.evaluate(() => ({
+    noKey: Tonnetz.getNoteName(70),       // A#/Bb, no key context
+    fMajor: Tonnetz.getNoteName(70, -1),  // F major (fifths=-1) -- Bb is IN this key's own scale
+    dMajor: Tonnetz.getNoteName(66, 2),   // D major (fifths=2) -- F# is IN this key's own scale
+  }));
+  expect(names.noKey).toBe('A#');
+  expect(names.fMajor).toBe('Bb');
+  expect(names.dMajor).toBe('F#');
+});
+
+test('Tonnetz.getNoteName: a chromatic (non-diatonic) tone falls back to sharps-below/flats-above by key', async ({ page }) => {
+  await page.goto('/');
+  // MIDI 66 (F#/Gb) is chromatic in C major (fifths=0) -- neither in its 7-note scale.
+  const names = await page.evaluate(() => ({
+    inSharpKey: Tonnetz.getNoteName(66, 0),  // C major (sharps-side convention, fifths >= 0)
+    inFlatKey: Tonnetz.getNoteName(66, -3),  // Eb major (fifths < 0, flats-side convention)
+  }));
+  expect(names.inSharpKey).toBe('F#');
+  expect(names.inFlatKey).toBe('Gb');
+});
+
+test('Tonnetz.detectKeySignature: picks the key whose scale covers the notes with the fewest accidentals', async ({ page }) => {
+  await page.goto('/');
+  const fifths = await page.evaluate(() => ({
+    fMajorScale: Tonnetz.detectKeySignature([65, 67, 69, 70, 72, 74, 76]), // F G A Bb C D E -- F major, fifths=-1
+    dMajorScale: Tonnetz.detectKeySignature([62, 64, 66, 67, 69, 71, 73]), // D E F# G A B C# -- D major, fifths=2
+    cMajorScale: Tonnetz.detectKeySignature([60, 62, 64, 65, 67, 69, 71]), // C D E F G A B -- C major, fifths=0
+  }));
+  expect(fifths.fMajorScale).toBe(-1);
+  expect(fifths.dMajorScale).toBe(2);
+  expect(fifths.cMajorScale).toBe(0);
+});
+
+test('Tonnetz.detectKeySignature: empty input returns 0 (C major/no signature) rather than throwing', async ({ page }) => {
+  await page.goto('/');
+  const fifths = await page.evaluate(() => Tonnetz.detectKeySignature([]));
+  expect(fifths).toBe(0);
+});
+
+test('Melody: the Tonnetz\'s own cell labels spell notes per the loaded song\'s detected key, not always sharps', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.evaluate(() => {
+    // An F-major-flavored melody (F G A Bb C) -- Bb should read as "Bb" on the lattice, not "A#",
+    // once MelodyMode.loadDefault's own key-detection has run.
+    MelodyMode.state.melody = [65, 67, 69, 70, 72].map((midi, i) => ({ midi, time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.isRandom = true;
+    MelodyMode.state.keySignature = Tonnetz.detectKeySignature(MelodyMode.state.melody.map((n) => n.midi));
+    MelodyMode.refreshBoard();
+  });
+  const detected = await page.evaluate(() => MelodyMode.state.keySignature);
+  expect(detected).toBe(-1); // F major
+  // The real assertion: some rendered cell label reads "Bb", none reads "A#", for that pitch.
+  const anyBbLabel = await page.evaluate(() => [...document.querySelectorAll('#tonnetz-svg text')].some((t) => t.textContent.startsWith('Bb')));
+  const anySharpMislabel = await page.evaluate(() => [...document.querySelectorAll('#tonnetz-svg text')].some((t) => t.textContent.startsWith('A#')));
+  expect(anyBbLabel).toBe(true);
+  expect(anySharpMislabel).toBe(false);
+});
