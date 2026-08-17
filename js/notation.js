@@ -325,9 +325,7 @@ const Notation = {
     // return value -- callers pass it straight through, no separate computation) into
     // #<containerId>, each absolutely positioned at that note's OWN x -- the same x VexFlow itself
     // reported, so this row lines up with the staff above it without a second, independently
-    // -computed layout. A minimal stand-in for the real "spans the whole stack" barline overlay
-    // (docs/melody-notation-design.md) -- draws labels only; barline-spanning-through-the-timeline
-    // itself is still open (see that doc's Open Items).
+    // -computed layout.
     renderLabels: function(containerId, noteXPositions, keySignature) {
         const container = document.getElementById(containerId);
         if (!container) return;
@@ -342,6 +340,24 @@ const Notation = {
             span.style.transform = 'translateX(-50%)';
             span.textContent = Tonnetz.getNoteName(n.midi, keySignature) + Tonnetz.getOctave(n.midi);
             container.appendChild(span);
+        });
+    },
+
+    // One .notation-barline div per entry of `barlineXPositions` (Notation.render's own return
+    // value), into #<containerId> -- meant to be the SHARED scroll wrapper
+    // (#melody-notation-scroll/#compose-notation-scroll), not the staff itself, so each line's
+    // CSS (top:0;bottom:0) spans the whole staff+labels+timeline stack rather than just the
+    // staff's own drawn barlines, which only mark the boundary within the staff.
+    // docs/melody-notation-design.md's "Barline-overlay mechanics" open item.
+    renderBarlineOverlay: function(containerId, barlineXPositions) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.querySelectorAll('.notation-barline').forEach((el) => el.remove());
+        (barlineXPositions || []).forEach((x) => {
+            const line = document.createElement('div');
+            line.className = 'notation-barline';
+            line.style.left = x + 'px';
+            container.appendChild(line);
         });
     },
 };

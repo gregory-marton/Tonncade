@@ -854,6 +854,9 @@ const ComposeMode = {
             keySignature: this.state.keySignature,
         });
         Notation.renderLabels('compose-staff-labels', this._staffRender ? this._staffRender.noteXPositions : [], this.state.keySignature);
+        // Spans the whole staff+labels+timeline stack (#compose-notation-scroll), not just the
+        // staff's own drawn barlines -- see js/melody.js's identical call.
+        Notation.renderBarlineOverlay('compose-notation-scroll', this._staffRender ? this._staffRender.barlineXPositions : []);
     },
 
     // A persistent ring per selected note, distinct from highlightByMidi's momentary play-flash

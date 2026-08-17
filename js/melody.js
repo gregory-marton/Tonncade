@@ -695,6 +695,10 @@ const MelodyMode = {
         if (typeof Notation === 'undefined') return;
         const result = Notation.render('melody-staff', notes, { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
         Notation.renderLabels('melody-staff-labels', result ? result.noteXPositions : [], this.state.keySignature);
+        // Spans the whole staff+labels+timeline stack (#melody-notation-scroll), not just the
+        // staff's own drawn barlines -- docs/melody-notation-design.md's "Barline-overlay
+        // mechanics" open item.
+        Notation.renderBarlineOverlay('melody-notation-scroll', result ? result.barlineXPositions : []);
     },
 
     // The scrub marker: a real I-beam (see css/style.css) absolutely positioned over the target
@@ -714,10 +718,15 @@ const MelodyMode = {
     positionScrubMarker: function(targetIdx) {
         const listEl = document.getElementById('melody-note-list');
         if (!listEl) return;
+        // Parented under #melody-notation-scroll (the shared scroll wrapper), not listEl itself --
+        // its CSS (top:0;bottom:0) spans the WHOLE staff+labels+timeline stack that way, per
+        // docs/melody-notation-design.md's "the scrub marker spans the whole grand staff and note
+        // names/octaves" requirement, rather than just the timeline row alone.
+        const scrollEl = document.getElementById('melody-notation-scroll') || listEl;
 
         const tokens = Array.from(listEl.querySelectorAll('.note-token'));
 
-        let marker = listEl.querySelector('.scrub-marker');
+        let marker = scrollEl.querySelector('.scrub-marker');
         const targetToken = tokens.find(t => parseInt(t.getAttribute('data-note-idx'), 10) === targetIdx);
         const showMarker = tokens.length > 0 && this.getMaxStartIndex() > 0 && !!targetToken;
 
@@ -729,11 +738,14 @@ const MelodyMode = {
             marker = document.createElement('span');
             marker.className = 'scrub-marker';
             marker.title = 'Drag to replay from here';
-            listEl.appendChild(marker);
+            scrollEl.appendChild(marker);
         }
 
         // offsetLeft is relative to listEl's own content box, not the viewport -- stable across
-        // scroll position, unlike getBoundingClientRect() (see #46's scrollable timeline).
+        // scroll position, unlike getBoundingClientRect() (see #46's scrollable timeline). Still
+        // correctly usable as the marker's position within scrollEl too: listEl sits flush
+        // against scrollEl's left edge (no horizontal margin/padding between them), so a position
+        // relative to one is a position relative to the other.
         // Clamped to 0 -- a negative left would sit outside the scroll container's clipped
         // content box (overflow-x: auto implicitly clips overflow-y too), making the marker
         // unclickable/invisible for the very first token (offsetLeft 0).
@@ -843,8 +855,12 @@ const MelodyMode = {
     // mousedown-tracks-then-mousemove-updates-then-mouseup-commits shape every other drag
     // gesture in this project already uses (Sandbox's ghost drag, Melody's own pan/pinch fix).
     setupScrubMarker: function() {
-        const listEl = document.getElementById('melody-note-list');
-        if (!listEl) return;
+        // The marker itself now lives under #melody-notation-scroll, not #melody-note-list (see
+        // positionScrubMarker) -- these listeners need to move with it, since a mousedown/
+        // touchstart on the marker no longer bubbles through listEl at all once it's not an
+        // ancestor of the marker anymore.
+        const scrollEl = document.getElementById('melody-notation-scroll');
+        if (!scrollEl) return;
         const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         const startDrag = (clientX) => {
@@ -862,7 +878,7 @@ const MelodyMode = {
             this.seekTo(this.state.scrubDragIndex);
         };
 
-        listEl.addEventListener('mousedown', (e) => {
+        scrollEl.addEventListener('mousedown', (e) => {
             if (isTouch) return;
             if (!e.target.classList.contains('scrub-marker')) return;
             e.preventDefault();
@@ -871,17 +887,17 @@ const MelodyMode = {
         window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
         window.addEventListener('mouseup', endDrag);
 
-        listEl.addEventListener('touchstart', (e) => {
+        scrollEl.addEventListener('touchstart', (e) => {
             if (!e.target.classList.contains('scrub-marker')) return;
             e.preventDefault();
             startDrag(e.touches[0].clientX);
         }, { passive: false });
-        listEl.addEventListener('touchmove', (e) => {
+        scrollEl.addEventListener('touchmove', (e) => {
             if (!this.state.isDraggingScrub) return;
             e.preventDefault();
             moveDrag(e.touches[0].clientX);
         }, { passive: false });
-        listEl.addEventListener('touchend', endDrag);
+        scrollEl.addEventListener('touchend', endDrag);
     },
 
     // While dragging, finds whichever rendered note token's horizontal center is closest to the

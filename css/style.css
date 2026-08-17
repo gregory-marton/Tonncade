@@ -332,6 +332,21 @@ svg {
 .notation-scroll {
     overflow-x: auto;
     scrollbar-width: thin;
+    position: relative; /* anchor for .scrub-marker and .notation-barline, both stack-spanning */
+}
+
+/* One thin line per measure boundary (Notation.render's own barlineXPositions -- js/notation.js),
+   spanning the WHOLE staff+labels+timeline stack, not just the staff's own drawn barlines (which
+   only mark the measure boundary within the staff itself). docs/melody-notation-design.md's
+   "Barline-overlay mechanics" open item (Codex review: barlines didn't span the stack). Low-
+   contrast and click-through -- an aid, not another interactive element. */
+.notation-barline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--border);
+    pointer-events: none;
 }
 
 /* #melody-note-list's timeline layout (#46 redesign): real flex+gap gives every pair of adjacent
@@ -377,24 +392,32 @@ svg {
     align-self: center;
 }
 
-/* #46 scrub marker: a real I-beam (CSS-drawn vertical stem + top/bottom serifs, no glyph text),
-   absolutely positioned over #melody-note-list at the target token's offsetLeft -- so it's
-   visually clear which two notes a replay would start between, unlike the plain range-slider
-   version this replaced, and unlike the easy-to-miss ▾ glyph it replaced after that (see
-   INV-26/docs/invariants.md). The SAME <span> is created once and only ever repositioned via
-   style.left afterward -- never recreated -- so a live touch/mouse capture stays valid mid-drag. */
+/* #46 scrub marker: a real I-beam (CSS-drawn vertical stem + a top serif, no glyph text),
+   absolutely positioned at the target token's offsetLeft -- so it's visually clear which two
+   notes a replay would start between, unlike the plain range-slider version this replaced, and
+   unlike the easy-to-miss ▾ glyph it replaced after that (see INV-26/docs/invariants.md). The
+   SAME <span> is created once and only ever repositioned via style.left afterward -- never
+   recreated -- so a live touch/mouse capture stays valid mid-drag.
+   Parented under .notation-scroll (not #melody-note-list) and spans top:0;bottom:0 -- the whole
+   staff+labels+timeline stack, not just the timeline row -- per docs/melody-notation-design.md's
+   "the scrub marker spans the whole grand staff and note names/octaves" requirement (Codex
+   review: this was still only spanning the timeline). Only ONE serif (top) now, not top+bottom:
+   the old bottom serif was drawn via box-shadow with a HARDCODED pixel offset (the marker's
+   fixed 1.4em height) -- box-shadow's offset can't track a height that's now dynamic (the stack's
+   own height varies by viewport/song), so that trick stopped being expressible at all once the
+   marker had to span it instead of a fixed short row. */
 .scrub-marker {
     position: absolute;
     top: 0;
+    bottom: 0;
     display: inline-block;
     width: 6px;
-    height: 1.4em;
     margin: 0 1px;
     cursor: grab;
     touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
 }
 .scrub-marker::before {
-    /* the vertical stem */
+    /* the vertical stem -- spans the marker's own full (now dynamic) height */
     content: '';
     position: absolute;
     left: 50%; top: 0; bottom: 0;
@@ -403,14 +426,13 @@ svg {
     transform: translateX(-50%);
 }
 .scrub-marker::after {
-    /* top serif; the bottom serif is the same box drawn again via box-shadow, no extra DOM */
+    /* top serif */
     content: '';
     position: absolute;
     left: 50%; top: 0;
     width: 6px; height: 2px;
     background: var(--accent);
     transform: translateX(-50%);
-    box-shadow: 0 calc(1.4em - 2px) 0 0 var(--accent);
 }
 
 .scrub-marker:active {

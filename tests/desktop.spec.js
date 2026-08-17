@@ -4257,6 +4257,74 @@ test('Notation.renderLabels: one note-name/octave label per note, positioned at 
   expect(parseFloat(labels[1].left)).toBeGreaterThan(parseFloat(labels[0].left)); // same x-order as the staff
 });
 
+test('Notation.renderBarlineOverlay: one .notation-barline per barlineXPositions entry, at that measure\'s own x', async ({ page }) => {
+  await page.goto('/');
+  const lines = await page.evaluate(() => {
+    const staffContainer = document.createElement('div');
+    staffContainer.id = 'notation-test-container-barline';
+    const overlayContainer = document.createElement('div');
+    overlayContainer.id = 'notation-test-overlay-barline';
+    document.body.appendChild(staffContainer);
+    document.body.appendChild(overlayContainer);
+    const notes = [0, 1, 2].map((i) => ({ midi: 60, time: i * 2, duration: 2 })); // 3 measures at 120bpm
+    const result = Notation.render('notation-test-container-barline', notes, { bpm: 120 });
+    Notation.renderBarlineOverlay('notation-test-overlay-barline', result.barlineXPositions);
+    return [...overlayContainer.querySelectorAll('.notation-barline')].map((el) => el.style.left);
+  });
+  expect(lines.length).toBe(3);
+  expect(lines.map(parseFloat)).toEqual(lines.map(parseFloat).slice().sort((a, b) => a - b)); // in x order
+});
+
+// Melody's own refreshStaff (js/melody.js) wires renderBarlineOverlay into #melody-notation-scroll
+// (the shared stack wrapper), not the staff itself -- so the lines' CSS (top:0;bottom:0, see
+// css/style.css) spans the whole staff+labels+timeline stack. docs/melody-notation-design.md's
+// "Barline-overlay mechanics" open item (Codex review: barlines didn't span the stack).
+test('Melody: the barline overlay lands in the shared stack wrapper, not just the staff', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+  const info = await page.evaluate(() => {
+    const wrapper = document.getElementById('melody-notation-scroll');
+    const lines = wrapper.querySelectorAll('.notation-barline');
+    return { lineCount: lines.length, parentIsWrapper: lines.length > 0 && lines[0].parentElement === wrapper };
+  });
+  expect(info.lineCount).toBeGreaterThan(0);
+  expect(info.parentIsWrapper).toBe(true);
+});
+
+// The scrub marker's CSS (top:0;bottom:0, css/style.css) makes it span whatever height its
+// POSITIONED ANCESTOR has -- moving it from #melody-note-list (one row tall) to
+// #melody-notation-scroll (the whole stack) is what actually makes it span the stack, per
+// docs/melody-notation-design.md's "the scrub marker spans the whole grand staff and note
+// names/octaves" requirement (Codex review: it only spanned the timeline row).
+test('Melody: the scrub marker spans the full staff+labels+timeline stack height, not just the timeline row', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+  await page.evaluate(() => {
+    MelodyMode.state.targetLength = 3;
+    MelodyMode.updateDifficultyUI();
+  });
+  const heights = await page.evaluate(() => {
+    const marker = document.querySelector('.scrub-marker');
+    const wrapper = document.getElementById('melody-notation-scroll');
+    const list = document.getElementById('melody-note-list');
+    return {
+      markerParentIsWrapper: marker.parentElement === wrapper,
+      markerHeight: marker.getBoundingClientRect().height,
+      wrapperHeight: wrapper.getBoundingClientRect().height,
+      listHeight: list.getBoundingClientRect().height,
+    };
+  });
+  expect(heights.markerParentIsWrapper).toBe(true);
+  // The marker should span roughly the WHOLE wrapper (staff + labels + timeline), not just the
+  // one-row-tall note-list -- a generous threshold (70% of the wrapper) avoids being brittle
+  // against exact pixel rounding while still clearly distinguishing "spans the stack" from
+  // "spans one row."
+  expect(heights.markerHeight).toBeGreaterThan(heights.wrapperHeight * 0.7);
+  expect(heights.markerHeight).toBeGreaterThan(heights.listHeight * 2);
+});
+
 test('Notation.pitchFromY: round-trips every rendered note\'s own reported y back to its exact midi', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
