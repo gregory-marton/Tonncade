@@ -254,6 +254,15 @@ const Replay = {
         return `https://github.com/gregory-marton/Tonncade/issues/new?${params.toString()}`;
     },
 
+    // YYYYMMDDHHmmss in the REPORTER's own local time (not UTC) -- the whole point is letting
+    // someone with several downloaded replays sitting in one folder tell which is newest at a
+    // glance, which their file browser's own "modified" column already does in local time too.
+    _timestamp: function(date) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
+            `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    },
+
     // No server involved -- a Blob + object URL + synthetic click, all client-side.
     downloadFullLog: function() {
         const fullLogJson = JSON.stringify({ seed: this.seed, meta: this.meta, events: this.log, sounds: this.soundLog });
@@ -261,7 +270,7 @@ const Replay = {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `tonncade-replay-${this.seed}.json`;
+        a.download = `tonncade-replay-${this._timestamp(new Date())}-${this.seed}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

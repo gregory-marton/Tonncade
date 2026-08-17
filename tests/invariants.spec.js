@@ -1233,7 +1233,10 @@ test.describe('Invariant tests', () => {
     const downloadPromise = page.waitForEvent('download');
     await page.locator('#report-bug-link').click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toMatch(/^tonncade-replay-\d+\.json$/);
+    // YYYYMMDDHHmmss-seed, e.g. "tonncade-replay-20260817140530-123456.json" -- the timestamp
+    // lets someone with several downloaded replays in one folder tell which is newest at a
+    // glance (requested live), without having to rely on the OS's own file-modified column.
+    expect(download.suggestedFilename()).toMatch(/^tonncade-replay-\d{14}-\d+\.json$/);
 
     const openedUrl = await page.evaluate(() => window.__openedUrl);
     expect(openedUrl).toContain('https://github.com/gregory-marton/Tonncade/issues/new?');
@@ -1246,11 +1249,24 @@ test.describe('Invariant tests', () => {
     expect(body).not.toContain('**Seed:**');
   });
 
-  test('INV-18b: declining the save prompt copies the full log to the clipboard instead', async ({ page, context, browserName }) => {
-    test.skip(browserName !== 'chromium', 'clipboard-write permission grants are Chromium-only in Playwright');
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-
+  test('INV-18b: declining the save prompt copies the full log to the clipboard instead', async ({ page }) => {
+    // A real context.grantPermissions(['clipboard-write']) + navigator.clipboard.writeText hits
+    // the REAL OS clipboard -- Playwright's browser is a genuine Chromium process on whatever
+    // machine runs the suite, not a sandboxed one, so a real grant here would clobber the
+    // developer's actual clipboard on every local test run (found live: stale fuzz-test replay
+    // JSON, from BEFORE "Mobile Chrome" switched off an iPhone-flavored device profile, sitting
+    // in a real clipboard weeks later). Stubbing navigator.clipboard.writeText/readText in-page
+    // tests exactly the same call site (Replay.copyFullLogToClipboard reads navigator.clipboard
+    // at call time, not at page-load time) without ever touching the real OS clipboard.
     await page.evaluate(() => {
+      window.__clipboardText = null;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: (text) => { window.__clipboardText = text; return Promise.resolve(); },
+          readText: () => Promise.resolve(window.__clipboardText),
+        },
+      });
       window.__openedUrl = null;
       window.open = (url) => { window.__openedUrl = url; return null; };
     });
@@ -1274,6 +1290,8 @@ test.describe('Invariant tests', () => {
     // is set the clipboard is guaranteed to already hold the full log.
     await expect.poll(() => page.evaluate(() => window.__openedUrl)).not.toBeNull();
     const clipboardPayload = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
+    // (reads back through the SAME navigator.clipboard.readText() call site a real caller would
+    // use -- it's just backed by the in-page stub above, not the real OS clipboard.)
     expect(typeof clipboardPayload.seed).toBe('number');
     expect(clipboardPayload.events.some(e => e.key === 'ArrowLeft')).toBe(true);
   });

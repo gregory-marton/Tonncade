@@ -2598,8 +2598,26 @@ test('Tonnetz gravity<->canonical transforms preserve pitch and round-trip', asy
 // between copy and paste (standing in for "a different window/tab, with its own empty in-memory
 // clipboard") and confirming the OS clipboard alone is enough to recover the exact cells.
 test('Copy/paste: copy also writes the real OS clipboard, and paste recovers from it alone (cross-window)', async ({ page }) => {
-  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/');
+  // A real context().grantPermissions(['clipboard-write']) + navigator.clipboard.writeText hits
+  // the ACTUAL OS clipboard -- Playwright's browser is a genuine process on whatever machine
+  // runs the suite, not a sandboxed one, so this test (part of the ordinary desktop.spec.js run,
+  // not an occasional one) would clobber the developer's real clipboard on every local run.
+  // Stubbing navigator.clipboard.writeText/readText in-page tests the exact same call site
+  // (App.copy()/pasteFromClipboardOrOS read navigator.clipboard at call time) without ever
+  // touching the real OS clipboard -- see the identical fix for tests/invariants.spec.js's
+  // INV-18b, found live: stale replay JSON sitting in a real clipboard for weeks from exactly
+  // this kind of test.
+  await page.evaluate(() => {
+    window.__clipboardText = null;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: (text) => { window.__clipboardText = text; return Promise.resolve(); },
+        readText: () => Promise.resolve(window.__clipboardText),
+      },
+    });
+  });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
   const canonicalCells = await page.evaluate(() => {
     SandboxMode.state.placedCells = [{ p: 0, q: 0 }, { p: 1, q: 0 }];
