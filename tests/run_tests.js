@@ -128,6 +128,7 @@ loadScript('board.js');
 loadScript('render.js');
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'vendor', 'vexflow.js'), 'utf8'), context, { filename: 'vendor/vexflow.js' }); // vendored, MIT -- js/vendor/README.md
 loadScript('notation.js');
+loadScript('repeat-navigation.js');
 loadScript('musicxml.js'); // DOMParser is only referenced inside MusicXML.parse()'s body, never called at load time -- safe here despite no real DOM
 loadScript('undo-stack.js'); // sandbox.js/blast.js/life.js/compose.js's UndoStack.create(...) needs this loaded first
 loadScript('sandbox.js');

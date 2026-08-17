@@ -4100,3 +4100,141 @@ test('MusicXML: an empty/malformed document throws rather than silently returnin
   });
   expect(result.threw).toBe(true);
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// js/repeat-navigation.js -- unrolls repeat/D.C./D.S./Coda/Fine structure into a flat linear
+// sequence at import (docs/melody-notation-design.md). Fixtures are HAND-AUTHORED MusicXML (not
+// produced via MusicXML.write, which never emits this structure at all -- these represent what a
+// real external notation tool's export would contain). Four whole notes at 120bpm/4-4, MIDI
+// 60/62/64/65 (C/D/E/F), one per measure, so the melody itself makes the play order legible.
+// ────────────────────────────────────────────────────────────────────────
+
+test('RepeatNavigation: a simple repeat plays its section twice, then continues', async ({ page }) => {
+  await page.goto('/');
+  // |: C D :| E  -- expect C D C D E.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <sound tempo="120"/>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <barline location="right"><repeat direction="backward"/></barline>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+  </part>
+</score-partwise>`;
+  const midis = await page.evaluate((xml) => MusicXML.parse(xml).notes.map((n) => n.midi), xml);
+  expect(midis).toEqual([60, 62, 60, 62, 64]);
+});
+
+test('RepeatNavigation: variant (first/second) endings play the right measure on each pass', async ({ page }) => {
+  await page.goto('/');
+  // |: C [1: D :| 2: E  -- expect C D C E (the 1st ending only on pass 1, 2nd only on pass 2).
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <sound tempo="120"/>
+      <barline location="left"><repeat direction="forward"/></barline>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+    <measure number="2">
+      <barline location="left"><ending number="1" type="start"/></barline>
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <barline location="right"><ending number="1" type="stop"/><repeat direction="backward"/></barline>
+    </measure>
+    <measure number="3">
+      <barline location="left"><ending number="2" type="start"/></barline>
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <barline location="right"><ending number="2" type="discontinue"/></barline>
+    </measure>
+  </part>
+</score-partwise>`;
+  const midis = await page.evaluate((xml) => MusicXML.parse(xml).notes.map((n) => n.midi), xml);
+  expect(midis).toEqual([60, 62, 60, 64]);
+});
+
+test('RepeatNavigation: D.C. al Fine returns to the start and stops at Fine, ignored on the first pass', async ({ page }) => {
+  await page.goto('/');
+  // C D(Fine) E(D.C.) -- forward: C D E, D.C. sends back to start, stop at Fine -> C D E C D.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <sound tempo="120"/>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <sound fine="yes"/>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <sound dacapo="yes"/>
+    </measure>
+  </part>
+</score-partwise>`;
+  const midis = await page.evaluate((xml) => MusicXML.parse(xml).notes.map((n) => n.midi), xml);
+  expect(midis).toEqual([60, 62, 64, 60, 62]);
+});
+
+test('RepeatNavigation: D.S. al Coda returns to the Segno, then jumps to the Coda on "To Coda"', async ({ page }) => {
+  await page.goto('/');
+  // C(segno) D(tocoda) E F(D.S.) -- forward: C D E F, D.S. sends back to segno (C), this time
+  // honor "To Coda" at D: the marking sits within/after D's own content ("play up to here, THEN
+  // jump" -- standard convention), so D itself still plays before jumping straight to G (the
+  // coda), skipping E/F on the replay. Expect C D E F C D G.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <sound tempo="120" segno="segno"/>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <sound tocoda="coda"/>
+    </measure>
+    <measure number="3">
+      <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+    </measure>
+    <measure number="4">
+      <note><pitch><step>F</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <sound dalsegno="segno"/>
+    </measure>
+    <measure number="5">
+      <note><pitch><step>G</step><octave>4</octave></pitch><duration>16</duration><type>whole</type></note>
+      <sound coda="coda"/>
+    </measure>
+  </part>
+</score-partwise>`;
+  const midis = await page.evaluate((xml) => MusicXML.parse(xml).notes.map((n) => n.midi), xml);
+  expect(midis).toEqual([60, 62, 64, 65, 60, 62, 67]); // C D E F C D G -- D plays again, THEN jumps to the coda
+});
+
+test('RepeatNavigation: a document with no repeat/jump markers at all plays through exactly once, unchanged', async ({ page }) => {
+  await page.goto('/');
+  const notes = [
+    { midi: 60, time: 0, duration: 0.5 },
+    { midi: 62, time: 0.5, duration: 0.5 },
+  ];
+  const parsed = await page.evaluate((notes) => {
+    const xml = MusicXML.write(notes, { bpm: 120 });
+    return MusicXML.parse(xml).notes;
+  }, notes);
+  expect(parsed).toEqual(notes); // MusicXML.write's own output never has repeat markers -- sanity check the plumbing is a no-op when there's nothing to navigate
+});

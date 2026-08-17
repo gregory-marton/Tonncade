@@ -245,7 +245,11 @@ ${measuresXml.join('\n')}
     // contract MelodyMode.parseMIDI already returns, so callers can treat either source
     // interchangeably. Ties are merged back into one logical note; <chord/> notes share their
     // predecessor's time, same convention state.notes already uses for a recorded chord.
-    // Repeats/D.C./D.S./Coda/Fine are NOT expanded here -- see js/repeat-navigation.js.
+    //
+    // Repeats/D.C./D.S./Coda/Fine ARE expanded here, via js/repeat-navigation.js -- measures get
+    // walked in the RESOLVED play order (which may revisit a measure element more than once for a
+    // repeated section), not raw document order. Everything below this point is unaware of
+    // repeats/jumps at all; it just sees however many times each measure was resolved to appear.
     parse: function(text) {
         const doc = new DOMParser().parseFromString(text, 'application/xml');
         if (doc.querySelector('parsererror')) throw new Error('Malformed MusicXML');
@@ -257,7 +261,11 @@ ${measuresXml.join('\n')}
         let beatCursor = 0;
         let chordAnchorStart = 0;
 
-        doc.querySelectorAll('part measure').forEach((measure) => {
+        const measureOrder = typeof RepeatNavigation !== 'undefined'
+            ? RepeatNavigation.resolveMeasureOrder(doc.querySelectorAll('part measure'))
+            : [...doc.querySelectorAll('part measure')];
+
+        measureOrder.forEach((measure) => {
             const divisionsEl = measure.querySelector('attributes > divisions');
             if (divisionsEl) divisions = parseInt(divisionsEl.textContent, 10) || divisions;
             const tempoEl = measure.querySelector('sound[tempo]');
