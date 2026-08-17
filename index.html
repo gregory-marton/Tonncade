@@ -172,6 +172,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                              actual notes shows directly which two notes you're starting between).
                              Range is clamped in js/melody.js to [0, targetLength-1] -- "anywhere
                              you've already played," never into unplayed territory. -->
+                        <!-- Grand-staff view (docs/melody-notation-design.md), rendered via
+                             js/notation.js (VexFlow) -- sits ABOVE the note-timeline, not in place
+                             of it; the timeline keeps doing the interactive job (scrub, drag-to-seek,
+                             tri-coloured upcoming notes). Empty/hidden until MelodyMode.refreshStaff
+                             has something to draw (Random's tiny sliding window included). -->
+                        <div id="melody-staff" style="overflow-x: auto; margin-top: 4px;"></div>
+                        <div id="melody-staff-labels" class="melody-note-list" style="height: 1.2em;"></div>
                         <p id="melody-note-list" class="melody-note-list"></p>
                     </div>
                     <div id="melody-keyboard-instructions" class="desktop-only" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 11px; color: var(--dim);">
@@ -422,6 +429,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/board.js"></script>
     <script src="js/render.js"></script>
     <script src="js/vendor/vexflow.js"></script>
+    <script src="js/notation.js"></script>
     <script src="js/undo-stack.js"></script>
     <script src="js/sandbox.js"></script>
     <script src="js/difficulty-barbell.js"></script>

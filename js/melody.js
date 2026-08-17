@@ -605,6 +605,21 @@ const MelodyMode = {
         const markerIdx = this.state.isDraggingScrub ? this.state.scrubDragIndex : this.state.startIndex;
         this.positionScrubMarker(markerIdx);
         if (!this.state.isRandom && !this.state.isDraggingScrub) this.scrollTimelineToCurrent(current);
+
+        // Grand-staff view (docs/melody-notation-design.md) -- renders exactly whatever's showing
+        // in the timeline above (displayNotes, minus measure-tick entries which carry no idx),
+        // so Random's small sliding window and a real song's whole timeline are handled uniformly
+        // by construction, without duplicating either one's own windowing logic here.
+        this.refreshStaff(displayNotes.filter((n) => n.idx !== null).map((n) => melody[n.idx]));
+    },
+
+    // A deliberately minimal first pass (docs/melody-notation-design.md) -- the lightweight
+    // quantizer/speller/measure-inference is a separate, later piece; this just proves the
+    // rendering pipeline against whatever's currently on the timeline.
+    refreshStaff: function(notes) {
+        if (typeof Notation === 'undefined') return;
+        const result = Notation.render('melody-staff', notes, { bpm: this.state.melodyBPM });
+        Notation.renderLabels('melody-staff-labels', result ? result.noteXPositions : []);
     },
 
     // The scrub marker: a real I-beam (see css/style.css) absolutely positioned over the target

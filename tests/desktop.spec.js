@@ -3895,3 +3895,122 @@ test('Undo (#17): the single header button stays disabled everywhere undo has no
   await page.locator('#undo-btn').click();
   expect(await isDisabled(), 'blast, after undoing back to empty').toBe(true);
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// js/notation.js -- grand-staff rendering (docs/melody-notation-design.md). Structural assertions
+// only (note count, x-position ordering, barline/measure counts, correct clef split), never
+// pixel-level, consistent with this project's existing test style -- Notation is a thin wrapper
+// around the vendored VexFlow (js/vendor/vexflow.js), which is responsible for the actual
+// engraving correctness.
+// ────────────────────────────────────────────────────────────────────────
+
+test('Notation.render: renders one note per input note, at strictly increasing x-positions', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container';
+    document.body.appendChild(container);
+    return Notation.render('notation-test-container', [
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 0.5, duration: 0.5 },
+      { midi: 64, time: 1.0, duration: 0.5 },
+      { midi: 65, time: 1.5, duration: 0.5 },
+    ], { bpm: 120 });
+  });
+  expect(result.noteXPositions.length).toBe(4);
+  for (let i = 1; i < result.noteXPositions.length; i++) {
+    expect(result.noteXPositions[i].x).toBeGreaterThan(result.noteXPositions[i - 1].x);
+  }
+});
+
+test('Notation.render: splits notes across the grand staff by register (MIDI 60 = middle C)', async ({ page }) => {
+  await page.goto('/');
+  const clefs = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-2';
+    document.body.appendChild(container);
+    // 59 (B3) must land on the bass staff, 60 (C4) on the treble -- the exact boundary.
+    const result = Notation.render('notation-test-container-2', [
+      { midi: 59, time: 0, duration: 1 },
+      { midi: 60, time: 1, duration: 1 },
+    ], { bpm: 60 });
+    return result.noteXPositions.map((n) => n.clef);
+  });
+  expect(clefs).toEqual(['bass', 'treble']);
+});
+
+test('Notation.render: barline count matches measure count for a phrase spanning multiple measures', async ({ page }) => {
+  await page.goto('/');
+  const staveCount = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-3';
+    document.body.appendChild(container);
+    // 120bpm -> 2 seconds/measure (4/4). 9 seconds of notes spans 5 measures (ceil(9/2)... using
+    // whole notes at 2s each to land exactly on measure boundaries, no ambiguity from clipping).
+    const notes = [0, 1, 2, 3, 4].map((i) => ({ midi: 60, time: i * 2, duration: 2 }));
+    const result = Notation.render('notation-test-container-3', notes, { bpm: 120 });
+    return { staves: container.querySelectorAll('.vf-stave').length, result };
+  });
+  // Two staves (treble+bass) per measure.
+  expect(staveCount.staves).toBe(5 * 2);
+});
+
+test('Notation.render: an empty note array renders nothing and returns null (no crash)', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-4';
+    document.body.appendChild(container);
+    const r = Notation.render('notation-test-container-4', [], { bpm: 120 });
+    return { r, childCount: container.children.length };
+  });
+  expect(result.r).toBeNull();
+  expect(result.childCount).toBe(0);
+});
+
+test('Notation.render: returns one barline x-position per measure', async ({ page }) => {
+  await page.goto('/');
+  const barlines = await page.evaluate(() => {
+    const container = document.createElement('div');
+    container.id = 'notation-test-container-5';
+    document.body.appendChild(container);
+    const notes = [0, 1, 2].map((i) => ({ midi: 60, time: i * 2, duration: 2 })); // 3 measures at 120bpm
+    return Notation.render('notation-test-container-5', notes, { bpm: 120 }).barlineXPositions;
+  });
+  expect(barlines.length).toBe(3);
+  expect(barlines[1]).toBeGreaterThan(barlines[0]);
+  expect(barlines[2]).toBeGreaterThan(barlines[1]);
+});
+
+test('Notation.renderLabels: one note-name/octave label per note, positioned at that note\'s OWN reported x', async ({ page }) => {
+  await page.goto('/');
+  const labels = await page.evaluate(() => {
+    const staffContainer = document.createElement('div');
+    staffContainer.id = 'notation-test-container-6';
+    const labelContainer = document.createElement('div');
+    labelContainer.id = 'notation-test-labels-6';
+    document.body.appendChild(staffContainer);
+    document.body.appendChild(labelContainer);
+    const result = Notation.render('notation-test-container-6', [
+      { midi: 60, time: 0, duration: 0.5 }, // C4
+      { midi: 64, time: 0.5, duration: 0.5 }, // E4
+    ], { bpm: 120 });
+    Notation.renderLabels('notation-test-labels-6', result.noteXPositions);
+    return [...labelContainer.querySelectorAll('.note-token')].map((el) => ({
+      text: el.textContent,
+      left: el.style.left,
+    }));
+  });
+  expect(labels.map((l) => l.text)).toEqual(['C4', 'E4']);
+  expect(parseFloat(labels[1].left)).toBeGreaterThan(parseFloat(labels[0].left)); // same x-order as the staff
+});
+
+test('Melody: the grand staff renders real notes once a song is loaded, matching the Random-vs-song timeline it mirrors', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => document.querySelectorAll('#melody-staff svg').length > 0 || document.getElementById('melody-note-list').children.length > 0, { timeout: 3000 });
+  const notesOnTimeline = await page.evaluate(() => document.querySelectorAll('#melody-note-list .note-token').length);
+  const staffHasContent = await page.evaluate(() => document.querySelectorAll('#melody-staff svg').length > 0);
+  expect(notesOnTimeline).toBeGreaterThan(0);
+  expect(staffHasContent).toBe(true);
+});

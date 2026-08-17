@@ -10,6 +10,7 @@ const ASSETS = [
     './js/board.js',
     './js/render.js',
     './js/vendor/vexflow.js',
+    './js/notation.js',
     './js/undo-stack.js',
     './js/sandbox.js',
     './js/difficulty-barbell.js',
