@@ -1245,7 +1245,7 @@ test('Melody mode: dragging the mouse pans the Tonnetz, and still plays the clic
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   // resetGame()'s auto-kickoff "listen to the notes" intro sets isPlayingSequence, which blocks
   // svg.onmousedown entirely (including the pan it starts) until it finishes.
-  await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+  await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
   const before = await page.evaluate(() => ({ x: Render.viewX, y: Render.viewY }));
 
@@ -1763,9 +1763,7 @@ test('INV-30: leaving Blast mode stops it from repainting the board on a later r
 // (top/left: 10px) HUD overlays capped at max-width: 200px -- but #melody-controls's own version
 // of that same rule never got the position/max-width pair its siblings have, so it defaulted to
 // its natural (wide, content-driven) flow width while still being position:absolute, floating
-// over the board instead of being constrained to a small corner box. Separately,
-// #melody-keyboard-instructions (.desktop-only) is only hidden by the touch-pointer and
-// max-width:767px rules -- not this landscape one -- so it kept contributing extra bulk here too.
+// over the board instead of being constrained to a small corner box.
 // ────────────────────────────────────────────────────────────────────────
 
 test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
@@ -1784,9 +1782,6 @@ test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a w
 
   // #melody-controls is emptied into the drawer on mobile -- it must not render as a wide overlay.
   await expect(page.locator('#melody-controls')).toBeHidden();
-
-  // The desktop-only keyboard instructions shouldn't contribute bulk to this compact overlay.
-  await expect(page.locator('#melody-keyboard-instructions')).toBeHidden();
 });
 
 test('panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds)', async ({ page }) => {
@@ -3014,7 +3009,7 @@ test('Snake: head note sounds its true pitch, not a clamped one', async ({ page 
 test('Melody: the next three notes are tri-coloured in the timeline and on the Tonnetz', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+  await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
   const out = await page.evaluate(() => {
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0;

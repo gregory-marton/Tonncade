@@ -757,7 +757,9 @@ const MelodyMode = {
 
         const tId2 = setTimeout(() => {
             this.state.isPlayingSequence = false;
-            this.setStatus("Your turn! Repeat the notes.", "success");
+            // No prose here (dropped per live feedback -- pure encouragement, not information:
+            // the highlighted current note on the practice strip already says what to play).
+            this.setStatus("", "success");
             this.state.userIndex = start;
             this.updateDifficultyUI();
         }, totalDuration);

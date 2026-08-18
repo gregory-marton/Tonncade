@@ -1528,7 +1528,7 @@ button:hover {
     }
 
     /* Hide Sandbox specific instructions & palettes on mobile sidebar */
-    #controls, #melody-keyboard-instructions, #snake-keyboard-instructions, #placement-controls, #sandbox-controls {
+    #controls, #snake-keyboard-instructions, #placement-controls, #sandbox-controls {
         display: none !important;
     }
 

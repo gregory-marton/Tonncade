@@ -281,7 +281,7 @@ test.describe('Invariant tests', () => {
 
   test('INV-5: tapping a cell in Melody mode both sounds its note AND visibly highlights that exact cell', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
     await page.evaluate(() => {
       window.__played = [];
@@ -306,7 +306,7 @@ test.describe('Invariant tests', () => {
   // for the SAME cell.
   test('INV-5: Render.highlightByMidi re-pulses visibly (a real paint frame with the class OFF) when called twice for the same pitch in quick succession', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
     const sawOffFrame = await page.evaluate(async () => {
       const midi = Tonnetz.getMidi(0, 0);
@@ -397,7 +397,7 @@ test.describe('Invariant tests', () => {
 
   test('INV-23: live MIDI hardware note-on advances Melody mode\'s practice sequence like a tap', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
     await connectFakeMidiDevice(page);
 
     const before = await page.evaluate(() => MelodyMode.state.userIndex);
@@ -667,7 +667,7 @@ test.describe('Invariant tests', () => {
       // and cross-iteration test interference are indistinguishable.
       await page.evaluate(() => Render.setRotation(0));
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-      if (mode === 'melody') await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+      if (mode === 'melody') await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
       if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       await setupModeState(page, mode);
 
@@ -1890,7 +1890,7 @@ test.describe('Invariant tests', () => {
 
   test('INV-25: Melody mode rejects a different-octave note with the same name, and accepts the exact pitch', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
     const targetMidi = await page.evaluate(() => MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
 
@@ -1923,7 +1923,7 @@ test.describe('Invariant tests', () => {
 
   test('INV-25: Melody\'s current-target readout shows an octave-qualified note name', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-game-status')).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
     const name = await page.evaluate(() => {
       const midi = MelodyMode.state.melody[MelodyMode.state.userIndex].midi;

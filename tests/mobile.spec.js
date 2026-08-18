@@ -1685,9 +1685,6 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await expect(page.locator('#controls')).toBeHidden();
 
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    await expect(page.locator('#melody-keyboard-instructions')).toBeHidden();
-
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
     await expect(page.locator('#snake-keyboard-instructions')).toBeHidden();
   });
@@ -1812,8 +1809,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   test('MIDI mode touch plays a note without crashing', async ({ page }) => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-    const status = page.locator('#melody-game-status');
-    await expect(status).toHaveText(/Your turn!/, { timeout: 8000 });
+    await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
     const cell = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="0"]');
     await expect(cell).toBeVisible();
