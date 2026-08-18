@@ -436,6 +436,22 @@ svg {
     text-decoration-style: dashed;
 }
 
+/* Colorblind-accessible "play this one" indicator (reported live: color alone wasn't enough) --
+   a small triangle above the current note's own token, in ADDITION to its color (never instead
+   of it). currentColor picks up whatever color updateDifficultyUI's decorate hook already set
+   on this token (UPCOMING_COLORS[0]), so the triangle always matches without extra wiring. Same
+   shape as .current-note-marker draws on the matching Tonnetz cell(s). */
+.note-token[data-note-role="current"]::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid currentColor;
+}
+
 /* The Timeline's two boundary markers (INV-55, js/timeline.js): a real I-beam (CSS-drawn
    vertical stem + a top serif, no glyph text), absolutely positioned at the target note's own x
    -- so it's visually clear which note a drag would land on, unlike the plain range-slider
@@ -454,8 +470,13 @@ svg {
     top: 0;
     bottom: 0;
     display: inline-block;
-    width: 6px;
-    margin: 0 1px;
+    /* Wider than the 2px visible stem (::before, below) on purpose -- a hit target this thin
+       was hard to grab precisely, especially now that it sits among real text in a busier
+       layout (reported live, more than once: a drag attempt landed on a neighboring note or the
+       bar's own background instead of the marker). The extra width is invisible (no
+       background), so it doesn't change how the marker LOOKS, only how forgiving it is to grab.
+       js/timeline.js's _positionMarker centers this box on its target note (left = x - width/2). */
+    width: 20px;
     cursor: grab;
     touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
 }
@@ -523,6 +544,43 @@ svg {
     stroke: white !important;
     stroke-width: 2.5px !important;
     transition: fill 0.05s ease-out, stroke 0.05s ease-out;
+}
+
+/* Melody's practice-strip decoration on the Tonnetz side (js/melody.js's updateDifficultyUI) --
+   past/future generic, plus the next three notes each in their own distinct colour matching the
+   pitch-row token they link to. Used to only be defined inside the mobile media query below,
+   so on desktop these classes were added to cells but never actually rendered any color at all
+   (found live, while adding a shape-based indicator alongside color for colorblind
+   accessibility -- see .current-note-marker). */
+polygon.glow-past {
+    fill: rgba(100, 255, 100, 0.25) !important;
+    filter: drop-shadow(0 0 6px rgba(100, 255, 100, 0.4));
+}
+polygon.glow-future {
+    fill: rgba(255, 200, 100, 0.25) !important;
+    filter: drop-shadow(0 0 6px rgba(255, 200, 100, 0.4));
+}
+polygon.glow-next-0 {
+    fill: rgba(90, 230, 140, 0.32) !important;
+    filter: drop-shadow(0 0 6px rgba(90, 230, 140, 0.5));
+}
+polygon.glow-next-1 {
+    fill: rgba(230, 178, 60, 0.32) !important;
+    filter: drop-shadow(0 0 6px rgba(230, 178, 60, 0.5));
+}
+polygon.glow-next-2 {
+    fill: rgba(209, 106, 143, 0.32) !important;
+    filter: drop-shadow(0 0 6px rgba(209, 106, 143, 0.5));
+}
+
+/* Colorblind-accessible "play this one" indicator (js/render.js's markCurrentNote/
+   clearCurrentNoteMarkers) -- a small triangle IN ADDITION to glow-next-0's color, drawn on top
+   of the current note's own cell(s). Same shape as .note-token[data-note-role="current"]'s own
+   ::before triangle on the pitch row, so the two read as the same signal in two places. */
+.current-note-marker {
+    fill: var(--text);
+    stroke: var(--bg);
+    stroke-width: 1px;
 }
 
 /* Sandbox tap-and-hold same-note highlight (task #24) -- every cell sharing the held cell's own
@@ -1658,37 +1716,6 @@ button:hover {
         bottom: var(--mobile-pad-safe-bottom);
         top: auto;
         align-items: flex-end;
-    }
-
-    polygon.active-note {
-        fill: rgba(255, 255, 255, 0.4) !important;
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
-    }
-
-    polygon.glow-past {
-        fill: rgba(100, 255, 100, 0.25) !important;
-        filter: drop-shadow(0 0 6px rgba(100, 255, 100, 0.4));
-    }
-
-    polygon.glow-future {
-        fill: rgba(255, 200, 100, 0.25) !important;
-        filter: drop-shadow(0 0 6px rgba(255, 200, 100, 0.4));
-    }
-
-    /* The next three notes to play (see js/midi.js updateDifficultyUI), each a distinct colour
-       that matches its token in the timeline note-list, so the upcoming notes read as linked
-       between the Tonnetz and the timeline. */
-    polygon.glow-next-0 {
-        fill: rgba(90, 230, 140, 0.32) !important;
-        filter: drop-shadow(0 0 6px rgba(90, 230, 140, 0.5));
-    }
-    polygon.glow-next-1 {
-        fill: rgba(230, 178, 60, 0.32) !important;
-        filter: drop-shadow(0 0 6px rgba(230, 178, 60, 0.5));
-    }
-    polygon.glow-next-2 {
-        fill: rgba(209, 106, 143, 0.32) !important;
-        filter: drop-shadow(0 0 6px rgba(209, 106, 143, 0.5));
     }
 
     #mobile-controls .m-btn {

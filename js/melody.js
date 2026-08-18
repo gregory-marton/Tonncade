@@ -256,7 +256,14 @@ const MelodyMode = {
             scrollContainerId: 'melody-notation-scroll',
             onStartCommit: (idx) => this.seekTo(idx),
             onEndCommit: (idx) => {
-                this.state.endIndex = Math.max(this.state.startIndex, idx);
+                // The real invariant is endIndex >= startIndex + 1, always -- <= here (not just
+                // <), so dragging end to land EXACTLY ON the current start also pushes the start
+                // back, not just past it. Symmetric with seekTo's own push-the-end-forward.
+                if (idx <= this.state.startIndex) {
+                    this.state.startIndex = Math.max(0, idx - 1);
+                    this.state.cleanStreak = 0; // now drilling a different stretch (#46)
+                }
+                this.state.endIndex = idx;
                 this.updateDifficultyUI();
             },
         });
@@ -578,6 +585,7 @@ const MelodyMode = {
         for (let r = 0; r < 3; r++) {
             document.querySelectorAll('.glow-next-' + r).forEach(el => el.classList.remove('glow-next-' + r));
         }
+        Render.clearCurrentNoteMarkers();
 
         if (diff === 3 || this.state.melody.length === 0) {
             this.timeline.refresh([], { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
@@ -637,6 +645,7 @@ const MelodyMode = {
                             data: { 'note-role': role, upcoming: String(rank) },
                         };
                         polygons.forEach(p => p.classList.add('glow-next-' + rank));
+                        if (rank === 0) Render.markCurrentNote(polygons);
                     } else {
                         decorations[i] = { style: { opacity: '0.8' }, data: { 'note-role': 'future' } };
                         polygons.forEach(p => p.classList.add('glow-future'));
@@ -667,6 +676,7 @@ const MelodyMode = {
                         data: { 'note-role': 'current', upcoming: '0' },
                     };
                     polygons.forEach(p => p.classList.add('glow-next-0'));
+                    Render.markCurrentNote(polygons);
                 } else if (diff === 1 && i - current <= 2) {
                     const rank = i - current;
                     decorations[i] = {
@@ -702,7 +712,11 @@ const MelodyMode = {
     resetGame: function() {
         this.state.gameStarted = true;
         this.cleanup();
-        this.state.endIndex = 0;
+        // Starts at [0, 1], not the degenerate [0, 0] -- a single-note segment made the two
+        // markers visually coincide from the very first moment (reported live: "the start bar
+        // should be at position 0, the end bar at position 1... right now both seem to be at
+        // zero"). Clamped for a genuinely 1-note melody, where there IS no second note.
+        this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
         this.state.userIndex = 0;
         this.state.startIndex = 0;
         this.state.cleanStreak = 0;
@@ -767,16 +781,14 @@ const MelodyMode = {
         this.state.playbackTimeoutIds.push(tId2);
     },
 
-    // #46 scrub control: replay the drilled segment starting from any note already reached.
-    // Clamped to [0, endIndex] -- "anywhere you've already played," never ahead into notes not
-    // yet drilled.
-    getMaxStartIndex: function() {
-        return Math.max(0, this.state.endIndex);
-    },
-
+    // #46 scrub control: replay the drilled segment starting from any note in the song --
+    // both markers are always freely draggable (INV-26), no proof-of-mastery gate on either.
+    // Dragging the start past the current end pushes the end forward (to one note ahead of the
+    // new start) instead of clamping the start backward to the old end, symmetric with
+    // onEndCommit's own push-the-start-back below.
     seekTo: function(index) {
         if (this.state.isPlayingPreview) return;
-        const clamped = Math.max(0, Math.min(index, this.getMaxStartIndex()));
+        const clamped = Math.max(0, Math.min(index, this.state.melody.length - 1));
 
         if (this.state.userRepeatTimeoutId) {
             clearTimeout(this.state.userRepeatTimeoutId);
@@ -794,6 +806,12 @@ const MelodyMode = {
         if (clamped !== this.state.startIndex) this.state.cleanStreak = 0;
 
         this.state.startIndex = clamped;
+        // The real invariant is endIndex >= startIndex + 1, always -- >= here (not just >), so
+        // dragging start to land EXACTLY ON the current end also pushes the end forward, not
+        // just past it.
+        if (clamped >= this.state.endIndex) {
+            this.state.endIndex = Math.min(this.state.melody.length - 1, clamped + 1);
+        }
         this.playTargetSequence();
     },
 
@@ -896,24 +914,29 @@ const MelodyMode = {
 
             // INV-26/53: the start's own measure-mastery streak -- scoped to the ONE measure
             // startIndex currently sits in, not the whole (possibly much longer, now that the
-            // end advances continuously) segment. Detected once per pass: the first correct
-            // note that lands past that measure's own boundary.
+            // end advances continuously) segment. Detected once per pass, the MOMENT that
+            // measure's own last note is played -- i.e. the note just played is still within
+            // startMeasure, but the next one (guaranteed to exist: the userIndex >= melody.length
+            // branch above already returned otherwise) is in a later measure. Previously required
+            // ALSO having played that next measure's first note before counting -- meaning a
+            // player who stopped right at the boundary (a natural place to pause) never got
+            // credit for a measure they'd already played correctly all the way through (reported
+            // live: "when I play the right sequence through a measure but don't play the first
+            // note of the next measure, it doesn't count... but it should").
             if (!this.state.isRandom && !this.state.segmentHadMistake && !this.state.measureStreakCounted) {
                 const startMeasure = this.measureOf(this.state.melody[this.state.startIndex].time);
-                if (this.measureOf(this.state.melody[this.state.userIndex - 1].time) > startMeasure) {
+                const justPlayedMeasure = this.measureOf(this.state.melody[this.state.userIndex - 1].time);
+                const nextNoteMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);
+                if (justPlayedMeasure === startMeasure && nextNoteMeasure > startMeasure) {
                     this.state.measureStreakCounted = true;
                     this.state.cleanStreak++;
                     if (this.state.cleanStreak >= 3) {
-                        let nextIdx = this.state.startIndex;
-                        while (nextIdx < this.state.melody.length && this.measureOf(this.state.melody[nextIdx].time) <= startMeasure) {
-                            nextIdx++;
-                        }
-                        if (nextIdx < this.state.melody.length) {
-                            this.state.startIndex = nextIdx;
-                            // endIndex should already be ahead of nextIdx (it tracks live), but
-                            // guard the startIndex <= endIndex invariant regardless.
-                            if (this.state.endIndex < nextIdx) this.state.endIndex = nextIdx;
-                        }
+                        // userIndex IS the first note of the next measure -- just verified above.
+                        const nextIdx = this.state.userIndex;
+                        this.state.startIndex = nextIdx;
+                        // endIndex should already be ahead of nextIdx (it tracks live), but
+                        // guard the startIndex <= endIndex invariant regardless.
+                        if (this.state.endIndex < nextIdx) this.state.endIndex = nextIdx;
                         this.state.cleanStreak = 0;
                         // Re-arm for the NEW current measure -- without this, a single
                         // continuous pass that keeps going (no mistake, no idle replay) could
@@ -1115,6 +1138,13 @@ const MelodyMode = {
         const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
         this.state.viewX = v.viewX;
         this.state.viewY = v.viewY;
+        // drawLattice rebuilds the whole lattice group from scratch -- a fresh set of <polygon>
+        // elements with none of updateDifficultyUI's own glow classes/markers, so anything that
+        // triggers a redraw AFTER the initial one (the pan-resize ResizeObserver, rotating the
+        // view, a window resize) silently wiped the practice-strip decoration entirely. Found
+        // live while adding the current-note shape marker (js/render.js's markCurrentNote) --
+        // it kept vanishing shortly after appearing.
+        this.updateDifficultyUI();
     },
 
     // MIDI parser logic (SMF format)

@@ -64,6 +64,7 @@ global.document = {
             style: {},
             setAttribute: () => {},
             appendChild: () => {},
+            insertBefore: () => {},
             addEventListener: () => {},
             getBoundingClientRect: ZERO_RECT,
             classList: { add: () => {}, remove: () => {} },

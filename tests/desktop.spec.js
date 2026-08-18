@@ -1328,12 +1328,15 @@ test('Melody mode: the start marker sits right before the note it targets', asyn
     const target = document.querySelector(`.note-token[data-note-idx="${MelodyMode.state.startIndex}"]`);
     if (!target) return false;
     const markerLeft = parseFloat(marker.style.left);
-    return Math.abs(markerLeft - target.offsetLeft) <= 5;
+    // Within half the marker's own (deliberately wide, easier-to-grab -- see css/style.css)
+    // hit-box width, not a tight pixel match -- its VISIBLE stem still lands exactly on the
+    // target via the same offset _positionMarker always used, just wider now.
+    return Math.abs(markerLeft - target.offsetLeft) <= 12;
   });
   expect(isAtTarget).toBe(true);
 });
 
-test('Melody mode: the scrub control clamps to notes already reached, never past endIndex', async ({ page }) => {
+test('Melody mode: the scrub control clamps to the last real note, and pushes the end forward past it', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
@@ -1342,11 +1345,75 @@ test('Melody mode: the scrub control clamps to notes already reached, never past
     MelodyMode.updateDifficultyUI();
   });
 
-  const clamped = await page.evaluate(() => {
-    MelodyMode.seekTo(99); // far beyond endIndex
-    return MelodyMode.state.startIndex;
+  const result = await page.evaluate(() => {
+    MelodyMode.seekTo(99); // far beyond both endIndex and the melody's own length
+    return { startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex, length: MelodyMode.state.melody.length };
   });
-  expect(clamped).toBe(3);
+  expect(result.startIndex, 'clamped to the last real note, not an out-of-range index').toBe(result.length - 1);
+  expect(result.endIndex, 'pushed forward to at least match the new start').toBeGreaterThanOrEqual(result.startIndex);
+});
+
+test('Melody mode: dragging the start marker past the end pushes the end one note ahead, instead of clamping the start back', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 3;
+    MelodyMode.seekTo(10); // past the current end (3)
+    return { startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex };
+  });
+  expect(result.startIndex).toBe(10);
+  expect(result.endIndex, 'one note ahead of the new start, not left behind at the old end').toBe(11);
+});
+
+test('Melody mode: dragging the end marker before the start pushes the start one note back, instead of clamping the end forward', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 10;
+    MelodyMode.state.endIndex = 15;
+    MelodyMode.timeline.onEndCommit(5); // before the current start (10)
+    return { startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex };
+  });
+  expect(result.endIndex).toBe(5);
+  expect(result.startIndex, 'one note behind the new end, not left behind at the old start').toBe(4);
+});
+
+// The real invariant is endIndex >= startIndex + 1, ALWAYS -- these two check the boundary the
+// above two don't: dragging a marker to land EXACTLY ON the other one (not past it) must still
+// push the other marker, not leave them coincident.
+test('Melody mode: dragging the start marker to exactly the current end still pushes the end forward', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 10;
+    MelodyMode.seekTo(10); // exactly the current end, not past it
+    return { startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex };
+  });
+  expect(result.startIndex).toBe(10);
+  expect(result.endIndex, 'endIndex must stay >= startIndex + 1').toBe(11);
+});
+
+test('Melody mode: dragging the end marker to exactly the current start still pushes the start back', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    MelodyMode.state.startIndex = 10;
+    MelodyMode.state.endIndex = 15;
+    MelodyMode.timeline.onEndCommit(10); // exactly the current start, not before it
+    return { startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex };
+  });
+  expect(result.endIndex).toBe(10);
+  expect(result.startIndex, 'startIndex must stay <= endIndex - 1').toBe(9);
 });
 
 test('Melody mode: dragging the start marker back replays the skipped-over earlier notes', async ({ page }) => {
@@ -3050,6 +3117,50 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
   expect(out.hasHz).toBe(false);                                // ...and no frequency in the timeline
 });
 
+// Colorblind-accessible "play this one" indicator, in ADDITION to color (reported live: color
+// alone wasn't enough): a small triangle on both the Tonnetz cell(s) sharing the current note's
+// pitch and the matching pitch-row token, not overlapping either one's own text label.
+test('Melody: the current note gets a small triangle marker on both the Tonnetz and the pitch row, above their own labels', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
+
+  const before = await page.evaluate(() => {
+    MelodyMode.state.difficulty = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.updateDifficultyUI();
+    const midi = MelodyMode.state.melody[0].midi;
+    const cell = document.querySelector(`polygon[data-midi="${midi}"]`);
+    const p = Number(cell.getAttribute('data-p'));
+    const q = Number(cell.getAttribute('data-q'));
+    const pos = Render.getScreenPos(p, q);
+    const marker = document.querySelector('#tonnetz-svg .current-note-marker');
+    const markerPoints = marker ? marker.getAttribute('points') : null;
+    const token = document.querySelector('.note-token[data-note-role="current"]');
+    return {
+      markerCount: document.querySelectorAll('#tonnetz-svg .current-note-marker').length,
+      markerY: markerPoints ? Math.min(...markerPoints.split(' ').map((pt) => parseFloat(pt.split(',')[1]))) : null,
+      cellCenterY: pos.y,
+      tokenExists: !!token,
+    };
+  });
+  expect(before.markerCount, 'every cell sharing the current pitch gets a marker').toBeGreaterThan(0);
+  expect(before.tokenExists, 'the pitch-row token is flagged as current (its own ::before draws the matching triangle)').toBe(true);
+  // createLabel (js/render.js) draws the note-name text at the cell's own center y + 5 -- "above,
+  // not overlapping" means the marker's y must sit comfortably before that, not centered on it.
+  // A smaller y is higher on screen (SVG y grows downward).
+  expect(before.markerY, 'the marker sits above the note-name label, not on top of it').toBeLessThan(before.cellCenterY - 5);
+
+  // A redraw (rotate, resize, etc. -- anything that calls refreshBoard) used to silently wipe
+  // the marker along with the rest of the glow decoration (drawLattice rebuilds the whole
+  // lattice group from scratch); refreshBoard now re-applies it.
+  const afterRedraw = await page.evaluate(() => {
+    MelodyMode.refreshBoard();
+    return document.querySelectorAll('#tonnetz-svg .current-note-marker').length;
+  });
+  expect(afterRedraw, 'the marker survives a board redraw, not just the initial paint').toBeGreaterThan(0);
+});
+
 // #94: a URL hash deep-links to a mode, and clicking a mode updates the URL so links are shareable
 // and discoverable.
 test('URL routing: hash deep-links to a mode and the URL updates on click', async ({ page }) => {
@@ -3419,6 +3530,28 @@ const loadSyntheticMeasures = (page) => page.evaluate(() => {
   MelodyMode.state.segmentHadMistake = false;
 });
 
+test('Melody: a measure banks its clean-play credit as soon as ITS OWN last note is played, without needing the next measure\'s first note too', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadSyntheticMeasures(page);
+
+  const result = await page.evaluate(() => {
+    const melody = MelodyMode.state.melody;
+    // Play exactly measure 0's own 4 notes (indices 0-3) and STOP there -- never play index 4
+    // (measure 1's own first note). Reported live: this used to not count at all.
+    for (let i = 0; i < 4; i++) MelodyMode.handleUserInputNote(melody[i].midi);
+    return {
+      cleanStreak: MelodyMode.state.cleanStreak,
+      measureStreakCounted: MelodyMode.state.measureStreakCounted,
+      userIndex: MelodyMode.state.userIndex,
+    };
+  });
+
+  expect(result.userIndex, 'stopped right at the boundary, never played into measure 1').toBe(4);
+  expect(result.measureStreakCounted).toBe(true);
+  expect(result.cleanStreak, 'measure 0 was played cleanly all the way through -- it should count').toBe(1);
+});
+
 test('Melody: a mistake in a later measure does not erase an already-banked clean-measure streak', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -3543,7 +3676,9 @@ test('Melody: the start marker matches the new startIndex on the very note that 
     return {
       startIndex: MelodyMode.state.startIndex,
       markerLeft: marker ? marker.style.left : null,
-      expectedLeft: entry ? (Math.max(0, entry.x - 3) + 'px') : null,
+      // -10: half of .timeline-marker's own (deliberately wide, easier-to-grab) 20px hit-box --
+      // see css/style.css/js/timeline.js's own comments on why it's not the marker's old -3.
+      expectedLeft: entry ? (Math.max(0, entry.x - 10) + 'px') : null,
     };
   });
 
@@ -3717,6 +3852,15 @@ test('Melody: a player-initiated scrub resets the clean-streak', async ({ page }
     return MelodyMode.state.cleanStreak;
   });
   expect(result).toBe(0);
+});
+
+test('Melody: a freshly loaded song starts at [0, 1], not the degenerate [0, 0]', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+  const result = await page.evaluate(() => ({ startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex }));
+  expect(result.startIndex).toBe(0);
+  expect(result.endIndex, 'the two markers should not visually coincide at the very start').toBe(1);
 });
 
 test('Melody: loading a new song resets the clean-streak', async ({ page }) => {
@@ -4672,17 +4816,23 @@ test('Notation.render: a measure\'s last note doesn\'t overlap the next measure\
   expect(firstOfMeasure2.x - lastOfMeasure1.x).toBeGreaterThan(15); // visually distinct noteheads, not overlapping
 });
 
-test('Notation.render: an empty note array renders nothing and returns null (no crash)', async ({ page }) => {
+// An empty note array used to render nothing at all (returning null) -- fine for a mode that
+// always has content by the time it draws (Melody), but Compose genuinely starts blank, and a
+// totally empty container read as "no timeline here at all" (reported live). Draws one empty
+// measure (clef/key/time signature, a whole rest) instead, so there's always a real, visible
+// staff to record onto.
+test('Notation.render: an empty note array still draws one empty measure (clef, no notes), not nothing', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
     const container = document.createElement('div');
     container.id = 'notation-test-container-4';
     document.body.appendChild(container);
     const r = Notation.render('notation-test-container-4', [], { bpm: 120 });
-    return { r, childCount: container.children.length };
+    return { r, childCount: container.children.length, hasSvg: !!container.querySelector('svg') };
   });
-  expect(result.r).toBeNull();
-  expect(result.childCount).toBe(0);
+  expect(result.r, 'still returns a real render result, not null').not.toBeNull();
+  expect(result.r.noteXPositions).toEqual([]);
+  expect(result.hasSvg, 'a real staff element is drawn').toBe(true);
 });
 
 // VexFlow defaults every drawn shape to solid black, which is effectively invisible against this

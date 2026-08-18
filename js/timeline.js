@@ -100,7 +100,11 @@ const Timeline = {
                 marker.title = which === 'start' ? 'Drag to move the start' : 'Drag to move the end';
                 scrollEl.appendChild(marker);
             }
-            marker.style.left = Math.max(0, entry.x - 3) + 'px';
+            // -10, not -3: half of .timeline-marker's own 20px width (css/style.css) --
+            // deliberately wider than its 2px visible stem, so the marker's own visible line
+            // still lands exactly on entry.x even though the (invisible, easier-to-grab) hit box
+            // around it is much wider.
+            marker.style.left = Math.max(0, entry.x - 10) + 'px';
         },
 
         // Keeps the currently-played note centered in the scroll container as playback advances

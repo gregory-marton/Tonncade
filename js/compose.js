@@ -202,14 +202,16 @@ const ComposeMode = {
 
         // Shares Melody's exact remembered folder (both work with .mid files) -- see
         // js/file-folder.js's `ids` parameter, which is what lets the same MidiFolder instance
-        // serve two different modes' own DOM elements. No `hasRandom`: Compose has no starting-
-        // content concept the way Melody's offline-degrade does.
+        // serve two different modes' own DOM elements. `hasBlank`, not `hasRandom`: Compose has
+        // no starting-content concept the way Melody's offline-degrade does -- its own
+        // synthetic top entry is a passive "nothing loaded yet" placeholder, not something that
+        // actively generates content the way Random does.
         if (typeof MidiFolder !== 'undefined') {
             MidiFolder.setup(this, {
                 sourceSelect: 'compose-source',
                 sourceStatus: 'compose-source-status',
                 uploadGroup: 'compose-upload-group',
-            });
+            }, { hasBlank: true, blankLabel: 'Record your own…' });
         }
     },
 

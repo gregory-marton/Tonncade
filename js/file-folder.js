@@ -146,8 +146,20 @@ const FileFolder = {
             this.mode = mode;
             this.ids = ids;
             this.hasRandom = !!(opts && opts.hasRandom);
+            // Compose's own synthetic top entry -- a passive placeholder (no load call, see
+            // handleSelect), distinct from Melody's "Random" (which actively generates and
+            // loads content). Only takes over the shared currentValue from null or Melody's own
+            // 'random' (meaningless for Compose, which has no such option) -- a REAL song
+            // chosen anywhere still shows selected here too, per this module's own "browse
+            // together" design (reported live: picking a song elsewhere should still load it
+            // onto Compose's timeline once you subsequently choose it there).
+            this.hasBlank = !!(opts && opts.hasBlank);
+            this.blankLabel = (opts && opts.blankLabel) || 'Record your own…';
             const token = ++this._token;
             if (this.hasRandom && this.currentValue === null) this.currentValue = 'random';
+            if (this.hasBlank && (this.currentValue === null || this.currentValue === 'random')) {
+                this.currentValue = 'blank';
+            }
 
             const select = document.getElementById(ids.sourceSelect);
             if (select) {
@@ -403,6 +415,13 @@ const FileFolder = {
                 if (this.mode && typeof this.mode.loadDefault === 'function') this.mode.loadDefault();
                 return;
             }
+            if (value === 'blank') {
+                // A pure placeholder -- no load, no clear of whatever's currently there. It's
+                // never a value the player picks to GO somewhere, only what's shown when
+                // nothing else has been chosen yet.
+                this.currentValue = 'blank';
+                return;
+            }
             const sep = value.indexOf(':');
             const tier = value.slice(0, sep);
             const idx = parseInt(value.slice(sep + 1), 10);
@@ -423,6 +442,7 @@ const FileFolder = {
             };
 
             if (this.hasRandom) addOption('random', 'Random');
+            if (this.hasBlank) addOption('blank', this.blankLabel);
 
             const usingFolder = this.fileHandles && this.fileHandles.length > 0;
             if (usingFolder) {

@@ -278,6 +278,10 @@ const App = {
             // Timeline too (see its own comment) -- covers a plain window resize picking up
             // #notation-bar's new width, not just a mode switch.
             this.setupMobileControls();
+            // positionModeSliderPill's own comment: a resize can cross the mobile-landscape
+            // breakpoint (a different transform axis) with no mode switch to otherwise trigger it.
+            const activeIdx = [...document.querySelectorAll('.mode-option')].findIndex((o) => o.classList.contains('active'));
+            if (activeIdx >= 0) this.positionModeSliderPill(activeIdx);
         });
 
         // Pannable modes (everything not in Render.RESTRICTED_MODES -- Sandbox/Melody/Compose/Life)
@@ -333,6 +337,23 @@ const App = {
         else this.setMode('sandbox', options.findIndex((o) => o.getAttribute('data-mode') === 'sandbox'));
     },
 
+    // The active pill's own position is a JS-set inline transform (a pure CSS breakpoint switch
+    // -- portrait/landscape mobile vs desktop -- can't retarget it on its own), using a
+    // DIFFERENT axis (translateY, stacked vertically) in mobile landscape than everywhere else
+    // (translateX). setMode already called this on every mode switch, but nothing ever
+    // recomputed it on a plain window resize with NO mode switch in between -- so resizing
+    // across that breakpoint (e.g. narrow-landscape back to wide desktop) left the pill sized
+    // and positioned for the OLD orientation's axis, with the newly-active option's own text
+    // rendered unreadable against the slider's own background (its ".active" color is
+    // deliberately set to blend into the slider, expecting the pill to be there) -- reported
+    // live as "Melody is invisible... its light blue pill is not where it's supposed to be."
+    positionModeSliderPill: function(idx) {
+        const activePill = document.querySelector('.mode-slider-active');
+        if (!activePill) return;
+        const isLandscape = window.innerWidth <= 950 && window.innerWidth > window.innerHeight;
+        activePill.style.transform = isLandscape ? `translateY(${idx * 100}%)` : `translateX(${idx * 100}%)`;
+    },
+
     setMode: function(mode, idx) {
         if (this.currentMode === mode) return;
 
@@ -344,22 +365,13 @@ const App = {
         const stats = document.getElementById('blast-stats');
         const sandboxCtrls = document.getElementById('sandbox-controls');
         const clickAction = document.getElementById('click-action');
-        const activePill = document.querySelector('.mode-slider-active');
         const options = document.querySelectorAll('.mode-option');
 
         // Update active class on options
         options.forEach(opt => opt.classList.remove('active'));
         options[idx].classList.add('active');
 
-        // Slide the active background indicator
-        if (activePill) {
-            const isLandscape = window.innerWidth <= 950 && window.innerWidth > window.innerHeight;
-            if (isLandscape) {
-                activePill.style.transform = `translateY(${idx * 100}%)`;
-            } else {
-                activePill.style.transform = `translateX(${idx * 100}%)`;
-            }
-        }
+        this.positionModeSliderPill(idx);
 
         // Clean up global listeners
         window.onkeydown = null;

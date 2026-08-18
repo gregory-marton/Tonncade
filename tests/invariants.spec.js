@@ -1419,6 +1419,30 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  // setMode itself only repositions the pill on an actual mode SWITCH -- nothing recomputed it
+  // on a plain window resize with no mode switch in between, so resizing across the mobile-
+  // landscape breakpoint (a different transform axis, translateY vs translateX) left the pill
+  // sized/positioned for the OLD orientation. Reported live: "Melody is invisible because its
+  // light blue pill is not where it's supposed to be" -- .mode-option.active's text color is
+  // deliberately set to blend into the slider's own background, expecting the pill to be there.
+  test('INV-29: resizing across the mobile-landscape breakpoint repositions the pill even without a mode switch', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 }); // mobile landscape -- translateY axis
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+    await page.waitForTimeout(300);
+
+    await page.setViewportSize({ width: 1280, height: 800 }); // desktop -- translateX axis
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    await page.waitForTimeout(300);
+
+    const { pillRect, optionRect } = await page.evaluate(() => {
+      const pill = document.querySelector('.mode-slider-active');
+      const option = document.querySelector('.mode-option[data-mode="melody"]');
+      return { pillRect: pill.getBoundingClientRect(), optionRect: option.getBoundingClientRect() };
+    });
+    expect(Math.abs(pillRect.left - optionRect.left), 'left').toBeLessThan(1);
+    expect(Math.abs(pillRect.top - optionRect.top), 'top').toBeLessThan(1);
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // INV-21: see docs/invariants.md for the two compounding CSS/rendering bugs this guards
   // against (both needed fixing together -- fixing only one had no visible effect).

@@ -119,7 +119,11 @@ const Notation = {
     // ties).
     toMeasures: function(beatNotes, beatsPerMeasure) {
         beatsPerMeasure = beatsPerMeasure || 4;
-        if (beatNotes.length === 0) return [];
+        // One measure of rest, not zero measures -- a caller with nothing recorded yet (Compose's
+        // own blank canvas) still gets a real, visible staff (clef/key/time signature) to record
+        // onto, rather than an empty container that reads as "no timeline here at all" (reported
+        // live).
+        if (beatNotes.length === 0) return [[{ rest: true, beatDuration: beatsPerMeasure }]];
         const totalBeats = Math.max(...beatNotes.map((n) => n.beatStart + n.beatDuration));
         const measureCount = Math.max(1, Math.ceil(totalBeats / beatsPerMeasure));
         const measures = [];
@@ -206,25 +210,27 @@ const Notation = {
         return Math.max(0, mi * beatsPerMeasure + frac * beatsPerMeasure);
     },
 
-    // Renders `notes` into #<containerId> as a grand staff. Returns null if there's nothing to
-    // draw (empty container, matches every other mode's "nothing to show yet" convention) or
-    // {width, height, noteXPositions, barlineXPositions, staveBounds} -- noteXPositions is
-    // [{midi, beatStart, x, y, clef}] (x/y via VexFlow's own getAbsoluteX()/getYs(), not
-    // reconstructed separately), staveBounds is the {trebleTop/Bottom, bassTop/Bottom, spacing}
-    // pitchFromY needs for hit-testing clicks on EMPTY staff space (not on an existing note).
+    // Renders `notes` into #<containerId> as a grand staff. Returns null only if the container
+    // itself doesn't exist; an empty `notes` still draws one empty measure (clef/key/time
+    // signature, a whole rest, see toMeasures) rather than nothing -- an empty Compose canvas
+    // still needs a real, clickable staff to record onto, not a blank void that reads as "no
+    // timeline here" (reported live). Returns {width, height, noteXPositions, barlineXPositions,
+    // staveBounds} -- noteXPositions is [{midi, beatStart, x, y, clef}] (x/y via VexFlow's own
+    // getAbsoluteX()/getYs(), not reconstructed separately), staveBounds is the {trebleTop/
+    // Bottom, bassTop/Bottom, spacing} pitchFromY needs for hit-testing clicks on EMPTY staff
+    // space (not on an existing note).
     render: function(containerId, notes, opts) {
         opts = opts || {};
         const container = document.getElementById(containerId);
         if (!container) return null;
         container.innerHTML = '';
-        if (!notes || notes.length === 0) return null;
 
         const bpm = opts.bpm || 120;
         const keySignature = opts.keySignature || null;
         const beatsPerMeasure = opts.beatsPerMeasure || 4;
         const clefSplit = opts.clefSplit != null ? opts.clefSplit : this.CLEF_SPLIT_MIDI;
 
-        const beatNotes = this.notesToBeatSpace(notes, bpm);
+        const beatNotes = this.notesToBeatSpace(notes || [], bpm);
         const measures = this.toMeasures(beatNotes, beatsPerMeasure);
 
         // opts.targetWidth (the scroll container's own current width, see Timeline.refresh) lets

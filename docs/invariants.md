@@ -478,7 +478,9 @@ getFrequency tests" (pure MIDI-to-Hz correctness, independent of any UI).
 
 The drilled segment starts at the left (start) scrubber and ends at the right (end) scrubber,
 `state.startIndex`/`state.endIndex` — both inclusive (`endIndex` IS the last included note's
-index, symmetric with `startIndex`), starting at `[0, 0]`. The end scrubber auto-advances with
+index, symmetric with `startIndex`), starting at `[0, 1]` (not the degenerate `[0, 0]` -- a
+single-note segment made the two markers visually coincide at the very start; reported live).
+The end scrubber auto-advances with
 correct play, once per correct play (or the user can move it directly) — continuous, no streak
 required. The beginning scrubber auto-advances by a measure once the player has cleanly played
 *that specific measure* (the one `startIndex` currently sits in, not the whole possibly-longer
@@ -502,7 +504,11 @@ always `melody[0].time`. A wrong note resets `userIndex` back to `startIndex`, n
 `seekTo` is a no-op during a full-melody preview (`isPlayingPreview`), a different,
 position-independent playback path. Dragging either scrubber directly is ungated — no
 proof-of-mastery required, matching this project's general stance (e.g. copy/paste into Blast is
-unrestricted too).
+unrestricted too), and neither marker can be blocked by the other's current position: dragging
+the start past the current end pushes the end forward to one note ahead of the new start (not a
+clamp back to the old end), and dragging the end before the current start pushes the start back
+to one note behind the new end (not a clamp forward to the old start) — reported live as "forcing
+me to move right before left."
 
 **Test:** `tests/desktop.spec.js` — "Melody mode: ... scrub marker/control ..." / "a wrong note
 resets progress back to the scrub position" tests, "dragging the marker near the timeline edge
@@ -510,9 +516,11 @@ scrolls it" (#46 edge-scroll), "the end of the drilled segment grows immediately
 correct play", "3 clean playthroughs of the current measure auto-advance the start into the next
 measure" (#46 part 5), "a mistake in a later measure does not erase an already-banked
 clean-measure streak", "three separate clean passes through a measure advance startIndex, and the
-next measure can bank its own streak in the same pass". `tests/mobile.spec.js` — "a real
-single-finger touch drag moves the scrub marker to the touched note", using genuine dispatched
-`Touch`/`TouchEvent` objects.
+next measure can bank its own streak in the same pass", "the scrub control clamps to the last real
+note, and pushes the end forward past it", "dragging the start marker past the end pushes the end
+one note ahead", "dragging the end marker before the start pushes the start one note back".
+`tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to the touched
+note", using genuine dispatched `Touch`/`TouchEvent` objects.
 
 ---
 

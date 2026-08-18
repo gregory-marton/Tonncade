@@ -200,6 +200,48 @@ const Render = {
         });
     },
 
+    // Colorblind-accessible "play this one" indicator (reported live: color alone wasn't enough)
+    // -- a small triangle drawn on top of the current note's own cell(s), the same shape
+    // css/style.css draws on the matching pitch-row token via ::before. Cleared and redrawn
+    // together, same pattern as the glow classes it supplements (never replaces -- this is in
+    // ADDITION to color, not instead of it).
+    clearCurrentNoteMarkers: function() {
+        if (!this.svg) return;
+        this.svg.querySelectorAll('.current-note-marker').forEach((el) => el.remove());
+    },
+
+    // polygons: a NodeList/array of the cell(s) sharing the current note's pitch (typically
+    // whatever the caller already queried via data-midi). Positioned via each cell's own
+    // data-p/data-q and the SAME (unrotated) getScreenPos cells themselves use -- appended into
+    // the lattice group (appendToLattice), so it picks up the group's rotate() transform for
+    // free, same as every other lattice-relative element, rather than double-applying rotation.
+    markCurrentNote: function(polygons) {
+        if (!this.svg) return;
+        (polygons || []).forEach((poly) => {
+            const p = Number(poly.getAttribute('data-p'));
+            const q = Number(poly.getAttribute('data-q'));
+            const pos = this.getScreenPos(p, q);
+            const marker = document.createElementNS(this.NS, 'polygon');
+            const r = 4;
+            // Small, and offset well above center -- createLabel's own note-name text sits at
+            // pos.y+5 and (in Melody, where this marker is used) createKeyboardLabel's own QWERTY
+            // hint sits at pos.y-7, so a marker AT center (found live: too big, sitting right on
+            // top of the pitch label) collided with both. This sits above them, near the hex's
+            // own top vertex (HEX_R=30) instead, mirroring how the pitch-row's own current-note
+            // triangle (css/style.css) sits ABOVE its text, not on top of it.
+            const cy = pos.y - 20;
+            const points = [
+                `${pos.x - r},${cy - r * 0.6}`,
+                `${pos.x + r},${cy - r * 0.6}`,
+                `${pos.x},${cy + r * 0.8}`,
+            ];
+            marker.setAttribute('points', points.join(' '));
+            marker.setAttribute('class', 'current-note-marker');
+            marker.style.pointerEvents = 'none';
+            this.appendToLattice(marker);
+        });
+    },
+
     // Counter-rotates a label around its own anchor point so it stays upright regardless of the
     // lattice-group's overall rotation -- a child's own rotate(-D) composes with the parent
     // group's rotate(D) to net zero rotation for the glyph itself, while the anchor point (and
