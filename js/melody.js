@@ -871,8 +871,16 @@ const MelodyMode = {
             }
 
             if (this.state.userIndex >= this.state.melody.length) {
-                // Completed the entire song! (celebrate() below is the payoff -- flourish +
-                // confetti -- self-explanatory without a status line spelling it out too.)
+                // Reported live: the flourish is for a COMPLETE playthrough. Reaching the last
+                // note when the drilled segment didn't start at the very beginning isn't that --
+                // send the start back to 0 instead, so the next pass is a genuine start-to-finish
+                // attempt, and skip the celebration.
+                if (this.state.startIndex !== 0) {
+                    this.seekTo(0);
+                    return;
+                }
+                // Completed the entire song, start to finish! (celebrate() below is the payoff --
+                // flourish + confetti -- self-explanatory without a status line spelling it out too.)
                 document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
                 document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
                 this.celebrate();

@@ -3509,6 +3509,31 @@ test('Melody: the song-complete flourish spawns self-removing confetti over the 
   );
 });
 
+// Reported live: the flourish is for a COMPLETE playthrough. Reaching the last note when the
+// drilled segment didn't start at the very beginning (startIndex != 0 -- e.g. still drilling a
+// later stretch) isn't that, so no flourish -- and the start marker goes back to 0 instead, so
+// the next pass is a genuine start-to-finish attempt.
+test('Melody: finishing the song without having started at the beginning skips the flourish and resets the start to 0', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const result = await page.evaluate(() => {
+    const melody = MelodyMode.state.melody;
+    MelodyMode.cleanupPlayback();
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.startIndex = 2; // did not start at the beginning
+    MelodyMode.state.endIndex = melody.length - 1;
+    MelodyMode.state.userIndex = melody.length - 1; // one note away from finishing
+    MelodyMode.handleUserInputNote(melody[melody.length - 1].midi); // the final note
+    return { startIndex: MelodyMode.state.startIndex };
+  });
+
+  const confettiCount = await page.locator('#melody-notation-scroll .confetti-piece').count();
+  expect(confettiCount, 'no flourish -- this was not a complete, start-to-finish playthrough').toBe(0);
+  expect(result.startIndex, 'the start marker is sent back to the beginning after finishing').toBe(0);
+});
+
 // Synthetic 4-measure/4-notes-per-measure melody at 120bpm (2s/measure) -- avoids needing a real
 // MIDI/MusicXML file just to control measure boundaries precisely for the INV-26/53 tests below.
 const loadSyntheticMeasures = (page) => page.evaluate(() => {

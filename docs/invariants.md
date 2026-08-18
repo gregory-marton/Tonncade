@@ -518,6 +518,13 @@ clamp back to the old end), and dragging the end before the current start pushes
 to one note behind the new end (not a clamp forward to the old start) — reported live as "forcing
 me to move right before left."
 
+Reaching the last note (`userIndex >= melody.length`) only triggers the song-complete flourish
+(`celebrate()`) if `startIndex` was 0 -- reported live: "the flourish is for a complete
+playthrough." Finishing while `startIndex` sits somewhere later in the song (drilling a
+later stretch, not the whole thing from the top) instead calls `seekTo(0)`, sending the start
+back to the very beginning so the next pass is a genuine start-to-finish attempt, with no
+celebration for this one.
+
 **Test:** `tests/desktop.spec.js` — "Melody mode: ... scrub marker/control ..." / "a wrong note
 resets progress back to the scrub position" tests, "dragging the marker near the timeline edge
 scrolls it" (#46 edge-scroll), "the end of the drilled segment grows immediately with each
@@ -526,9 +533,10 @@ measure" (#46 part 5), "a mistake in a later measure does not erase an already-b
 clean-measure streak", "three separate clean passes through a measure advance startIndex, and the
 next measure can bank its own streak in the same pass", "the scrub control clamps to the last real
 note, and pushes the end forward past it", "dragging the start marker past the end pushes the end
-one note ahead", "dragging the end marker before the start pushes the start one note back".
-`tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to the touched
-note", using genuine dispatched `Touch`/`TouchEvent` objects.
+one note ahead", "dragging the end marker before the start pushes the start one note back",
+"finishing the song without having started at the beginning skips the flourish and resets the
+start to 0". `tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub marker to
+the touched note", using genuine dispatched `Touch`/`TouchEvent` objects.
 
 ---
 
