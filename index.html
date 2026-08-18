@@ -90,6 +90,17 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
         </header>
 
         <div id="main-content">
+            <!-- Desktop/tablet only (see css/style.css's mobile breakpoint, which dissolves this
+                 into #main-content there): the Timeline (js/timeline.js) is genuinely a timeline
+                 now (grand staff + aligned pitch row + two draggable markers), and a narrow
+                 300px sidebar column gives it far less width than the full window -- so on
+                 desktop/tablet, Melody's and Compose's own #melody-notation-scroll/
+                 #compose-notation-scroll travel here instead, spanning the whole window width.
+                 js/main.js's updateNotationBar (called from setupMobileControls, itself called on
+                 resize and mode switch) moves the current mode's one in and restores it to its
+                 normal sidebar position for every other mode/viewport. Empty/hidden otherwise. -->
+            <div id="notation-bar" style="display: none;"></div>
+            <div id="content-row">
             <aside id="sidebar">
                 <div id="blast-stats" style="display: none;">
                     <div class="control-buttons">
@@ -429,6 +440,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 
 
             </main>
+            </div>
         </div>
     </div>
 

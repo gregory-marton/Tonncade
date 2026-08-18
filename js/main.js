@@ -835,6 +835,49 @@ const App = {
                 }
             }
         }
+
+        this.updateNotationBar();
+    },
+
+    // Desktop/tablet only (see index.html/css/style.css's own comments): Melody's and Compose's
+    // #melody-notation-scroll/#compose-notation-scroll -- the shared Timeline (js/timeline.js) --
+    // travel into #notation-bar, spanning the full window width instead of a narrow 300px sidebar
+    // column. Always restores each to its normal sidebar position first, regardless of viewport
+    // or mode, so there's exactly one place either element can be and every caller (mode switch,
+    // resize) converges on the same state rather than accumulating special cases.
+    updateNotationBar: function() {
+        const bar = document.getElementById('notation-bar');
+        if (!bar) return;
+
+        const melodyScroll = document.getElementById('melody-notation-scroll');
+        const melodyStatsGroup = document.getElementById('melody-stats-group');
+        if (melodyScroll && melodyStatsGroup && melodyScroll.parentElement !== melodyStatsGroup) {
+            melodyStatsGroup.appendChild(melodyScroll);
+        }
+
+        const composeScroll = document.getElementById('compose-notation-scroll');
+        const composeControls = document.getElementById('compose-controls');
+        const composeEditGroup = document.getElementById('compose-edit-group');
+        if (composeScroll && composeControls && composeScroll.parentElement !== composeControls) {
+            // insertBefore, not appendChild -- its authored position sits between the transport
+            // and edit-controls groups, not at the end (after stats).
+            if (composeEditGroup) composeControls.insertBefore(composeScroll, composeEditGroup);
+            else composeControls.appendChild(composeScroll);
+        }
+
+        if (Render.isMobileViewport()) {
+            bar.style.display = 'none';
+            return;
+        }
+        if (this.currentMode === 'melody' && melodyScroll) {
+            bar.appendChild(melodyScroll);
+            bar.style.display = 'block';
+        } else if (this.currentMode === 'compose' && composeScroll) {
+            bar.appendChild(composeScroll);
+            bar.style.display = 'block';
+        } else {
+            bar.style.display = 'none';
+        }
     },
 
     setupTouchGestures: function() {

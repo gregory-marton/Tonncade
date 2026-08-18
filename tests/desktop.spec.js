@@ -3159,6 +3159,44 @@ test('Melody: difficulty, transport, and the streak bar share one line, about as
   expect(rowBox.width).toBeLessThanOrEqual(dropdownBox.width + 4);
 });
 
+test('Melody/Compose: the Timeline spans the full window width, not the narrow sidebar column', async ({ page }) => {
+  await page.goto('/');
+  const sidebarWidth = await page.locator('#sidebar').boundingBox().then((b) => b.width);
+  const windowWidth = await page.evaluate(() => window.innerWidth);
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await expect(page.locator('#notation-bar #melody-notation-scroll')).toBeVisible();
+  const melodyBarWidth = await page.locator('#notation-bar').boundingBox().then((b) => b.width);
+  expect(melodyBarWidth).toBeGreaterThan(sidebarWidth);
+  expect(melodyBarWidth).toBeCloseTo(windowWidth, -1);
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await expect(page.locator('#notation-bar #compose-notation-scroll')).toBeVisible();
+  const composeBarWidth = await page.locator('#notation-bar').boundingBox().then((b) => b.width);
+  expect(composeBarWidth).toBeGreaterThan(sidebarWidth);
+  // Melody is no longer active -- its own Timeline already returned to the sidebar, not left
+  // stranded in the bar alongside Compose's.
+  await expect(page.locator('#melody-stats-group #melody-notation-scroll')).toHaveCount(1);
+
+  // Switching to a mode with no Timeline hides the bar and returns each element home.
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  await expect(page.locator('#notation-bar')).toBeHidden();
+  await expect(page.locator('#melody-stats-group #melody-notation-scroll')).toHaveCount(1);
+  await expect(page.locator('#compose-controls > #compose-notation-scroll')).toHaveCount(1);
+});
+
+test('Melody: the Timeline returns to the sidebar at a mobile viewport width', async ({ page }) => {
+  await page.setViewportSize({ width: 500, height: 800 });
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+  await expect(page.locator('#notation-bar')).toBeHidden();
+  // On a real mobile width, the whole notation stack travels into the always-visible dock
+  // alongside the rest of #melody-stats-group (task #77) -- not back into the (hidden)
+  // #melody-controls sidebar panel.
+  await expect(page.locator('#melody-mobile-tools #melody-notation-scroll')).toHaveCount(1);
+});
+
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
 // pieces by cell-count, so an easier game deals smaller, more-placeable pieces and a harder one
 // deals only the full four-cell tetrahexes (the historical default).

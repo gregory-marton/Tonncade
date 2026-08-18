@@ -57,10 +57,29 @@ body {
 
 #main-content {
     display: flex;
-    flex-direction: row;
-    flex-grow: 1;
+    flex-direction: column;
     height: calc(100vh - 60px);
     width: 100%;
+}
+
+/* Desktop/tablet only -- see index.html's own comment. Dissolved (display:contents) at the
+   mobile breakpoint below so #sidebar/#game-container flatten straight into #main-content's
+   column flow exactly as they did before this wrapper existed. */
+#content-row {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0; /* lets #sidebar/#game-container's own overflow rules actually apply */
+    width: 100%;
+}
+
+#notation-bar {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
 }
 
 .mobile-only {
@@ -1190,6 +1209,18 @@ button:hover {
         height: calc(100dvh - 40px);
     }
 
+    /* #notation-bar is desktop/tablet-only (see index.html) -- js/main.js never populates it on
+       a mobile-width viewport, but hide it here too so a resize can't leave it visibly empty. */
+    #notation-bar {
+        display: none !important;
+    }
+
+    /* Dissolved so #sidebar's OWN display:contents below flattens all the way up into
+       #main-content's column flow, same as before this wrapper existed. */
+    #content-row {
+        display: contents;
+    }
+
     #sidebar {
         display: contents;
     }
@@ -1850,6 +1881,19 @@ button:hover {
                                 above for why this matters. */
         height: 100dvh; /* Unlike portrait, the landscape header takes horizontal space (a side
                             column), not vertical, so there's no top-bar height to subtract. */
+        /* The base rule (non-media) is column, for desktop/tablet's #notation-bar-above-
+           #content-row stack -- landscape mobile needs its original row (sidebar's dissolved
+           contents beside #game-container), same as before that base rule existed. */
+        flex-direction: row;
+    }
+    /* Same treatment as the portrait breakpoint above -- #notation-bar is desktop/tablet-only,
+       and #content-row needs to dissolve for #sidebar's own display:contents to flatten all the
+       way up into #main-content's flow. */
+    #notation-bar {
+        display: none !important;
+    }
+    #content-row {
+        display: contents;
     }
     #sidebar {
         display: contents;
