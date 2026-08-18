@@ -63,17 +63,17 @@ const MelodyMode = {
                                 // always from note 0.
         // INV-26/53: the two ends auto-advance independently. endIndex grows immediately on
         // every correct play that reaches new territory (see handleUserInputNote) -- no streak
-        // involved. startIndex only jumps forward, by a whole measure, once the player has
-        // cleanly played THAT MEASURE (the one startIndex currently sits in, not the whole,
-        // possibly-longer-by-now segment) `cleanStreak` reaches 3 times in a row.
-        // measureStreakCounted guards against counting the same pass's measure-crossing twice;
-        // segmentHadMistake is transient, tracking whether the in-progress pass has had a
-        // mistake yet. None of these three are touched by cleanup()/init()'s resume branch, so
-        // they survive a mode switch away and back for free (INV-48), same as
-        // endIndex/userIndex/startIndex already do.
-        cleanStreak: 0,
-        measureStreakCounted: false,
-        segmentHadMistake: false,
+        // involved. startIndex jumps forward past every CONSECUTIVE measure (starting from
+        // wherever it currently sits) that's individually been played cleanly through to ITS
+        // OWN end `k`=3 times, stopping at the first one that hasn't yet -- not always exactly
+        // one measure at a time (reported live: playing a 2-measure stretch cleanly 3 times
+        // should skip both, not require separately re-proving the second one). Each measure's
+        // count lives independently in measureCleanStreak (keyed by measureOf(...) -- see
+        // handleUserInputNote), so a mistake only zeroes the ONE measure the wrong note actually
+        // fell in; every other measure's already-banked progress (earlier OR later) is
+        // untouched. Not reset by cleanup()/init()'s resume branch, so it survives a mode switch
+        // away and back for free (INV-48), same as endIndex/userIndex/startIndex already do.
+        measureCleanStreak: {},
         isPlayingPreview: false,
         isPlayingSequence: false,
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
@@ -259,9 +259,10 @@ const MelodyMode = {
                 // The real invariant is endIndex >= startIndex + 1, always -- <= here (not just
                 // <), so dragging end to land EXACTLY ON the current start also pushes the start
                 // back, not just past it. Symmetric with seekTo's own push-the-end-forward.
+                // Doesn't touch measureCleanStreak -- each measure's own banked credit is a
+                // historical record independent of where the drilled segment currently sits.
                 if (idx <= this.state.startIndex) {
                     this.state.startIndex = Math.max(0, idx - 1);
-                    this.state.cleanStreak = 0; // now drilling a different stretch (#46)
                 }
                 this.state.endIndex = idx;
                 this.updateDifficultyUI();
@@ -719,9 +720,7 @@ const MelodyMode = {
         this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
         this.state.userIndex = 0;
         this.state.startIndex = 0;
-        this.state.cleanStreak = 0;
-        this.state.measureStreakCounted = false;
-        this.state.segmentHadMistake = false;
+        this.state.measureCleanStreak = {};
         this.updateStreak(0);
         this.updateGhost();
         this.updateDifficultyUI();
@@ -735,8 +734,6 @@ const MelodyMode = {
     playTargetSequence: function() {
         this.cleanupPlayback();
         this.state.isPlayingSequence = true;
-        this.state.segmentHadMistake = false; // fresh pass at this segment -- see handleUserInputNote
-        this.state.measureStreakCounted = false; // fresh pass -- see handleUserInputNote
         this.setStatus("Listen to the notes...", "info");
 
         // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
@@ -799,12 +796,9 @@ const MelodyMode = {
             this.state.mistakeTimeoutId = null;
         }
 
-        // A player-initiated scrub to a different segment breaks the clean-streak (#46) -- it's
-        // now drilling a different stretch of the song, not continuing the one the streak counted.
-        // The internal auto-advance (handleUserInputNote) sets startIndex directly, not through
-        // seekTo, so it's naturally exempt from this reset.
-        if (clamped !== this.state.startIndex) this.state.cleanStreak = 0;
-
+        // Doesn't touch measureCleanStreak (#46) -- each measure's own banked credit is a
+        // historical record independent of where the drilled segment currently sits, so
+        // scrubbing to a different stretch doesn't erase progress on any measure.
         this.state.startIndex = clamped;
         // The real invariant is endIndex >= startIndex + 1, always -- >= here (not just >), so
         // dragging start to land EXACTLY ON the current end also pushes the end forward, not
@@ -912,38 +906,41 @@ const MelodyMode = {
                 return;
             }
 
-            // INV-26/53: the start's own measure-mastery streak -- scoped to the ONE measure
-            // startIndex currently sits in, not the whole (possibly much longer, now that the
-            // end advances continuously) segment. Detected once per pass, the MOMENT that
-            // measure's own last note is played -- i.e. the note just played is still within
-            // startMeasure, but the next one (guaranteed to exist: the userIndex >= melody.length
-            // branch above already returned otherwise) is in a later measure. Previously required
-            // ALSO having played that next measure's first note before counting -- meaning a
-            // player who stopped right at the boundary (a natural place to pause) never got
-            // credit for a measure they'd already played correctly all the way through (reported
-            // live: "when I play the right sequence through a measure but don't play the first
-            // note of the next measure, it doesn't count... but it should").
-            if (!this.state.isRandom && !this.state.segmentHadMistake && !this.state.measureStreakCounted) {
-                const startMeasure = this.measureOf(this.state.melody[this.state.startIndex].time);
+            // INV-26/53: bank clean-play credit for whichever measure just got fully, cleanly
+            // played through -- the note just played (userIndex-1) is still within its own
+            // measure, but the next one (guaranteed to exist: the userIndex >= melody.length
+            // branch above already returned otherwise) is in a later measure. Each measure's
+            // count lives independently (measureCleanStreak, keyed by measureOf(...)), not one
+            // shared counter -- a single continuous pass can cross several measure boundaries in
+            // a row, each banking its OWN credit, and a later mistake (see the mistake branch
+            // below) only zeroes the ONE measure it actually happened in.
+            if (!this.state.isRandom) {
                 const justPlayedMeasure = this.measureOf(this.state.melody[this.state.userIndex - 1].time);
                 const nextNoteMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);
-                if (justPlayedMeasure === startMeasure && nextNoteMeasure > startMeasure) {
-                    this.state.measureStreakCounted = true;
-                    this.state.cleanStreak++;
-                    if (this.state.cleanStreak >= 3) {
-                        // userIndex IS the first note of the next measure -- just verified above.
-                        const nextIdx = this.state.userIndex;
-                        this.state.startIndex = nextIdx;
-                        // endIndex should already be ahead of nextIdx (it tracks live), but
-                        // guard the startIndex <= endIndex invariant regardless.
-                        if (this.state.endIndex < nextIdx) this.state.endIndex = nextIdx;
-                        this.state.cleanStreak = 0;
-                        // Re-arm for the NEW current measure -- without this, a single
-                        // continuous pass that keeps going (no mistake, no idle replay) could
-                        // never bank a second measure's crossing: this flag would stay stuck
-                        // true from the first one forever, since it's otherwise only cleared by
-                        // a fresh pass (playTargetSequence) or a mistake.
-                        this.state.measureStreakCounted = false;
+                if (nextNoteMeasure > justPlayedMeasure) {
+                    this.state.measureCleanStreak[justPlayedMeasure] = (this.state.measureCleanStreak[justPlayedMeasure] || 0) + 1;
+
+                    // Advance start past every CONSECUTIVE measure (starting from wherever it
+                    // currently sits) that's individually reached k=3 -- not just one at a time --
+                    // stopping at the first one that hasn't (reported live: "stop at the beginning
+                    // of the first measure that wasn't quite right"; also: a 2-measure stretch
+                    // played cleanly 3 times should skip both measures, not just the first).
+                    let idx = this.state.startIndex;
+                    let m = this.measureOf(this.state.melody[idx].time);
+                    while ((this.state.measureCleanStreak[m] || 0) >= 3) {
+                        let nextIdx = idx;
+                        while (nextIdx < this.state.melody.length && this.measureOf(this.state.melody[nextIdx].time) <= m) {
+                            nextIdx++;
+                        }
+                        if (nextIdx >= this.state.melody.length) break; // that was the last measure
+                        idx = nextIdx;
+                        m = this.measureOf(this.state.melody[idx].time);
+                    }
+                    if (idx !== this.state.startIndex) {
+                        this.state.startIndex = idx;
+                        // endIndex should already be ahead of idx (it tracks live), but guard the
+                        // startIndex <= endIndex invariant regardless.
+                        if (this.state.endIndex < idx) this.state.endIndex = idx;
                     }
                 }
             }
@@ -986,18 +983,14 @@ const MelodyMode = {
         } else {
             // Mistake!
             this.setStatus("Oops! Let's listen again...", "error");
-            this.state.segmentHadMistake = true;
-            // Only wipe the streak if THIS measure's own clean crossing hasn't already been
-            // banked this pass -- once measureStreakCounted is true, the credit for cleanly
-            // playing through startIndex's current measure is already earned; a mistake further
-            // along, past that measure, is real progress toward the NEXT crossing and shouldn't
-            // retroactively undo the one already counted (reported live: "if I make an error
-            // later, that shouldn't count against the three consecutive good plays of an
-            // earlier measure").
-            if (!this.state.measureStreakCounted) {
-                this.state.cleanStreak = 0;
+            // Reset only the ONE measure the mistake actually fell in -- every other measure's
+            // own banked credit (including ones already fully mastered and skipped past) is
+            // untouched (reported live: "if I make an error later, that shouldn't count against
+            // the three consecutive good plays of an earlier measure").
+            if (!this.state.isRandom) {
+                const mistakeMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);
+                this.state.measureCleanStreak[mistakeMeasure] = 0;
             }
-            this.state.measureStreakCounted = false;
 
             // Random's end only grows via the timeout above, so a mistake can still land past it
             // -- show the correct version of the note they missed. (For a real song this is a

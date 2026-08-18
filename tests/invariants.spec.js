@@ -2197,25 +2197,25 @@ test.describe('Invariant tests', () => {
     });
   }
 
-  // #46's spaced-repetition auto-advance adds cleanStreak/segmentHadMistake to MelodyMode.state --
-  // untouched by cleanup()/init()'s resume branch (only resetGame() touches them, same as
-  // targetLength/userIndex/startIndex already were per the INV-48 fix above), so they should
+  // #46/#53's per-measure clean-play credit (MelodyMode.state.measureCleanStreak) is untouched by
+  // cleanup()/init()'s resume branch (only resetGame() touches it, same as
+  // targetLength/userIndex/startIndex already were per the INV-48 fix above), so it should
   // survive a switch away and back for free. paintedFingerprint() is deliberately a black-box DOM
-  // check (see its own comment) with no visible on-screen representation of cleanStreak to catch
-  // this, so it's asserted directly here instead, same spirit as the INV-25 tests that read
+  // check (see its own comment) with no visible on-screen representation of measureCleanStreak to
+  // catch this, so it's asserted directly here instead, same spirit as the INV-25 tests that read
   // MelodyMode.state directly.
   test('INV-48: Melody\'s clean-streak survives a switch away and back untouched', async ({ page }) => {
     await page.goto('/');
     await switchTo(page, 'melody');
     await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 5000 });
-    await page.evaluate(() => { MelodyMode.state.cleanStreak = 2; });
+    await page.evaluate(() => { MelodyMode.state.measureCleanStreak = { 0: 2 }; });
 
     await switchTo(page, 'blast');
     await page.waitForTimeout(300);
     await switchTo(page, 'melody');
 
-    const streak = await page.evaluate(() => MelodyMode.state.cleanStreak);
-    expect(streak).toBe(2);
+    const streak = await page.evaluate(() => MelodyMode.state.measureCleanStreak);
+    expect(streak).toEqual({ 0: 2 });
   });
 
   // Issue #17's undo history (state.undoStack, js/undo-stack.js) is untouched by cleanup()/

@@ -482,21 +482,29 @@ index, symmetric with `startIndex`), starting at `[0, 1]` (not the degenerate `[
 single-note segment made the two markers visually coincide at the very start; reported live).
 The end scrubber auto-advances with
 correct play, once per correct play (or the user can move it directly) — continuous, no streak
-required. The beginning scrubber auto-advances by a measure once the player has cleanly played
-*that specific measure* (the one `startIndex` currently sits in, not the whole possibly-longer
-segment up to `endIndex`) `k` correct plays in a row, where `k` is currently 3 (or the user can
-move it directly). Scoping the streak to one measure rather than the whole segment keeps the
-mastery bar constant as the segment grows.
+required. The beginning scrubber auto-advances once the player has cleanly played a measure `k`
+correct plays in a row, where `k` is currently 3 (or the user can move it directly).
 
-A mistake only resets the streak if THIS measure's own clean crossing hasn't already been banked
-this pass (`measureStreakCounted`) — once it has, that credit is earned, and a mistake further
-along (in a later measure) is real progress toward the next crossing, not grounds to retroactively
-undo an earlier one (reported live: an error later shouldn't count against three already-clean
-plays of an earlier measure). `measureStreakCounted` is re-armed both by a fresh pass
-(`playTargetSequence`) and immediately after `startIndex` itself advances — without the latter, a
-single continuous pass that keeps going past the just-mastered measure could bank at most one
-crossing ever, since nothing else would re-arm it (also reported live: three clean playthroughs of
-a measure not advancing it).
+Clean-play credit is tracked per measure, independently: `state.measureCleanStreak` is a plain
+object keyed by `measureOf(...)`'s numeric measure index, not a single shared counter. The
+instant a measure's own last note is played -- the note just played (`userIndex - 1`) is still in
+measure M, but the next one is in a later measure -- `measureCleanStreak[M]` increments. Because
+each measure's count is independent, a single continuous pass can cross several measure
+boundaries in a row, each banking its own credit, without needing a "fresh pass" gate to avoid
+double-counting: crossing a given boundary is structurally a one-time event within one monotonic
+forward pass. A mistake resets ONLY the specific measure it happened in
+(`measureCleanStreak[mistakeMeasure] = 0`) — a mistake in a later measure never erases an earlier,
+already-banked measure's own credit (reported live: an error later shouldn't count against three
+already-clean plays of an earlier measure). Banked credit is a historical record, not undone by
+`startIndex` advancing past it or by a scrub (`seekTo`) moving `startIndex` elsewhere.
+
+Every time a measure's credit is banked, `startIndex` advances past every CONSECUTIVE
+already-mastered measure starting from wherever it currently sits — not just one measure per
+crossing — stopping at the first measure whose own count hasn't yet reached `k` (reported live,
+the exact final spec: "all the way to where the consecutive measures were correct 3x in a row;
+stop at the beginning of the first measure that wasn't quite right." Two earlier, rejected
+alternatives: always advancing by exactly one measure per crossing regardless of how many were
+actually mastered, and jumping all the way to wherever the player happened to stop playing).
 
 `MelodyMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets `startIndex`, and
 calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of
@@ -1389,7 +1397,7 @@ so the test actually discriminates between the two, confirmed red against the ol
 before landing), "Compose: loading a file clears the undo history". `tests/invariants.spec.js` —
 "INV-48: Sandbox/Blast/Life/Compose's undo history survives a switch away and back untouched"
 (each mode's `undoStack` is untouched by `cleanup()`/`init()`'s resume branch, same shape as
-Melody's own `cleanStreak`, INV-26 — asserted directly since `paintedFingerprint`'s black-box DOM
+Melody's own `measureCleanStreak`, INV-26 — asserted directly since `paintedFingerprint`'s black-box DOM
 check has no visible representation of undo history to catch a regression here). Also "Undo (#17):
 the single header button stays disabled everywhere undo has nothing to do, and enables once there
 is something to undo" — covers the always-disabled modes (Melody/Snake/Gravity), the

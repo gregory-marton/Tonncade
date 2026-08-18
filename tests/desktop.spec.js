@@ -3525,9 +3525,7 @@ const loadSyntheticMeasures = (page) => page.evaluate(() => {
   MelodyMode.state.startIndex = 0;
   MelodyMode.state.endIndex = melody.length - 1;
   MelodyMode.state.userIndex = 0;
-  MelodyMode.state.cleanStreak = 0;
-  MelodyMode.state.measureStreakCounted = false;
-  MelodyMode.state.segmentHadMistake = false;
+  MelodyMode.state.measureCleanStreak = {};
 });
 
 test('Melody: a measure banks its clean-play credit as soon as ITS OWN last note is played, without needing the next measure\'s first note too', async ({ page }) => {
@@ -3541,15 +3539,13 @@ test('Melody: a measure banks its clean-play credit as soon as ITS OWN last note
     // (measure 1's own first note). Reported live: this used to not count at all.
     for (let i = 0; i < 4; i++) MelodyMode.handleUserInputNote(melody[i].midi);
     return {
-      cleanStreak: MelodyMode.state.cleanStreak,
-      measureStreakCounted: MelodyMode.state.measureStreakCounted,
+      measure0Streak: MelodyMode.state.measureCleanStreak[0],
       userIndex: MelodyMode.state.userIndex,
     };
   });
 
   expect(result.userIndex, 'stopped right at the boundary, never played into measure 1').toBe(4);
-  expect(result.measureStreakCounted).toBe(true);
-  expect(result.cleanStreak, 'measure 0 was played cleanly all the way through -- it should count').toBe(1);
+  expect(result.measure0Streak, 'measure 0 was played cleanly all the way through -- it should count').toBe(1);
 });
 
 test('Melody: a mistake in a later measure does not erase an already-banked clean-measure streak', async ({ page }) => {
@@ -3561,20 +3557,16 @@ test('Melody: a mistake in a later measure does not erase an already-banked clea
     const melody = MelodyMode.state.melody;
     // Play measure 0 cleanly, crossing into measure 1 -- banks one clean-measure credit.
     for (let i = 0; i < 5; i++) MelodyMode.handleUserInputNote(melody[i].midi);
-    const afterFirstCross = {
-      cleanStreak: MelodyMode.state.cleanStreak,
-      measureStreakCounted: MelodyMode.state.measureStreakCounted,
-    };
+    const measure0StreakAfterFirstCross = MelodyMode.state.measureCleanStreak[0];
 
     // A mistake in measure 2 -- a LATER measure, unrelated to measure 0's already-banked crossing.
     MelodyMode.handleUserInputNote(999);
-    return { afterFirstCross, cleanStreakAfterMistake: MelodyMode.state.cleanStreak };
+    return { measure0StreakAfterFirstCross, measure0StreakAfterMistake: MelodyMode.state.measureCleanStreak[0] };
   });
 
-  expect(result.afterFirstCross.measureStreakCounted).toBe(true);
-  expect(result.afterFirstCross.cleanStreak).toBe(1);
+  expect(result.measure0StreakAfterFirstCross).toBe(1);
   expect(
-    result.cleanStreakAfterMistake,
+    result.measure0StreakAfterMistake,
     'a mistake in a later measure must not erase credit already banked for an earlier one'
   ).toBe(1);
 });
@@ -3588,11 +3580,7 @@ test('Melody: three separate clean passes through a measure advance startIndex, 
     const melody = MelodyMode.state.melody;
     // Mirrors playTargetSequence's own fresh-pass reset (see its own comment), without the
     // real audio/timeout scheduling that isn't needed here.
-    const freshPass = () => {
-      MelodyMode.state.segmentHadMistake = false;
-      MelodyMode.state.measureStreakCounted = false;
-      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
-    };
+    const freshPass = () => { MelodyMode.state.userIndex = MelodyMode.state.startIndex; };
 
     // Three separate clean passes through measure 0 should advance startIndex into measure 1.
     for (let pass = 0; pass < 3; pass++) {
@@ -3601,23 +3589,23 @@ test('Melody: three separate clean passes through a measure advance startIndex, 
     }
     const afterThreePasses = {
       startIndex: MelodyMode.state.startIndex,
-      cleanStreak: MelodyMode.state.cleanStreak,
-      measureStreakCounted: MelodyMode.state.measureStreakCounted,
+      measure1Streak: MelodyMode.state.measureCleanStreak[1],
     };
 
     // Continuing in the SAME (4th) pass, past measure 1's own boundary too -- no fresh
     // playTargetSequence call in between.
     for (let i = MelodyMode.state.userIndex; i < 9; i++) MelodyMode.handleUserInputNote(melody[i].midi);
-    return { afterThreePasses, cleanStreakAfterContinuing: MelodyMode.state.cleanStreak };
+    return { afterThreePasses, measure1StreakAfterContinuing: MelodyMode.state.measureCleanStreak[1] };
   });
 
   expect(
     result.afterThreePasses.startIndex,
     'three clean passes through measure 0 should advance startIndex into measure 1'
   ).toBe(4);
+  expect(result.afterThreePasses.measure1Streak, "measure 1 hasn't been played yet").toBeUndefined();
   expect(
-    result.cleanStreakAfterContinuing,
-    "measure 1's own crossing should also be counted, not blocked by a flag stuck true from measure 0's advance"
+    result.measure1StreakAfterContinuing,
+    "measure 1's own crossing should also be counted independently, in the same pass"
   ).toBe(1);
 });
 
@@ -3641,18 +3629,12 @@ test('Melody: the start marker matches the new startIndex on the very note that 
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = melody.length - 1;
     MelodyMode.state.userIndex = 0;
-    MelodyMode.state.cleanStreak = 0;
-    MelodyMode.state.measureStreakCounted = false;
-    MelodyMode.state.segmentHadMistake = false;
+    MelodyMode.state.measureCleanStreak = {};
   });
 
   const result = await page.evaluate(() => {
     const melody = MelodyMode.state.melody;
-    const freshPass = () => {
-      MelodyMode.state.segmentHadMistake = false;
-      MelodyMode.state.measureStreakCounted = false;
-      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
-    };
+    const freshPass = () => { MelodyMode.state.userIndex = MelodyMode.state.startIndex; };
     // Two clean passes through measure 0 (banking 2 of the 3 needed) -- crossing is only
     // detected once a note IN THE NEXT measure is actually played, so each pass plays measure
     // 0's own 2 notes plus the next measure's first note.
@@ -3720,34 +3702,29 @@ test('Melody: 3 clean playthroughs of the current measure auto-advance the start
     // note 4 (time 2.0) is the first note of measure 1.
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 3; // notes 0..3 already established (measure 0), inclusive
-    MelodyMode.state.cleanStreak = 0;
+    MelodyMode.state.measureCleanStreak = {};
 
     const streaks = [];
     for (let pass = 0; pass < 3; pass++) {
-      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
-      MelodyMode.state.segmentHadMistake = false;
-      MelodyMode.state.measureStreakCounted = false;
+      MelodyMode.state.userIndex = 0; // measure 0's own start -- fixed, unlike startIndex which moves on advance
       MelodyMode.state.isPlayingSequence = false;
-      const startMeasure = MelodyMode.measureOf(MelodyMode.state.melody[MelodyMode.state.startIndex].time);
-      let i = MelodyMode.state.startIndex;
+      let i = 0;
       let crossed = false;
       while (!crossed) {
         const note = MelodyMode.state.melody[i];
-        crossed = MelodyMode.measureOf(note.time) > startMeasure;
+        crossed = MelodyMode.measureOf(note.time) > 0;
         MelodyMode.handleUserInputNote(note.midi);
         i++;
       }
-      streaks.push(MelodyMode.state.cleanStreak);
+      streaks.push(MelodyMode.state.measureCleanStreak[0]);
     }
     return {
       streaks,
       startIndex: MelodyMode.state.startIndex,
-      cleanStreak: MelodyMode.state.cleanStreak,
       startMeasure: MelodyMode.measureOf(MelodyMode.state.melody[MelodyMode.state.startIndex].time),
     };
   });
-  expect(result.streaks).toEqual([1, 2, 0]); // the 3rd clean pass triggers auto-advance, resetting the streak
-  expect(result.cleanStreak).toBe(0);
+  expect(result.streaks).toEqual([1, 2, 3]); // the 3rd clean pass triggers auto-advance; the banked credit itself is a historical record and isn't reset by advancing past it
   expect(result.startIndex).toBeGreaterThan(0); // moved out of measure 0
   expect(result.startMeasure).toBeGreaterThan(0); // landed in a later measure, not just +1 note
 });
@@ -3767,7 +3744,6 @@ test('Melody: the end of the drilled segment grows immediately with each correct
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 0; // only note 0 known so far
     MelodyMode.state.userIndex = 0;
-    MelodyMode.state.segmentHadMistake = false;
     MelodyMode.state.isPlayingSequence = false;
     const ends = [];
     for (let i = 0; i < 4; i++) {
@@ -3804,7 +3780,6 @@ test('Melody: pausing after a correct note still replays the segment after 2s, e
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 0;
     MelodyMode.state.userIndex = 0;
-    MelodyMode.state.segmentHadMistake = false;
     MelodyMode.handleUserInputNote(MelodyMode.state.melody[0].midi); // the only correct note so far
   });
 
@@ -3821,7 +3796,7 @@ test('Melody: pausing after a correct note still replays the segment after 2s, e
   expect(playedSegment).toBe(true);
 });
 
-test('Melody: a mistake resets the clean-streak', async ({ page }) => {
+test('Melody: a mistake resets only the specific measure it happened in', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
@@ -3829,17 +3804,19 @@ test('Melody: a mistake resets the clean-streak', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 3;
-    MelodyMode.state.cleanStreak = 2; // simulate 2 clean passes already banked
+    MelodyMode.state.measureCleanStreak = { 0: 2 }; // simulate 2 clean passes already banked for measure 0
     MelodyMode.state.userIndex = 0;
-    MelodyMode.state.segmentHadMistake = false;
     MelodyMode.state.isPlayingSequence = false;
-    MelodyMode.handleUserInputNote(MelodyMode.state.melody[0].midi + 1); // deliberately wrong
-    return MelodyMode.state.cleanStreak;
+    MelodyMode.handleUserInputNote(MelodyMode.state.melody[0].midi + 1); // deliberately wrong, in measure 0
+    return MelodyMode.state.measureCleanStreak[0];
   });
   expect(result).toBe(0);
 });
 
-test('Melody: a player-initiated scrub resets the clean-streak', async ({ page }) => {
+// The old shared cleanStreak used to be wiped on any scrub, since it had no notion of WHICH
+// measure it belonged to. Per-measure credit doesn't have that problem -- it's keyed by measure,
+// so it survives moving startIndex around; only an actual mistake in that measure resets it.
+test('Melody: a player-initiated scrub does not erase a measure\'s already-banked clean-play credit', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
@@ -3847,11 +3824,11 @@ test('Melody: a player-initiated scrub resets the clean-streak', async ({ page }
   const result = await page.evaluate(() => {
     MelodyMode.state.startIndex = 2;
     MelodyMode.state.endIndex = 3;
-    MelodyMode.state.cleanStreak = 2;
+    MelodyMode.state.measureCleanStreak = { 0: 2 };
     MelodyMode.seekTo(0); // a different startIndex -- player-initiated
-    return MelodyMode.state.cleanStreak;
+    return MelodyMode.state.measureCleanStreak[0];
   });
-  expect(result).toBe(0);
+  expect(result).toBe(2);
 });
 
 test('Melody: a freshly loaded song starts at [0, 1], not the degenerate [0, 0]', async ({ page }) => {
@@ -3867,10 +3844,10 @@ test('Melody: loading a new song resets the clean-streak', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await loadFrereJacques(page);
-  await page.evaluate(() => { MelodyMode.state.cleanStreak = 2; });
+  await page.evaluate(() => { MelodyMode.state.measureCleanStreak = { 0: 2, 1: 1 }; });
   await loadFrereJacques(page); // resetGame() runs again as part of loading
-  const streak = await page.evaluate(() => MelodyMode.state.cleanStreak);
-  expect(streak).toBe(0);
+  const streak = await page.evaluate(() => MelodyMode.state.measureCleanStreak);
+  expect(streak).toEqual({});
 });
 
 // ────────────────────────────────────────────────────────────────────────
