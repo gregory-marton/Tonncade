@@ -688,6 +688,10 @@ const MelodyMode = {
             decorate,
             showBarlines: !this.state.isRandom,
         });
+        // Random's own small sliding window (built above) always already contains `current` --
+        // nothing to scroll to. A real song renders in full up front, so playback needs to pull
+        // the view along with it.
+        if (!this.state.isRandom) this.timeline.scrollToCurrent(current);
     },
 
     // Marks the drill as genuinely started -- checked by init() so a mere mode SWITCH (away and

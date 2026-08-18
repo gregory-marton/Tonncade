@@ -3262,6 +3262,25 @@ test('Melody: dragging the marker near the timeline edge scrolls it (#46 edge-sc
   expect(scrollLeft).toBeGreaterThan(0);
 });
 
+test('Melody: the practice strip scrolls to follow the current note as you play through a song', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  const before = await page.evaluate(() => document.getElementById('melody-notation-scroll').scrollLeft);
+  expect(before).toBe(0); // starts scrolled to the very beginning
+
+  // Advance play well past whatever's visible at the default zoom -- exactly what happens over
+  // the course of a real playthrough, just done in one jump rather than note by note.
+  const after = await page.evaluate(() => {
+    MelodyMode.state.endIndex = MelodyMode.state.melody.length - 1;
+    MelodyMode.state.userIndex = MelodyMode.state.melody.length - 1;
+    MelodyMode.updateDifficultyUI();
+    return document.getElementById('melody-notation-scroll').scrollLeft;
+  });
+  expect(after, 'the strip should scroll to keep the current note in view').toBeGreaterThan(0);
+});
+
 test('Melody: measure ticks appear exactly where the computed measure changes (#46 part 4)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());

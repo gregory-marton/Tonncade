@@ -96,6 +96,22 @@ const Timeline = {
             marker.style.left = Math.max(0, entry.x - 3) + 'px';
         },
 
+        // Keeps the currently-played note centered in the scroll container as playback advances
+        // past whatever's already visible -- without this, a real song (rendered in full up
+        // front, per updateDifficultyUI's own comment) just sits there once play scrolls past the
+        // initially-visible notes, even though the note-role/glow decoration is still updating
+        // correctly underneath. Skipped entirely mid-drag (see setupDrag's this._dragging) so it
+        // never fights a live gesture's own scroll position.
+        scrollToCurrent: function(idx) {
+            if (this._dragging || idx == null) return;
+            const scrollEl = document.getElementById(this.scrollContainerId);
+            if (!scrollEl || !this._lastRender) return;
+            const entry = this._lastRender.noteXPositions.find((n) => n.id === idx);
+            if (!entry) return;
+            const target = entry.x - scrollEl.clientWidth / 2;
+            scrollEl.scrollLeft = Math.max(0, target);
+        },
+
         // Nearest rendered note (by x, in the scroll container's own coordinate space) to a
         // given screen clientX -- the same closest-token approach Melody's original
         // updateScrubDragTarget used, generalized to work off Notation.render's own
@@ -124,7 +140,9 @@ const Timeline = {
             const scrollEl = document.getElementById(this.scrollContainerId);
             if (!scrollEl) return;
             const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-            let dragging = null; // 'start' | 'end' | null
+            this._dragging = null; // 'start' | 'end' | null -- exposed on `this` so scrollToCurrent
+                                    // can tell a live drag apart from ordinary playback and not
+                                    // fight the user's own scroll position mid-gesture
             const EDGE = 40; // px from either edge that triggers auto-scroll
             const MAX_SPEED = 12; // px per tick
 
@@ -137,24 +155,24 @@ const Timeline = {
                 }
             };
             const startDrag = (which, clientX) => {
-                dragging = which;
+                this._dragging = which;
                 this._dragIndex = this._nearestIndex(clientX);
                 if (this._dragIndex != null) this._positionMarker(which, this._dragIndex);
             };
             const moveDrag = (clientX) => {
-                if (!dragging) return;
+                if (!this._dragging) return;
                 edgeScroll(clientX);
                 const idx = this._nearestIndex(clientX);
                 if (idx != null) {
                     this._dragIndex = idx;
-                    this._positionMarker(dragging, idx);
+                    this._positionMarker(this._dragging, idx);
                 }
             };
             const endDrag = () => {
-                if (!dragging) return;
-                const which = dragging;
+                if (!this._dragging) return;
+                const which = this._dragging;
                 const idx = this._dragIndex;
-                dragging = null;
+                this._dragging = null;
                 if (idx == null) return;
                 if (which === 'start') this.onStartCommit(idx);
                 else this.onEndCommit(idx);
