@@ -879,8 +879,6 @@ const MelodyMode = {
                 this.state.endIndex = this.state.userIndex;
             }
 
-            this.updateDifficultyUI();
-
             // Clear any existing "going ahead" timeout
             if (this.state.userRepeatTimeoutId) {
                 clearTimeout(this.state.userRepeatTimeoutId);
@@ -926,6 +924,13 @@ const MelodyMode = {
                     }
                 }
             }
+
+            // Placed AFTER the measure-mastery block above, not before it -- this is the call
+            // that repositions the start marker (via state.startIndex), so rendering it any
+            // earlier in this function would draw the marker at its PRE-advance position on
+            // exactly the note that advances it, landing it one note late (reported live: on a
+            // 2-note measure, "the start marker landed at half a measure").
+            this.updateDifficultyUI();
 
             // The idle-replay reminder must fire regardless of whether the player is at the
             // frontier or still mid-segment: a real song's end now grows immediately on every
