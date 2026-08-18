@@ -274,6 +274,9 @@ const App = {
         this.setupClipboard();
 
         window.addEventListener('resize', () => {
+            // setupMobileControls calls updateNotationBar, which re-renders the active mode's
+            // Timeline too (see its own comment) -- covers a plain window resize picking up
+            // #notation-bar's new width, not just a mode switch.
             this.setupMobileControls();
         });
 
@@ -481,6 +484,14 @@ const App = {
             guide.style.display = 'none';
         }
 
+        // Settles #sidebar/#notation-bar's visibility (and so #game-container's final size)
+        // BEFORE the mode's own init() below computes its first zoom/pan fit -- Melody/Compose
+        // otherwise fit against the pre-notation-bar layout (sidebar still visible, bar not
+        // shown yet), and that fit then persists un-recomputed on every later redraw by design
+        // (a real user zoom/pan must survive a redraw), silently wrong forever after. Harmless
+        // to call again at the end of setupMobileControls below -- idempotent.
+        this.updateNotationBar();
+
         if (mode === 'sandbox') {
             document.getElementById('placement-controls').style.display = 'block';
             if (hexNavControls) hexNavControls.style.display = 'block';
@@ -684,16 +695,10 @@ const App = {
                 
                 // Set up contents of the drawer depending on mode
                 const sandboxTools = document.getElementById('sandbox-mobile-tools');
-                const melodyTools = document.getElementById('melody-mobile-tools');
                 const drawerInjected = document.getElementById('drawer-injected-tools');
                 const palette = document.getElementById('palette');
                 const guide = document.getElementById('sandbox-guide');
                 const sidebar = document.getElementById('sidebar');
-
-                const melodySource = document.getElementById('melody-source-group');
-                const melodyUpload = document.getElementById('melody-upload-group');
-                const melodyStats = document.getElementById('melody-stats-group');
-                const melodyActions = document.getElementById('melody-actions-group');
 
                 if (drawerInjected) drawerInjected.style.display = 'none';
 
@@ -722,54 +727,8 @@ const App = {
                     // Hide the full guide in the drawer (label + instruction text stay hidden)
                     if (guide) guide.style.display = 'none';
                     if (drawerInjected) drawerInjected.style.display = 'none';
-                    if (melodyTools) melodyTools.style.display = 'none';
-                } else if (this.currentMode === 'melody') {
-                    if (sandboxTools) sandboxTools.style.display = 'none';
-                    // Every #melody-controls child is redistributed on mobile (stats+transport to the
-                    // always-visible dock, pickers+settings to the drawer), so the container itself
-                    // would otherwise render as an empty padded sliver over the board -- hide it.
-                    // The desktop branch restores its children and its display.
-                    const midiControlsEl = document.getElementById('melody-controls');
-                    if (midiControlsEl) midiControlsEl.style.display = 'none';
-                    const melodyStreak = document.getElementById('melody-streak-group');
-                    if (melodyTools) {
-                        melodyTools.style.display = 'flex';
-                        if (melodyStreak) melodyTools.appendChild(melodyStreak);
-                        if (melodyStats) melodyTools.appendChild(melodyStats);
-                        if (melodyActions) melodyTools.appendChild(melodyActions);
-                    }
-                    // The grand-staff view (docs/melody-notation-design.md) is rich content sized
-                    // for a real panel, not a small corner HUD -- #melody-stats-group travels into
-                    // the compact always-visible dock above, but #melody-staff itself doesn't
-                    // belong there the way the streak bar/pitch row do. Hidden here, restored by
-                    // the desktop branch below. #melody-staff-labels (the compact one-line pitch
-                    // row, INV-25) stays visible -- it travels along with #melody-stats-group into
-                    // the dock just fine, and it's the ONLY place a mobile player sees which note
-                    // is next, now that Melody's practice-strip decoration lives there instead of
-                    // a separate always-visible list (see INV-25/55).
-                    const melodyStaff = document.getElementById('melody-staff');
-                    if (melodyStaff) melodyStaff.style.display = 'none';
-                    // One-time setup + settings live in the drawer, out of the board's way: the
-                    // song-source dropdown, the upload fallback, and the Difficulty selector. Only
-                    // the transport (Play/Restart icons) and the streak stats stay in the
-                    // always-visible area (melodyTools, appended above). See task #77.
-                    if (drawerInjected) {
-                        drawerInjected.style.display = 'block';
-                        const melodySettings = document.getElementById('melody-settings-group');
-                        if (melodySource) drawerInjected.appendChild(melodySource);
-                        if (melodyUpload) drawerInjected.appendChild(melodyUpload);
-                        if (melodySettings) drawerInjected.appendChild(melodySettings);
-                    }
-                    // #palette (Sandbox's carousel) isn't used in MIDI mode — return it home and
-                    // hide it so it doesn't stay stranded inside a hidden sandboxTools.
-                    if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
-                    if (palette) {
-                        palette.style.display = 'none';
-                        palette.classList.remove('floating-queue');
-                    }
                 } else if (this.currentMode === 'blast' || this.currentMode === 'gravity') {
                     if (sandboxTools) sandboxTools.style.display = 'none';
-                    if (melodyTools) melodyTools.style.display = 'none';
                     // #palette doubles as Blast/Gravity's next-piece queue (their own
                     // renderNextQueue writes into #piece-list) — return it from wherever a
                     // previous mode left it and show it as a floating overlay over the board.
@@ -780,7 +739,6 @@ const App = {
                     }
                 } else {
                     if (sandboxTools) sandboxTools.style.display = 'none';
-                    if (melodyTools) melodyTools.style.display = 'none';
                     if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
                     if (palette) {
                         palette.style.display = 'none';
@@ -791,40 +749,7 @@ const App = {
                 // On desktop, ensure the drawer doesn't act like a drawer
                 topDrawer.classList.remove('expanded');
                 topDrawer.classList.remove('collapsed');
-                // Ensure midi controls are back in melody-controls container
-                const melodyControls = document.getElementById('melody-controls');
-                const melodySource = document.getElementById('melody-source-group');
-                const melodyUpload = document.getElementById('melody-upload-group');
-                const melodyActions = document.getElementById('melody-actions-group');
-                const melodyStats = document.getElementById('melody-stats-group');
 
-                if (melodyControls) {
-                    // Undo the mobile branch's display:none (its content is back in-panel here). On
-                    // desktop the sidebar is always visible, so #melody-controls shows only when midi
-                    // is the active mode -- covers a mobile->desktop resize with no mode change.
-                    melodyControls.style.display = (this.currentMode === 'melody') ? 'block' : 'none';
-                    // Restore original DOM order so the desktop sidebar panel reads top-to-bottom
-                    // as authored (source dropdown, upload fallback, then the settings/transport/
-                    // streak row, then stats). Settings/actions/streak go back INTO their shared
-                    // row (#melody-controls-row), not straight onto melodyControls, or a
-                    // mobile->desktop transition would pull them out of that row and back into
-                    // separate full-width lines.
-                    const melodySettings = document.getElementById('melody-settings-group');
-                    const melodyControlsRow = document.getElementById('melody-controls-row');
-                    const melodyStreak = document.getElementById('melody-streak-group');
-                    if (melodySource && melodySource.parentElement !== melodyControls) melodyControls.appendChild(melodySource);
-                    if (melodyUpload && melodyUpload.parentElement !== melodyControls) melodyControls.appendChild(melodyUpload);
-                    if (melodyControlsRow) {
-                        if (melodySettings && melodySettings.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodySettings);
-                        if (melodyActions && melodyActions.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodyActions);
-                        if (melodyStreak && melodyStreak.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodyStreak);
-                        if (melodyControlsRow.parentElement !== melodyControls) melodyControls.appendChild(melodyControlsRow);
-                    }
-                    if (melodyStats && melodyStats.parentElement !== melodyControls) melodyControls.appendChild(melodyStats);
-                    const melodyStaff = document.getElementById('melody-staff');
-                    if (melodyStaff) melodyStaff.style.display = ''; // undo the mobile-dock hide above
-                }
-                
                 // Ensure palette and guide are back in sidebar
                 const palette = document.getElementById('palette');
                 const guide = document.getElementById('sandbox-guide');
@@ -839,45 +764,69 @@ const App = {
         this.updateNotationBar();
     },
 
-    // Desktop/tablet only (see index.html/css/style.css's own comments): Melody's and Compose's
-    // #melody-notation-scroll/#compose-notation-scroll -- the shared Timeline (js/timeline.js) --
-    // travel into #notation-bar, spanning the full window width instead of a narrow 300px sidebar
-    // column. Always restores each to its normal sidebar position first, regardless of viewport
-    // or mode, so there's exactly one place either element can be and every caller (mode switch,
-    // resize) converges on the same state rather than accumulating special cases.
+    // Melody's and Compose's whole control panel (#melody-controls/#compose-controls) plus their
+    // own Timeline (#melody-notation-scroll/#compose-notation-scroll, js/timeline.js) move into
+    // #notation-bar -- a top bar with controls on the left and the Timeline filling the rest --
+    // whenever that mode is active, at EVERY viewport (a narrow phone doesn't have much width to
+    // split, so css/style.css's mobile breakpoints stack the two into thin-controls-then-Timeline
+    // instead of side by side, but the placement itself -- not the sidebar -- is consistent
+    // everywhere; see live feedback). #sidebar is hidden while the bar is showing, since it would
+    // otherwise just be an empty reserved-width column with nothing left in it. Every other mode
+    // is untouched: its own control panel stays in #sidebar exactly as before, and the bar stays
+    // hidden.
     updateNotationBar: function() {
         const bar = document.getElementById('notation-bar');
-        if (!bar) return;
+        const barControls = document.getElementById('notation-bar-controls');
+        if (!bar || !barControls) return;
 
+        const sidebar = document.getElementById('sidebar');
+        const melodyControls = document.getElementById('melody-controls');
         const melodyScroll = document.getElementById('melody-notation-scroll');
         const melodyStatsGroup = document.getElementById('melody-stats-group');
-        if (melodyScroll && melodyStatsGroup && melodyScroll.parentElement !== melodyStatsGroup) {
-            melodyStatsGroup.appendChild(melodyScroll);
+        const composeControls = document.getElementById('compose-controls');
+        const composeScroll = document.getElementById('compose-notation-scroll');
+        const composeEditGroup = document.getElementById('compose-edit-group');
+
+        if (this.currentMode === 'melody') {
+            if (melodyControls && melodyControls.parentElement !== barControls) barControls.appendChild(melodyControls);
+            if (melodyScroll && melodyScroll.parentElement !== bar) bar.appendChild(melodyScroll);
+        } else {
+            // Restore to their normal sidebar-panel homes -- melodyControls itself, then its own
+            // notation-scroll back inside melodyStatsGroup (its authored position, last child).
+            if (melodyControls && sidebar && melodyControls.parentElement !== sidebar) sidebar.appendChild(melodyControls);
+            if (melodyScroll && melodyStatsGroup && melodyScroll.parentElement !== melodyStatsGroup) melodyStatsGroup.appendChild(melodyScroll);
         }
 
-        const composeScroll = document.getElementById('compose-notation-scroll');
-        const composeControls = document.getElementById('compose-controls');
-        const composeEditGroup = document.getElementById('compose-edit-group');
-        if (composeScroll && composeControls && composeScroll.parentElement !== composeControls) {
+        if (this.currentMode === 'compose') {
+            if (composeControls && composeControls.parentElement !== barControls) barControls.appendChild(composeControls);
+            if (composeScroll && composeScroll.parentElement !== bar) bar.appendChild(composeScroll);
+        } else {
+            if (composeControls && sidebar && composeControls.parentElement !== sidebar) sidebar.appendChild(composeControls);
             // insertBefore, not appendChild -- its authored position sits between the transport
             // and edit-controls groups, not at the end (after stats).
-            if (composeEditGroup) composeControls.insertBefore(composeScroll, composeEditGroup);
-            else composeControls.appendChild(composeScroll);
+            if (composeScroll && composeControls && composeScroll.parentElement !== composeControls) {
+                if (composeEditGroup) composeControls.insertBefore(composeScroll, composeEditGroup);
+                else composeControls.appendChild(composeScroll);
+            }
         }
 
-        if (Render.isMobileViewport()) {
-            bar.style.display = 'none';
-            return;
-        }
-        if (this.currentMode === 'melody' && melodyScroll) {
-            bar.appendChild(melodyScroll);
-            bar.style.display = 'block';
-        } else if (this.currentMode === 'compose' && composeScroll) {
-            bar.appendChild(composeScroll);
-            bar.style.display = 'block';
-        } else {
-            bar.style.display = 'none';
-        }
+        const showBar = this.currentMode === 'melody' || this.currentMode === 'compose';
+        bar.style.display = showBar ? 'flex' : 'none';
+        // #sidebar would otherwise sit there as an empty reserved-width column (its own CSS
+        // gives it a fixed width) with nothing left in it once its one visible panel moves into
+        // the bar -- every other mode's own panel is already display:none (see setMode) whether
+        // or not the bar is showing.
+        if (sidebar) sidebar.style.display = showBar ? 'none' : '';
+
+        // Whatever triggered this (mode switch, resize) already rendered the Timeline once,
+        // reading its container's width BEFORE the reparenting above -- e.g. still the old
+        // sidebar's ~260px on first entering Melody, not #notation-bar's actual (much wider)
+        // Timeline half. Re-render now that it's actually landed in its final spot, so it fills
+        // the width it really has. Guarded by .timeline existing: setMode calls this BEFORE
+        // MelodyMode.init()/ComposeMode.init() too (see its own comment), and on that mode's
+        // very first-ever visit this runs before init() has created .timeline at all.
+        if (this.currentMode === 'melody' && MelodyMode.timeline) MelodyMode.updateDifficultyUI();
+        else if (this.currentMode === 'compose' && ComposeMode.timeline) ComposeMode.refreshStaff();
     },
 
     setupTouchGestures: function() {

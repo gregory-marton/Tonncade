@@ -62,9 +62,11 @@ body {
     width: 100%;
 }
 
-/* Desktop/tablet only -- see index.html's own comment. Dissolved (display:contents) at the
-   mobile breakpoint below so #sidebar/#game-container flatten straight into #main-content's
-   column flow exactly as they did before this wrapper existed. */
+/* #sidebar/#game-container's row. #sidebar itself is hidden outright (inline style, see
+   js/main.js's updateNotationBar) while Melody/Compose's own panel lives in #notation-bar
+   instead, so #game-container fills the whole row on its own then. For every other mode,
+   #sidebar shows normally here; the mobile breakpoints below just change this row's own
+   flex-direction so #sidebar's dissolved (display:contents) children stack correctly there. */
 #content-row {
     display: flex;
     flex-direction: row;
@@ -73,13 +75,50 @@ body {
     width: 100%;
 }
 
+/* Melody's/Compose's control panel (left) + Timeline (right, filling the rest) -- see
+   index.html's own comment. Row by default; the mobile breakpoints below switch this to a
+   column (thin controls, then the Timeline) once there isn't enough width to put them
+   side by side. A max-height keeps the bar (and so #game-container below it) a predictable
+   size regardless of which mode's own panel is currently inside it -- Compose's is
+   considerably taller than Melody's (tempo/quantize/transport/edit/paste/stats, not just a
+   dropdown+barbell+streak) -- rather than however tall its own content happens to need,
+   which could otherwise squeeze the board down to nothing (found live: it was intercepting
+   clicks meant for the board). #notation-bar-controls scrolls internally if it doesn't fit. */
 #notation-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
     width: 100%;
+    max-height: 45vh;
     box-sizing: border-box;
-    padding: 8px 20px;
+    padding: 10px 20px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     z-index: 10;
+}
+
+/* Capped well under half the bar's width, so the Timeline (the OTHER direct child of
+   #notation-bar -- its own .notation-scroll, flex:1 below) always gets more than half, per
+   its own explicit ask. min-width keeps a real dropdown/barbell/transport row usable even
+   when the window is on the narrow side of "wide enough for row layout." */
+/* max-height uses a fixed unit here, not a percentage -- percentage heights only resolve
+   against a parent with a DEFINITE height, and #notation-bar's is auto (content-driven) up to
+   its own max-height, which isn't guaranteed to count as definite for this purpose. Roughly
+   matches #notation-bar's own 45vh cap (close enough after its padding; exact parity isn't
+   load-bearing). */
+#notation-bar-controls {
+    flex: 0 1 300px;
+    max-width: 42%;
+    min-width: 200px;
+    max-height: 45vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+#notation-bar > .notation-scroll {
+    flex: 1 1 auto;
+    min-width: 0; /* let it shrink below its content's natural width instead of overflowing */
 }
 
 .mobile-only {
@@ -1165,7 +1204,7 @@ button:hover {
         box-sizing: border-box;
     }
 
-    #sandbox-mobile-tools, #melody-mobile-tools {
+    #sandbox-mobile-tools {
         padding: 0 10px 10px 10px;
         border-top: 1px solid var(--border);
         display: flex;
@@ -1209,16 +1248,27 @@ button:hover {
         height: calc(100dvh - 40px);
     }
 
-    /* #notation-bar is desktop/tablet-only (see index.html) -- js/main.js never populates it on
-       a mobile-width viewport, but hide it here too so a resize can't leave it visibly empty. */
+    /* #notation-bar shows at every viewport (not much room on a narrow phone, but the same
+       consistent placement everywhere beats a mobile-only special case -- see js/main.js's
+       updateNotationBar); not enough width for controls+Timeline side by side here though, so
+       stack them instead: thin controls row on top, Timeline below. #content-row carries the
+       row-vs-column split instead of dissolving away, so #main-content can stay a column with
+       #notation-bar stacked above it at every breakpoint; #sidebar's own display:contents (below)
+       flattens its children into whichever real box #content-row now is. */
     #notation-bar {
-        display: none !important;
+        flex-direction: column;
+        /* The base rule's flex-start (deliberate for the row layout: controls and the Timeline
+           can be different heights side by side without either stretching oddly) would leave
+           both children at their own natural CONTENT width once stacked in a column -- stretch
+           so each one spans the full available width instead. */
+        align-items: stretch;
     }
-
-    /* Dissolved so #sidebar's OWN display:contents below flattens all the way up into
-       #main-content's column flow, same as before this wrapper existed. */
+    #notation-bar-controls {
+        max-width: 100%;
+        flex: 0 0 auto;
+    }
     #content-row {
-        display: contents;
+        flex-direction: column;
     }
 
     #sidebar {
@@ -1881,19 +1931,14 @@ button:hover {
                                 above for why this matters. */
         height: 100dvh; /* Unlike portrait, the landscape header takes horizontal space (a side
                             column), not vertical, so there's no top-bar height to subtract. */
-        /* The base rule (non-media) is column, for desktop/tablet's #notation-bar-above-
-           #content-row stack -- landscape mobile needs its original row (sidebar's dissolved
-           contents beside #game-container), same as before that base rule existed. */
-        flex-direction: row;
+        /* Stays a column (the base rule) -- #notation-bar on top, #content-row (sidebar's
+           dissolved contents beside #game-container, its ORIGINAL row layout, restored just
+           below) filling the rest. */
     }
-    /* Same treatment as the portrait breakpoint above -- #notation-bar is desktop/tablet-only,
-       and #content-row needs to dissolve for #sidebar's own display:contents to flatten all the
-       way up into #main-content's flow. */
-    #notation-bar {
-        display: none !important;
-    }
+    /* #notation-bar shows here too now (see the portrait rule above's comment) -- #content-row
+       carries landscape's original side-by-side layout instead. */
     #content-row {
-        display: contents;
+        flex-direction: row;
     }
     #sidebar {
         display: contents;
@@ -1942,7 +1987,7 @@ button:hover {
         justify-content: flex-start;
         overflow-y: auto;
     }
-    #sandbox-mobile-tools, #melody-mobile-tools {
+    #sandbox-mobile-tools {
         flex-direction: column;
         height: 100%;
     }

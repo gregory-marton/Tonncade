@@ -49,6 +49,10 @@ const Notation = {
     FIFTHS_TO_VEX_KEY: ['Cb', 'Gb', 'Db', 'Ab', 'Eb', 'Bb', 'F', 'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#'], // index = fifths + 7
 
     MEASURE_WIDTH: 180,
+    // Widest a single measure is ever stretched to fill available space (opts.targetWidth,
+    // below) -- without a cap, a one-measure Random preview in a very wide #notation-bar would
+    // space its handful of notes absurdly far apart instead of just leaving room to spare.
+    MEASURE_WIDTH_MAX: 420,
     STAVE_HEIGHT: 80,
 
     // Matches css/style.css's --text custom property -- see render()'s own comment on why this
@@ -185,16 +189,19 @@ const Notation = {
     // Inverse of beat->x layout: given an x pixel and the barlineXPositions Notation.render
     // returns, finds which measure x falls in and interpolates linearly across that measure's
     // width to a beat position. Used by click-to-add/drag-to-retime to turn a staff click back
-    // into a beat (then a time, via the caller's own bpm).
-    beatFromX: function(x, barlineXPositions, beatsPerMeasure) {
+    // into a beat (then a time, via the caller's own bpm). measureWidth defaults to the constant
+    // for backward compatibility, but callers should pass render()'s OWN returned measureWidth --
+    // it can differ per render now that render() stretches to fill available width (opts.targetWidth).
+    beatFromX: function(x, barlineXPositions, beatsPerMeasure, measureWidth) {
         beatsPerMeasure = beatsPerMeasure || 4;
+        measureWidth = measureWidth || this.MEASURE_WIDTH;
         if (!barlineXPositions || barlineXPositions.length === 0) return 0;
         let mi = 0;
         for (let i = 0; i < barlineXPositions.length; i++) {
             if (barlineXPositions[i] <= x) mi = i;
         }
         const measureStartX = barlineXPositions[mi];
-        const measureEndX = measureStartX + this.MEASURE_WIDTH;
+        const measureEndX = measureStartX + measureWidth;
         const frac = Math.max(0, Math.min(1, (x - measureStartX) / (measureEndX - measureStartX)));
         return Math.max(0, mi * beatsPerMeasure + frac * beatsPerMeasure);
     },
@@ -220,7 +227,20 @@ const Notation = {
         const beatNotes = this.notesToBeatSpace(notes, bpm);
         const measures = this.toMeasures(beatNotes, beatsPerMeasure);
 
-        const width = Math.max(300, measures.length * this.MEASURE_WIDTH + 40);
+        // opts.targetWidth (the scroll container's own current width, see Timeline.refresh) lets
+        // a short segment fill whatever room the caller actually has -- e.g. #notation-bar's
+        // Timeline half, per the layout it now shares with the mode's controls -- instead of
+        // always rendering at the same fixed size regardless of how much space is available.
+        // Never shrinks below MEASURE_WIDTH: a long piece that needs MORE room than it's given
+        // keeps its normal spacing and scrolls (.notation-scroll's own overflow-x), rather than
+        // cramming notes tighter just because the viewport happens to be narrow.
+        let measureWidth = this.MEASURE_WIDTH;
+        if (opts.targetWidth) {
+            const fitted = (opts.targetWidth - 40) / measures.length;
+            measureWidth = Math.min(this.MEASURE_WIDTH_MAX, Math.max(this.MEASURE_WIDTH, fitted));
+        }
+
+        const width = Math.max(300, measures.length * measureWidth + 40);
         const height = this.STAVE_HEIGHT * 2 + 40;
 
         const renderer = new VexFlow.Renderer(container, VexFlow.Renderer.Backends.SVG);
@@ -241,8 +261,8 @@ const Notation = {
         let x = 10;
         measures.forEach((items, mi) => {
             barlineXPositions.push(x);
-            const treble = new VexFlow.Stave(x, 10, this.MEASURE_WIDTH);
-            const bass = new VexFlow.Stave(x, 10 + this.STAVE_HEIGHT, this.MEASURE_WIDTH);
+            const treble = new VexFlow.Stave(x, 10, measureWidth);
+            const bass = new VexFlow.Stave(x, 10 + this.STAVE_HEIGHT, measureWidth);
             if (mi === 0) {
                 treble.addClef('treble');
                 bass.addClef('bass');
@@ -323,12 +343,13 @@ const Notation = {
             trebleVoice.draw(ctx, treble);
             bassVoice.draw(ctx, bass);
 
-            x += this.MEASURE_WIDTH;
+            x += measureWidth;
         });
 
         return {
             width,
             height,
+            measureWidth,
             noteXPositions: noteXPositions.map((n) => ({
                 id: n.id,
                 midi: n.midi,

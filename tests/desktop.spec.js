@@ -789,8 +789,12 @@ test('Compose: tapping cells while recording appends notes with the tapped cell\
   await page.locator('#compose-record').click();
   await expect(page.locator('#compose-record')).toHaveAttribute('title', 'Stop recording');
 
+  // Both close to the origin (not q=3, which this test used to use) -- Compose's board now has
+  // less vertical room than before (its own control panel + the Timeline share the top bar with
+  // it, see js/main.js's updateNotationBar), so a cell several steps out on the q axis can fall
+  // outside the default zoom/fit's shorter visible height.
   const cellA = page.locator('polygon.cell:not(.ghost)[data-p="2"][data-q="1"]');
-  const cellB = page.locator('polygon.cell:not(.ghost)[data-p="0"][data-q="3"]');
+  const cellB = page.locator('polygon.cell:not(.ghost)[data-p="-2"][data-q="-1"]');
   await cellA.click();
   await page.waitForTimeout(30); // real, small elapsed time between taps -- just needs to be > 0
   await cellB.click();
@@ -798,7 +802,7 @@ test('Compose: tapping cells while recording appends notes with the tapped cell\
   const notes = await page.evaluate(() => ComposeMode.state.notes);
   expect(notes.length).toBe(2);
   expect(notes[0]).toMatchObject({ p: 2, q: 1, midi: 60 + 7 * 2 + 3 * 1 });
-  expect(notes[1]).toMatchObject({ p: 0, q: 3, midi: 60 + 7 * 0 + 3 * 3 });
+  expect(notes[1]).toMatchObject({ p: -2, q: -1, midi: 60 + 7 * -2 + 3 * -1 });
   expect(notes[1].time).toBeGreaterThan(notes[0].time);
 });
 
@@ -1766,34 +1770,36 @@ test('INV-30: leaving Blast mode stops it from repainting the board on a later r
 // over the board instead of being constrained to a small corner box.
 // ────────────────────────────────────────────────────────────────────────
 
-test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a wide overlay) at a landscape width under 950px', async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 600 });
+// Superseded task #77's mobile dock+drawer split (that mechanism no longer exists for Melody --
+// its whole panel travels into #notation-bar at every viewport, see js/main.js's
+// updateNotationBar): melody's controls now live in #notation-bar-controls always, stacked
+// above the Timeline (not beside it) once the window is too narrow for both side by side.
+test('Melody: controls and Timeline stack (not side by side) at a narrow (phone-portrait) width', async ({ page }) => {
+  await page.setViewportSize({ width: 500, height: 800 });
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-  // The always-visible Melody controls (streak readout + the Play/Restart transport icons) live
-  // in the mobile dock; one-time setup (folder/song pickers, Difficulty) now routes to the drawer
-  // and #melody-controls itself is emptied + hidden on mobile (task #77). Guard the DOCK's width so
-  // the HUD stays compact -- the invariant's real intent, unchanged: not a wide overlay.
-  const dock = page.locator('#melody-mobile-tools');
-  await expect(dock).toBeVisible();
-  const box = await dock.boundingBox();
-  expect(box.width, 'the Melody HUD dock should stay a small corner HUD, like its Blast/Gravity/Snake siblings').toBeLessThanOrEqual(210);
+  const controlsBox = await page.locator('#notation-bar-controls').boundingBox();
+  const scrollBox = await page.locator('#notation-bar #melody-notation-scroll').boundingBox();
+  expect(controlsBox.width, 'stacked, not squeezed into a narrow side column').toBeGreaterThan(400);
+  expect(scrollBox.y, 'the Timeline sits below the controls, not beside them').toBeGreaterThanOrEqual(controlsBox.y + controlsBox.height - 2);
 
-  // #melody-controls is emptied into the drawer on mobile -- it must not render as a wide overlay.
-  await expect(page.locator('#melody-controls')).toBeHidden();
+  // #sidebar must stay hidden -- its own fixed width would otherwise waste real board space.
+  await expect(page.locator('#sidebar')).toBeHidden();
 });
 
-test('Melody: the streak bar travels into the mobile dock and back into its desktop row on resize', async ({ page }) => {
-  await page.setViewportSize({ width: 900, height: 600 });
+test('Melody: controls and Timeline sit side by side once the window is wide enough, and back on resize', async ({ page }) => {
+  await page.setViewportSize({ width: 500, height: 800 });
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-
-  await expect(page.locator('#melody-mobile-tools #melody-streak-group')).toBeVisible();
+  await expect(page.locator('#notation-bar')).toHaveCSS('flex-direction', 'column');
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  await expect(page.locator('#melody-controls-row #melody-streak-group')).toBeVisible();
+  await expect(page.locator('#notation-bar')).toHaveCSS('flex-direction', 'row');
+  const controlsBox = await page.locator('#notation-bar-controls').boundingBox();
+  const scrollBox = await page.locator('#notation-bar #melody-notation-scroll').boundingBox();
+  expect(scrollBox.x, 'side by side once there is room').toBeGreaterThanOrEqual(controlsBox.x + controlsBox.width);
 });
 
 test('panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds)', async ({ page }) => {
@@ -3185,16 +3191,18 @@ test('Melody/Compose: the Timeline spans the full window width, not the narrow s
   await expect(page.locator('#compose-controls > #compose-notation-scroll')).toHaveCount(1);
 });
 
-test('Melody: the Timeline returns to the sidebar at a mobile viewport width', async ({ page }) => {
+test('Melody: the Timeline stays in the full-width bar at a mobile viewport width too, not the dock', async ({ page }) => {
   await page.setViewportSize({ width: 500, height: 800 });
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
-  await expect(page.locator('#notation-bar')).toBeHidden();
-  // On a real mobile width, the whole notation stack travels into the always-visible dock
-  // alongside the rest of #melody-stats-group (task #77) -- not back into the (hidden)
-  // #melody-controls sidebar panel.
-  await expect(page.locator('#melody-mobile-tools #melody-notation-scroll')).toHaveCount(1);
+  // Consistent placement at every viewport (live feedback) -- not much room to gain on a narrow
+  // phone, but the same #notation-bar as desktop/tablet rather than a mobile-only special case
+  // that used to fold it into the compact always-visible dock instead.
+  await expect(page.locator('#notation-bar #melody-notation-scroll')).toBeVisible();
+  await expect(page.locator('#melody-mobile-tools #melody-notation-scroll')).toHaveCount(0);
+  const barWidth = await page.locator('#notation-bar').boundingBox().then((b) => b.width);
+  expect(barWidth).toBeCloseTo(500, -1);
 });
 
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
@@ -3478,6 +3486,69 @@ test('Melody: three separate clean passes through a measure advance startIndex, 
     result.cleanStreakAfterContinuing,
     "measure 1's own crossing should also be counted, not blocked by a flag stuck true from measure 0's advance"
   ).toBe(1);
+});
+
+test('Melody: the start marker matches the new startIndex on the very note that advances it, not one note late', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.evaluate(() => {
+    // 2 notes per measure -- landing on the stale (pre-advance) note here puts the marker
+    // visibly at exactly the midpoint of the new measure, matching what was reported live
+    // ("the start marker landed at half a measure").
+    const melody = [];
+    for (let m = 0; m < 4; m++) {
+      for (let n = 0; n < 2; n++) {
+        melody.push({ midi: 60 + m * 2 + n, time: m * 2 + n, duration: 0.8 });
+      }
+    }
+    MelodyMode.state.melody = melody;
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melodyBPM = 120;
+    MelodyMode.state.keySignature = null;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = melody.length - 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.cleanStreak = 0;
+    MelodyMode.state.measureStreakCounted = false;
+    MelodyMode.state.segmentHadMistake = false;
+  });
+
+  const result = await page.evaluate(() => {
+    const melody = MelodyMode.state.melody;
+    const freshPass = () => {
+      MelodyMode.state.segmentHadMistake = false;
+      MelodyMode.state.measureStreakCounted = false;
+      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
+    };
+    // Two clean passes through measure 0 (banking 2 of the 3 needed) -- crossing is only
+    // detected once a note IN THE NEXT measure is actually played, so each pass plays measure
+    // 0's own 2 notes plus the next measure's first note.
+    for (let pass = 0; pass < 2; pass++) {
+      freshPass();
+      MelodyMode.handleUserInputNote(melody[0].midi);
+      MelodyMode.handleUserInputNote(melody[1].midi);
+      MelodyMode.handleUserInputNote(melody[2].midi);
+    }
+    // ... then the third: its LAST note (melody[2], the next measure's own first note) both
+    // crosses into measure 1 AND (3rd time) triggers the advance, in the same
+    // handleUserInputNote call. The marker must already reflect the NEW startIndex immediately
+    // after THIS call returns.
+    freshPass();
+    MelodyMode.handleUserInputNote(melody[0].midi);
+    MelodyMode.handleUserInputNote(melody[1].midi);
+    MelodyMode.handleUserInputNote(melody[2].midi);
+
+    const marker = document.querySelector('.timeline-marker-start');
+    const entry = MelodyMode.timeline._lastRender.noteXPositions.find((n) => n.id === MelodyMode.state.startIndex);
+    return {
+      startIndex: MelodyMode.state.startIndex,
+      markerLeft: marker ? marker.style.left : null,
+      expectedLeft: entry ? (Math.max(0, entry.x - 3) + 'px') : null,
+    };
+  });
+
+  expect(result.startIndex, 'a full 2-note measure, not landed mid-measure').toBe(2);
+  expect(result.markerLeft).toBe(result.expectedLeft);
 });
 
 test('Melody: measure ticks appear exactly where the computed measure changes (#46 part 4)', async ({ page }) => {

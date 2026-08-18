@@ -132,9 +132,11 @@ test.describe('Invariant tests', () => {
   test('INV-3: nothing moved into the always-visible mobile area is left unreachable by a hidden ancestor', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    // Only Sandbox and Melody populate #mobile-always-visible's panels — Snake/Blast/Gravity
-    // correctly leave both panels display:none, which is not what this invariant is about.
-    for (const [mode, panelId] of [['sandbox', 'sandbox-mobile-tools'], ['melody', 'melody-mobile-tools']]) {
+    // Only Sandbox populates #mobile-always-visible's panel now -- Melody's own whole control
+    // panel travels into #notation-bar instead (see js/main.js's updateNotationBar), at every
+    // viewport, not this always-visible dock. Snake/Blast/Gravity correctly leave it
+    // display:none too, which is not what this invariant is about.
+    for (const [mode, panelId] of [['sandbox', 'sandbox-mobile-tools']]) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
       const problems = await page.evaluate((id) => {
         const panel = document.getElementById(id);
@@ -914,6 +916,12 @@ test.describe('Invariant tests', () => {
           const result = await page.evaluate((sel) => {
             const el = document.querySelector(sel);
             if (!el) return { present: false };
+            // Same "reachable, not necessarily already visible" philosophy as opening the
+            // drawer above -- #notation-bar-controls (Melody/Compose's own panel, see
+            // js/main.js's updateNotationBar) scrolls internally if its content doesn't fit the
+            // bar's own height budget, same as a real player would need to scroll to reach a
+            // control below the fold there.
+            el.scrollIntoView({ block: 'nearest' });
             const r = el.getBoundingClientRect();
             if (r.width === 0 || r.height === 0) return { present: true, width: r.width, height: r.height };
             const cx = r.left + r.width / 2;

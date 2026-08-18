@@ -1059,7 +1059,7 @@ const ComposeMode = {
                     this.refreshBoard();
                 }
             } else {
-                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4);
+                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4, this._staffRender.measureWidth);
                 const time = Math.max(0, beatToTime(beat));
                 if (Math.abs(time - note.time) > 1e-6) {
                     note.time = time;
@@ -1099,7 +1099,7 @@ const ComposeMode = {
                 const pos = posFromEvent(e);
                 if (!pos || !this._staffRender) return;
                 const midi = Notation.pitchFromY(pos.y, this._staffRender.staveBounds, this.state.keySignature);
-                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4);
+                const beat = Notation.beatFromX(pos.x, this._staffRender.barlineXPositions, 4, this._staffRender.measureWidth);
                 this.addNoteAt(midi, beatToTime(beat));
             }
         };

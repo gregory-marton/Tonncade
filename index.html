@@ -83,23 +83,27 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
             
             <div id="mobile-always-visible" class="mobile-only" style="width: 100%;">
                 <div id="sandbox-mobile-tools" style="display: none;"></div>
-                <div id="melody-mobile-tools" style="display: none;"></div>
             </div>
             
             <div id="drawer-handle" class="mobile-only"></div>
         </header>
 
         <div id="main-content">
-            <!-- Desktop/tablet only (see css/style.css's mobile breakpoint, which dissolves this
-                 into #main-content there): the Timeline (js/timeline.js) is genuinely a timeline
-                 now (grand staff + aligned pitch row + two draggable markers), and a narrow
-                 300px sidebar column gives it far less width than the full window -- so on
-                 desktop/tablet, Melody's and Compose's own #melody-notation-scroll/
-                 #compose-notation-scroll travel here instead, spanning the whole window width.
-                 js/main.js's updateNotationBar (called from setupMobileControls, itself called on
-                 resize and mode switch) moves the current mode's one in and restores it to its
-                 normal sidebar position for every other mode/viewport. Empty/hidden otherwise. -->
-            <div id="notation-bar" style="display: none;"></div>
+            <!-- Melody's/Compose's own control panel plus their Timeline (js/timeline.js -- grand
+                 staff + aligned pitch row + two draggable markers) live here, side by side, while
+                 that mode is active -- controls on the left, Timeline filling the rest (more than
+                 half the bar's width; see css/style.css's #notation-bar-controls) -- instead of a
+                 narrow 300px sidebar column beside the board, which gave the Timeline far less
+                 room than the window actually has. #sidebar is hidden while this shows (see
+                 js/main.js's updateNotationBar, called from setupMobileControls on resize and
+                 mode switch), since it'd otherwise sit there as an empty reserved-width column.
+                 Consistent at every viewport, including phone portrait: css/style.css's mobile
+                 breakpoints just stack controls-then-Timeline instead of placing them side by
+                 side, rather than falling back to a different mechanism entirely. Empty/hidden
+                 for every other mode, whose own panel stays in #sidebar as always. -->
+            <div id="notation-bar" style="display: none;">
+                <div id="notation-bar-controls"></div>
+            </div>
             <div id="content-row">
             <aside id="sidebar">
                 <div id="blast-stats" style="display: none;">
@@ -156,15 +160,15 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                          the dropdown's own width, rather than each taking a full row -- the
                          barbell and buttons are compact by nature (js/difficulty-barbell.js's
                          vertical/growable redesign, icon-only transport), leaving the streak bar
-                         (flex:1, see css/style.css) to fill whatever's left. On mobile these three
-                         are individually plucked out by js/main.js (settings -> drawer, transport
-                         + streak -> the always-visible dock), same as before this row wrapper
-                         existed -- js/main.js reaches for them by their own ids, not this row's. -->
+                         (flex:1, see css/style.css) to fill whatever's left. This whole
+                         #melody-controls panel (this row included) travels into #notation-bar
+                         while Melody is active, at every viewport -- see js/main.js's
+                         updateNotationBar. -->
                     <div id="melody-controls-row" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap;">
                         <!-- Difficulty is a one-time setting, not a per-play action -- grouped with
-                             the folder/song selectors so it routes into the drawer on mobile (see
-                             js/main.js), out of the board's way. Vertical dumbbell-barbell
-                             (js/difficulty-barbell.js, shared with Blast/Gravity). Difficulty here
+                             the folder/song selectors so they read together as one panel.
+                             Vertical dumbbell-barbell (js/difficulty-barbell.js, shared with
+                             Blast/Gravity). Difficulty here
                              means how much of the note-list/Tonnetz hinting shows while drilling
                              (see MelodyMode.updateDifficultyUI, which repaints those hints), not
                              piece size like Blast/Gravity's own control -- its labels say so

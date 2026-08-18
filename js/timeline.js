@@ -64,7 +64,14 @@ const Timeline = {
         refresh: function(notes, opts) {
             opts = opts || {};
             const notesWithId = (notes || []).map((n, i) => Object.assign({}, n, { id: n.id != null ? n.id : i }));
-            this._lastRender = Notation.render(this.staffContainerId, notesWithId, opts);
+            // The scroll container's OWN current width -- not the staff container's, which is
+            // exactly as wide as whatever VexFlow drew last time and would otherwise never grow
+            // (see Notation.render's opts.targetWidth) -- lets the staff fill however much room
+            // it's actually been given (e.g. #notation-bar's Timeline half) instead of always
+            // rendering at a fixed content-driven size regardless of available space.
+            const scrollEl = document.getElementById(this.scrollContainerId);
+            const renderOpts = Object.assign({}, opts, { targetWidth: scrollEl ? scrollEl.clientWidth : undefined });
+            this._lastRender = Notation.render(this.staffContainerId, notesWithId, renderOpts);
             const noteXPositions = this._lastRender ? this._lastRender.noteXPositions : [];
             const barlineXPositions = this._lastRender ? this._lastRender.barlineXPositions : [];
             Notation.renderLabels(this.labelsContainerId, noteXPositions, opts.keySignature, opts.decorate);
