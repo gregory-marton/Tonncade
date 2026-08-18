@@ -915,6 +915,12 @@ const MelodyMode = {
                             if (this.state.endIndex < nextIdx) this.state.endIndex = nextIdx;
                         }
                         this.state.cleanStreak = 0;
+                        // Re-arm for the NEW current measure -- without this, a single
+                        // continuous pass that keeps going (no mistake, no idle replay) could
+                        // never bank a second measure's crossing: this flag would stay stuck
+                        // true from the first one forever, since it's otherwise only cleared by
+                        // a fresh pass (playTargetSequence) or a mistake.
+                        this.state.measureStreakCounted = false;
                     }
                 }
             }
@@ -951,7 +957,16 @@ const MelodyMode = {
             // Mistake!
             this.setStatus("Oops! Let's listen again...", "error");
             this.state.segmentHadMistake = true;
-            this.state.cleanStreak = 0;
+            // Only wipe the streak if THIS measure's own clean crossing hasn't already been
+            // banked this pass -- once measureStreakCounted is true, the credit for cleanly
+            // playing through startIndex's current measure is already earned; a mistake further
+            // along, past that measure, is real progress toward the NEXT crossing and shouldn't
+            // retroactively undo the one already counted (reported live: "if I make an error
+            // later, that shouldn't count against the three consecutive good plays of an
+            // earlier measure").
+            if (!this.state.measureStreakCounted) {
+                this.state.cleanStreak = 0;
+            }
             this.state.measureStreakCounted = false;
 
             // Random's end only grows via the timeout above, so a mistake can still land past it
@@ -986,20 +1001,65 @@ const MelodyMode = {
     },
 
     celebrate: function() {
-        // Get unique notes present in the melody, sorted from lowest to highest
         const songNotes = [...new Set(this.state.melody.map(n => n.midi))];
         songNotes.sort((a, b) => a - b);
 
-        const victoryChord = songNotes.length > 0 ? songNotes : [60, 64, 67, 72];
-        
-        // Play the rolled notes of the song
-        Synth.playChord(victoryChord, true, 0.18, 2.0);
+        // The tonic major triad of the song's own DETECTED key (not just whichever pitch
+        // classes happen to appear in the melody) -- a real "you win" cadence resolving home,
+        // picked into whichever octave sits nearest the melody's own tessitura so it reads as
+        // part of the same piece rather than a jarring register jump.
+        const root = this.state.keySignature != null ? (((7 * this.state.keySignature) % 12) + 12) % 12 : 0;
+        const triadPCs = [root, (root + 4) % 12, (root + 7) % 12];
+        const refMidi = songNotes.length > 0 ? songNotes[Math.floor(songNotes.length / 2)] : 60;
+        const victoryChord = triadPCs.map((pc) => this._nearestMidiForPitchClass(pc, refMidi));
 
-        // Flash corresponding cells on the lattice
-        for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-                victoryChord.forEach(note => Render.highlightByMidi(note, 150));
-            }, i * 300);
+        // Purely decorative, over the practice strip -- makes no claim about which Tonnetz cell
+        // is sounding, so unlike the old per-cell flash flourish (see the highlight comment
+        // below), it can't violate INV-5 by construction.
+        this.spawnConfetti();
+
+        // INV-5: a cell's visible feedback must correspond to that cell actually sounding at
+        // that instant. The old flourish flashed every victory-chord cell together, 5 times, on
+        // a fixed 300ms cadence unrelated to Synth.playChord's own per-note roll timing -- almost
+        // every flash showed a cell that wasn't actually sounding. Timing each highlight to that
+        // SAME rolled per-note delay (js/synth.js) keeps the two in sync instead.
+        const rolled = true, dur = 2.0;
+        Synth.playChord(victoryChord, rolled, 0.18, dur);
+        victoryChord.forEach((note, i) => {
+            const delay = rolled ? i * 0.06 * 1000 : 0;
+            setTimeout(() => Render.highlightByMidi(note, dur * 1000), delay);
+        });
+    },
+
+    // The octave-shifted MIDI note nearest refMidi whose pitch class is `pc` -- lets celebrate()
+    // build a real chord voicing near the melody's own register instead of an arbitrary fixed
+    // octave that might sit far from what was just played (or outside the audible range).
+    _nearestMidiForPitchClass: function(pc, refMidi) {
+        const base = refMidi - (((refMidi % 12) + 12) % 12) + pc;
+        let best = base;
+        for (const cand of [base - 12, base, base + 12]) {
+            if (Math.abs(cand - refMidi) < Math.abs(best - refMidi)) best = cand;
+        }
+        return best;
+    },
+
+    // Decorative only -- see celebrate()'s comment on why this replaced the old per-cell flash
+    // flourish. Pieces are plain DOM spans, CSS-animated (see css/style.css's .confetti-piece),
+    // and self-removing after the animation ends so a repeat win doesn't accumulate stale nodes.
+    spawnConfetti: function() {
+        const host = document.getElementById('melody-notation-scroll');
+        if (!host) return;
+        const COLORS = ['#7fe0d0', '#e6b23c', '#d16a8f', '#8fb3f2', '#ffffff'];
+        const COUNT = 24;
+        for (let i = 0; i < COUNT; i++) {
+            const piece = document.createElement('span');
+            piece.className = 'confetti-piece';
+            piece.style.left = Math.random() * 100 + '%';
+            piece.style.background = COLORS[i % COLORS.length];
+            piece.style.animationDelay = (Math.random() * 0.3) + 's';
+            piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+            host.appendChild(piece);
+            piece.addEventListener('animationend', () => piece.remove());
         }
     },
 

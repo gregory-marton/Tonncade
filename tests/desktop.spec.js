@@ -3281,6 +3281,141 @@ test('Melody: the practice strip scrolls to follow the current note as you play 
   expect(after, 'the strip should scroll to keep the current note in view').toBeGreaterThan(0);
 });
 
+test('Melody: the song-complete flourish highlights each victory chord cell exactly when it sounds (INV-5)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  // Runs each scheduled callback immediately, in schedule order, tagging it with the delay it
+  // was scheduled at -- deterministic, with no dependence on real or virtualized wall-clock
+  // timing (Playwright's clock.fastForward doesn't reliably preserve each already-scheduled
+  // timer's own individual offset within one jump, only which are due by the jump's target).
+  const { chord, log } = await page.evaluate(() => {
+    const log = [];
+    const realSetTimeout = window.setTimeout;
+    window.setTimeout = (fn, delay) => { log.push({ delay }); fn(); return 0; };
+    Render.highlightByMidi = (midi) => { log[log.length - 1].midi = midi; };
+    let chord = null;
+    Synth.playChord = (midis) => { chord = midis; };
+    MelodyMode.celebrate();
+    window.setTimeout = realSetTimeout;
+    return { chord, log };
+  });
+
+  expect(chord.length).toBeGreaterThan(0);
+  // Exactly one highlight per chord note -- no separate flash cycle unrelated to the sound
+  // (the old flourish flashed all cells together 5 times, most of them not actually sounding).
+  expect(log.length).toBe(chord.length);
+  log.forEach((entry, i) => {
+    expect(entry.midi).toBe(chord[i]);
+    expect(entry.delay).toBe(i * 60); // matches Synth.playChord's own rolled per-note delay
+  });
+});
+
+test('Melody: the song-complete flourish spawns self-removing confetti over the practice strip', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadFrereJacques(page);
+
+  await page.evaluate(() => MelodyMode.celebrate());
+  const during = await page.locator('#melody-notation-scroll .confetti-piece').count();
+  expect(during).toBeGreaterThan(0);
+  await page.waitForFunction(
+    () => document.querySelectorAll('#melody-notation-scroll .confetti-piece').length === 0,
+    { timeout: 5000 }
+  );
+});
+
+// Synthetic 4-measure/4-notes-per-measure melody at 120bpm (2s/measure) -- avoids needing a real
+// MIDI/MusicXML file just to control measure boundaries precisely for the INV-26/53 tests below.
+const loadSyntheticMeasures = (page) => page.evaluate(() => {
+  const melody = [];
+  for (let m = 0; m < 4; m++) {
+    for (let n = 0; n < 4; n++) {
+      melody.push({ midi: 60 + m * 4 + n, time: m * 2 + n * 0.5, duration: 0.4 });
+    }
+  }
+  MelodyMode.state.melody = melody;
+  MelodyMode.state.isRandom = false;
+  MelodyMode.state.melodyBPM = 120;
+  MelodyMode.state.keySignature = null;
+  MelodyMode.state.startIndex = 0;
+  MelodyMode.state.endIndex = melody.length - 1;
+  MelodyMode.state.userIndex = 0;
+  MelodyMode.state.cleanStreak = 0;
+  MelodyMode.state.measureStreakCounted = false;
+  MelodyMode.state.segmentHadMistake = false;
+});
+
+test('Melody: a mistake in a later measure does not erase an already-banked clean-measure streak', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadSyntheticMeasures(page);
+
+  const result = await page.evaluate(() => {
+    const melody = MelodyMode.state.melody;
+    // Play measure 0 cleanly, crossing into measure 1 -- banks one clean-measure credit.
+    for (let i = 0; i < 5; i++) MelodyMode.handleUserInputNote(melody[i].midi);
+    const afterFirstCross = {
+      cleanStreak: MelodyMode.state.cleanStreak,
+      measureStreakCounted: MelodyMode.state.measureStreakCounted,
+    };
+
+    // A mistake in measure 2 -- a LATER measure, unrelated to measure 0's already-banked crossing.
+    MelodyMode.handleUserInputNote(999);
+    return { afterFirstCross, cleanStreakAfterMistake: MelodyMode.state.cleanStreak };
+  });
+
+  expect(result.afterFirstCross.measureStreakCounted).toBe(true);
+  expect(result.afterFirstCross.cleanStreak).toBe(1);
+  expect(
+    result.cleanStreakAfterMistake,
+    'a mistake in a later measure must not erase credit already banked for an earlier one'
+  ).toBe(1);
+});
+
+test('Melody: three separate clean passes through a measure advance startIndex, and the next measure can bank its own streak in the same pass', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await loadSyntheticMeasures(page);
+
+  const result = await page.evaluate(() => {
+    const melody = MelodyMode.state.melody;
+    // Mirrors playTargetSequence's own fresh-pass reset (see its own comment), without the
+    // real audio/timeout scheduling that isn't needed here.
+    const freshPass = () => {
+      MelodyMode.state.segmentHadMistake = false;
+      MelodyMode.state.measureStreakCounted = false;
+      MelodyMode.state.userIndex = MelodyMode.state.startIndex;
+    };
+
+    // Three separate clean passes through measure 0 should advance startIndex into measure 1.
+    for (let pass = 0; pass < 3; pass++) {
+      freshPass();
+      for (let i = MelodyMode.state.startIndex; i < 5; i++) MelodyMode.handleUserInputNote(melody[i].midi);
+    }
+    const afterThreePasses = {
+      startIndex: MelodyMode.state.startIndex,
+      cleanStreak: MelodyMode.state.cleanStreak,
+      measureStreakCounted: MelodyMode.state.measureStreakCounted,
+    };
+
+    // Continuing in the SAME (4th) pass, past measure 1's own boundary too -- no fresh
+    // playTargetSequence call in between.
+    for (let i = MelodyMode.state.userIndex; i < 9; i++) MelodyMode.handleUserInputNote(melody[i].midi);
+    return { afterThreePasses, cleanStreakAfterContinuing: MelodyMode.state.cleanStreak };
+  });
+
+  expect(
+    result.afterThreePasses.startIndex,
+    'three clean passes through measure 0 should advance startIndex into measure 1'
+  ).toBe(4);
+  expect(
+    result.cleanStreakAfterContinuing,
+    "measure 1's own crossing should also be counted, not blocked by a flag stuck true from measure 0's advance"
+  ).toBe(1);
+});
+
 test('Melody: measure ticks appear exactly where the computed measure changes (#46 part 4)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());

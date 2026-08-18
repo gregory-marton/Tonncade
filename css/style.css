@@ -437,6 +437,24 @@ svg {
     height: 1.2em; /* matches .pitch-row's own height */
 }
 
+/* Melody's song-complete flourish (MelodyMode.celebrate/spawnConfetti) -- purely decorative
+   pieces over the practice strip, self-removing on animationend. Deliberately makes no claim
+   about which Tonnetz cell is sounding (unlike the old per-cell flash flourish it replaced),
+   so it can't violate INV-5 the way that one did. */
+.confetti-piece {
+    position: absolute;
+    top: -10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    pointer-events: none;
+    animation: confetti-fall 1.4s ease-in forwards;
+}
+@keyframes confetti-fall {
+    0% { top: -10px; opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+}
+
 #midi-connect-btn.connected {
     opacity: 1;
     filter: drop-shadow(0 0 3px var(--accent));
