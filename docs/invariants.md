@@ -483,8 +483,18 @@ correct play, once per correct play (or the user can move it directly) — conti
 required. The beginning scrubber auto-advances by a measure once the player has cleanly played
 *that specific measure* (the one `startIndex` currently sits in, not the whole possibly-longer
 segment up to `endIndex`) `k` correct plays in a row, where `k` is currently 3 (or the user can
-move it directly); a mistake resets that streak to 0. Scoping the streak to one measure rather
-than the whole segment keeps the mastery bar constant as the segment grows.
+move it directly). Scoping the streak to one measure rather than the whole segment keeps the
+mastery bar constant as the segment grows.
+
+A mistake only resets the streak if THIS measure's own clean crossing hasn't already been banked
+this pass (`measureStreakCounted`) — once it has, that credit is earned, and a mistake further
+along (in a later measure) is real progress toward the next crossing, not grounds to retroactively
+undo an earlier one (reported live: an error later shouldn't count against three already-clean
+plays of an earlier measure). `measureStreakCounted` is re-armed both by a fresh pass
+(`playTargetSequence`) and immediately after `startIndex` itself advances — without the latter, a
+single continuous pass that keeps going past the just-mastered measure could bank at most one
+crossing ever, since nothing else would re-arm it (also reported live: three clean playthroughs of
+a measure not advancing it).
 
 `MelodyMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets `startIndex`, and
 calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of
@@ -498,8 +508,11 @@ unrestricted too).
 resets progress back to the scrub position" tests, "dragging the marker near the timeline edge
 scrolls it" (#46 edge-scroll), "the end of the drilled segment grows immediately with each
 correct play", "3 clean playthroughs of the current measure auto-advance the start into the next
-measure" (#46 part 5). `tests/mobile.spec.js` — "a real single-finger touch drag moves the scrub
-marker to the touched note", using genuine dispatched `Touch`/`TouchEvent` objects.
+measure" (#46 part 5), "a mistake in a later measure does not erase an already-banked
+clean-measure streak", "three separate clean passes through a measure advance startIndex, and the
+next measure can bank its own streak in the same pass". `tests/mobile.spec.js` — "a real
+single-finger touch drag moves the scrub marker to the touched note", using genuine dispatched
+`Touch`/`TouchEvent` objects.
 
 ---
 
