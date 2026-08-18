@@ -669,6 +669,15 @@ button:hover {
     font-weight: bold;
     line-height: 1;
 }
+/* Melody's one-line settings/transport/streak row: the barbell and transport buttons are
+   compact by nature, so the streak bar fills whatever width is left over instead of sitting at
+   its own small fixed width like every other .stat-bar (Blast/Gravity's own stats panels, which
+   aren't sharing a row with anything). */
+#melody-controls-row .stat-bar {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 60px;
+}
 .stat-bar-fill {
     position: absolute;
     left: 0;

@@ -141,28 +141,38 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <input id="melody-file-input" type="file" accept=".mid,.midi,.musicxml,.xml,.mxl" style="display: none;" />
                         <span id="melody-filename"></span>
                     </div>
-                    <!-- Difficulty is a one-time setting, not a per-play action -- grouped with the
-                         folder/song selectors so it routes into the drawer on mobile (see js/main.js),
-                         out of the board's way. -->
-                    <!-- Vertical dumbbell-barbell (js/difficulty-barbell.js, shared with Blast/
-                         Gravity). Difficulty here means how much of the note-list/Tonnetz hinting
-                         shows while drilling (see MelodyMode.updateDifficultyUI, which repaints
-                         those hints), not piece size like Blast/Gravity's own control -- its
-                         labels say so instead; the barbell itself is populated by JS. -->
-                    <div id="melody-settings-group" class="control-group" style="margin-top: 6px;">
-                        <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints"></div>
-                    </div>
-                    <div id="melody-actions-group" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; gap: 8px;">
-                        <button id="melody-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
-                        <button id="melody-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
-                    </div>
-                    <div id="melody-stats-group" class="stats-panel" style="margin-top: 15px;">
-                        <div class="stat-bar" role="img" aria-label="Current streak as a fraction of your best">
+                    <!-- Difficulty, the transport, and the streak bar all fit on one line, roughly
+                         the dropdown's own width, rather than each taking a full row -- the
+                         barbell and buttons are compact by nature (js/difficulty-barbell.js's
+                         vertical/growable redesign, icon-only transport), leaving the streak bar
+                         (flex:1, see css/style.css) to fill whatever's left. On mobile these three
+                         are individually plucked out by js/main.js (settings -> drawer, transport
+                         + streak -> the always-visible dock), same as before this row wrapper
+                         existed -- js/main.js reaches for them by their own ids, not this row's. -->
+                    <div id="melody-controls-row" class="control-buttons" style="margin-top: 10px; display: flex; flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <!-- Difficulty is a one-time setting, not a per-play action -- grouped with
+                             the folder/song selectors so it routes into the drawer on mobile (see
+                             js/main.js), out of the board's way. Vertical dumbbell-barbell
+                             (js/difficulty-barbell.js, shared with Blast/Gravity). Difficulty here
+                             means how much of the note-list/Tonnetz hinting shows while drilling
+                             (see MelodyMode.updateDifficultyUI, which repaints those hints), not
+                             piece size like Blast/Gravity's own control -- its labels say so
+                             instead; the barbell itself is populated by JS. -->
+                        <div id="melody-settings-group" class="control-group">
+                            <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints"></div>
+                        </div>
+                        <div id="melody-actions-group" class="control-buttons" style="display: flex; flex-direction: row; gap: 8px;">
+                            <button id="melody-play-preview" class="icon-btn" title="Play melody" aria-label="Play melody">▶</button>
+                            <button id="melody-game-restart" class="icon-btn" title="Restart game" aria-label="Restart game">↻</button>
+                        </div>
+                        <div id="melody-streak-group" class="stat-bar" role="img" aria-label="Current streak as a fraction of your best">
                             <div class="stat-bar-fill" id="melody-streak-fill"></div>
                             <span class="stat-bar-num"><span id="melody-current-streak">0</span></span>
                             <span class="stat-bar-best">/<span id="melody-best-streak">0</span></span>
                         </div>
-                        <p id="melody-game-status" style="font-size: 13px; color: var(--accent); margin-top: 10px; font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
+                    </div>
+                    <div id="melody-stats-group" class="stats-panel" style="margin-top: 15px;">
+                        <p id="melody-game-status" style="font-size: 13px; color: var(--accent); font-weight: bold; line-height: 1.4;">Listen to the notes...</p>
                         <!-- The Timeline (INV-55, js/timeline.js): grand staff + aligned pitch row
                              + two draggable boundary markers, shared with Compose. Melody's own
                              practice strip (past/current/upcoming color hints, Tonnetz glow-linkage)

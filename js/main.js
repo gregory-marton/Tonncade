@@ -731,8 +731,10 @@ const App = {
                     // The desktop branch restores its children and its display.
                     const midiControlsEl = document.getElementById('melody-controls');
                     if (midiControlsEl) midiControlsEl.style.display = 'none';
+                    const melodyStreak = document.getElementById('melody-streak-group');
                     if (melodyTools) {
                         melodyTools.style.display = 'flex';
+                        if (melodyStreak) melodyTools.appendChild(melodyStreak);
                         if (melodyStats) melodyTools.appendChild(melodyStats);
                         if (melodyActions) melodyTools.appendChild(melodyActions);
                     }
@@ -802,12 +804,22 @@ const App = {
                     // is the active mode -- covers a mobile->desktop resize with no mode change.
                     melodyControls.style.display = (this.currentMode === 'melody') ? 'block' : 'none';
                     // Restore original DOM order so the desktop sidebar panel reads top-to-bottom
-                    // as authored (source dropdown, upload fallback, settings/Difficulty, actions, stats).
+                    // as authored (source dropdown, upload fallback, then the settings/transport/
+                    // streak row, then stats). Settings/actions/streak go back INTO their shared
+                    // row (#melody-controls-row), not straight onto melodyControls, or a
+                    // mobile->desktop transition would pull them out of that row and back into
+                    // separate full-width lines.
                     const melodySettings = document.getElementById('melody-settings-group');
+                    const melodyControlsRow = document.getElementById('melody-controls-row');
+                    const melodyStreak = document.getElementById('melody-streak-group');
                     if (melodySource && melodySource.parentElement !== melodyControls) melodyControls.appendChild(melodySource);
                     if (melodyUpload && melodyUpload.parentElement !== melodyControls) melodyControls.appendChild(melodyUpload);
-                    if (melodySettings && melodySettings.parentElement !== melodyControls) melodyControls.appendChild(melodySettings);
-                    if (melodyActions && melodyActions.parentElement !== melodyControls) melodyControls.appendChild(melodyActions);
+                    if (melodyControlsRow) {
+                        if (melodySettings && melodySettings.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodySettings);
+                        if (melodyActions && melodyActions.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodyActions);
+                        if (melodyStreak && melodyStreak.parentElement !== melodyControlsRow) melodyControlsRow.appendChild(melodyStreak);
+                        if (melodyControlsRow.parentElement !== melodyControls) melodyControls.appendChild(melodyControlsRow);
+                    }
                     if (melodyStats && melodyStats.parentElement !== melodyControls) melodyControls.appendChild(melodyStats);
                     const melodyStaff = document.getElementById('melody-staff');
                     if (melodyStaff) melodyStaff.style.display = ''; // undo the mobile-dock hide above

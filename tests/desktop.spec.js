@@ -1784,6 +1784,18 @@ test('INV-31: Melody\'s always-visible controls stay a small corner HUD (not a w
   await expect(page.locator('#melody-controls')).toBeHidden();
 });
 
+test('Melody: the streak bar travels into the mobile dock and back into its desktop row on resize', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 });
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+  await expect(page.locator('#melody-mobile-tools #melody-streak-group')).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await expect(page.locator('#melody-controls-row #melody-streak-group')).toBeVisible();
+});
+
 test('panning is left unclamped in restricted modes (Snake/Gravity have no free-pan bounds)', async ({ page }) => {
   await page.goto('/');
   for (const mode of ['snake', 'gravity']) {
@@ -3126,6 +3138,25 @@ test('Melody: the difficulty control is the same dumbbell-barbell as Blast/Gravi
   await weights.nth(1).click();
   expect(await page.evaluate(() => MelodyMode.state.difficulty)).toBe(2);
   expect(await litCount(), 'level 2 lights 2').toBe(2);
+});
+
+test('Melody: difficulty, transport, and the streak bar share one line, about as wide as the dropdown', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+  const settingsBox = await page.locator('#melody-settings-group').boundingBox();
+  const actionsBox = await page.locator('#melody-actions-group').boundingBox();
+  const streakBox = await page.locator('#melody-streak-group').boundingBox();
+  const dropdownBox = await page.locator('#melody-source').boundingBox();
+
+  // Same row: near-identical vertical center, not stacked on separate lines.
+  const centerY = (b) => b.y + b.height / 2;
+  expect(Math.abs(centerY(settingsBox) - centerY(actionsBox))).toBeLessThan(12);
+  expect(Math.abs(centerY(settingsBox) - centerY(streakBox))).toBeLessThan(12);
+
+  // Roughly the dropdown's own width, not a full extra sidebar-width row each.
+  const rowBox = await page.locator('#melody-controls-row').boundingBox();
+  expect(rowBox.width).toBeLessThanOrEqual(dropdownBox.width + 4);
 });
 
 // #39: Easy/Medium/Hard piece-size presets for Blast and Gravity. Difficulty selects the pool of
