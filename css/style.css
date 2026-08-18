@@ -995,17 +995,17 @@ button:hover {
     /* Compact text/button sizing for the stats/controls overlays. Landscape previously fell
        back to full desktop button sizing here (no override existed outside the portrait-only
        block below), ballooning #snake-controls/#gravity-controls over a third of the board. */
-    #blast-stats p, #gravity-controls p, #melody-controls p, #snake-controls p {
+    #blast-stats p, #gravity-controls p, #snake-controls p {
         margin: 2px 0;
         font-size: var(--chrome-font);
         font-weight: bold;
     }
 
-    #blast-stats *, #gravity-controls *, #melody-controls *, #snake-controls * {
+    #blast-stats *, #gravity-controls *, #snake-controls * {
         pointer-events: auto;
     }
 
-    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons, #melody-controls .control-buttons {
+    #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons {
         display: flex;
         flex-direction: row !important;
         gap: var(--chrome-gap);
@@ -1015,7 +1015,6 @@ button:hover {
     /* .stats-panel is a sibling of .control-buttons now (single horizontal strip, not a stacked
        card), so the shared rule's margin-top above would misalign it vertically against
        .control-buttons within that row -- override it back to 0 for just these three.
-       #melody-controls keeps its own margin-top; it's still a stacked column layout.
        width: max-content is the real fix here: both .control-buttons and .stats-panel are
        THEMSELVES flex containers, so as flex ITEMS of the outer row their flex-basis:auto falls
        back to ordinary block width:auto (fill available space), not shrink-to-content -- forcing
@@ -1048,7 +1047,7 @@ button:hover {
         margin: 0;
     }
 
-    #blast-stats button, #gravity-controls button, #snake-controls button, #melody-controls button {
+    #blast-stats button, #gravity-controls button, #snake-controls button {
         padding: var(--chrome-btn-pad-v) var(--chrome-btn-pad-h);
         font-size: var(--chrome-btn-font);
         height: var(--chrome-btn-h);
@@ -1058,37 +1057,8 @@ button:hover {
         width: auto;
     }
 
-    /* Found live (issue #12): unlike its #blast-stats/#gravity-controls/#snake-controls siblings
-       above, this rule never got the same top/left/max-width triple, so it defaulted to its
-       natural (wide, content-driven) flow width while still being position:absolute -- floating
-       over a large share of the board instead of a small corner HUD like the others. */
-    #melody-controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        max-width: 200px;
-        z-index: 100;
-        background: rgba(20, 22, 28, 0.9);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: var(--chrome-pad-v) var(--chrome-pad-h);
-        box-sizing: border-box;
-        font-family: monospace;
-        color: #fff;
-        margin-top: 0 !important;
-        display: flex;
-        flex-direction: column;
-        gap: var(--chrome-gap);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        pointer-events: none;
-    }
-
     /* Keyboard-instructions text (.desktop-only) is only hidden by the touch-pointer and
-       max-width:767px rules elsewhere -- not this landscape breakpoint -- so on a device that
-       matches only THIS rule (e.g. a laptop-class landscape width without a coarse pointer) it
-       kept contributing bulk to the now-compact #melody-controls HUD above. */
+       max-width:767px rules elsewhere -- not this landscape breakpoint. */
     .desktop-only {
         display: none !important;
     }
@@ -1321,9 +1291,25 @@ button:hover {
            so each one spans the full available width instead. */
         align-items: stretch;
     }
+    /* Capped well below #notation-bar's own 45vh budget -- found live: without its own smaller
+       cap, Compose's control panel (tempo/grid/quantize/metronome/transport/stats, much taller
+       than Melody's) could claim the ENTIRE budget on a narrow phone, squeezing .notation-scroll
+       below (flex:1 1 auto) down toward its flexbox automatic-minimum-size of near-zero instead
+       of leaving it any real room -- the Timeline was there in the DOM but visually a sliver,
+       reported live as "no timeline at all." Still scrolls internally (unchanged) for whatever
+       doesn't fit in this smaller cap. */
     #notation-bar-controls {
         max-width: 100%;
         flex: 0 0 auto;
+        max-height: 160px;
+    }
+    #notation-bar > .notation-scroll {
+        /* Guards against the same flexbox automatic-minimum-size-zero collapse (see above) even
+           after giving controls a smaller cap -- without an explicit floor, flex:1 1 auto (the
+           base rule) can still shrink this below its own content height when the two together
+           still don't fit #notation-bar's 45vh. Scrolls internally itself past that floor. */
+        min-height: 160px;
+        overflow-y: auto;
     }
     #content-row {
         flex-direction: column;
@@ -1511,56 +1497,15 @@ button:hover {
         max-width: 50%;
     }
 
-    /* MIDI Controls all the way across top */
-    #melody-controls {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        z-index: 100;
-        background: rgba(20, 22, 28, 0.9);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border-bottom: 1px solid var(--border);
-        padding: var(--chrome-pad-v);
-        box-sizing: border-box;
-        font-family: monospace;
-        color: #fff;
-        margin-top: 0 !important;
-        display: flex;
-        flex-direction: column;
-        gap: var(--chrome-gap);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        pointer-events: none;
-    }
-
-    #melody-controls .stats-panel {
-        margin-top: 0 !important;
-        display: flex;
-        flex-direction: column;
-        gap: var(--chrome-gap);
-    }
-
-    #melody-controls .control-buttons {
-        margin-top: 0 !important;
-        flex-direction: row !important;
-        gap: var(--chrome-gap);
-    }
-
-    #melody-controls .control-buttons button {
-        flex: 1;
-    }
-
     /* Keep stats text elements layout clean */
-    #blast-stats p, #gravity-controls p, #melody-controls p, #snake-controls p {
+    #blast-stats p, #gravity-controls p, #snake-controls p {
         margin: 2px 0;
         font-size: var(--chrome-font);
         font-weight: bold;
     }
 
     /* Allow buttons/inputs inside stats overlay to be clickable */
-    #blast-stats *, #gravity-controls *, #melody-controls *, #snake-controls * {
+    #blast-stats *, #gravity-controls *, #snake-controls * {
         pointer-events: auto;
     }
 

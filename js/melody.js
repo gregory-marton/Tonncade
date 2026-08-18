@@ -189,9 +189,9 @@ const MelodyMode = {
             // Resuming after a mode switch (INV-48): repaint exactly where the player left off --
             // no reset, no auto-playing the target sequence. cleanup() (run when Melody was left)
             // already cleared the note-list markup and Tonnetz glow classes without touching
-            // endIndex/userIndex/startIndex/the streak or #melody-game-status's text, so
-            // rebuilding the note list/ghost/streak bar from that untouched progress is enough to
-            // make the resume look exactly like nothing happened.
+            // endIndex/userIndex/startIndex/the streak, so rebuilding the note list/ghost/streak
+            // bar from that untouched progress is enough to make the resume look exactly like
+            // nothing happened.
             this.updateStreakUI();
             this.updateDifficultyUI();
             this.updateGhost();
@@ -513,25 +513,6 @@ const MelodyMode = {
         }
     },
 
-    setStatus: function(text, type = 'info') {
-        const statusEl = document.getElementById('melody-game-status');
-        if (statusEl) {
-            statusEl.textContent = text;
-            
-            // Apply color classes based on status type
-            statusEl.className = ''; // Reset
-            if (type === 'error') {
-                statusEl.style.color = '#ff6b6b';
-            } else if (type === 'success') {
-                statusEl.style.color = '#4bff4b';
-            } else if (type === 'going-ahead') {
-                statusEl.style.color = '#ffc04b';
-            } else {
-                statusEl.style.color = 'var(--accent)';
-            }
-        }
-    },
-
     updateStreak: function(streak) {
         this.state.currentStreak = streak;
         const currentStreakEl = document.getElementById('melody-current-streak');
@@ -725,7 +706,6 @@ const MelodyMode = {
         this.updateGhost();
         this.updateDifficultyUI();
 
-        this.setStatus("Starting game...", "info");
         setTimeout(() => {
             this.playTargetSequence();
         }, 1000);
@@ -734,7 +714,6 @@ const MelodyMode = {
     playTargetSequence: function() {
         this.cleanupPlayback();
         this.state.isPlayingSequence = true;
-        this.setStatus("Listen to the notes...", "info");
 
         // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
         // control), so a player can drill any already-reached stretch of the melody.
@@ -768,9 +747,6 @@ const MelodyMode = {
 
         const tId2 = setTimeout(() => {
             this.state.isPlayingSequence = false;
-            // No prose here (dropped per live feedback -- pure encouragement, not information:
-            // the highlighted current note on the practice strip already says what to play).
-            this.setStatus("", "success");
             this.state.userIndex = start;
             this.updateDifficultyUI();
         }, totalDuration);
@@ -827,8 +803,6 @@ const MelodyMode = {
 
         this.setPlayIcon(true);
 
-        this.setStatus("Playing full melody preview...", "info");
-
         let delayOffset = 0.2;
 
         for (let i = 0; i < this.state.melody.length; i++) {
@@ -862,7 +836,6 @@ const MelodyMode = {
 
         this.setPlayIcon(false);
 
-        this.setStatus("Preview stopped. Ready.", "info");
         this.updateDifficultyUI();
     },
 
@@ -898,8 +871,8 @@ const MelodyMode = {
             }
 
             if (this.state.userIndex >= this.state.melody.length) {
-                // Completed the entire song!
-                this.setStatus("Congratulations! You completed the song! 🎉", "success");
+                // Completed the entire song! (celebrate() below is the payoff -- flourish +
+                // confetti -- self-explanatory without a status line spelling it out too.)
                 document.querySelectorAll('.glow-past').forEach(el => el.classList.remove('glow-past'));
                 document.querySelectorAll('.glow-future').forEach(el => el.classList.remove('glow-future'));
                 this.celebrate();
@@ -960,17 +933,6 @@ const MelodyMode = {
             // before, silently made it unreachable for any real song: nothing ever re-prompted
             // the player again after their first correct note, exactly the regression reported
             // live ("not timing out ... consequently not showing me what to do next").
-            if (this.state.userIndex > this.state.endIndex) {
-                // At the frontier -- either about to extend into brand-new territory (a real
-                // song's end already grows live above, so this is just the prompt) or waiting on
-                // Random's own timeout-driven growth below.
-                this.setStatus("Correct! Go ahead! (2s timeout)...", "going-ahead");
-            } else {
-                // Still repeating already-established territory
-                const remaining = this.state.endIndex - this.state.userIndex + 1;
-                this.setStatus(`Correct! Repeat ${remaining} more note${remaining > 1 ? 's' : ''}...`, "progress");
-            }
-
             this.state.userRepeatTimeoutId = setTimeout(() => {
                 // Timeout fired: player paused. Random has no measure concept -- grow by however
                 // far they got, same as always. A real song's end already advances live above;
@@ -981,8 +943,8 @@ const MelodyMode = {
                 this.playTargetSequence();
             }, 2000);
         } else {
-            // Mistake!
-            this.setStatus("Oops! Let's listen again...", "error");
+            // Mistake! (the board's own mistake-flash / replay-from-start is the feedback --
+            // deliberately no status text; the wrong note flashing red already says it.)
             // Reset only the ONE measure the mistake actually fell in -- every other measure's
             // own banked credit (including ones already fully mastered and skipped past) is
             // untouched (reported live: "if I make an error later, that shouldn't count against
