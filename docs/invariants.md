@@ -969,11 +969,23 @@ button-size first, text size only once even shorter) so the measured footprint
 `Render.svg` itself, whose own output size can stay unchanged across a resize) keeps the fit
 correct through drawer open/close transitions and rapid mode switches.
 
+Because the fit is always tight to the restricted mode's own fixed board shape, no cell outside
+that mode's own in-bounds set can ever land inside the fitted view — a restricted board never
+pans or zooms, so a drawn out-of-bounds cell is guaranteed unseen by construction, not just
+unseen today. `Render.drawLattice` skips (rather than dims or otherwise draws) any cell outside
+`isInBounds` for every mode in `Render.RESTRICTED_MODES`, on that reasoning: drawing something
+provably unreachable and provably invisible is pure waste, regardless of which restricted mode it
+is (one of them used to dim its out-of-bounds ring instead of skipping it, a stale leftover from
+before the tight-fit behavior above existed — fixed to match its siblings).
+
 **Test:** `tests/invariants.spec.js`'s "INV-40: Snake/Gravity/Blast size #tonnetz-svg to match
 their own board shape, not the leftover chrome space" asserts `#tonnetz-svg`'s own rendered aspect
 ratio matches `Render.computeCellBounds`'s content aspect ratio (within 5%) for each restricted
-mode, in both portrait and landscape. "INV-43: ..." separately asserts, for Snake portrait across
-a sweep of sizes, that the board's rendered width spans more than 80% of the container width and
+mode, in both portrait and landscape. `tests/desktop.spec.js`'s "Restricted modes: each only draws
+its own in-bounds cells -- no dimmed/wasted out-of-bounds ring" separately asserts, per restricted
+mode (`Render.RESTRICTED_MODES`), that every drawn `polygon.cell` is in-bounds. "INV-43: ..."
+separately asserts, for Snake portrait across a sweep of sizes, that the board's rendered width
+spans more than 80% of the container width and
 that no cell overlaps chrome (`measureBoardOcclusion`).
 
 ### INV-41: the restricted board reaches within one hex-diameter of two opposite edges of its available space

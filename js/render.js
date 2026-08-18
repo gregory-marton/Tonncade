@@ -271,12 +271,15 @@ const Render = {
                 if (!options.isSnake && !options.isGravity && !options.grayInaudible &&
                     (midi < 0 || midi > audibleCeiling)) continue;
 
-                // For Blast Mode, dim cells outside the radius
+                // A restricted board's viewport is tightly fit to its own fixed shape (INV-40) --
+                // an out-of-bounds cell is never reachable and never inside that fit, so it's
+                // never actually seen either; drawing one at all is pure waste. Same reasoning as
+                // the isGravity/isSnake checks below.
+                if (options.isBlast && !Board.isInBounds(p, q)) {
+                    continue;
+                }
                 let fill = '#1c1f28';
                 let opacity = 1;
-                if (options.isBlast && !Board.isInBounds(p, q)) {
-                    opacity = 0.2;
-                }
                 if (options.grayInaudible && !audible) {
                     fill = '#34373f'; // dull gray -- outside human hearing, will not sound
                 }

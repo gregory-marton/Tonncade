@@ -3547,6 +3547,32 @@ test('Sandbox: Undo on an empty history is a silent no-op', async ({ page }) => 
   expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
 });
 
+// A restricted board's viewport is tightly fit to its own fixed shape (INV-40) -- an
+// out-of-bounds cell can never actually be reached OR seen, so drawing one at all is pure waste.
+// Checked generically across every restricted mode (not one-off per mode), so a future one gets
+// this for free instead of needing its own copy of this test. The mode list itself comes from
+// Render.RESTRICTED_MODES (read inside the page, its only real home) rather than a second,
+// hand-maintained copy here that could drift from it.
+test('Restricted modes: each only draws its own in-bounds cells -- no dimmed/wasted out-of-bounds ring', async ({ page }) => {
+  await page.goto('/');
+  const modes = await page.evaluate(() => Render.RESTRICTED_MODES);
+  for (const mode of modes) {
+    await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+    const counts = await page.evaluate((m) => {
+      const checker = { blast: Board, gravity: GravityBoard, snake: SnakeMode }[m];
+      let inBounds = 0, total = 0;
+      document.querySelectorAll('#tonnetz-svg polygon.cell:not(.ghost)').forEach((el) => {
+        total++;
+        const p = Number(el.getAttribute('data-p')), q = Number(el.getAttribute('data-q'));
+        if (checker.isInBounds(p, q)) inBounds++;
+      });
+      return { inBounds, total };
+    }, mode);
+    expect(counts.total, `${mode}: sanity, the board actually drew something`).toBeGreaterThan(0);
+    expect(counts.total, `${mode}: every drawn cell is in-bounds, none dimmed-and-hidden`).toBe(counts.inBounds);
+  }
+});
+
 test('Blast: Undo reverses a placement', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
