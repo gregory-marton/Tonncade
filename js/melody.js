@@ -668,9 +668,14 @@ const MelodyMode = {
                     }
                 }
             }
-            // No meaningful boundary markers for a forever-sliding window.
-            startIndex = null;
-            endIndex = null;
+            // Reported live: "why wouldn't random have positions? They exist, they just grow the
+            // same way Compose does." Right -- the window itself has real edges that slide
+            // forward as `current` advances, same as Compose's own range growing. windowEnd is
+            // EXCLUSIVE (see the build loop above), so the last rendered id is windowEnd - 1; a
+            // genuinely empty window (e.g. current===0 outside Easy, windowStart===windowEnd)
+            // has nothing to bracket, so both stay null there instead of pointing at a stale id.
+            startIndex = windowEnd > windowStart ? windowStart : null;
+            endIndex = windowEnd > windowStart ? windowEnd - 1 : null;
         } else {
             // #46: a real song renders EVERY note up front, not a small window -- the whole
             // piece, scrollable (css/style.css). Measure boundaries are the barline overlay's

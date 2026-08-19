@@ -100,9 +100,15 @@ const Timeline = {
             // silently looked up whichever note happens to have id 1 instead of correctly
             // finding nothing (reported live: Random showed an end marker with no start marker).
             const lookupId = (which === 'end' && idx != null) ? idx + 1 : idx;
+            // Random mode's window renders a small SLICE of the melody with non-contiguous-from-
+            // zero ids (e.g. 7,8,9) -- neither a real id+1 note nor endPadding (whose own id
+            // assumes a contiguous-from-zero range) exists there. Falling back to idx itself
+            // (same spot the start marker would use) still brackets the window correctly, just
+            // without the "after the note" nudge a full song's end marker gets.
             const entry = this._lastRender.noteXPositions.find((n) => n.id === lookupId) ||
                 (which === 'end' && this._lastRender.endPadding && this._lastRender.endPadding.id === lookupId
-                    ? this._lastRender.endPadding : null);
+                    ? this._lastRender.endPadding : null) ||
+                (which === 'end' && idx != null ? this._lastRender.noteXPositions.find((n) => n.id === idx) : null);
             let marker = scrollEl.querySelector('.timeline-marker-' + which);
             if (!entry) {
                 if (marker) marker.remove();

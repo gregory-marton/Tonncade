@@ -322,7 +322,7 @@ test('stopping preview restores the note list to reflect actual game progress', 
   // Octave-qualified since INV-25 -- see the comment on the earlier "pivots the window" test.
   const expectedName = await page.evaluate(() => {
     const midi = MelodyMode.state.melody[MelodyMode.state.userIndex].midi;
-    return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
+    return `${Tonnetz.getNoteName(midi, MelodyMode.state.keySignature)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
 });
@@ -5383,6 +5383,59 @@ test('Timeline.refresh: a null endIndex removes the end marker entirely, not a p
   }, setupTimelineContainers('tl3'));
   expect(info.startMarkerExists).toBe(false);
   expect(info.endMarkerExists, 'a null endIndex must remove the end marker too, not phantom-render one at id 1').toBe(false);
+});
+
+// Reported live, disputing the fix just above: "why wouldn't random have positions? They exist,
+// they just grow the same way Compose does." Right -- Random's sliding window (windowStart/
+// windowEnd in updateDifficultyUI) has real, meaningful edges that slide forward as `current`
+// advances, the same way Compose's own note range grows. Suppressing both markers to null was
+// the actual bug; they should track the window's own bounds instead.
+test('Melody Random mode: the timeline shows real start/end markers tracking the sliding window, not none', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+  const info = await page.evaluate(() => {
+    MelodyMode.state.melody = Array.from({ length: 20 }, (_, i) => ({ midi: 60 + (i % 12), time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.isRandom = true;
+    MelodyMode.state.difficulty = 2; // non-Easy: windowEnd = current (exclusive), no future window
+    MelodyMode.state.userIndex = 10;
+    MelodyMode.updateDifficultyUI();
+    const startEl = document.querySelector('.timeline-marker-start');
+    const endEl = document.querySelector('.timeline-marker-end');
+    return {
+      startExists: !!startEl,
+      endExists: !!endEl,
+      startLeft: startEl ? startEl.getBoundingClientRect().left : null,
+      endLeft: endEl ? endEl.getBoundingClientRect().left : null,
+    };
+  });
+  // pastWindow=3, current=10 -> windowStart=7, windowEnd=10 (exclusive) -> ids 7,8,9 rendered;
+  // real markers should bracket that window, not be absent.
+  expect(info.startExists).toBe(true);
+  expect(info.endExists).toBe(true);
+  expect(info.endLeft).toBeGreaterThan(info.startLeft);
+});
+
+// Companion edge case: at the very start (current=0, non-Easy so windowEnd=current), the window
+// is genuinely empty -- windowStart===windowEnd===0, no notes rendered at all. Markers must stay
+// absent here (nothing to bracket), not point at a stale or out-of-range id.
+test('Melody Random mode: an empty sliding window (current=0) shows no markers, not stale ones', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+  const info = await page.evaluate(() => {
+    MelodyMode.state.melody = Array.from({ length: 20 }, (_, i) => ({ midi: 60 + (i % 12), time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.isRandom = true;
+    MelodyMode.state.difficulty = 2;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.updateDifficultyUI();
+    return {
+      startExists: !!document.querySelector('.timeline-marker-start'),
+      endExists: !!document.querySelector('.timeline-marker-end'),
+    };
+  });
+  expect(info.startExists).toBe(false);
+  expect(info.endExists).toBe(false);
 });
 
 // Reported live: the end marker rendered as a caret BEFORE its own note -- correct for the start
