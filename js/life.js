@@ -236,9 +236,12 @@ const Life = {
 };
 
 // Life's own file source (js/file-folder.js): the bundled life/ folder plus a local folder --
-// the SAME shared remembered folder Melody/Compose use (js/midi-folder.js's MidiFolder), just
-// filtered down to .yaml. Auto-loads the first bundled automaton on first visit (Life's own
-// long-standing behavior, unlike Melody's reselectable "Random" default).
+// the SAME underlying remembered folder Melody/Compose use (js/melody.js's MelodyFolder,
+// js/compose.js's ComposeFolder -- FileFolder's own IndexedDB persistence is shared at the
+// namespace level, see their own comments), just filtered down to .yaml, and its own independent
+// instance (INV-48: no shared mutable selection state between modes). Auto-loads the first
+// bundled automaton on first visit (Life's own long-standing behavior, unlike Melody's
+// reselectable "Random" default).
 const LifeFolder = FileFolder.create({
     onlineIndexUrl: './life/index.json',
     bundledPathPrefix: './life/',

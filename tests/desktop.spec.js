@@ -318,7 +318,7 @@ test('stopping preview restores the note list to reflect actual game progress', 
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// MidiFolder (js/midi-folder.js -> js/file-folder.js's FileFolder, task #27 + the one-dropdown
+// MelodyFolder (js/melody.js -> js/file-folder.js's FileFolder, task #27 + the one-dropdown
 // reorg): local MIDI folder source, folded into the single #melody-source select alongside "Random"
 // and the bundled online tier, on browsers that support the File System Access API.
 // window.showDirectoryPicker is mocked with a fake directory handle (real handles are
@@ -415,12 +415,12 @@ function buildMxlFixtureSingleEntry(musicXmlText, entryName) {
 // Each fake file's "bytes" are just a one-byte tag identifying which fake file it is; the
 // parseMIDI stub reads that tag back out, so a distinct, easily-asserted MIDI note stands in for
 // "this specific file's real content loaded" without needing real Standard MIDI File bytes.
-const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.evaluate(({ files, permission }) => {
+const installFakeMelodyFolder = (page, { files, permission = 'granted' }) => page.evaluate(({ files, permission }) => {
   // Real FileSystemDirectoryHandles are structured-cloneable (by design, so they survive an
   // IndexedDB round-trip) -- a fake JS object with methods is NOT, so saveHandle would throw a
   // real DataCloneError against a fake handle. Stubbed out here since these tests exercise
   // FileFolder's own browsing/restore logic, not real IndexedDB persistence.
-  MidiFolder.saveHandle = async () => {};
+  MelodyFolder.saveHandle = async () => {};
   window.__parseMIDICalls = [];
   MelodyMode.parseMIDI = (buf) => {
     const tag = new Uint8Array(buf)[0];
@@ -445,7 +445,7 @@ const installFakeMidiFolder = (page, { files, permission = 'granted' }) => page.
     requestPermission: async (opts) => { window.__permissionModeCalls.push({ fn: 'request', mode: opts && opts.mode }); return 'granted'; },
     // Default: nothing bundled already exists in this fake folder (chooseFolder's
     // copyDefaultsInto checks this before writing); tests that care about the copy-in behavior
-    // itself override this after installFakeMidiFolder runs.
+    // itself override this after installFakeMelodyFolder runs.
     getFileHandle: async () => { throw new Error('not found'); },
   };
   window.__showDirectoryPickerCalls = [];
@@ -458,9 +458,9 @@ const sourceLocalOptionNames = (page, selectId) => page.evaluate((id) =>
     .filter(o => o.value.startsWith('local:'))
     .map(o => o.textContent), selectId);
 
-test('MidiFolder: choosing a folder lists only .mid/.midi files (sorted) and auto-loads the first', async ({ page }) => {
+test('MelodyFolder: choosing a folder lists only .mid/.midi files (sorted) and auto-loads the first', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, {
+  await installFakeMelodyFolder(page, {
     files: [
       { name: 'Zebra.mid', tag: 0 },
       { name: 'Apple.midi', tag: 1 },
@@ -481,9 +481,9 @@ test('MidiFolder: choosing a folder lists only .mid/.midi files (sorted) and aut
   expect(loadedMidi).toBe(61);
 });
 
-test('MidiFolder: selecting a different dropdown entry loads that file instead', async ({ page }) => {
+test('MelodyFolder: selecting a different dropdown entry loads that file instead', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, {
+  await installFakeMelodyFolder(page, {
     files: [{ name: 'Apple.mid', tag: 0 }, { name: 'Banana.mid', tag: 1 }],
   });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -496,11 +496,11 @@ test('MidiFolder: selecting a different dropdown entry loads that file instead',
   expect(await page.evaluate(() => MelodyMode.state.melody[0].midi)).toBe(61);
 });
 
-test('MidiFolder: a granted saved folder restores silently on entering Melody mode, no click needed', async ({ page }) => {
+test('MelodyFolder: a granted saved folder restores silently on entering Melody mode, no click needed', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 5 }], permission: 'granted' });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Saved.mid', tag: 5 }], permission: 'granted' });
   await page.evaluate(() => {
-    MidiFolder.loadHandle = async () => window.__fakeFolderHandle;
+    MelodyFolder.loadHandle = async () => window.__fakeFolderHandle;
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -509,11 +509,11 @@ test('MidiFolder: a granted saved folder restores silently on entering Melody mo
   await expect(page.locator('#melody-source-status')).toHaveText(/MySongs/);
 });
 
-test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnect instead of silently failing', async ({ page }) => {
+test('MelodyFolder: a lapsed (non-granted) saved folder shows a one-click reconnect instead of silently failing', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 2 }], permission: 'prompt' });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Saved.mid', tag: 2 }], permission: 'prompt' });
   await page.evaluate(() => {
-    MidiFolder.loadHandle = async () => window.__fakeFolderHandle;
+    MelodyFolder.loadHandle = async () => window.__fakeFolderHandle;
   });
 
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -527,7 +527,7 @@ test('MidiFolder: a lapsed (non-granted) saved folder shows a one-click reconnec
   await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 62);
 });
 
-test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the plain upload picker is untouched', async ({ page }) => {
+test('MelodyFolder: on an unsupported browser, the folder UI stays hidden and the plain upload picker is untouched', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => { delete window.showDirectoryPicker; });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -539,13 +539,13 @@ test('MidiFolder: on an unsupported browser, the folder UI stays hidden and the 
 });
 
 // ────────────────────────────────────────────────────────────────────────
-// MidiFolder's bundled online tier (task #27): a plain relative fetch to ./midi/index.json, no
+// MelodyFolder/ComposeFolder's bundled online tier (task #27): a plain relative fetch to ./midi/index.json, no
 // File System Access API involved -- works in every browser, its entries simply don't appear in
 // #melody-source on any failure (offline, file://, 404) rather than surfacing an error, since it's
 // a bonus content tier, not a required one.
 // ────────────────────────────────────────────────────────────────────────
 
-test('MidiFolder online: populates the dropdown from index.json, and selecting a song loads the real fetched file', async ({ page }) => {
+test('MelodyFolder online: populates the dropdown from index.json, and selecting a song loads the real fetched file', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({
     json: [{ name: 'Test Song A', file: 'a.mid' }, { name: 'Test Song B', file: 'b.mid' }],
   }));
@@ -575,7 +575,7 @@ test('MidiFolder online: populates the dropdown from index.json, and selecting a
   await page.waitForFunction(() => MelodyMode.state.melody.length === 1 && MelodyMode.state.melody[0].midi === 60);
 });
 
-test('MidiFolder online: a failed fetch (offline/404) leaves no bundled entries in the dropdown', async ({ page }) => {
+test('MelodyFolder online: a failed fetch (offline/404) leaves no bundled entries in the dropdown', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
@@ -586,7 +586,7 @@ test('MidiFolder online: a failed fetch (offline/404) leaves no bundled entries 
   expect(hasBundled).toBe(false);
 });
 
-test('MidiFolder online: Compose gets the same bundled songs via its own dropdown', async ({ page }) => {
+test('ComposeFolder online: Compose gets the same bundled songs via its own dropdown', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({
     json: [{ name: 'Test Song A', file: 'a.mid' }],
   }));
@@ -602,7 +602,7 @@ test('MidiFolder online: Compose gets the same bundled songs via its own dropdow
   expect(optionNames).toEqual(['Test Song A']);
 });
 
-test('MidiFolder: choosing a folder copies bundled defaults into it that it does not already have', async ({ page }) => {
+test('MelodyFolder: choosing a folder copies bundled defaults into it that it does not already have', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({
     json: [{ name: 'Bundled Song', file: 'bundled.mid' }],
   }));
@@ -610,7 +610,7 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
   await page.route('**/midi/bundled.mid', route => route.fulfill({ body: bytes, contentType: 'audio/midi' }));
 
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Existing.mid', tag: 0 }] });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Existing.mid', tag: 0 }] });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
     [...document.getElementById('melody-source').options].some(o => o.value === 'bundled:0'));
@@ -641,7 +641,7 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
 // alongside the old one. Both display with the SAME label (renderOptions strips the extension),
 // so the dropdown shows the song name twice even though the two entries are genuinely different
 // files, exactly matching what was reported.
-test('MidiFolder: choosing a folder does not duplicate a bundled default that already exists under an older extension', async ({ page }) => {
+test('MelodyFolder: choosing a folder does not duplicate a bundled default that already exists under an older extension', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.fulfill({
     json: [{ name: 'Bundled Song', file: 'bundled.musicxml' }],
   }));
@@ -649,7 +649,7 @@ test('MidiFolder: choosing a folder does not duplicate a bundled default that al
 
   await page.goto('/');
   // The folder already has this exact song, just under the OLD bundled extension.
-  await installFakeMidiFolder(page, { files: [{ name: 'bundled.mid', tag: 0 }] });
+  await installFakeMelodyFolder(page, { files: [{ name: 'bundled.mid', tag: 0 }] });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
     [...document.getElementById('melody-source').options].some(o => o.value === 'bundled:0'));
@@ -679,11 +679,11 @@ test('MidiFolder: choosing a folder does not duplicate a bundled default that al
 // (getFileHandle().createWritable()) throws against a real browser's read-only grant and silently
 // falls back to a plain download -- the exact bug reported live ("Life save gives me a download
 // rather than saving to my local folder"). These fakes always grant whatever's asked regardless of
-// mode (see installFakeMidiFolder's own comment), so they can't reproduce the real throw -- what
+// mode (see installFakeMelodyFolder's own comment), so they can't reproduce the real throw -- what
 // they CAN and must verify is that 'readwrite' is what actually gets asked for in the first place.
-test('MidiFolder: choosing a folder requests readwrite permission, not just read', async ({ page }) => {
+test('MelodyFolder: choosing a folder requests readwrite permission, not just read', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [] });
+  await installFakeMelodyFolder(page, { files: [] });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
     [...document.getElementById('melody-source').options].some(o => o.value === 'choose-folder'));
@@ -696,20 +696,20 @@ test('MidiFolder: choosing a folder requests readwrite permission, not just read
   expect(mode).toBe('readwrite');
 });
 
-test('MidiFolder: restoring a saved folder queries readwrite permission, not just read', async ({ page }) => {
+test('MelodyFolder: restoring a saved folder queries readwrite permission, not just read', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 1 }], permission: 'granted' });
-  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Saved.mid', tag: 1 }], permission: 'granted' });
+  await page.evaluate(() => { MelodyFolder.loadHandle = async () => window.__fakeFolderHandle; });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() => window.__permissionModeCalls.some((c) => c.fn === 'query'));
   const call = await page.evaluate(() => window.__permissionModeCalls.find((c) => c.fn === 'query'));
   expect(call.mode).toBe('readwrite');
 });
 
-test('MidiFolder: reconnecting a lapsed folder requests readwrite permission, not just read', async ({ page }) => {
+test('MelodyFolder: reconnecting a lapsed folder requests readwrite permission, not just read', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Saved.mid', tag: 2 }], permission: 'prompt' });
-  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Saved.mid', tag: 2 }], permission: 'prompt' });
+  await page.evaluate(() => { MelodyFolder.loadHandle = async () => window.__fakeFolderHandle; });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() =>
     [...document.getElementById('melody-source').options].some(o => o.value === 'reconnect-folder'));
@@ -727,10 +727,10 @@ test('MidiFolder: reconnecting a lapsed folder requests readwrite permission, no
 // file's content just because the player hovered the dropdown -- a real risk, since re-listing
 // re-sorts alphabetically and a plain numeric index could otherwise start pointing at a different
 // file after an external rename/add.
-test('MidiFolder: opening the dropdown re-lists the folder, picking up an externally added file', async ({ page }) => {
+test('MelodyFolder: opening the dropdown re-lists the folder, picking up an externally added file', async ({ page }) => {
   await page.goto('/');
-  await installFakeMidiFolder(page, { files: [{ name: 'Existing.mid', tag: 3 }], permission: 'granted' });
-  await page.evaluate(() => { MidiFolder.loadHandle = async () => window.__fakeFolderHandle; });
+  await installFakeMelodyFolder(page, { files: [{ name: 'Existing.mid', tag: 3 }], permission: 'granted' });
+  await page.evaluate(() => { MelodyFolder.loadHandle = async () => window.__fakeFolderHandle; });
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() => MelodyMode.state.melody[0] && MelodyMode.state.melody[0].midi === 63);
 
@@ -821,7 +821,7 @@ test('Sandbox: holding an empty cell highlights every same-named cell with its o
 // Compose mode (task #27's "edit any melody, record a new song" -- built as its own mode rather
 // than bolted onto Melody's practice loop, since drag/rotate-to-transpose belongs to composition,
 // not a structured drill). v1 scope: record by tapping cells in real time, play back, Undo/Clear,
-// and Save (via MelodyMode.writeMIDI + MidiFolder.saveFileAs, both new). Per-note drag-to-
+// and Save (via MelodyMode.writeMIDI + ComposeFolder.saveFileAs, both new). Per-note drag-to-
 // reposition/retime, a timeline view, and polyphony are explicitly deferred.
 // ────────────────────────────────────────────────────────────────────────
 
@@ -942,7 +942,7 @@ test('Compose: Save writes a MusicXML file that round-trips back to the same not
         }),
       }),
     };
-    MidiFolder.folderHandle = fakeHandle;
+    ComposeFolder.folderHandle = fakeHandle;
     window.prompt = () => 'my-song.musicxml';
   });
 
@@ -996,7 +996,7 @@ test('Compose: Save keeps the dropdown pointed at the just-saved song, not which
         }),
       }),
     };
-    MidiFolder.folderHandle = fakeHandle;
+    ComposeFolder.folderHandle = fakeHandle;
     window.prompt = () => 'my-song.musicxml';
   });
 
@@ -1009,7 +1009,7 @@ test('Compose: Save keeps the dropdown pointed at the just-saved song, not which
   await page.waitForFunction(() => window.__savedFiles['my-song.musicxml'] !== undefined);
 
   const result = await page.evaluate(() => ({
-    currentValue: MidiFolder.currentValue,
+    currentValue: ComposeFolder.currentValue,
     selectValue: document.getElementById('compose-source').value,
     selectedLabel: document.getElementById('compose-source').selectedOptions[0]?.textContent,
   }));
@@ -1333,7 +1333,7 @@ test('Compose: Save\'s MusicXML always embeds the chosen tempo, regardless of Qu
   await page.goto('/');
   await page.evaluate(() => {
     window.__savedXml = null;
-    MidiFolder.folderHandle = {
+    ComposeFolder.folderHandle = {
       getFileHandle: async () => ({
         createWritable: async () => ({
           write: async (text) => { window.__savedXml = text; },
@@ -2637,9 +2637,9 @@ test('Life: Save As writes a YAML file that round-trips back to the same rule an
   expect(roundTrippedLive).toEqual(before.live.map(([k]) => k));
 });
 
-// LifeFolder is just FileFolder.create({...}) like MidiFolder (js/life.js) -- the readwrite-
-// permission fix lives entirely in the shared js/file-folder.js code the MidiFolder tests above
-// already cover in detail, but this confirms Life's own instance inherits it too, since the bug
+// LifeFolder is just FileFolder.create({...}) like MelodyFolder/ComposeFolder (js/life.js) -- the
+// readwrite-permission fix lives entirely in the shared js/file-folder.js code the MelodyFolder
+// tests above already cover in detail, but this confirms Life's own instance inherits it too, since the bug
 // was reported live specifically against Life's own Save As ("gives me a download rather than
 // saving to my local folder").
 test('LifeFolder: choosing a folder requests readwrite permission, not just read', async ({ page }) => {
@@ -5730,12 +5730,12 @@ test('Bundled songs: midi/index.json now lists .musicxml files', async ({ page }
 test('Melody: loading the first bundled (.musicxml) song produces a real, playable melody', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  // Melody's MidiFolder instance has autoLoadFirstBundled: false BY DESIGN (it already has its
-  // own Random offline-degrade default, js/midi-folder.js) -- explicitly select the first bundled
+  // Melody's MelodyFolder instance has autoLoadFirstBundled: false BY DESIGN (it already has its
+  // own Random offline-degrade default, js/melody.js) -- explicitly select the first bundled
   // song, same as a real player picking it from the dropdown, rather than waiting for an
   // auto-load that deliberately doesn't happen here.
-  await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex && MidiFolder.onlineIndex.length > 0, { timeout: 5000 });
-  await page.evaluate(() => MidiFolder.loadOnlineFile(0));
+  await page.waitForFunction(() => typeof MelodyFolder !== 'undefined' && MelodyFolder.onlineIndex && MelodyFolder.onlineIndex.length > 0, { timeout: 5000 });
+  await page.evaluate(() => MelodyFolder.loadOnlineFile(0));
   const result = await page.evaluate(() => ({
     noteCount: MelodyMode.state.melody.length,
     allValidMidi: MelodyMode.state.melody.every((n) => Number.isFinite(n.midi) && n.midi >= 0 && n.midi <= 127),
@@ -5753,16 +5753,16 @@ test('Melody: loading the first bundled (.musicxml) song produces a real, playab
 test('Melody: EVERY bundled song loads without error and produces a sane melody', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-  await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex, { timeout: 5000 });
+  await page.waitForFunction(() => typeof MelodyFolder !== 'undefined' && MelodyFolder.onlineIndex, { timeout: 5000 });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
   const results = await page.evaluate(async () => {
     const out = [];
-    for (let i = 0; i < MidiFolder.onlineIndex.length; i++) {
-      await MidiFolder.loadOnlineFile(i);
+    for (let i = 0; i < MelodyFolder.onlineIndex.length; i++) {
+      await MelodyFolder.loadOnlineFile(i);
       out.push({
-        name: MidiFolder.onlineIndex[i].name,
+        name: MelodyFolder.onlineIndex[i].name,
         noteCount: MelodyMode.state.melody.length,
         allValidMidi: MelodyMode.state.melody.every((n) => Number.isFinite(n.midi)),
       });

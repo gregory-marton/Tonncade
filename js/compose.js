@@ -31,6 +31,27 @@ for the JavaScript code in this file.
  * controls that already exist) remain real interaction-design work saved for later.
  */
 
+// Compose's own file source (js/file-folder.js) -- see js/melody.js's MelodyFolder for why this
+// is its own instance rather than one shared object (INV-48: no shared mutable state between
+// modes -- a shared `currentValue` used to carry Melody's selected song straight into Compose's
+// dropdown instead of Compose's own "Record your own…" default). Same config as MelodyFolder
+// (identical file source), read/write of the same remembered folder via FileFolder's own
+// namespace-level IndexedDB persistence -- only the per-mode SELECTION is independent now.
+const ComposeFolder = FileFolder.create({
+    onlineIndexUrl: './midi/index.json',
+    bundledPathPrefix: './midi/',
+    extensionPattern: /\.(midi?|musicxml|mxl|xml)$/i,
+    readAs: 'arrayBuffer',
+    mimeType: 'audio/midi',
+    loadMethod: 'loadMelodyFromArrayBuffer',
+    fileTypes: [
+        { pattern: /\.musicxml$/i, readAs: 'text', loadMethod: 'loadMelodyFromMusicXML' },
+        { pattern: /\.xml$/i, readAs: 'text', loadMethod: 'loadMelodyFromMusicXML' },
+        { pattern: /\.mxl$/i, readAs: 'arrayBuffer', loadMethod: 'loadMelodyFromMxl' },
+    ],
+    autoLoadFirstBundled: false,
+});
+
 const ComposeMode = {
     state: {
         notes: [],              // { midi, p, q, time, duration }
@@ -175,8 +196,8 @@ const ComposeMode = {
                 const file = e.target.files[0];
                 if (!file) return;
                 // See js/melody.js's identical fix for why this can't just hard-code
-                // loadMelodyFromArrayBuffer -- reuses MidiFolder's own fileTypes dispatch.
-                const { readAs, loadMethod } = MidiFolder.resolveFileType(file.name);
+                // loadMelodyFromArrayBuffer -- reuses ComposeFolder's own fileTypes dispatch.
+                const { readAs, loadMethod } = ComposeFolder.resolveFileType(file.name);
                 const reader = new FileReader();
                 reader.onload = (event) => this[loadMethod](event.target.result, file.name);
                 if (readAs === 'text') reader.readAsText(file);
@@ -204,14 +225,15 @@ const ComposeMode = {
         });
         this.timeline.setupDrag();
 
-        // Shares Melody's exact remembered folder (both work with .mid files) -- see
-        // js/file-folder.js's `ids` parameter, which is what lets the same MidiFolder instance
-        // serve two different modes' own DOM elements. `hasBlank`, not `hasRandom`: Compose has
-        // no starting-content concept the way Melody's offline-degrade does -- its own
+        // ComposeFolder browses the SAME remembered folder MelodyFolder does (both work with
+        // .mid/.musicxml/.mxl files, and FileFolder's own folder-handle persistence is shared at
+        // the namespace level -- see ComposeFolder's own comment) but is its own independent
+        // instance, own currentValue/fileHandles (INV-48). `hasBlank`, not `hasRandom`: Compose
+        // has no starting-content concept the way Melody's offline-degrade does -- its own
         // synthetic top entry is a passive "nothing loaded yet" placeholder, not something that
         // actively generates content the way Random does.
-        if (typeof MidiFolder !== 'undefined') {
-            MidiFolder.setup(this, {
+        if (typeof ComposeFolder !== 'undefined') {
+            ComposeFolder.setup(this, {
                 sourceSelect: 'compose-source',
                 sourceStatus: 'compose-source-status',
                 uploadGroup: 'compose-upload-group',
@@ -737,8 +759,8 @@ const ComposeMode = {
             ? this.state.keySignature
             : Tonnetz.detectKeySignature(this.state.notes.map((n) => n.midi));
         const xml = MusicXML.write(this.state.notes, { bpm: this.state.tempoBPM, keySignatureFifths: fifths, name });
-        if (typeof MidiFolder !== 'undefined') {
-            await MidiFolder.saveFileAs(name, xml, 'application/vnd.recordare.musicxml+xml');
+        if (typeof ComposeFolder !== 'undefined') {
+            await ComposeFolder.saveFileAs(name, xml, 'application/vnd.recordare.musicxml+xml');
         }
     },
 

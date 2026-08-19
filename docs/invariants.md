@@ -688,10 +688,12 @@ its own save flow later:
   since `tickToSec` already defaults to 500000 usec/beat (120bpm) with none present — this keeps
   `parseMIDI(writeMIDI(x))` an exact round trip at the fixed 480-ticks-per-beat resolution
   `writeMIDI` uses, rather than merely an equivalent-sounding one.
-- `MidiFolder.saveFileAs(name, arrayBuffer)` — writes into whichever folder is currently
-  remembered (`this.folderHandle`, shared with Melody's own folder browsing — Compose and Melody
-  both work with `.mid` files, so there's no reason for the separate directory Life mode's YAML
-  files will need), falling back to a plain `<a download>` blob link when no folder is set.
+- `ComposeFolder.saveFileAs(name, arrayBuffer)` — writes into whichever folder is currently
+  remembered (`this.folderHandle`, browsing the SAME underlying folder Melody's own `MelodyFolder`
+  does — Compose and Melody both work with `.mid`/`.musicxml`/`.mxl` files, so there's no reason
+  for the separate directory Life mode's YAML files will need — see the `MelodyFolder`/
+  `ComposeFolder` split below for why this is its own instance, not literally the same object),
+  falling back to a plain `<a download>` blob link when no folder is set.
 
 A tapped cell's `(p,q)` needs no reverse-mapping — the player chose it directly. Loading an
 existing file is different: `Tonnetz.getMidi(p,q)` isn't injective (any pitch sits at infinitely
@@ -702,14 +704,24 @@ can be shown on the lattice. `Tonnetz.nearestCoordFor(midi, near)` finds the sol
 connected path — note 0 nearest the origin, each note after it nearest the previous note's own
 chosen cell — rather than a valid but visually arbitrary/disconnected scatter.
 
-`MidiFolder.setup` now takes an optional `ids` config (defaulting to Melody's original element
-ids, so its existing call site is unaffected) so both Melody and Compose can browse the *same*
-remembered folder while each keeps its own upload/folder/select/status DOM elements.
+`FileFolder.setup` takes an `ids` config (`sourceSelect`/`sourceStatus`/`uploadGroup`, one set per
+mode) so each mode's own instance drives its own DOM elements.
 
 The local-folder mechanism itself later generalized into `js/file-folder.js`'s
-`FileFolder.create(config)`, the single shared implementation behind both `MidiFolder`
-(Melody/Compose, `.mid` files) and `LifeFolder` (Life, `.yaml` files). Two real guarantees this
-shared code must hold, found violated live against Life's own Save As:
+`FileFolder.create(config)`, the single shared implementation behind `MelodyFolder` (js/melody.js),
+`ComposeFolder` (js/compose.js, both `.mid`/`.musicxml`/`.mxl` files), and `LifeFolder` (Life,
+`.yaml` files). Melody and Compose originally shared ONE `MidiFolder` instance (`js/midi-folder.js`,
+since deleted) so the two modes "browsed together" — but that made `currentValue` (which file is
+CURRENTLY SELECTED) the same mutable object both modes read and wrote, a direct INV-48 violation:
+picking a real song in Melody silently carried it straight into Compose's own dropdown instead of
+Compose's "Record your own…" default (reported live — "why did that test pass?": no test had ever
+asserted Compose's own default in the first place). Split into `MelodyFolder`/`ComposeFolder`, two
+independent instances — each still browses (and remembers) the SAME underlying folder, since
+`FileFolder`'s IndexedDB persistence (`DB_NAME`/`STORE_NAME`/`HANDLE_KEY`) is declared at the
+shared namespace level, not per-instance; only the per-mode SELECTION state
+(`currentValue`/`fileHandles`) is independent now.
+
+Two real guarantees this shared code must hold, found violated live against Life's own Save As:
 - **Writes actually reach the folder, never silently downgrade to a download.**
   `showDirectoryPicker()`/`queryPermission`/`requestPermission` must all request `'readwrite'`
   (not `'read'`, which is enough to *list* the folder but not to write into it) at every call site
@@ -736,8 +748,8 @@ existing file into a connected on-lattice path; "Life: Save As writes a YAML fil
 round-trips back to the same rule and live cells" and "Life: Save As round-trips a multi-state
 automaton (transition table + per-cell state)" — both, like Compose's, write through a faked
 folder handle and re-parse the actual captured bytes/text (`MusicXML.parse`/`Life.parseYaml`),
-not just checking that some function ran; plus "MidiFolder: choosing/restoring/reconnecting ...
-requests readwrite permission, not just read" (three call sites), "MidiFolder: opening the
+not just checking that some function ran; plus "MelodyFolder: choosing/restoring/reconnecting ...
+requests readwrite permission, not just read" (three call sites), "MelodyFolder: opening the
 dropdown re-lists the folder, picking up an externally added file" (also asserts the
 currently-loaded file's content is untouched — `parseMIDI` called exactly once), and "LifeFolder:
 choosing a folder requests readwrite permission, not just read" (confirms Life inherits the same
@@ -747,7 +759,7 @@ call log on the fake's `queryPermission`/`requestPermission`, since a real
 originally.
 
 This invariant is checked wherever Save currently exists (Compose, Life) — it should be extended
-to cover Melody's own Save the moment that ships (`writeMIDI`/`MidiFolder.saveFileAs` are already
+to cover Melody's own Save the moment that ships (`writeMIDI`/`FileFolder.saveFileAs` are already
 shared and ready for it, per above), and to any future mode that gains one.
 
 ---
@@ -930,7 +942,7 @@ sequence leaves the shared palette/piece-list correct for the final mode (N^3 tr
 
 Task #27's remaining piece: `midi/index.json` + `midi/*.mid` in the repo itself — a third content
 tier for Melody/Compose alongside the built-in default and the player's own local folder,
-fetched via a plain relative `fetch('./midi/index.json')` in `js/midi-folder.js`'s new
+fetched via a plain relative `fetch('./midi/index.json')` in `js/file-folder.js`'s
 `setupOnline`/`loadOnlineFile`. Deliberately a relative path, not an absolute
 `raw.githubusercontent.com` URL: works identically on any http(s) host (GitHub Pages, a local
 dev server, anything else this app is ever served from) and simply fails under `file://` (no
@@ -946,11 +958,12 @@ by `scripts/generate-bundled-midi.js` from plain `[noteName, beats]` data using 
 SMF bytes a second time. Run that script again to regenerate the files (e.g. after a `writeMIDI`
 change) or to add another song.
 
-**Test:** `tests/desktop.spec.js` — three "MidiFolder online: ..." tests using `page.route` to
+**Test:** `tests/desktop.spec.js` — "MelodyFolder online: ..." tests using `page.route` to
 mock the `index.json`/`.mid` fetches: the dropdown populates and a selected song actually loads
 (verified via a real `writeMIDI`-produced buffer parsed back through the real `loadMelodyFromArrayBuffer`,
-not a stubbed loader), a failed fetch hides the group instead of erroring, and Compose gets the
-same bundled list via its own dropdown.
+not a stubbed loader), a failed fetch hides the group instead of erroring; "ComposeFolder online:
+Compose gets the same bundled songs via its own dropdown" confirms Compose's own independent
+instance fetches the same bundled list too.
 
 ---
 

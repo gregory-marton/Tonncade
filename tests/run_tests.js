@@ -138,10 +138,10 @@ loadScript('sandbox.js');
 loadScript('difficulty-barbell.js'); // blast.js/gravity.js/melody.js's DifficultyBarbell.create(...) needs this loaded first
 loadScript('blast.js');
 loadScript('gravity.js');
+loadScript('file-folder.js'); // melody.js's MelodyFolder/compose.js's ComposeFolder/life.js's LifeFolder = FileFolder.create(...) all need this loaded first
 loadScript('melody.js');
 loadScript('compose.js');
 loadScript('snake.js');
-loadScript('file-folder.js'); // life.js's LifeFolder = FileFolder.create(...) needs this loaded first
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'vendor', 'js-yaml.js'), 'utf8'), context, { filename: 'vendor/js-yaml.js' }); // vendored, MIT -- js/vendor/README.md
 loadScript('life.js');
 loadScript('main.js');

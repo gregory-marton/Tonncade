@@ -22,9 +22,12 @@ through which recipients can access the Corresponding Source.
 for the JavaScript code in this file.
 */
 /**
- * file-folder.js - a local folder + bundled-online-tier file source, one <select> per mode, shared
- * by Melody/Compose (js/midi-folder.js's MidiFolder, .mid files) and Life (js/life.js's LifeFolder,
- * .yaml files). Extracted from what used to be MidiFolder's own hard-coded implementation, the same
+ * file-folder.js - a local folder + bundled-online-tier file source, one <select> per mode, used
+ * by Melody (js/melody.js's MelodyFolder), Compose (js/compose.js's ComposeFolder, both .mid/
+ * .musicxml/.mxl files), and Life (js/life.js's LifeFolder, .yaml files). Extracted from what
+ * used to be one hard-coded implementation shared literally between Melody and Compose (a single
+ * object both modes read/wrote -- an INV-48 violation: picking a song in one silently selected it
+ * in the other's dropdown too, reported live), the same
  * way js/board.js's createBoard(shape) factors Board/GravityBoard out of one shared shape -- each
  * FileFolder.create(config) instance is independent (its own online index URL, extension filter,
  * read mode), but all instances remember the SAME local folder handle (one shared IndexedDB entry):
@@ -492,10 +495,10 @@ const FileFolder = {
         // Writes a file into the remembered shared folder -- falls back to a plain <a download>
         // blob link when no folder is set (Safari/Firefox, or Chrome before a folder's been chosen
         // this session), so Save always works regardless of browser/state.
-        // mimeTypeOverride: this instance's own single this.mimeType (e.g. MidiFolder's
+        // mimeTypeOverride: this instance's own single this.mimeType (e.g. ComposeFolder's
         // 'audio/midi') is wrong for a save whose FORMAT varies by caller, not just its
         // extension -- e.g. Compose can save either MusicXML text or a MIDI ArrayBuffer through
-        // this SAME shared MidiFolder instance. Falls back to this.mimeType when omitted, so
+        // this SAME ComposeFolder instance. Falls back to this.mimeType when omitted, so
         // every other (single-format) caller is unaffected.
         saveFileAs: async function(name, content, mimeTypeOverride) {
             if (this.folderHandle && !this.needsReconnect) {

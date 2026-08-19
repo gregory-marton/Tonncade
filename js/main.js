@@ -414,8 +414,11 @@ const App = {
         // mode we're actually leaving) rather than each mode's own cleanup() -- several modes'
         // cleanup() is reused internally too (e.g. MelodyMode.resetGame() calls it on normal entry,
         // not just on exit), so invalidating from there fires far more often than "really left."
-        if ((this.currentMode === 'melody' || this.currentMode === 'compose') && typeof MidiFolder !== 'undefined') {
-            MidiFolder.invalidate();
+        if (this.currentMode === 'melody' && typeof MelodyFolder !== 'undefined') {
+            MelodyFolder.invalidate();
+        }
+        if (this.currentMode === 'compose' && typeof ComposeFolder !== 'undefined') {
+            ComposeFolder.invalidate();
         }
         if (this.currentMode === 'life' && typeof LifeFolder !== 'undefined') {
             LifeFolder.invalidate();

@@ -142,13 +142,13 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                     <!-- One dropdown: Random (Melody's own offline-degrade, reselectable), then
                          bundled songs OR -- once a local folder is chosen -- that folder's own
                          listing, then a trailing "Choose/Change/Reconnect Folder" action item.
-                         js/file-folder.js (via js/midi-folder.js's MidiFolder) builds this. -->
+                         js/file-folder.js (via js/melody.js's MelodyFolder) builds this. -->
                     <div id="melody-source-group" class="control-group">
                         <select id="melody-source" aria-label="Song source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
                         <span id="melody-source-status" style="font-size: 11px; color: var(--dim);"></span>
                     </div>
                     <!-- Fallback for browsers without the File System Access API (Safari/Firefox) --
-                         js/midi-folder.js hides this once the folder tier above is available. -->
+                         js/melody.js's MelodyFolder hides this once the folder tier above is available. -->
                     <div id="melody-upload-group" class="control-group">
                         <label for="melody-file-input" class="custom-file-upload">
                             Upload File
@@ -202,9 +202,10 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 
                 <!-- Compose Mode Controls & Stats -->
                 <div id="compose-controls" style="display: none;">
-                    <!-- Shares Melody's exact remembered folder (js/midi-folder.js's MidiFolder) --
-                         both work with .mid files. Same one-dropdown layout as Melody's, just with
-                         no "Random" entry (Compose has no starting-content concept). -->
+                    <!-- ComposeFolder (js/compose.js) browses the same remembered folder
+                         MelodyFolder does, as its own independent instance (INV-48). Same
+                         one-dropdown layout as Melody's, just with no "Random" entry (Compose has
+                         no starting-content concept). -->
                     <div id="compose-source-group" class="control-group">
                         <select id="compose-source" aria-label="MIDI source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select>
                         <span id="compose-source-status" style="font-size: 11px; color: var(--dim);"></span>
@@ -465,9 +466,8 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
     <script src="js/difficulty-barbell.js"></script>
     <script src="js/blast.js"></script>
     <script src="js/gravity.js"></script>
-    <script src="js/melody.js"></script>
     <script src="js/file-folder.js"></script>
-    <script src="js/midi-folder.js"></script>
+    <script src="js/melody.js"></script>
     <script src="js/midi-input.js"></script>
     <script src="js/compose.js"></script>
     <script src="js/snake.js"></script>

@@ -269,15 +269,15 @@ test.describe('Exploratory tests (prototype)', () => {
       // progress," streak and all), not just a freshly-loaded, untouched song.
       if (rand() < 0.67) {
         const songIndex = Math.floor(rand() * 6); // 6 bundled songs, see midi/index.json
-        // MidiFolder.setup() (called from MelodyMode.init(), itself just triggered by the mode
+        // MelodyFolder.setup() (called from MelodyMode.init(), itself just triggered by the mode
         // click above) fetches midi/index.json asynchronously -- onlineIndex isn't populated yet
         // at this exact point, so checking it immediately and skipping when empty (as an earlier
         // version of this code did) silently fell through to "leave it on Random" every single
         // time, regardless of the dice roll above. Wait for it for real instead of guessing a
         // fixed delay.
-        await page.waitForFunction(() => typeof MidiFolder !== 'undefined' && MidiFolder.onlineIndex && MidiFolder.onlineIndex.length > 0);
+        await page.waitForFunction(() => typeof MelodyFolder !== 'undefined' && MelodyFolder.onlineIndex && MelodyFolder.onlineIndex.length > 0);
         await page.evaluate(async (songIndex) => {
-          await MidiFolder.loadOnlineFile(songIndex % MidiFolder.onlineIndex.length);
+          await MelodyFolder.loadOnlineFile(songIndex % MelodyFolder.onlineIndex.length);
         }, songIndex);
         await page.waitForFunction(() => !MelodyMode.state.isRandom); // loadOnlineFile's own fetch + parse is async too
         const notesToPlay = 1 + Math.floor(rand() * 4); // a few notes in, not the whole song

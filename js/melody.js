@@ -25,11 +25,42 @@ for the JavaScript code in this file.
  * midi.js - MIDI File Parser and Melody Game Mode.
  */
 
+// Melody's own file source (js/file-folder.js): the bundled midi/ songs plus a local folder the
+// player sets once. Used to be one instance shared with Compose (js/midi-folder.js's MidiFolder,
+// now deleted) so the two modes "browsed together" -- but that meant `currentValue` (which file
+// is CURRENTLY SELECTED) was the same mutable object both modes read and wrote, a direct INV-48
+// violation ("no shared mutable state between modes"): picking a real song in Melody silently
+// carried it into Compose's own dropdown instead of Compose's own "Record your own…" default
+// (reported live). Split into two independent instances, one per mode -- each still browses (and
+// remembers) the SAME underlying folder, since FileFolder's IndexedDB persistence
+// (DB_NAME/STORE_NAME/HANDLE_KEY) is declared at the shared namespace level, not per-instance;
+// only the per-mode SELECTION state (currentValue/fileHandles) is no longer shared.
+const MelodyFolder = FileFolder.create({
+    onlineIndexUrl: './midi/index.json',
+    bundledPathPrefix: './midi/',
+    // All three listable/browsable in the SAME folder -- MusicXML is the canonical format going
+    // forward (docs/melody-notation-design.md), MIDI stays a fully-supported import for files that
+    // already exist, and .mxl (compressed MusicXML -- a ZIP container, js/mxl.js) is the format
+    // real notation software (MuseScore, Finale, Sibelius) actually exports by default.
+    // extensionPattern governs the LOCAL FOLDER listing filter; the bundled online tier's own
+    // files are whatever midi/index.json says regardless of this regex.
+    extensionPattern: /\.(midi?|musicxml|mxl|xml)$/i,
+    readAs: 'arrayBuffer',              // default for anything NOT matched by fileTypes below (.mid)
+    mimeType: 'audio/midi',
+    loadMethod: 'loadMelodyFromArrayBuffer',
+    fileTypes: [
+        { pattern: /\.musicxml$/i, readAs: 'text', loadMethod: 'loadMelodyFromMusicXML' },
+        { pattern: /\.xml$/i, readAs: 'text', loadMethod: 'loadMelodyFromMusicXML' },
+        { pattern: /\.mxl$/i, readAs: 'arrayBuffer', loadMethod: 'loadMelodyFromMxl' },
+    ],
+    autoLoadFirstBundled: false,
+});
+
 const MelodyMode = {
     state: {
         melody: [],            // List of { midi, time, duration }
         // Set explicitly at both load sites (loadDefault/loadMelodyFromArrayBuffer) -- never
-        // inferred from #melody-filename's text or MidiFolder.currentValue, which would couple
+        // inferred from #melody-filename's text or MelodyFolder.currentValue, which would couple
         // this file to file-folder.js internals. Random is a memory-quiz sliding window forever
         // (no measures, no auto-advance -- it isn't a piece to progress through, #46); every
         // other branch below reads this flag to pick the Random path or the full-song path.
@@ -168,7 +199,7 @@ const MelodyMode = {
         this.updateStreakUI();
 
         // Offline degrade if nothing is loaded yet: a random one-octave sequence. The online
-        // midi/ folder (populated async by MidiFolder) replaces this with a real song when a
+        // midi/ folder (populated async by MelodyFolder) replaces this with a real song when a
         // connection exists; this only persists offline / under file:// (#86).
         if (this.state.melody.length === 0) {
             this.state.melody = this.randomMelody();
@@ -212,14 +243,14 @@ const MelodyMode = {
                 if (!file) return;
 
                 // Same fileTypes dispatch js/file-folder.js's own folder-browsing tier already
-                // uses (MidiFolder.resolveFileType) -- this fallback picker (Safari/Firefox, or
+                // uses (MelodyFolder.resolveFileType) -- this fallback picker (Safari/Firefox, or
                 // Chrome before a folder's been chosen) needs to route .musicxml/.xml/.mxl to
                 // their own loaders too, not just .mid. Reusing it here instead of duplicating the
                 // pattern match is what a fix for "the direct picker only understands MIDI" (an
                 // earlier gap in this file, caught by Codex's review) actually requires -- widening
                 // the <input accept> alone wouldn't have been enough, since this handler still
                 // would have force-fed the wrong bytes into the MIDI parser.
-                const { readAs, loadMethod } = MidiFolder.resolveFileType(file.name);
+                const { readAs, loadMethod } = MelodyFolder.resolveFileType(file.name);
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     this[loadMethod](event.target.result, file.name);
@@ -285,8 +316,8 @@ const MelodyMode = {
         this._difficultyBarbell.render();
         this._difficultyBarbell.setLevel(this.state.difficulty);
 
-        if (typeof MidiFolder !== 'undefined') {
-            MidiFolder.setup(this, {
+        if (typeof MelodyFolder !== 'undefined') {
+            MelodyFolder.setup(this, {
                 sourceSelect: 'melody-source',
                 sourceStatus: 'melody-source-status',
                 uploadGroup: 'melody-upload-group',
@@ -702,11 +733,12 @@ const MelodyMode = {
         // should be at position 0, the end bar at position 1... right now both seem to be at
         // zero"). Clamped for a genuinely 1-note melody, where there IS no second note.
         //
-        // endIndex is INCLUSIVE (not an exclusive upper bound), matching startIndex's own
-        // meaning -- both are indices of real notes the markers sit on, symmetric with how they
-        // look on screen. So [0, 1] deliberately drills TWO notes (0 and 1), not one -- this is
-        // intentional, not an off-by-one bug: a single starting note would put both markers back
-        // at the same visual position anyway, defeating the point of this fix.
+        // Both bounds are INCLUSIVE note indices, matching startIndex/endIndex's shared meaning
+        // everywhere else. Visually the marker reads as a caret in the gap BEFORE its note (like
+        // a text-cursor position, not a highlight ON the note), but it's still keyed by that
+        // note's own index -- same index means the same computed x, so [startIndex, endIndex]
+        // both pointing at note 0 would still draw both markers at the same spot. [0, 1]
+        // deliberately drills TWO notes (0 and 1), not one -- intentional, not an off-by-one.
         this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
         this.state.userIndex = 0;
         this.state.startIndex = 0;

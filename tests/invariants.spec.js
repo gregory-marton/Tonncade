@@ -2107,7 +2107,21 @@ test.describe('Invariant tests', () => {
     life: 'life-generation', compose: 'compose-note-count', sandbox: null,
     melody: 'melody-current-streak',
   };
-  const paintedFingerprint = async (page, mode) => page.evaluate((counterId) => {
+  // Melody's/Compose's own file-source dropdown selection -- a real, meaningfully-classed piece
+  // of state that isn't a painted cell or a counter, but is exactly the shape of thing INV-48
+  // covers ("any piece of state for any mode not frozen and thawed across a switch is a bug").
+  // Added after a real violation, reported live: MelodyFolder and ComposeFolder used to be ONE
+  // shared object (js/midi-folder.js's MidiFolder), so picking a real song in Melody silently
+  // carried it into Compose's own dropdown instead of Compose's "Record your own…" default -- no
+  // test caught it because nothing checked this piece of state at all. Split into two independent
+  // instances (see js/melody.js's MelodyFolder / js/compose.js's ComposeFolder); this fingerprint
+  // field is what makes a future regression of that sharing bug fail HERE, generically, rather
+  // than needing its own bespoke "Melody then Compose" test.
+  const SOURCE_SELECT_ID_FOR_MODE = {
+    blast: null, gravity: null, snake: null, life: null, sandbox: null,
+    compose: 'compose-source', melody: 'melody-source',
+  };
+  const paintedFingerprint = async (page, mode) => page.evaluate(({ counterId, sourceSelectId }) => {
     const MEANINGFUL_CLASSES = [
       'placed-piece', 'placed-cell', 'life-alive', 'snake-body', 'snake-head', 'snake-gem',
       'active-piece', 'compose-selected-note',
@@ -2118,10 +2132,31 @@ test.describe('Invariant tests', () => {
       .sort();
     const counterEl = counterId && document.getElementById(counterId);
     const counter = counterEl ? counterEl.textContent : null;
-    return { cells, counter };
-  }, COUNTER_ID_FOR_MODE[mode]);
+    const sourceEl = sourceSelectId && document.getElementById(sourceSelectId);
+    const sourceValue = sourceEl ? sourceEl.value : null;
+    return { cells, counter, sourceValue };
+  }, { counterId: COUNTER_ID_FOR_MODE[mode], sourceSelectId: SOURCE_SELECT_ID_FOR_MODE[mode] });
 
   const switchTo = (page, mode) => page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+
+  // Registers a fake bundled song for melody's own INV-48 mutate() (see its own comment) --
+  // called right after page.goto, before either switchTo() in the generated test below (melody
+  // can be EITHER the primary or the "other" mode), so the route is in place before
+  // MelodyFolder's real fetch of midi/index.json ever fires -- registering it any later (e.g.
+  // inside mutate() itself) races the real, unmocked fetch that switchTo(page, 'melody') already
+  // triggered by then. MelodyMode.writeMIDI needs the page already loaded to call, which
+  // page.goto having just resolved guarantees.
+  const mockMelodyBundledSong = async (page) => {
+    const bytes = await page.evaluate(() => Array.from(new Uint8Array(MelodyMode.writeMIDI([
+      { midi: 60, time: 0, duration: 0.4 }, { midi: 62, time: 0.5, duration: 0.4 },
+    ]))));
+    await page.route('**/midi/index.json', (route) => route.fulfill({
+      json: [{ name: 'INV-48 Test Song', file: 'inv48-test-song.mid' }],
+    }));
+    await page.route('**/midi/inv48-test-song.mid', (route) => route.fulfill({
+      body: Buffer.from(bytes), contentType: 'audio/midi',
+    }));
+  };
 
   // Every mode gets an entry here, unconditionally -- there's no such thing as a "stateless"
   // mode to legitimately exempt (previously named STATEFUL_MODES, implying an opt-in category
@@ -2165,11 +2200,20 @@ test.describe('Invariant tests', () => {
       await page.locator('#compose-record').click();
     } },
     { mode: 'melody', mutate: async (page) => {
+      // Pick a real bundled song via the dropdown first -- a plain tap never touches
+      // MelodyFolder.currentValue, so without this step the fingerprint's own sourceValue field
+      // (see its own comment) would never actually exercise the shared-object regression it
+      // exists to catch. The route mocks themselves are registered by mockMelodyBundledSong,
+      // called BEFORE this test's own page.goto -- registering them here would be too late: by
+      // the time mutate() runs, switchTo() has already triggered MelodyFolder's real (unmocked)
+      // fetch of the genuine midi/index.json.
+      await page.waitForFunction(() => typeof MelodyFolder !== 'undefined' && MelodyFolder.onlineIndex && MelodyFolder.onlineIndex.length > 0, { timeout: 5000 });
+      await page.locator('#melody-source').selectOption({ label: 'INV-48 Test Song' });
+      await page.waitForFunction(() => MelodyMode.state.melody.length === 2, { timeout: 5000 });
+
       // Wait out the intro "listen" playback (resetGame() -> playTargetSequence() runs on its
-      // own timers) before answering, same as a real player would have to. Reads the actual
-      // target note/melody rather than assuming one (Melody's own melody is whatever loaded --
-      // often the random offline-degrade in a test environment with no network) -- a real tap on
-      // the correct cell, not a direct state mutation, matching every other mode's own mutate().
+      // own timers) before answering, same as a real player would have to. A real tap on the
+      // correct cell, not a direct state mutation, matching every other mode's own mutate().
       await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 5000 });
       const midi = await page.evaluate(() => MelodyMode.state.melody[MelodyMode.state.userIndex].midi);
       const coord = await page.evaluate((m) => Tonnetz.nearestCoordFor(m, { p: 0, q: 0 }), midi);
@@ -2189,6 +2233,7 @@ test.describe('Invariant tests', () => {
     const MODES = await getModes(page);
     expect(MODE_MUTATIONS.map((m) => m.mode).sort(), 'MODE_MUTATIONS').toEqual([...MODES].sort());
     expect(Object.keys(COUNTER_ID_FOR_MODE).sort(), 'COUNTER_ID_FOR_MODE').toEqual([...MODES].sort());
+    expect(Object.keys(SOURCE_SELECT_ID_FOR_MODE).sort(), 'SOURCE_SELECT_ID_FOR_MODE').toEqual([...MODES].sort());
   });
 
   for (let i = 0; i < MODE_MUTATIONS.length; i++) {
@@ -2204,6 +2249,7 @@ test.describe('Invariant tests', () => {
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.goto('/');
+      if (mode === 'melody' || other.mode === 'melody') await mockMelodyBundledSong(page);
 
       await switchTo(page, mode);
       if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
