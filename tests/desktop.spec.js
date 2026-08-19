@@ -961,6 +961,39 @@ test('Compose: loading an existing MIDI file lays its notes out as one connected
   result.distances.forEach(dist => expect(dist).toBeLessThanOrEqual(3));
 });
 
+// Reported live: "I don't have start and end bars on the compose timeline so I could select
+// anything" -- refreshStaff()'s "first note(s) just appeared" branch set BOTH startIndex and
+// endIndex to 0 whenever notes went from empty to non-empty, so after loading a whole file the
+// two markers landed exactly on top of each other at note 0 instead of spanning anything
+// selectable.
+test('Compose: loading a file with several notes gives the end marker somewhere real to sit, not stacked on the start', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    MelodyMode.parseMIDI = () => ({
+      notes: [
+        { midi: 60, time: 0, duration: 0.4 },
+        { midi: 64, time: 0.5, duration: 0.4 },
+        { midi: 67, time: 1.0, duration: 0.4 },
+      ],
+    });
+  });
+  await page.evaluate(async () => {
+    await ComposeMode.loadMelodyFromArrayBuffer(new ArrayBuffer(0), 'test.mid');
+  });
+
+  const result = await page.evaluate(() => ({
+    startIndex: ComposeMode.state.startIndex,
+    endIndex: ComposeMode.state.endIndex,
+    startLeft: document.querySelector('.timeline-marker-start')?.style.left,
+    endLeft: document.querySelector('.timeline-marker-end')?.style.left,
+  }));
+  expect(result.startIndex).toBe(0);
+  expect(result.endIndex, 'the end marker should default to the LAST loaded note, not stay stuck at 0').toBe(2);
+  expect(result.startLeft, 'the two markers must not visually coincide').not.toBe(result.endLeft);
+});
+
 // Compose per-note editing (task #64): select/delete/insert/drag/rotate on the lattice.
 // Deliberately excludes any timing-edit UI (nudge buttons, a timeline) -- see next_steps.md #52
 // and js/compose.js's own comment: a rough recording is cheap to redo, rhythm-precision editing
@@ -4486,8 +4519,10 @@ test('Compose: dragging the end marker on the real Timeline selects every note u
     ];
     ComposeMode.refreshBoard();
   });
-  // A fresh note set defaults both markers to note 0 (INV-55) -- nothing to drag onto view yet.
-  expect(await page.evaluate(() => [ComposeMode.state.startIndex, ComposeMode.state.endIndex])).toEqual([0, 0]);
+  // A fresh note set defaults the end marker to the LAST note (reported live: "I don't have
+  // start and end bars on the compose timeline so I could select anything" -- both used to stack
+  // on note 0), so drag it back DOWN to note 2 to exercise the same "selects up to here" path.
+  expect(await page.evaluate(() => [ComposeMode.state.startIndex, ComposeMode.state.endIndex])).toEqual([0, 3]);
 
   const markerBox = await page.locator('.timeline-marker-end').boundingBox();
   const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();

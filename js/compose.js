@@ -885,9 +885,14 @@ const ComposeMode = {
             this.state.endIndex = null;
         } else if (this.state.startIndex == null || this.state.endIndex == null) {
             // First note(s) just appeared -- give the markers somewhere real to sit rather than
-            // staying invisible with nothing to grab.
+            // staying invisible with nothing to grab. End defaults to the LAST note (not 0) --
+            // reported live: "I don't have start and end bars on the compose timeline so I could
+            // select anything," because both markers used to land on top of each other at note 0
+            // whenever a whole file had just been loaded. Defaulting to the full span means a
+            // freshly loaded piece is immediately selectable end-to-end; a single freshly-tapped
+            // note (maxIdx === 0) still degenerates to both at 0, correctly.
             this.state.startIndex = this.state.startIndex == null ? 0 : this.state.startIndex;
-            this.state.endIndex = this.state.endIndex == null ? 0 : this.state.endIndex;
+            this.state.endIndex = this.state.endIndex == null ? maxIdx : this.state.endIndex;
         }
         this.timeline.refresh(this.state.notes, {
             bpm: this.state.tempoBPM,
