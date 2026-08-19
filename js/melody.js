@@ -701,6 +701,12 @@ const MelodyMode = {
         // markers visually coincide from the very first moment (reported live: "the start bar
         // should be at position 0, the end bar at position 1... right now both seem to be at
         // zero"). Clamped for a genuinely 1-note melody, where there IS no second note.
+        //
+        // endIndex is INCLUSIVE (not an exclusive upper bound), matching startIndex's own
+        // meaning -- both are indices of real notes the markers sit on, symmetric with how they
+        // look on screen. So [0, 1] deliberately drills TWO notes (0 and 1), not one -- this is
+        // intentional, not an off-by-one bug: a single starting note would put both markers back
+        // at the same visual position anyway, defeating the point of this fix.
         this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
         this.state.userIndex = 0;
         this.state.startIndex = 0;

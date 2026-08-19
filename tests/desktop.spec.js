@@ -4063,6 +4063,10 @@ test('Melody: a freshly loaded song starts at [0, 1], not the degenerate [0, 0]'
   const result = await page.evaluate(() => ({ startIndex: MelodyMode.state.startIndex, endIndex: MelodyMode.state.endIndex }));
   expect(result.startIndex).toBe(0);
   expect(result.endIndex, 'the two markers should not visually coincide at the very start').toBe(1);
+  // Both bounds are INCLUSIVE (INV-26), so [0, 1] deliberately drills notes 0 AND 1 -- two notes,
+  // not one -- at the very start. Asserted explicitly so this reads as intentional, not an
+  // off-by-one left for a future reader to "fix".
+  expect(result.endIndex - result.startIndex + 1, 'the starting segment covers exactly two notes').toBe(2);
 });
 
 test('Melody: loading a new song resets the clean-streak', async ({ page }) => {

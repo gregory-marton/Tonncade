@@ -480,6 +480,9 @@ The drilled segment starts at the left (start) scrubber and ends at the right (e
 `state.startIndex`/`state.endIndex` — both inclusive (`endIndex` IS the last included note's
 index, symmetric with `startIndex`), starting at `[0, 1]` (not the degenerate `[0, 0]` -- a
 single-note segment made the two markers visually coincide at the very start; reported live).
+Because both bounds are inclusive, `[0, 1]` deliberately drills TWO notes, not one — intentional,
+not an off-by-one bug: a genuinely single-note starting segment would put both markers back at
+the same visual position, defeating the point of this fix in the first place.
 The end scrubber auto-advances with
 correct play, once per correct play (or the user can move it directly) — continuous, no streak
 required. The beginning scrubber auto-advances once the player has cleanly played a measure `k`
