@@ -814,10 +814,17 @@ a real viewport resize to confirm nothing calls it with that mode's own options 
 
 ### INV-32: Live MIDI hardware input is supported in every mode
 
-**Not currently met.** `js/midi-input.js`'s `MidiInput.handleNoteOn` has a real, per-mode-specific
-routing branch for Sandbox, Melody (INV-23), Gravity, Snake, Blast, and Life — but none at all for
-**Compose**, the one remaining mode. A MIDI note-on while Compose is active is silently dropped.
-See next_steps.md for the planned fix; not yet designed in enough detail to schedule.
+`js/midi-input.js`'s `MidiInput.handleNoteOn` has a real, per-mode-specific routing branch for
+every mode: Sandbox, Melody (INV-23), Compose, Gravity, Snake, Blast, and Life.
+
+**Compose** was the last gap (reported live: "my midi keyboard doesn't light up Compose at all" —
+`handleNoteOn`'s if/else chain had a branch for every OTHER mode, silently falling through to
+nothing for this one). Fixed with `ComposeMode.playNoteByMidi(midi)`: a MIDI note-on only carries
+a pitch, not a cell, so `Tonnetz.nearestCoordFor(midi, state.lastMidiCoord)` picks the nearest
+matching cell to wherever the last MIDI note landed (the origin for the very first one — same
+seeded-nearest-cell pattern Sandbox's own `playNoteByMidi` already used), then it's exactly a tap
+on that cell via the existing `tapCell(p, q, {})`: records it if `state.isRecording`, otherwise
+selects/inserts/plays like any other tap.
 
 `MidiInput.handleNoteOn` originally only routed to Sandbox and Melody — "other modes have no
 'play a free note' concept" was true at the time (issue #11), but the user asked for real
@@ -867,9 +874,13 @@ not a new bespoke test.
 
 **Test:** `tests/run_tests.js` — "Gravity/Snake/Blast MIDI hardware routing tests" (pure state-
 mutation logic, each mode's `refreshUI`/`updateDirectionHighlight` DOM tail stubbed out).
-`tests/invariants.spec.js` — "issue #11: live MIDI hardware input drives Gravity/Snake/Blast,
-each per its own spec", using the same fake-MIDI-device pattern INV-23 established, exercising
-the real end-to-end path including the chord-buffering timing.
+`tests/invariants.spec.js` — "issue #11: live MIDI hardware input drives
+Gravity/Snake/Blast/Compose/Life, each per its own spec", using the same fake-MIDI-device pattern
+INV-23 established, exercising the real end-to-end path including the chord-buffering timing.
+Gravity's own check drives all 5 mapped notes (C/D/E/F/G), not just middle C, after a real
+regression post-mortem (INV-56, a completely different bug) turned up a case where only checking
+ONE representative case of an otherwise-general mechanism let a real bug hide in the untested
+rest of it.
 
 ---
 

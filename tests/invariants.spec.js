@@ -422,11 +422,29 @@ test.describe('Invariant tests', () => {
   // ────────────────────────────────────────────────────────────────────────
 
   const MIDI_ROUTING_CHECKS = {
+    // Every mapped note (C/D/E/F/G -- the full spec, not just middle C), not one hand-picked case
+    // that would leave the other four silently uncovered.
     gravity: async (page) => {
-      const before = await page.evaluate(() => GravityMode.state.p);
-      await sendFakeNoteOn(page, 60);
-      const after = await page.evaluate(() => GravityMode.state.p);
-      expect(after, 'MIDI note 60 (middle C) should move Gravity\'s piece left, matching the D-pad').toBe(before - 1);
+      await sendFakeNoteOn(page, 60); // C: move left
+      const afterLeft = await page.evaluate(() => GravityMode.state.p);
+      const initialP = afterLeft + 1;
+      expect(afterLeft, 'MIDI note 60 (middle C) should move Gravity\'s piece left, matching the D-pad').toBe(initialP - 1);
+
+      await sendFakeNoteOn(page, 67); // G: move right -- back to the starting column
+      expect(await page.evaluate(() => GravityMode.state.p), 'MIDI note 67 (G) should move Gravity\'s piece right').toBe(initialP);
+
+      const rotBefore = await page.evaluate(() => GravityMode.state.rotation);
+      await sendFakeNoteOn(page, 62); // D: rotate CCW
+      const rotCCW = await page.evaluate(() => GravityMode.state.rotation);
+      expect(rotCCW, 'MIDI note 62 (D) should rotate Gravity\'s piece CCW').not.toBe(rotBefore);
+
+      await sendFakeNoteOn(page, 65); // F: rotate CW -- back to the starting rotation
+      expect(await page.evaluate(() => GravityMode.state.rotation), 'MIDI note 65 (F) should rotate Gravity\'s piece CW').toBe(rotBefore);
+
+      const qBefore = await page.evaluate(() => GravityMode.state.q);
+      await sendFakeNoteOn(page, 64); // E: soft drop
+      const qAfter = await page.evaluate(() => GravityMode.state.q);
+      expect(qAfter, 'MIDI note 64 (E) should soft-drop Gravity\'s piece').not.toBe(qBefore);
     },
     snake: async (page) => {
       const targetDir = await page.evaluate(() => {
@@ -464,6 +482,24 @@ test.describe('Invariant tests', () => {
       });
       expect(result, 'Blast\'s ghost should move to a placement reproducing the played chord').toEqual(chord.slice().sort((a, b) => a - b));
     },
+    // Reported live: "my midi keyboard doesn't light up Compose at all" -- MidiInput.handleNoteOn
+    // (js/midi-input.js) had a branch for every other mode but this one. A MIDI note-on is just a
+    // tap on the nearest matching cell (ComposeMode.playNoteByMidi): records it if recording is
+    // on, matching a real tapped note exactly (pitch, and something recorded at all).
+    compose: async (page) => {
+        await page.evaluate(() => {
+            ComposeMode.state.isRecording = true;
+            ComposeMode.state.recordStartTime = performance.now();
+        });
+        const before = await page.evaluate(() => ComposeMode.state.notes.length);
+        await sendFakeNoteOn(page, 60);
+        const after = await page.evaluate(() => ({
+            count: ComposeMode.state.notes.length,
+            lastMidi: ComposeMode.state.notes[ComposeMode.state.notes.length - 1]?.midi,
+        }));
+        expect(after.count, 'a live MIDI note-on while recording should append a note, same as a tap').toBe(before + 1);
+        expect(after.lastMidi).toBe(60);
+    },
     life: async (page) => {
       await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
       // The exact target the app itself computes (nearest matching cell to the view center) --
@@ -482,7 +518,7 @@ test.describe('Invariant tests', () => {
     },
   };
 
-  test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast/Life, each per its own spec', async ({ page }) => {
+  test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast/Compose/Life, each per its own spec', async ({ page }) => {
     await connectFakeMidiDevice(page); // hardware connection is session-level, not per-mode
     for (const mode of Object.keys(MIDI_ROUTING_CHECKS)) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);

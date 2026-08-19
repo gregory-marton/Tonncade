@@ -59,6 +59,10 @@ const ComposeMode = {
         isPanning: false,
         lastMouse: { x: 0, y: 0 },
         dragCandidate: null,    // { startClientX, startClientY, startP, startQ, moved } -- see setupEvents
+        lastMidiCoord: null,    // seeds Tonnetz.nearestCoordFor for the NEXT live MIDI note (see
+                                 // playNoteByMidi) so a run of keyboard notes lands on nearby
+                                 // cells instead of snapping back to the origin every time --
+                                 // null (-> origin) until the first live MIDI note arrives.
         tempoBPM: 120,
         subdivision: '1/16',
         quantizeEnabled: false, // opt-in (task #52) -- a rough free-tapped recording stays as-is unless asked
@@ -344,6 +348,20 @@ const ComposeMode = {
         }
         Render.highlightByMidi(midi, 250);
         Synth.playNote(midi);
+    },
+
+    // Live MIDI hardware input (js/midi-input.js, issue #11) -- was entirely unrouted (reported
+    // live: "my midi keyboard doesn't light up Compose at all"; MidiInput.handleNoteOn had a
+    // branch for every OTHER mode but Compose). Unlike a tap, a MIDI note-on only knows the
+    // pitch, not which cell -- Tonnetz.nearestCoordFor picks the nearest match to wherever the
+    // last MIDI note landed (near the origin for the very first one), same pattern as Sandbox's
+    // own hoverCell-seeded playNoteByMidi, so a run of keyboard notes stays visually coherent
+    // instead of jumping back to the origin every time. Then it's exactly a tap on that cell --
+    // records if recording, otherwise selects/inserts/plays like any other tapCell call.
+    playNoteByMidi: function(midi) {
+        const coord = Tonnetz.nearestCoordFor(midi, this.state.lastMidiCoord);
+        this.state.lastMidiCoord = coord;
+        this.tapCell(coord.p, coord.q, {});
     },
 
     // Touch equivalent of tapCell's recording branch, but built for real multitouch: mouse can
