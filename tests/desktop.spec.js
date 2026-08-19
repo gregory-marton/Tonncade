@@ -632,6 +632,49 @@ test('MidiFolder: choosing a folder copies bundled defaults into it that it does
   expect(written).toContain('bundled.mid');
 });
 
+// Reported live: "When selecting my music folder which already had the defaults in it, I ended
+// up with duplicates in the menu... not duplicate files, just duplicate menu entries." Root
+// cause: the bundled songs' own format migrated from .mid to .musicxml at some point (see
+// midi/index.json), and copyDefaultsInto's "do we already have this" check only looked for the
+// EXACT current filename -- a folder populated back when the bundled index still said
+// "bundled.mid" never matches today's "bundled.musicxml", so the new file gets copied in
+// alongside the old one. Both display with the SAME label (renderOptions strips the extension),
+// so the dropdown shows the song name twice even though the two entries are genuinely different
+// files, exactly matching what was reported.
+test('MidiFolder: choosing a folder does not duplicate a bundled default that already exists under an older extension', async ({ page }) => {
+  await page.route('**/midi/index.json', route => route.fulfill({
+    json: [{ name: 'Bundled Song', file: 'bundled.musicxml' }],
+  }));
+  await page.route('**/midi/bundled.musicxml', route => route.fulfill({ body: '<score-partwise/>', contentType: 'application/vnd.recordare.musicxml+xml' }));
+
+  await page.goto('/');
+  // The folder already has this exact song, just under the OLD bundled extension.
+  await installFakeMidiFolder(page, { files: [{ name: 'bundled.mid', tag: 0 }] });
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() =>
+    [...document.getElementById('melody-source').options].some(o => o.value === 'bundled:0'));
+
+  const written = await page.evaluate(async () => {
+    const calls = [];
+    window.__fakeFolderHandle.getFileHandle = async (name, opts) => {
+      if (!opts || !opts.create) {
+        if (name === 'bundled.mid') return { getFile: async () => ({ name, arrayBuffer: async () => new Uint8Array([0]).buffer }) };
+        throw new Error('not found');
+      }
+      calls.push(name);
+      return { createWritable: async () => ({ write: async () => {}, close: async () => {} }) };
+    };
+    document.getElementById('melody-source').value = 'choose-folder';
+    document.getElementById('melody-source').dispatchEvent(new Event('change'));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return calls;
+  });
+  expect(written, 'bundled.musicxml should NOT be copied in -- this song already exists as bundled.mid').not.toContain('bundled.musicxml');
+
+  const names = await sourceLocalOptionNames(page, 'melody-source');
+  expect(names.filter((n) => n === 'bundled').length, 'only one dropdown entry for this song').toBe(1);
+});
+
 // A folder picked/restored under only 'read' permission can list files, but saveFileAs's write
 // (getFileHandle().createWritable()) throws against a real browser's read-only grant and silently
 // falls back to a plain download -- the exact bug reported live ("Life save gives me a download

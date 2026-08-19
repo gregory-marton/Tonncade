@@ -315,15 +315,29 @@ const FileFolder = {
         },
 
         // Backfills the newly-chosen folder with this mode's bundled defaults it doesn't already
-        // have (by filename), so "the dropdown should be populated from there" doesn't mean losing
-        // the built-in songs/automata the player already knows -- they get copied in once, not
-        // re-copied or overwritten on every visit.
+        // have, so "the dropdown should be populated from there" doesn't mean losing the built-in
+        // songs/automata the player already knows -- they get copied in once, not re-copied or
+        // overwritten on every visit.
+        //
+        // Matched by BASENAME (extension stripped), not the exact current filename -- the bundled
+        // set's own format has migrated before (.mid -> .musicxml), so a folder populated back
+        // when the index still pointed at the old extension has e.g. "frere-jacques.mid" but not
+        // "frere-jacques.musicxml". An exact-filename check would copy the new file in right
+        // alongside the old one -- both display with the SAME label (renderOptions strips the
+        // extension), so the dropdown silently showed the same song twice (reported live: "I
+        // ended up with duplicates in the menu... not duplicate files, just duplicate menu
+        // entries" -- exactly this: two genuinely different files, same displayed name).
         copyDefaultsInto: async function(handle) {
             if (!this.onlineIndex) return;
+            const existingBasenames = new Set();
+            for await (const entry of handle.values()) {
+                if (entry.kind === 'file' && this.extensionPattern.test(entry.name)) {
+                    existingBasenames.add(entry.name.replace(this.extensionPattern, ''));
+                }
+            }
             for (const song of this.onlineIndex) {
                 try {
-                    const existing = await handle.getFileHandle(song.file).catch(() => null);
-                    if (existing) continue;
+                    if (existingBasenames.has(song.file.replace(this.extensionPattern, ''))) continue;
                     const content = await this._fetchBundled(song.file);
                     const fileHandle = await handle.getFileHandle(song.file, { create: true });
                     const writable = await fileHandle.createWritable();
