@@ -411,7 +411,12 @@ const Notation = {
             const deco = decorate ? (decorate(n) || {}) : {};
             span.className = 'note-token' + (deco.className ? ' ' + deco.className : ''); // same look as the Melody/Compose timeline tokens
             span.style.position = 'absolute';
-            span.style.left = n.x + 'px';
+            // +3px -- reported live: centered exactly on n.x read slightly LEFT of the actual
+            // notehead above it. VexFlow's own getAbsoluteX() anchors to a note's left-side tick
+            // position, not its glyph's visual center (see Timeline._positionMarker's own comment
+            // on the same quirk) -- the notehead itself is drawn a little to the right of that x,
+            // so the label needs the same small rightward bias to actually sit under it.
+            span.style.left = (n.x + 3) + 'px';
             span.style.transform = 'translateX(-50%)';
             if (deco.style) {
                 Object.keys(deco.style).forEach((key) => { span.style[key] = deco.style[key]; });

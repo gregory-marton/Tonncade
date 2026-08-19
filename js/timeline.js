@@ -95,7 +95,11 @@ const Timeline = {
             // there is one, or Notation.render's own trailing padding-rest entry (endPadding) if
             // idx is the very last real note (reported live: the end marker visually excluded its
             // own last note).
-            const lookupId = which === 'end' ? idx + 1 : idx;
+            // idx != null, not just `which === 'end'` -- JS coerces `null + 1` to `1`, so an
+            // absent endIndex (Random mode's "no meaningful boundary markers" -- js/melody.js)
+            // silently looked up whichever note happens to have id 1 instead of correctly
+            // finding nothing (reported live: Random showed an end marker with no start marker).
+            const lookupId = (which === 'end' && idx != null) ? idx + 1 : idx;
             const entry = this._lastRender.noteXPositions.find((n) => n.id === lookupId) ||
                 (which === 'end' && this._lastRender.endPadding && this._lastRender.endPadding.id === lookupId
                     ? this._lastRender.endPadding : null);

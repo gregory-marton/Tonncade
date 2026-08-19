@@ -1528,9 +1528,11 @@ test('Melody mode: the start marker sits right before the note it targets', asyn
     if (!target) return false;
     const markerLeft = parseFloat(marker.style.left);
     // Within half the marker's own (deliberately wide, easier-to-grab -- see css/style.css)
-    // hit-box width, not a tight pixel match -- its VISIBLE stem still lands exactly on the
-    // target via the same offset _positionMarker always used, just wider now.
-    return Math.abs(markerLeft - target.offsetLeft) <= 12;
+    // hit-box width PLUS the pitch label's own +3px rightward bias (Notation.renderLabels --
+    // nudged to better match the actual notehead position on the staff above, reported live),
+    // not a tight pixel match -- the marker's VISIBLE stem still lands exactly on entry.x via the
+    // same offset _positionMarker always used; only the LABEL's own x is deliberately offset now.
+    return Math.abs(markerLeft - target.offsetLeft) <= 15;
   });
   expect(isAtTarget).toBe(true);
 });
@@ -5355,6 +5357,32 @@ test('Timeline.refresh: renders the staff, pitch row, and both markers at the ri
   expect(info.startLeft).not.toBeNull();
   expect(info.endLeft).not.toBeNull();
   expect(parseFloat(info.endLeft)).toBeGreaterThan(parseFloat(info.startLeft)); // end (note 1) is right of start (note 0)
+});
+
+// Reported live: Melody's Random mode ("no meaningful boundary markers for a forever-sliding
+// window" -- js/melody.js passes startIndex/endIndex both null there) showed an end marker with
+// no start marker. Root cause: _positionMarker's `idx + 1` lookup for 'end' doesn't guard against
+// idx being null -- JS coerces `null + 1` to `1`, so a null endIndex silently looked up whichever
+// note happens to have id 1 (present in Random's sliding window most of the time) instead of
+// finding nothing and removing the marker, the way the null start correctly did.
+test('Timeline.refresh: a null endIndex removes the end marker entirely, not a phantom one at id 1', async ({ page }) => {
+  await page.goto('/');
+  const info = await page.evaluate((setupCode) => {
+    eval(setupCode);
+    const tl = Timeline.create({ staffContainerId: 'tl3-staff', labelsContainerId: 'tl3-labels', scrollContainerId: 'tl3-scroll' });
+    const notes = [
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 0.5, duration: 0.5 }, // id 1 -- exactly what null + 1 coerces to
+      { midi: 64, time: 1, duration: 0.5 },
+    ];
+    tl.refresh(notes, { bpm: 120, startIndex: null, endIndex: null });
+    return {
+      startMarkerExists: !!document.querySelector('.timeline-marker-start'),
+      endMarkerExists: !!document.querySelector('.timeline-marker-end'),
+    };
+  }, setupTimelineContainers('tl3'));
+  expect(info.startMarkerExists).toBe(false);
+  expect(info.endMarkerExists, 'a null endIndex must remove the end marker too, not phantom-render one at id 1').toBe(false);
 });
 
 // Reported live: the end marker rendered as a caret BEFORE its own note -- correct for the start

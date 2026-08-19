@@ -391,6 +391,11 @@ svg {
     overflow-x: auto;
     scrollbar-width: thin;
     position: relative; /* anchor for .scrub-marker and .notation-barline, both stack-spanning */
+    /* Room for .timeline-marker-handle-bottom to sit BELOW the pitch row's own text instead of
+       overlapping it (reported live) -- the marker spans top:0;bottom:0 of this exact box, so
+       padding-bottom here is what pushes bottom:0 (and the handle sitting there) down past the
+       row's last line of text. */
+    padding-bottom: 12px;
 }
 
 /* One thin line per measure boundary (Notation.render's own barlineXPositions -- js/notation.js),
