@@ -504,7 +504,19 @@ const FileFolder = {
                     const writable = await fileHandle.createWritable();
                     await writable.write(content);
                     await writable.close();
-                    await this.listFiles(this.folderHandle); // the new file becomes pickable immediately
+                    // Re-list to pick up the new/updated file, but stay pointed at what was JUST
+                    // saved -- listFiles() always auto-loads whichever file sorts first
+                    // alphabetically instead, silently discarding the save (reported live: "the
+                    // menu should stay on my (perhaps new) song, not switch to alphabet").
+                    const files = [];
+                    for await (const entry of this.folderHandle.values()) {
+                        if (entry.kind === 'file' && this.extensionPattern.test(entry.name)) files.push(entry);
+                    }
+                    files.sort((a, b) => a.name.localeCompare(b.name));
+                    this.fileHandles = files;
+                    const idx = files.findIndex((f) => f.name === name);
+                    if (idx >= 0) this.currentValue = 'local:' + idx;
+                    this.renderOptions();
                     return true;
                 } catch (err) {
                     console.warn('Could not save into the remembered folder, falling back to a download:', err);

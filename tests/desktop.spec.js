@@ -968,6 +968,55 @@ test('Compose: Save writes a MusicXML file that round-trips back to the same not
   expect(roundTripped[1].time).toBeGreaterThan(roundTripped[0].time);
 });
 
+// Reported live: "After saving my song to the music folder, the menu should stay on my (perhaps
+// new) song, not switch to alphabet." saveFileAs used to re-list the folder via listFiles(),
+// which always auto-loads whichever file sorts FIRST alphabetically -- "alphabet.musicxml" being
+// exactly that in the bundled set -- silently discarding the just-saved selection.
+test('Compose: Save keeps the dropdown pointed at the just-saved song, not whichever file sorts first', async ({ page }) => {
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.__savedFiles = {};
+    // Two files that already exist and sort BEFORE the one we're about to save -- if saveFileAs
+    // regresses back to listFiles()'s auto-load-index-0 behavior, the dropdown would land on
+    // "alphabet" instead of "my-song".
+    const existingNames = ['alphabet.musicxml', 'happy-birthday.musicxml'];
+    const toEntry = (name) => ({ kind: 'file', name, getFile: async () => ({ name, arrayBuffer: async () => new Uint8Array([0]).buffer }) });
+    const fakeHandle = {
+      name: 'MySongs',
+      // Reflects whatever's actually been written (via getFileHandle below), same as a real
+      // directory handle would -- a static list wouldn't include the just-saved file at all.
+      values: async function* () {
+        for (const name of existingNames.concat(Object.keys(window.__savedFiles))) yield toEntry(name);
+      },
+      getFileHandle: async (name) => ({
+        createWritable: async () => ({
+          write: async (buf) => { window.__savedFiles[name] = buf; },
+          close: async () => {},
+        }),
+      }),
+    };
+    MidiFolder.folderHandle = fakeHandle;
+    window.prompt = () => 'my-song.musicxml';
+  });
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [{ midi: 60, p: 0, q: 0, time: 0, duration: 0.4 }];
+  });
+
+  await page.locator('#compose-save').click();
+  await page.waitForFunction(() => window.__savedFiles['my-song.musicxml'] !== undefined);
+
+  const result = await page.evaluate(() => ({
+    currentValue: MidiFolder.currentValue,
+    selectValue: document.getElementById('compose-source').value,
+    selectedLabel: document.getElementById('compose-source').selectedOptions[0]?.textContent,
+  }));
+  expect(result.selectedLabel, 'the dropdown should still show the just-saved song, not "alphabet"').toBe('my-song');
+  expect(result.selectValue).toBe(result.currentValue);
+});
+
 test('Compose: loading an existing MIDI file lays its notes out as one connected path on the lattice', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
