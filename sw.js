@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tonncade-v18';
+const CACHE_NAME = 'tonncade-v19';
 const ASSETS = [
     './',
     './index.html',

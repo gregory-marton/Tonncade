@@ -25,8 +25,10 @@ for the JavaScript code in this file.
  * replay.js - Always-on input recording for post-hoc bug reports and full session recreation.
  *
  * Keeps a rolling log of the last MAX_EVENTS raw events (keydown, pointer down/up, viewport
- * resize/orientation changes, and every real note played -- see wrapSynth) from page load,
- * independent of the current mode. Modes routinely
+ * resize/orientation changes, and every live MIDI hardware note-on -- see wrapMidiInput) from
+ * page load, independent of the current mode -- plus a separate, much larger soundLog of every
+ * note actually SOUNDED (see wrapSynth), a distinct verification trace, not input to replay
+ * against. Modes routinely
  * reassign window.onkeydown per mode switch (App.setMode nulls it, each mode's setupEvents()
  * reassigns it) -- this listens via addEventListener instead, so it keeps recording across every
  * mode change without needing any mode to cooperate.
@@ -201,11 +203,33 @@ const Replay = {
         };
     },
 
+    // Live MIDI hardware input (js/midi-input.js, issue #11) never became a replayable EVENT --
+    // only its resulting sound did (via wrapSynth above), and that's indistinguishable from the
+    // app's own auto-play (Melody's target-sequence playback, both funnel through the same
+    // Synth.playNote). A session driven by a real MIDI keyboard therefore couldn't become a
+    // faithful story test (tests/stories.spec.js): there was nothing to actually replay, only a
+    // sound trace that mixed the player's real presses with the app's own audio. Wrapping
+    // handleNoteOn (the one place every live note-on already funnels through, regardless of
+    // which mode routes it where -- see js/midi-input.js's own handleNoteOn) records the raw
+    // pitch as a real `midi-note-on` event in the same input-event log as keydown/pointerdown, so
+    // a replay tool can feed it straight back through MidiInput.handleNoteOn(midi) (or a fake
+    // device's onmidimessage, matching tests/invariants.spec.js's INV-23/issue-#11 harness) to
+    // reproduce the exact same session.
+    wrapMidiInput: function() {
+        if (typeof MidiInput === 'undefined' || typeof MidiInput.handleNoteOn !== 'function') return;
+        const originalHandleNoteOn = MidiInput.handleNoteOn.bind(MidiInput);
+        MidiInput.handleNoteOn = (midi) => {
+            this.record({ type: 'midi-note-on', t: Date.now(), midi });
+            return originalHandleNoteOn(midi);
+        };
+    },
+
     init: function() {
         this.seedRandom();
         this.recordMeta();
         this.recordViewport();
         this.wrapSynth();
+        this.wrapMidiInput();
 
         window.addEventListener('keydown', (e) => {
             this.record({ type: 'keydown', t: Date.now(), key: e.key, code: e.code, shiftKey: e.shiftKey });

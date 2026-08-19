@@ -140,6 +140,7 @@ loadScript('blast.js');
 loadScript('gravity.js');
 loadScript('file-folder.js'); // melody.js's MelodyFolder/compose.js's ComposeFolder/life.js's LifeFolder = FileFolder.create(...) all need this loaded first
 loadScript('melody.js');
+loadScript('midi-input.js'); // Replay.wrapMidiInput() needs MidiInput.handleNoteOn defined
 loadScript('compose.js');
 loadScript('snake.js');
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'vendor', 'js-yaml.js'), 'utf8'), context, { filename: 'vendor/js-yaml.js' }); // vendored, MIT -- js/vendor/README.md
@@ -1308,6 +1309,38 @@ try {
     }
     ReplayObj.soundLog = [];
     console.log("PASS: Replay.wrapSynth() records every real note played (not internal bass-boost harmonics) into its own soundLog!");
+
+    // A session driven by a real MIDI keyboard used to leave nothing replayable behind: only the
+    // resulting SOUND was recorded (via wrapSynth above), indistinguishable from the app's own
+    // auto-play (both funnel through the same Synth.playNote). wrapMidiInput records the raw
+    // note-on itself, as a real event in the same input-event log as keydown/pointerdown, so a
+    // captured session can actually be replayed (tests/stories.spec.js), not just sound-checked.
+    console.log("Running Replay.wrapMidiInput() note-on recording test...");
+    ReplayObj.log = [];
+    const MidiInputObj = vm.runInContext("MidiInput", context);
+    const AppObj = vm.runInContext("App", context);
+    AppObj.currentMode = 'sandbox';
+    const SandboxModeObj = vm.runInContext("SandboxMode", context);
+    let sandboxSawMidi = null;
+    SandboxModeObj.playNoteByMidi = (midi) => { sandboxSawMidi = midi; };
+    MidiInputObj.handleNoteOn(64);
+    const midiEvents = ReplayObj.log.filter((e) => e.type === 'midi-note-on');
+    if (midiEvents.length !== 1 || midiEvents[0].midi !== 64) {
+        console.error(`FAIL: MidiInput.handleNoteOn(64) should record exactly one {type:'midi-note-on', midi:64} event in Replay.log! Got: ${JSON.stringify(ReplayObj.log)}`);
+        process.exit(1);
+    }
+    if (sandboxSawMidi !== 64) {
+        console.error(`FAIL: wrapping handleNoteOn must still call the real handler -- SandboxMode.playNoteByMidi should have been called with 64! Got: ${sandboxSawMidi}`);
+        process.exit(1);
+    }
+    // Must NOT also land in soundLog -- soundLog is exclusively for actual sounded notes
+    // (wrapSynth), a different signal from raw input events.
+    if (ReplayObj.soundLog.some((e) => e.midi === 64)) {
+        console.error(`FAIL: a midi-note-on input event must not also be recorded as a sound event -- those are two separate logs.`);
+        process.exit(1);
+    }
+    ReplayObj.log = [];
+    console.log("PASS: Replay.wrapMidiInput() records every live MIDI note-on as a real, replayable input event!");
 
     console.log("Running Replay soundLog capped-eviction test...");
     ReplayObj.soundLog = [];
