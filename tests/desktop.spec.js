@@ -5275,6 +5275,38 @@ test('Timeline.refresh: renders the staff, pitch row, and both markers at the ri
   expect(parseFloat(info.endLeft)).toBeGreaterThan(parseFloat(info.startLeft)); // end (note 1) is right of start (note 0)
 });
 
+// Reported live: the end marker rendered as a caret BEFORE its own note -- correct for the start
+// marker (an inclusive start reads naturally as "right before the first included note"), but for
+// an INCLUSIVE end that visually EXCLUDES its own last note instead of including it. Fixed by
+// looking up id+1 for 'end' -- the next real note's x if there is one, or Notation.render's own
+// trailing padding-rest entry (endPadding) if endIndex is the very last real note.
+test('Timeline.refresh: the end marker sits AFTER its own note (the next note\'s x, or the trailing padding rest if it\'s the last note), never on top of it', async ({ page }) => {
+  await page.goto('/');
+  const info = await page.evaluate((setupCode) => {
+    eval(setupCode);
+    const tl = Timeline.create({ staffContainerId: 'tl2-staff', labelsContainerId: 'tl2-labels', scrollContainerId: 'tl2-scroll' });
+    const notes = [
+      { midi: 60, time: 0, duration: 0.5 },
+      { midi: 62, time: 0.5, duration: 0.5 },
+      { midi: 64, time: 1, duration: 0.5 },
+    ];
+    tl.refresh(notes, { bpm: 120, startIndex: 0, endIndex: 1 }); // NOT the last note (index 2 is)
+    const note1X = tl._lastRender.noteXPositions.find((n) => n.id === 1).x;
+    const note2X = tl._lastRender.noteXPositions.find((n) => n.id === 2).x;
+    const endLeftMidSong = parseFloat(document.querySelector('.timeline-marker-end').style.left);
+
+    tl.refresh(notes, { bpm: 120, startIndex: 0, endIndex: 2 }); // the LAST note
+    const endLeftAtLastNote = parseFloat(document.querySelector('.timeline-marker-end').style.left);
+
+    return { note1X, note2X, endLeftMidSong, endLeftAtLastNote };
+  }, setupTimelineContainers('tl2'));
+
+  expect(info.endLeftMidSong, 'end at note 1 (not last) should sit at note 2\'s x, not note 1\'s own x')
+    .toBeCloseTo(info.note2X - 10, 0);
+  expect(info.endLeftAtLastNote, 'end at the LAST note should sit past it (the padding rest), not on top of it')
+    .toBeGreaterThan(info.note2X - 10);
+});
+
 test('Timeline: dragging the start marker to a different note calls onStartCommit with that note\'s id, exactly once, on release', async ({ page }) => {
   await page.goto('/');
   await page.evaluate((setupCode) => { eval(setupCode); }, setupTimelineContainers('tld'));

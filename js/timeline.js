@@ -88,7 +88,17 @@ const Timeline = {
         _positionMarker: function(which, idx) {
             const scrollEl = document.getElementById(this.scrollContainerId);
             if (!scrollEl || !this._lastRender) return;
-            const entry = this._lastRender.noteXPositions.find((n) => n.id === idx);
+            // Every marker renders as a caret BEFORE its own note's x (see below) -- correct for
+            // 'start' (an inclusive start sits right before the first included note), but that
+            // would read as EXCLUDING its own note for 'end' (an inclusive end). Looking up id+1
+            // instead places the end marker in the gap AFTER its note -- the next real note if
+            // there is one, or Notation.render's own trailing padding-rest entry (endPadding) if
+            // idx is the very last real note (reported live: the end marker visually excluded its
+            // own last note).
+            const lookupId = which === 'end' ? idx + 1 : idx;
+            const entry = this._lastRender.noteXPositions.find((n) => n.id === lookupId) ||
+                (which === 'end' && this._lastRender.endPadding && this._lastRender.endPadding.id === lookupId
+                    ? this._lastRender.endPadding : null);
             let marker = scrollEl.querySelector('.timeline-marker-' + which);
             if (!entry) {
                 if (marker) marker.remove();

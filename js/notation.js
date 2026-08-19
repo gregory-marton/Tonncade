@@ -264,6 +264,7 @@ const Notation = {
         const noteXPositions = [];
         const barlineXPositions = [];
         let staveBounds = null;
+        let endPaddingVexNote = null;
         let x = 10;
         measures.forEach((items, mi) => {
             barlineXPositions.push(x);
@@ -298,10 +299,23 @@ const Notation = {
 
             const trebleItems = [];
             const bassItems = [];
-            items.forEach((item) => {
+            items.forEach((item, ii) => {
                 if (item.rest) {
-                    trebleItems.push(this._ghostRest('treble', item.beatDuration));
+                    const trebleRest = this._ghostRest('treble', item.beatDuration);
+                    trebleItems.push(trebleRest);
                     bassItems.push(this._ghostRest('bass', item.beatDuration));
+                    // The padding rest at the very end of the whole piece -- captured separately
+                    // (endPadding below), NOT pushed into noteXPositions itself, since that array
+                    // feeds renderLabels/hit-testing, which only know how to handle real notes.
+                    // Gives an inclusive endIndex pointing at the LAST real note somewhere to
+                    // render its marker (Timeline._positionMarker looks up id+1 for 'end', reusing
+                    // the same "caret before this id" placement the start marker already uses --
+                    // see its own comment). Without this, the end marker had no real landmark once
+                    // the drilled segment reached the last note and visually sat BEFORE it instead
+                    // of after, reading as excluding its own last note (reported live).
+                    if (mi === measures.length - 1 && ii === items.length - 1 && beatNotes.length > 0) {
+                        endPaddingVexNote = trebleRest;
+                    }
                     return;
                 }
                 const isTreble = item.midi >= clefSplit;
@@ -366,6 +380,11 @@ const Notation = {
             })),
             barlineXPositions: barlineXPositions,
             staveBounds: staveBounds,
+            // {id, x} of the trailing padding rest at the very end of the piece, or null for an
+            // empty `notes` -- see the items.forEach comment above. id === beatNotes.length, one
+            // past the last real note's own id, so Timeline._positionMarker's "id+1" lookup for
+            // the end marker finds this when endIndex is the last real note.
+            endPadding: endPaddingVexNote ? { id: beatNotes.length, x: endPaddingVexNote.getAbsoluteX() } : null,
         };
     },
 
