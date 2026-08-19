@@ -238,8 +238,12 @@ const ComposeMode = {
                 this.state.viewY -= dy;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
                 // panView keeps the aspect-matched viewBox the draw used (a bare updateView would
-                // reset it to the fixed 4:3 box and re-letterbox mid-drag).
-                const v = Render.panView(this.state.viewX, this.state.viewY, Render.zoom);
+                // reset it to the fixed 4:3 box and re-letterbox mid-drag). this.state.zoom, not
+                // Render.zoom (a global "whatever was last rendered ANYWHERE") -- the two can
+                // easily differ, and using the wrong one snapped the view to a different zoom
+                // level on the very first move event of a drag (reported live: "dragging zoomed
+                // out instead of dragging... even a tiny drag zoomed out a lot").
+                const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom);
                 this.state.viewX = v.viewX;
                 this.state.viewY = v.viewY;
             }

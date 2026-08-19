@@ -1399,6 +1399,70 @@ test('Melody mode: dragging the mouse pans the Tonnetz, and still plays the clic
   expect(played.length, 'the initial mousedown should still play whatever cell was clicked').toBeGreaterThan(0);
 });
 
+// Reported live: "dragging zoomed out instead of dragging... even a tiny drag zoomed out a lot"
+// -- "drag by a pixel or two while trying to click". Root cause: onmousemove's pan handler
+// re-rendered using Render.zoom (whatever zoom was last rendered ANYWHERE, a global convenience
+// value updateView happens to leave behind) instead of this mode's own this.state.zoom -- the
+// two can easily differ (e.g. right after some other render at a different zoom level), so even
+// a 1px drag could snap the view to a completely different zoom level on its very first move
+// event. Sandbox's own identical pan handler already used this.state.zoom correctly; Melody and
+// Compose didn't.
+test('Melody mode: dragging the mouse pans without silently changing the zoom level', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+  await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
+
+  // Reproduces the exact staleness that causes the bug: this mode's own tracked zoom differs
+  // from the global Render.zoom left over from some other render.
+  await page.evaluate(() => {
+    MelodyMode.state.zoom = 2;
+    Render.zoom = 1;
+  });
+  // What the viewBox width SHOULD be for this mode's own zoom (2) -- the ground truth to check
+  // the post-drag render against, independent of whatever was on screen before this test touched
+  // state.zoom at all.
+  const expectedWidthAtZoom2 = await page.evaluate(() => Render.getAspectMatchedRefBox().refW * 2);
+
+  const box = await page.locator('#tonnetz-svg').boundingBox();
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx - 2, cy - 2, { steps: 1 }); // "a pixel or two" -- reported live
+  await page.mouse.up();
+
+  // The rendered viewBox must reflect the mode's OWN zoom (2), not the stale global Render.zoom
+  // (1) -- this is what actually catches the bug: the old code re-rendered against the wrong
+  // value on the very first move event, snapping the view to a different zoom level.
+  const viewBoxWidthAfter = await page.evaluate(() =>
+    parseFloat(Render.svg.getAttribute('viewBox').split(/\s+/)[2]));
+  expect(viewBoxWidthAfter, 'the rendered view must not snap to a different zoom level while panning')
+    .toBeCloseTo(expectedWidthAtZoom2, 0);
+});
+
+// Same bug, same fix, Compose's own copy of the pan handler.
+test('Compose: dragging the mouse pans without silently changing the zoom level', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+
+  await page.evaluate(() => {
+    ComposeMode.state.zoom = 2;
+    Render.zoom = 1;
+  });
+  const expectedWidthAtZoom2 = await page.evaluate(() => Render.getAspectMatchedRefBox().refW * 2);
+
+  const box = await page.locator('#tonnetz-svg').boundingBox();
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx - 2, cy - 2, { steps: 1 });
+  await page.mouse.up();
+
+  const viewBoxWidthAfter = await page.evaluate(() =>
+    parseFloat(Render.svg.getAttribute('viewBox').split(/\s+/)[2]));
+  expect(viewBoxWidthAfter, 'the rendered view must not snap to a different zoom level while panning')
+    .toBeCloseTo(expectedWidthAtZoom2, 0);
+});
+
 test('Melody mode: a pan survives refreshBoard() (e.g. after rotating), instead of snapping back to the fixed default', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
