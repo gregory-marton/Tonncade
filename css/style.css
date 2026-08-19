@@ -452,36 +452,41 @@ svg {
     border-top: 6px solid currentColor;
 }
 
-/* The Timeline's two boundary markers (INV-55, js/timeline.js): a real I-beam (CSS-drawn
-   vertical stem + a top serif, no glyph text), absolutely positioned at the target note's own x
-   -- so it's visually clear which note a drag would land on, unlike the plain range-slider
-   version this replaced long ago, and unlike the easy-to-miss ▾ glyph it replaced after that
-   (see INV-26/docs/invariants.md). The SAME <span> is created once per marker and only ever
-   repositioned via style.left afterward -- never recreated -- so a live touch/mouse capture
-   stays valid mid-drag.
-   Parented under .notation-scroll and spans top:0;bottom:0 -- the whole staff+labels+timeline
-   stack, not just the pitch row. Only ONE serif (top) per marker, not top+bottom: a bottom serif
-   would need box-shadow with a HARDCODED pixel offset, which can't track a height that's
-   dynamic (the stack's own height varies by viewport/song).
-   .timeline-marker-start/.timeline-marker-end get distinct colors so the two are
-   distinguishable at a glance; which color means which isn't otherwise load-bearing. */
+/* The Timeline's two boundary markers (INV-55, js/timeline.js): a vertical line with a trapezoid
+   handle at each end, absolutely positioned at the target note's own x -- so it's visually clear
+   which note a drag would land on, unlike the plain range-slider version this replaced long ago,
+   and unlike the easy-to-miss ▾ glyph it replaced after that (see INV-26/docs/invariants.md).
+   Spans top:0;bottom:0 -- the whole staff+labels+timeline stack, not just the pitch row, on
+   BOTH modes now (Compose used to be confined to the pitch row alone -- see the handles' own
+   comment below for why that's no longer needed).
+
+   The line, the handles, and the marker's own box all move together as one visual unit (one
+   <span>, positioned once via style.left) -- but only the two handles actually receive pointer
+   events; the box and line are pointer-events:none, deliberately click-through. Reported live:
+   "the most natural interaction... is to drag the top or bottom" -- the handles make that the
+   REAL grab target (bigger, unmistakable) instead of a thin line buried among real text, and
+   being click-through is what lets Compose's staff (click-to-add/drag-to-repitch, INV-33/Task
+   #9) go back to a full-height marker without ever shadowing a note click: only the two small
+   handles could still overlap a note, not the line/box passing over the rest of the staff.
+
+   The SAME <span> (and its two handle children) are created once per marker and never
+   recreated -- only ever repositioned via style.left -- so a live touch/mouse capture on a
+   handle stays valid mid-drag. .timeline-marker-start/.timeline-marker-end get distinct colors
+   so the two are distinguishable at a glance; which color means which isn't otherwise
+   load-bearing. */
 .timeline-marker {
     position: absolute;
     top: 0;
     bottom: 0;
     display: inline-block;
-    /* Wider than the 2px visible stem (::before, below) on purpose -- a hit target this thin
-       was hard to grab precisely, especially now that it sits among real text in a busier
-       layout (reported live, more than once: a drag attempt landed on a neighboring note or the
-       bar's own background instead of the marker). The extra width is invisible (no
-       background), so it doesn't change how the marker LOOKS, only how forgiving it is to grab.
-       js/timeline.js's _positionMarker centers this box on its target note (left = x - width/2). */
-    width: 20px;
+    width: 20px; /* centers the line/handles on the target note -- js/timeline.js's
+                    _positionMarker centers this box on its target note (left = x - width/2) */
+    pointer-events: none;
     cursor: grab;
     touch-action: none; /* this project handles the drag itself -- don't let the browser scroll/zoom */
 }
 .timeline-marker::before {
-    /* the vertical stem -- spans the marker's own full (now dynamic) height */
+    /* the vertical stem -- spans the marker's own full (now dynamic) height, purely visual */
     content: '';
     position: absolute;
     left: 50%; top: 0; bottom: 0;
@@ -489,31 +494,36 @@ svg {
     background: currentColor;
     transform: translateX(-50%);
 }
-.timeline-marker::after {
-    /* top serif */
-    content: '';
-    position: absolute;
-    left: 50%; top: 0;
-    width: 6px; height: 2px;
-    background: currentColor;
-    transform: translateX(-50%);
-}
 .timeline-marker-start { color: var(--accent); }
 .timeline-marker-end { color: #e6b23c; }
 
-.timeline-marker:active {
+/* The two actual grab handles -- real child elements (not ::before/::after; a single element
+   only gets two pseudo-element slots and the line already uses one), each pointer-events:auto
+   against the marker's own pointer-events:none. Narrower than a note's own on-staff spacing on
+   purpose (~10-12px of usable staff width at typical zoom), so even sitting right at the top of
+   Compose's staff a handle only ever risks shadowing the note directly under it, never a
+   neighbor. Trapezoid via clip-path -- wide at the outer edge (easy to spot/grab), narrowing
+   toward the line so it doesn't visually overwhelm whatever's directly behind it. */
+.timeline-marker-handle {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 14px;
+    height: 10px;
+    background: currentColor;
+    pointer-events: auto;
+    cursor: grab;
+}
+.timeline-marker-handle:active {
     cursor: grabbing;
 }
-
-/* Compose ONLY: confine the marker to the pitch row's own height, not the full stack. Compose's
-   staff is itself click-to-add/drag-to-repitch editable (INV-33/Task #9) -- a full-height marker
-   at the same x as a note would sit on top of it, silently swallowing every click meant for that
-   note instead of the staff's own handler (found live: a click landed on the marker, not the
-   notehead, exactly where a fresh piece's default markers and its first note coincide). Melody's
-   own staff has no competing click target, so its markers keep the full-stack span (see above). */
-#compose-notation-scroll .timeline-marker {
-    top: auto;
-    height: 1.2em; /* matches .pitch-row's own height */
+.timeline-marker-handle-top {
+    top: 0;
+    clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
+}
+.timeline-marker-handle-bottom {
+    bottom: 0;
+    clip-path: polygon(0% 0%, 100% 0%, 80% 100%, 20% 100%);
 }
 
 /* Melody's song-complete flourish (MelodyMode.celebrate/spawnConfetti) -- purely decorative

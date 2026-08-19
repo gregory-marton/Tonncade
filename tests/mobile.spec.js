@@ -631,7 +631,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
       const targetX = positions.find((n) => n.id === 0).x;
       scrollEl.scrollLeft = Math.max(0, targetX - 30);
     });
-    const markerBox = await page.locator('.timeline-marker-start').boundingBox();
+    // The top handle specifically, not the marker's overall center -- the marker's own line/box
+    // are pointer-events:none (INV-55), so a real touch there would hit whatever's underneath.
+    const markerBox = await page.locator('.timeline-marker-start .timeline-marker-handle-top').boundingBox();
     const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
     const startX = markerBox.x + markerBox.width / 2;
     const startY = markerBox.y + markerBox.height / 2;

@@ -108,6 +108,15 @@ const Timeline = {
                 marker = document.createElement('span');
                 marker.className = 'timeline-marker timeline-marker-' + which;
                 marker.title = which === 'start' ? 'Drag to move the start' : 'Drag to move the end';
+                // The line/box are pointer-events:none (css/style.css) -- only these two handles
+                // actually receive pointer events, so a drag always starts from grabbing one of
+                // them, never the line passing over the staff.
+                const handleTop = document.createElement('span');
+                handleTop.className = 'timeline-marker-handle timeline-marker-handle-top';
+                const handleBottom = document.createElement('span');
+                handleBottom.className = 'timeline-marker-handle timeline-marker-handle-bottom';
+                marker.appendChild(handleTop);
+                marker.appendChild(handleBottom);
                 scrollEl.appendChild(marker);
             }
             // -10, not -3: half of .timeline-marker's own 20px width (css/style.css) --
@@ -198,22 +207,24 @@ const Timeline = {
                 else this.onEndCommit(idx);
             };
 
+            // .closest(), not a direct classList check -- e.target is now one of the two handle
+            // children (css/style.css: the marker's own box/line are pointer-events:none), so the
+            // marker itself has to be found by walking up from whichever handle was actually hit.
             scrollEl.addEventListener('mousedown', (e) => {
                 // Render.wasRecentlyTouched(), not a device-capability sniff (see its own
                 // comment) -- a static check here disabled mouse dragging entirely on any
                 // touch-CAPABLE device (e.g. a touchscreen laptop driven by a real mouse), which
                 // is exactly the bug reported live as "having trouble dragging the start marker."
                 if (Render.wasRecentlyTouched()) return;
-                if (e.target.classList.contains('timeline-marker-start')) { e.preventDefault(); startDrag('start', e.clientX); }
-                else if (e.target.classList.contains('timeline-marker-end')) { e.preventDefault(); startDrag('end', e.clientX); }
+                if (e.target.closest('.timeline-marker-start')) { e.preventDefault(); startDrag('start', e.clientX); }
+                else if (e.target.closest('.timeline-marker-end')) { e.preventDefault(); startDrag('end', e.clientX); }
             });
             window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
             window.addEventListener('mouseup', endDrag);
 
             scrollEl.addEventListener('touchstart', (e) => {
-                const cls = e.target.classList;
-                if (cls.contains('timeline-marker-start')) { e.preventDefault(); startDrag('start', e.touches[0].clientX); }
-                else if (cls.contains('timeline-marker-end')) { e.preventDefault(); startDrag('end', e.touches[0].clientX); }
+                if (e.target.closest('.timeline-marker-start')) { e.preventDefault(); startDrag('start', e.touches[0].clientX); }
+                else if (e.target.closest('.timeline-marker-end')) { e.preventDefault(); startDrag('end', e.touches[0].clientX); }
             }, { passive: false });
             scrollEl.addEventListener('touchmove', (e) => {
                 // Was `if (!dragging) return;` -- `dragging` was never declared anywhere in this

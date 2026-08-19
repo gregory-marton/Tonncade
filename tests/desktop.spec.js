@@ -1636,8 +1636,12 @@ test('Melody mode: dragging the start marker back replays the skipped-over earli
   // whatever's behind it instead. scrollIntoViewIfNeeded (which locator.click() does
   // automatically, but raw page.mouse coordinates don't) brings the marker into the visible
   // area first, matching how a real drag actually starts.
+  //
+  // Grabs the TOP HANDLE specifically, not the marker's own overall center -- the marker's
+  // line/box are deliberately pointer-events:none (INV-55), click-through so they never shadow a
+  // staff click; only the two small handle children actually start a drag.
   await page.locator('.timeline-marker-start').scrollIntoViewIfNeeded();
-  const markerBox = await page.locator('.timeline-marker-start').boundingBox();
+  const markerBox = await page.locator('.timeline-marker-start .timeline-marker-handle-top').boundingBox();
   await page.locator('.note-token[data-note-idx="0"]').scrollIntoViewIfNeeded();
   const targetBox = await page.locator('.note-token[data-note-idx="0"]').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
@@ -1679,7 +1683,7 @@ test('Melody mode: dragging the start marker forward skips already-mastered note
   // under 2px apart -- genuinely ambiguous for _nearestIndex's closest-by-x match. Index 2 sits
   // safely mid-measure, clear of that boundary.
   await page.locator('.timeline-marker-start').scrollIntoViewIfNeeded();
-  const markerBox = await page.locator('.timeline-marker-start').boundingBox();
+  const markerBox = await page.locator('.timeline-marker-start .timeline-marker-handle-top').boundingBox();
   await page.locator('.note-token[data-note-idx="2"]').scrollIntoViewIfNeeded();
   const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
@@ -4705,7 +4709,7 @@ test('Compose: dragging the end marker on the real Timeline selects every note u
   // on note 0), so drag it back DOWN to note 2 to exercise the same "selects up to here" path.
   expect(await page.evaluate(() => [ComposeMode.state.startIndex, ComposeMode.state.endIndex])).toEqual([0, 3]);
 
-  const markerBox = await page.locator('.timeline-marker-end').boundingBox();
+  const markerBox = await page.locator('.timeline-marker-end .timeline-marker-handle-top').boundingBox();
   const targetBox = await page.locator('.note-token[data-note-idx="2"]').boundingBox();
   await page.mouse.move(markerBox.x + markerBox.width / 2, markerBox.y + markerBox.height / 2);
   await page.mouse.down();
@@ -5240,6 +5244,74 @@ test('Melody: the start marker spans the full staff+labels+timeline stack height
   expect(heights.markerHeight).toBeGreaterThan(heights.labelsHeight * 2);
 });
 
+// Compose's own markers used to be confined to just the pitch row (its staff is itself
+// click-to-add/drag-to-repitch editable, and a full-height marker at the same x as a note would
+// have swallowed clicks meant for it) -- reunified with Melody's full-stack span once the
+// marker's line/box became click-through (pointer-events:none) and only its two small top/bottom
+// handles remained interactive, per "shouldn't they be [the same]?" / "this is for Melody as
+// well... unify them."
+test('Compose: the start marker also spans the full staff+labels+timeline stack height, unified with Melody\'s', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },
+    ];
+    ComposeMode.refreshBoard();
+  });
+  const heights = await page.evaluate(() => {
+    const marker = document.querySelector('.timeline-marker-start');
+    const wrapper = document.getElementById('compose-notation-scroll');
+    const labels = document.getElementById('compose-staff-labels');
+    return {
+      markerHeight: marker.getBoundingClientRect().height,
+      wrapperHeight: wrapper.getBoundingClientRect().height,
+      labelsHeight: labels.getBoundingClientRect().height,
+    };
+  });
+  expect(heights.markerHeight).toBeGreaterThan(heights.wrapperHeight * 0.7);
+  expect(heights.markerHeight).toBeGreaterThan(heights.labelsHeight * 2);
+});
+
+// The marker's own line/box are pointer-events:none (INV-55) -- clicking directly on the STAFF at
+// the same x as a real notehead, with a marker's line passing right over it, must still reach the
+// staff's own click-to-select handler (INV-33/Task #9), not the marker. This is the actual point
+// of the click-through redesign: Compose's markers went back to full height (matching Melody)
+// specifically because this no longer risks shadowing a note.
+test('Compose: clicking a notehead the marker line passes directly over still selects it, not the marker', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+  await page.evaluate(() => {
+    ComposeMode.state.notes = [
+      { midi: 60, p: 0, q: 0, time: 0, duration: 0.4 },
+      { midi: 64, p: 1, q: 0, time: 1, duration: 0.4 },
+      { midi: 67, p: 0, q: 1, time: 2, duration: 0.4 },
+    ];
+    // The START marker (lookupId === idx, unlike the END marker which sits one note AFTER its
+    // own idx -- see Timeline._positionMarker) renders exactly on note 1's own x here. A plain
+    // staff click on note 1 selects JUST note 1 -- but if the marker intercepted the click
+    // instead, releasing a (no-op) drag back onto the same note commits onStartCommit(1), which
+    // calls selectTimeRange(1, 2) and selects notes 1 AND 2 together. The two paths give
+    // genuinely different results, which is what makes this an actual regression test (an
+    // earlier version of this test used a degenerate single-note range where both paths happened
+    // to produce the same [0], so it could never actually fail).
+    ComposeMode.state.startIndex = 1;
+    ComposeMode.state.endIndex = 2;
+    ComposeMode.refreshBoard();
+  });
+  await page.waitForTimeout(200); // let layout/ResizeObserver settle before reading pixel coords
+  const clickPoint = await page.evaluate(() => {
+    const svg = document.querySelector('#compose-staff svg').getBoundingClientRect();
+    const n = ComposeMode._staffRender.noteXPositions.find((p) => p.id === 1);
+    return { x: svg.left + n.x, y: svg.top + n.y };
+  });
+  await page.mouse.click(clickPoint.x, clickPoint.y);
+  const selected = await page.evaluate(() => ComposeMode.state.selectedIndices.slice().sort());
+  expect(selected, 'a plain click should select just note 1, not be swallowed by the marker (which would select [1,2] instead)').toEqual([1]);
+});
+
 // ────────────────────────────────────────────────────────────────────────
 // Timeline (js/timeline.js, INV-55): the shared staff+pitch-row+two-marker component both
 // Melody's practice strip and Compose use. Tested standalone here, against synthetic containers,
@@ -5337,11 +5409,13 @@ test('Timeline: dragging the start marker to a different note calls onStartCommi
   const positions = await page.evaluate(() => {
     const scrollRect = document.getElementById('tld-scroll').getBoundingClientRect();
     const target = window.__tl._lastRender.noteXPositions[2]; // drag start onto note 2
-    const startMarker = document.querySelector('.timeline-marker-start');
-    const mr = startMarker.getBoundingClientRect();
+    // The marker's own line/box are pointer-events:none (INV-55) -- mousedown has to actually
+    // land on one of the two handle children to start a drag.
+    const handle = document.querySelector('.timeline-marker-start .timeline-marker-handle-top');
+    const hr = handle.getBoundingClientRect();
     return {
-      markerX: mr.x + mr.width / 2, markerY: mr.y + mr.height / 2,
-      targetX: scrollRect.left + target.x, targetY: mr.y + mr.height / 2,
+      markerX: hr.x + hr.width / 2, markerY: hr.y + hr.height / 2,
+      targetX: scrollRect.left + target.x, targetY: hr.y + hr.height / 2,
     };
   });
   await page.mouse.move(positions.markerX, positions.markerY);
