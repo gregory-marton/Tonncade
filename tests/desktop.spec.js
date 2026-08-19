@@ -3230,6 +3230,104 @@ test('Gravity: pasting the exact missing note into a near-complete row clears it
   expect(final.remaining[0][0]).toBe('4,0'); // and cascaded all the way down to the (now-open) floor
 });
 
+// Reported live: after the fix above, real play still showed post-clear debris freezing solid
+// instead of falling. Root cause, confirmed by direct repro: _boardComponents grouped cells by
+// FRESH geometric adjacency every tick, so any falling mass whose descent merely brushed past an
+// UNRELATED already-settled piece got welded to it and froze as one rigid body -- even though
+// only one cell of the mass actually touched anything, and the rest was hanging over open floor.
+// Real pieces should stay rigid (they fell connected), but two SEPARATE settled pieces touching
+// each other is ordinary stacking (each independently blocked by the other), not fusion. Fixed by
+// grouping on a persistent groupId stamped at lock/paste time (_assignGroupId) instead of
+// recomputing adjacency from scratch.
+test('Gravity: a falling mass that brushes past an unrelated settled piece keeps falling past it, not fused to it', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.linesCleared = 0;
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    GravityMode.spawnPiece();
+    GravityMode.state.p = 20; GravityMode.state.q = 40; // active piece parked well out of the way
+
+    // An unrelated, genuinely settled single-column spike (its own group, via lockActivePiece --
+    // simulated directly here the same way GravityBoard.fillCells + _assignGroupId would).
+    const spike = [];
+    for (let q = 0; q <= 5; q++) spike.push({ p: -5 - Math.floor(q / 2), q });
+    GravityBoard.fillCells(spike, 'X', '#fff');
+    GravityMode._assignGroupId(spike);
+
+    // The row that will clear (q=6, every column, including the spike's own continuation).
+    const clearRow = [];
+    for (let col = -5; col <= 4; col++) clearRow.push({ p: col - Math.floor(6 / 2), q: 6 });
+    GravityBoard.fillCells(clearRow, 'X', '#fff');
+    GravityMode._assignGroupId(clearRow);
+
+    // A wide mass at q=7 (cols -4..4, i.e. NOT above the spike's own column) -- its own group,
+    // unrelated to the spike or the clearing row.
+    const mass = [];
+    for (let col = -4; col <= 4; col++) mass.push({ p: col - Math.floor(7 / 2), q: 7 });
+    GravityBoard.fillCells(mass, 'X', '#fff');
+    GravityMode._assignGroupId(mass);
+    const massGroupId = GravityBoard.cells.get(`${mass[0].p},${mass[0].q}`).groupId;
+
+    const massQsByTick = [];
+    for (let i = 0; i < 15; i++) {
+      GravityMode.tick();
+      const qs = [...GravityBoard.cells.entries()]
+        .filter(([k, v]) => v.groupId === massGroupId)
+        .map(([k]) => +k.split(',')[1]);
+      massQsByTick.push(qs.length ? Math.min(...qs) : null); // null once fully consumed by a clear
+    }
+    return { linesCleared: GravityMode.state.linesCleared, massQsByTick };
+  });
+  // Old buggy behavior: the mass touches the spike's column in passing on its way down, gets
+  // welded to it as one rigid mass, and freezes at q=6 forever -- massQsByTick would read
+  // [7, 6, 6, 6, 6, ...] and linesCleared would stay at 1. Correct behavior: it keeps falling past
+  // the brush-contact, drops far enough to nestle flush against the spike's own peak, and
+  // completes a SECOND real line there (q=5 -- the spike's one cell plus the mass's other nine
+  // exactly fill it) -- two clears total, and the mass's own cells are consumed by that second
+  // clear rather than sitting frozen.
+  expect(result.linesCleared).toBe(2);
+  expect(result.massQsByTick).toContain(6);  // it did pass through q=6 on the way down...
+  expect(result.massQsByTick.filter((q) => q === 6).length).toBeLessThan(5); // ...but didn't STAY there
+  expect(result.massQsByTick[result.massQsByTick.length - 1]).toBeNull(); // consumed by the 2nd clear, not frozen mid-air
+});
+
+// checkActivePlacement lets a piece overhang the side wall while steering, as long as it keeps a
+// toe-hold on the real playable columns (js/board.js) -- locking that way used to leave the
+// overhanging cells in GravityBoard.cells PERMANENTLY (findFullLines never scans past col 4 to
+// clear them). Harmless under the old physics; a hazard under per-tick connected-component
+// falling (see the test above) -- so lockActivePiece now trims them at lock time instead.
+test('Gravity: a piece locked while overhanging the wall has its off-grid cells trimmed, not left as permanent debris', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // The '-' domino at p=5,q=0: absolute cells (4,0) and (5,0). col = p+floor(q/2) = p at q=0,
+    // so cols 4 (in bounds, the toe-hold) and 5 (one past the right wall, col<=4 is the limit).
+    GravityMode.state.activePiece = '-';
+    GravityMode.state.p = 5;
+    GravityMode.state.q = 0;
+    GravityMode.state.rotation = 0;
+    GravityMode.state.isGameOver = false;
+    const placementLegal = GravityBoard.checkActivePlacement('-', 5, 0, 0);
+    GravityMode.lockActivePiece();
+    const keys = [...GravityBoard.cells.keys()];
+    const anyOffBoard = keys.some((k) => {
+      const [p, q] = k.split(',').map(Number);
+      const col = p + Math.floor(q / 2);
+      return col < -5 || col > 4;
+    });
+    return { placementLegal, keys, anyOffBoard };
+  });
+  expect(result.placementLegal).toBe(true);      // confirms this really is the overhang scenario
+  expect(result.keys).toContain('4,0');           // the in-bounds toe-hold cell survives
+  expect(result.anyOffBoard).toBe(false);          // the overhanging (5,0) cell was trimmed, not kept
+});
+
 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),
 // so it's reachable by panning -- not clipped to the fixed default band. Capped for performance.
 test('Sandbox: the gray lattice box grows to reach pasted far cells', async ({ page }) => {

@@ -38,6 +38,8 @@ const GravityMode = {
         dropInterval: 1000, // ms
         timer: null,
         difficulty: DifficultyBarbell.migrateLevel('tonncade_gravity_difficulty', 3),
+        nextGroupId: 1, // Every locked piece / pasted cell gets a persistent rigid-group id --
+                         // see _assignGroupId and _boardComponents.
     },
 
     init: function() {
@@ -243,6 +245,21 @@ const GravityMode = {
         const cells = Pieces.getAbsoluteCells(this.state.activePiece, this.state.p, this.state.q, this.state.rotation);
         GravityBoard.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
 
+        // checkActivePlacement lets a piece overhang the side wall while steering (a "toe-hold" is
+        // enough) -- if it locks that way, the overhanging cells land outside col -5..4, where
+        // findFullLines never looks, so they used to sit there forever as permanent, invisible
+        // clutter. Harmless under the old instant-shift line-clearing; actively dangerous under
+        // per-tick connected-component falling (settleFloatingCellsStep) -- reported live: any
+        // later debris whose descent merely brushed past one of these permanent off-grid
+        // fragments got welded to it and froze solid, even though the fragment had nothing to do
+        // with the row that cleared. Trimmed at lock time instead: an overhanging cell is
+        // discarded the moment its piece settles, same as falling off the edge of a real table.
+        const isOffBoard = (c) => { const col = c.p + Math.floor(c.q / 2); return col < -5 || col > 4; };
+        const offBoardCells = cells.filter(isOffBoard);
+        const inBoundsCells = cells.filter((c) => !isOffBoard(c));
+        if (offBoardCells.length) GravityBoard.clearCells(offBoardCells);
+        this._assignGroupId(inBoundsCells);
+
         // Solid placement chord
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         Synth.playChord(midis, true, 0.16, 1.2);
@@ -355,44 +372,45 @@ const GravityMode = {
         });
         if (!placed.length) return;
         GravityBoard.fillCells(placed, 'paste', '#6fae9b');
+        // Each pasted cell is its OWN independent rigid group (a "snow of 1x1s", per the paste
+        // design above) -- never fused with the pile it lands near just because it happens to
+        // touch it. See _assignGroupId/_boardComponents.
+        placed.forEach((c) => this._assignGroupId([c]));
         this.refreshBoard();
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
-    // Groups a flat list of {p, q, val, key} cells into connected components (cells sharing hex
-    // edges via Tonnetz.getNeighbors) -- the one BFS _boardComponents (the whole board) builds on.
-    _groupIntoComponents: function(cells) {
-        const byKey = new Map(cells.map((c) => [c.key, c]));
-        const visited = new Set();
-        const components = [];
-        for (const start of cells) {
-            if (visited.has(start.key)) continue;
-            const component = [];
-            const stack = [start];
-            visited.add(start.key);
-            while (stack.length) {
-                const cur = stack.pop();
-                component.push(cur);
-                for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
-                    const nk = `${n.p},${n.q}`;
-                    const neighbor = byKey.get(nk);
-                    if (neighbor && !visited.has(nk)) { visited.add(nk); stack.push(neighbor); }
-                }
-            }
-            components.push(component);
-        }
-        return components;
+    // Stamps every cell in `cells` with the SAME new group id, overwriting GravityBoard.cells'
+    // stored value in place. Cells that share a group id always move together as one rigid mass in
+    // settleFloatingCellsStep, regardless of whether they currently happen to touch anything else --
+    // membership is assigned once, at lock/paste time, and never recomputed from geometry.
+    _assignGroupId: function(cells) {
+        const gid = this.state.nextGroupId++;
+        cells.forEach((c) => {
+            const v = GravityBoard.cells.get(`${c.p},${c.q}`);
+            if (v) v.groupId = gid;
+        });
     },
 
-    // The connected components of the whole board (cells sharing hex edges), as arrays of
-    // {p, q, val}.
+    // The board's rigid groups, as arrays of {p, q, val}. Reported live: grouping this by fresh
+    // geometric adjacency (BFS over Tonnetz.getNeighbors) every tick was the actual bug behind
+    // "line clears stop falling" -- any falling debris whose descent merely brushed past an
+    // unrelated, already-settled piece got welded to it and froze solid as one mass, since a rigid
+    // body can only move as far as its LEAST mobile cell. Real pieces that fell connected should
+    // stay connected, and a piece resting on another should be individually blocked by it -- but
+    // that's ordinary per-group occupancy collision (see settleFloatingCellsStep's canOffset), not
+    // a reason to fuse two originally-separate pieces into one bigger rigid mass. Grouping by the
+    // persistent groupId each cell was stamped with at lock/paste time (_assignGroupId) gives
+    // exactly that: pieces keep the shape they fell with, forever, and a line clear changes
+    // nothing about how already-settled pieces relate to each other -- it only deletes cells.
     _boardComponents: function() {
-        const cells = [];
+        const byGroup = new Map();
         GravityBoard.cells.forEach((val, key) => {
             const [p, q] = key.split(',').map(Number);
-            cells.push({ p, q, val, key });
+            if (!byGroup.has(val.groupId)) byGroup.set(val.groupId, []);
+            byGroup.get(val.groupId).push({ p, q, val, key });
         });
-        return this._groupIntoComponents(cells);
+        return [...byGroup.values()];
     },
 
     // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row
