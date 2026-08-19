@@ -251,9 +251,18 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
   // Octave-qualified (e.g. "E4", not bare "E") since INV-25 -- two different-octave notes
   // sharing a bare name were an understandable "wrong note" mix-up (real report), fixed by
   // making the octave part of every displayed name, not just the current target's.
+  //
+  // keySignature must be passed here too -- state.melody is Melody's own random offline-degrade
+  // default (unseeded Math.random()), so its DETECTED key (Tonnetz.detectKeySignature, set right
+  // alongside state.melody) genuinely varies run to run and can land on a flat-preferring key.
+  // The app itself always renders spelled per that detected key; omitting it here silently
+  // defaults to sharps-only, which only coincidentally matches the app's own spelling and was a
+  // real, deterministic (not flaky) source of failure whenever the random melody detected a flat
+  // key (e.g. F major) -- "F#4" expected, "Gb4" actually rendered, both correct spellings of the
+  // same pitch, but not the SAME spelling the app chose.
   const expectedName = await page.evaluate(() => {
     const midi = MelodyMode.state.melody[5].midi;
-    return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
+    return `${Tonnetz.getNoteName(midi, MelodyMode.state.keySignature)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
 });
@@ -278,10 +287,11 @@ test('playing the full melody preview live-updates the note list as it plays', a
     const el = document.querySelector('#melody-staff-labels [data-note-role="current"]');
     return el ? el.textContent : null;
   });
-  // Octave-qualified since INV-25 -- see the comment on the preceding test.
+  // Octave-qualified since INV-25, and keySignature-aware since the random melody's own detected
+  // key varies run to run -- see the preceding test's own comment for why both matter here.
   const expectedName = await page.evaluate(() => {
     const midi = MelodyMode.state.melody[2].midi;
-    return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`;
+    return `${Tonnetz.getNoteName(midi, MelodyMode.state.keySignature)}${Tonnetz.getOctave(midi)}`;
   });
   expect(currentName).toBe(expectedName);
 });
