@@ -879,6 +879,15 @@ const MelodyMode = {
                 // send the start back to 0 instead, so the next pass is a genuine start-to-finish
                 // attempt, and skip the celebration.
                 if (this.state.startIndex !== 0) {
+                    // Also reset the end to 1 (matching a freshly loaded song's own starting
+                    // state) and clear every measure's banked clean-play credit -- seekTo alone
+                    // deliberately leaves both of those untouched (a normal scrub's credit is a
+                    // historical record), but here that stale credit would immediately re-trigger
+                    // the consecutive-mastered-measures advance (INV-26) on the very next correct
+                    // note, jumping the start straight back ahead of the playhead the instant it
+                    // was reset to 0.
+                    this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
+                    this.state.measureCleanStreak = {};
                     this.seekTo(0);
                     return;
                 }

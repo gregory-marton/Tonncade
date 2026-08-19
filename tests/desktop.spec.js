@@ -3714,13 +3714,24 @@ test('Melody: finishing the song without having started at the beginning skips t
     MelodyMode.state.startIndex = 2; // did not start at the beginning
     MelodyMode.state.endIndex = melody.length - 1;
     MelodyMode.state.userIndex = melody.length - 1; // one note away from finishing
+    // Measure 0 already banked full mastery from earlier practice -- without also clearing this
+    // on reset, the very next correct note played would immediately re-trigger the consecutive-
+    // mastered-measures advance (INV-26) using THIS stale credit, jumping the start straight back
+    // ahead of the playhead the instant it was reset to 0.
+    MelodyMode.state.measureCleanStreak = { 0: 3 };
     MelodyMode.handleUserInputNote(melody[melody.length - 1].midi); // the final note
-    return { startIndex: MelodyMode.state.startIndex };
+    return {
+      startIndex: MelodyMode.state.startIndex,
+      endIndex: MelodyMode.state.endIndex,
+      measureCleanStreak: MelodyMode.state.measureCleanStreak,
+    };
   });
 
   const confettiCount = await page.locator('#melody-notation-scroll .confetti-piece').count();
   expect(confettiCount, 'no flourish -- this was not a complete, start-to-finish playthrough').toBe(0);
   expect(result.startIndex, 'the start marker is sent back to the beginning after finishing').toBe(0);
+  expect(result.endIndex, 'the end marker resets to 1 too, matching a fresh song\'s own starting state').toBe(1);
+  expect(result.measureCleanStreak, 'stale banked credit must not survive, or the start would jump right back ahead of the playhead').toEqual({});
 });
 
 // Synthetic 4-measure/4-notes-per-measure melody at 120bpm (2s/measure) -- avoids needing a real
