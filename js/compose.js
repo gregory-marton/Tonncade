@@ -607,7 +607,6 @@ const ComposeMode = {
         this.state.recordStartTime = performance.now();
         const btn = document.getElementById('compose-record');
         if (btn) { btn.textContent = '⏹'; btn.title = 'Stop recording'; btn.setAttribute('aria-label', 'Stop recording'); }
-        this.setStatus('Recording... tap cells to add notes.');
         this.startMetronome();
     },
 
@@ -626,7 +625,6 @@ const ComposeMode = {
         if (this.state.quantizeEnabled) this.quantizeNotes();
         const btn = document.getElementById('compose-record');
         if (btn) { btn.textContent = '⏺'; btn.title = 'Record'; btn.setAttribute('aria-label', 'Record'); }
-        this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
     },
 
     // Snaps every note's raw (freely-tapped) time/duration onto the current tempo/subdivision
@@ -666,7 +664,6 @@ const ComposeMode = {
         this.state.isPlaying = true;
         const playBtn = document.getElementById('compose-play');
         if (playBtn) { playBtn.textContent = '⏹'; playBtn.title = 'Stop'; playBtn.setAttribute('aria-label', 'Stop'); }
-        this.setStatus('Playing...');
 
         this.state.notes.forEach(note => {
             const tId = setTimeout(() => {
@@ -688,7 +685,6 @@ const ComposeMode = {
         this.state.isPlaying = false;
         const playBtn = document.getElementById('compose-play');
         if (playBtn) { playBtn.textContent = '▶'; playBtn.title = 'Play'; playBtn.setAttribute('aria-label', 'Play'); }
-        this.setStatus(this.state.notes.length > 0 ? 'Ready to play or save.' : 'Ready to record.');
     },
 
     // #17: reverses the most recent edit -- record/chord/delete/insert/translate/rotate/paste/
@@ -715,7 +711,6 @@ const ComposeMode = {
         this.state.selectedIndices = [];
         this.updateStats();
         this.updateEditControls();
-        this.setStatus('Ready to record.');
         this.refreshBoard();
     },
 
@@ -739,8 +734,7 @@ const ComposeMode = {
             : Tonnetz.detectKeySignature(this.state.notes.map((n) => n.midi));
         const xml = MusicXML.write(this.state.notes, { bpm: this.state.tempoBPM, keySignatureFifths: fifths, name });
         if (typeof MidiFolder !== 'undefined') {
-            const savedToFolder = await MidiFolder.saveFileAs(name, xml, 'application/vnd.recordare.musicxml+xml');
-            this.setStatus(savedToFolder ? `Saved "${name}" to your song folder.` : `Downloaded "${name}".`);
+            await MidiFolder.saveFileAs(name, xml, 'application/vnd.recordare.musicxml+xml');
         }
     },
 
@@ -771,7 +765,6 @@ const ComposeMode = {
             this.stopRecording();
             this.updateStats();
             this.updateEditControls();
-            this.setStatus(`Loaded "${displayName}" -- ready to play, edit, or save.`);
             this.refreshBoard();
         } catch (err) {
             console.error(err);
@@ -811,7 +804,6 @@ const ComposeMode = {
             this.stopRecording();
             this.updateStats();
             this.updateEditControls();
-            this.setStatus(`Loaded "${displayName}" -- ready to play, edit, or save.`);
             this.refreshBoard();
         } catch (err) {
             console.error(err);
@@ -830,11 +822,6 @@ const ComposeMode = {
             console.error(err);
             alert('Error reading .mxl file. Please make sure it is a valid compressed MusicXML archive.');
         }
-    },
-
-    setStatus: function(text) {
-        const el = document.getElementById('compose-status');
-        if (el) el.textContent = text;
     },
 
     updateStats: function() {
