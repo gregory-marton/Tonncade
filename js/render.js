@@ -964,5 +964,22 @@ const Render = {
         // updateView may have clamped the top-left against the pan bounds -- re-derive the center
         // from what it actually applied so the stored center reflects any clamp.
         return { viewX: this.viewX + refW * zoom / 2, viewY: this.viewY + refH * zoom / 2 };
+    },
+
+    // Was a REAL touch event just fired, as opposed to a device that merely SUPPORTS touch?
+    // Several modes' own svg.onmousedown-based pan/drag (melody.js, sandbox.js, compose.js,
+    // timeline.js) used to gate on `'ontouchstart' in window || navigator.maxTouchPoints > 0` --
+    // a device CAPABILITY check, true on any hybrid touchscreen laptop even while it's being
+    // driven by an ordinary mouse, which silently disabled mouse panning/dragging there entirely
+    // (reported live: "I can zoom but not pan" -- worked in Life, which uses real Pointer Events
+    // instead and never had this problem). wasRecentlyTouched() tracks actual touchstart events
+    // instead, so mouse-only interactions on a touch-capable device work exactly like they would
+    // on a mouse-only one, while still suppressing DUPLICATE handling from the synthesized
+    // compatibility mouse events browsers fire ~300ms after a real touch.
+    _lastTouchTs: -Infinity,
+    wasRecentlyTouched: function() {
+        return (Date.now() - Render._lastTouchTs) < 500;
     }
 };
+
+document.addEventListener('touchstart', () => { Render._lastTouchTs = Date.now(); }, { capture: true, passive: true });

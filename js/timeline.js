@@ -150,7 +150,6 @@ const Timeline = {
         setupDrag: function() {
             const scrollEl = document.getElementById(this.scrollContainerId);
             if (!scrollEl) return;
-            const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             this._dragging = null; // 'start' | 'end' | null -- exposed on `this` so scrollToCurrent
                                     // can tell a live drag apart from ordinary playback and not
                                     // fight the user's own scroll position mid-gesture
@@ -190,7 +189,11 @@ const Timeline = {
             };
 
             scrollEl.addEventListener('mousedown', (e) => {
-                if (isTouch) return;
+                // Render.wasRecentlyTouched(), not a device-capability sniff (see its own
+                // comment) -- a static check here disabled mouse dragging entirely on any
+                // touch-CAPABLE device (e.g. a touchscreen laptop driven by a real mouse), which
+                // is exactly the bug reported live as "having trouble dragging the start marker."
+                if (Render.wasRecentlyTouched()) return;
                 if (e.target.classList.contains('timeline-marker-start')) { e.preventDefault(); startDrag('start', e.clientX); }
                 else if (e.target.classList.contains('timeline-marker-end')) { e.preventDefault(); startDrag('end', e.clientX); }
             });
@@ -203,7 +206,10 @@ const Timeline = {
                 else if (cls.contains('timeline-marker-end')) { e.preventDefault(); startDrag('end', e.touches[0].clientX); }
             }, { passive: false });
             scrollEl.addEventListener('touchmove', (e) => {
-                if (!dragging) return;
+                // Was `if (!dragging) return;` -- `dragging` was never declared anywhere in this
+                // file, so this threw a ReferenceError the first time a real touchmove fired
+                // during a drag, silently aborting it after the initial touchstart placement.
+                if (!this._dragging) return;
                 e.preventDefault();
                 moveDrag(e.touches[0].clientX);
             }, { passive: false });

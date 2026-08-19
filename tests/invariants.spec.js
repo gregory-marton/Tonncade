@@ -766,11 +766,21 @@ test.describe('Invariant tests', () => {
       if (pannable) {
         const svgBox = await page.locator('#tonnetz-svg').boundingBox();
         const cx = svgBox.x + svgBox.width / 2, cy = svgBox.y + svgBox.height / 2;
+        const centerBeforePan = await viewCenter();
         await page.mouse.move(cx, cy);
         await page.mouse.down();
         await page.mouse.move(cx - 60, cy - 40, { steps: 5 });
         await page.mouse.up();
         expect(await snapshotModeState(page, mode), `[${mode}] state after panning`).toEqual(stateBefore);
+        // The pan must actually have MOVED the view -- checked here (not just after, in
+        // isolation) because a broken pan handler that silently does nothing at all would also
+        // leave game state untouched, passing the assertion above for the wrong reason. Missing
+        // this exact check is how a real regression (mouse-pan gated on a device CAPABILITY
+        // check, silently disabled on any hybrid touchscreen device even when driven by an
+        // ordinary mouse -- see INV-56) shipped undetected: this test only ever verified state
+        // didn't corrupt, never that panning did anything.
+        const centerAfterPan = await viewCenter();
+        expect(centerAfterPan, `[${mode}] a real mouse-drag must move the view`).not.toEqual(centerBeforePan);
       }
     }
   });

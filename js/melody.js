@@ -375,7 +375,6 @@ const MelodyMode = {
 
     setupKeyboardEvents: function() {
         const svg = Render.svg;
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         window.onmousemove = (e) => {
             // Panning is just camera movement -- independent of whether the game is currently
@@ -384,7 +383,7 @@ const MelodyMode = {
             // flag for ~1.2s (see handleUserInputNote's Mistake! branch) -- gating pan on it too
             // would leave a real player unable to drag the view for over a second after almost
             // any accidental wrong-note click, which is exactly the bug this fix is for.
-            if (!isTouch && this.state.isPanning) {
+            if (!Render.wasRecentlyTouched() && this.state.isPanning) {
                 const dx = e.clientX - this.state.lastMouse.x;
                 const dy = e.clientY - this.state.lastMouse.y;
                 this.state.viewX -= dx;
@@ -438,7 +437,7 @@ const MelodyMode = {
                 this.playUserNote(midi, p, q);
             }
 
-            if (!isTouch) {
+            if (!Render.wasRecentlyTouched()) {
                 this.state.isPanning = true;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
             }

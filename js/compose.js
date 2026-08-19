@@ -217,18 +217,17 @@ const ComposeMode = {
 
     setupEvents: function() {
         const svg = Render.svg;
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         const DRAG_THRESHOLD_PX = 6;
 
         window.onmousemove = (e) => {
-            if (!isTouch && this.state.dragCandidate) {
+            if (!Render.wasRecentlyTouched() && this.state.dragCandidate) {
                 const dc = this.state.dragCandidate;
                 const dx = e.clientX - dc.startClientX;
                 const dy = e.clientY - dc.startClientY;
                 if (Math.abs(dx) > DRAG_THRESHOLD_PX || Math.abs(dy) > DRAG_THRESHOLD_PX) dc.moved = true;
                 return; // suppress panning while a note-drag is in progress
             }
-            if (!isTouch && this.state.isPanning) {
+            if (!Render.wasRecentlyTouched() && this.state.isPanning) {
                 const dx = e.clientX - this.state.lastMouse.x;
                 const dy = e.clientY - this.state.lastMouse.y;
                 this.state.viewX -= dx;
@@ -243,7 +242,7 @@ const ComposeMode = {
         };
 
         window.onmouseup = (e) => {
-            if (!isTouch && this.state.dragCandidate) {
+            if (!Render.wasRecentlyTouched() && this.state.dragCandidate) {
                 const dc = this.state.dragCandidate;
                 this.state.dragCandidate = null;
                 this.state.isPanning = false;
@@ -268,7 +267,7 @@ const ComposeMode = {
                 const p = parseInt(e.target.getAttribute('data-p'));
                 const q = parseInt(e.target.getAttribute('data-q'));
                 const matches = this.notesAt(p, q);
-                const isDraggable = !isTouch && !this.state.isRecording &&
+                const isDraggable = !Render.wasRecentlyTouched() && !this.state.isRecording &&
                     matches.some(i => this.state.selectedIndices.includes(i));
                 if (isDraggable) {
                     this.state.dragCandidate = { startClientX: e.clientX, startClientY: e.clientY, startP: p, startQ: q, moved: false };
@@ -276,7 +275,7 @@ const ComposeMode = {
                     this.tapCell(p, q, { shiftKey: e.shiftKey });
                 }
             }
-            if (!isTouch) {
+            if (!Render.wasRecentlyTouched()) {
                 this.state.isPanning = true;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
             }

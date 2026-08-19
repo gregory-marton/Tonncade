@@ -1130,14 +1130,55 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     if (width >= 768) return;
 
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
     await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
 
-    // Query by selector fresh each time rather than holding one locator -- once this bug is
-    // fixed the cell never gains a second (.placed-piece) polygon, but while red, asserting via
-    // a stale locator across multiple placements makes for a confusing failure.
-    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
-    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
-    await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().click({ force: true });
+    // Real dispatched touchstart/touchend, not .click() -- .click() fires a plain mouse event
+    // even in a touch-enabled browser context (Playwright doesn't synthesize touch from it), so
+    // it was never actually exercising the touch code path this test's own name/comment is
+    // about. It happened to pass anyway only because of the very bug this test exists to catch:
+    // js/sandbox.js used to gate touch-vs-mouse on a static DEVICE-capability check
+    // (`'ontouchstart' in window`), true for the whole Mobile Chrome project regardless of which
+    // kind of event actually fired, so even these plain mouse clicks got routed through the
+    // touch-safe branch by accident. Now that the gate is Render.wasRecentlyTouched() (a REAL,
+    // per-event check -- see its own comment), a plain .click() here is correctly treated as an
+    // actual desktop click and places on the first tap, which is what surfaced this test's own
+    // methodology gap.
+    const cellBox = await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().boundingBox();
+    const x = cellBox.x + cellBox.width / 2, y = cellBox.y + cellBox.height / 2;
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x, y });
+      await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x, y });
+    }
+
+    expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
+  });
+
+  // The real bug this whole test exists for (see the touch-tap test above's own comment): a
+  // genuine touch device fires a SYNTHESIZED compatibility mousedown/click a few hundred ms
+  // after a real touchend, purely for legacy sites that only listen for mouse events. That
+  // synthesized mousedown must NOT be treated as a real desktop click (it would otherwise
+  // silently double-handle the same physical tap) -- Render.wasRecentlyTouched()'s 500ms window
+  // is what suppresses it.
+  test('a synthesized compatibility mousedown shortly after a real touch tap does not also place a piece', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+    await page.evaluate(touchHelpers);
+    await page.locator('.piece-item[data-key]:not(.note-tool-item)').first().click({ force: true });
+
+    const cellBox = await page.locator('polygon.cell[data-p="2"][data-q="2"]').first().boundingBox();
+    const x = cellBox.x + cellBox.width / 2, y = cellBox.y + cellBox.height / 2;
+
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchstart', x, y), { x, y });
+    await page.evaluate(({ x, y }) => window.__dispatchTouch('touchend', x, y), { x, y });
+    // Real Android/iOS browsers fire the compatibility mousedown well within Render's 500ms
+    // window (commonly ~300ms) -- comfortably inside it here too.
+    await page.evaluate(({ x, y }) => {
+      const el = document.elementFromPoint(x, y);
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    }, { x, y });
 
     expect(await page.evaluate(() => SandboxMode.state.placedPieces.length)).toBe(0);
   });

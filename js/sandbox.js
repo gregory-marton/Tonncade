@@ -387,7 +387,6 @@ const SandboxMode = {
 
     setupEvents: function() {
         const svg = Render.svg;
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
         window.onkeydown = (e) => {
             const key = e.key.toLowerCase();
@@ -464,7 +463,7 @@ const SandboxMode = {
                     return cells.some(c => c.p === p && c.q === q);
                 });
 
-                if (isExistingPiece || !this.state.selectedPiece || !isTouch) {
+                if (isExistingPiece || !this.state.selectedPiece || !Render.wasRecentlyTouched()) {
                     this.handleAction(p, q);
                 }
 
@@ -472,20 +471,20 @@ const SandboxMode = {
                 // equivalent is main.js's own performHoldAction, since touch already has a
                 // hold-vs-tap disambiguation mechanism this app-wide, mouse doesn't. Only makes
                 // sense for the note-play tool on an empty cell (matches touch's own gating).
-                if (!isTouch && !isExistingPiece && !this.state.selectedPiece) {
+                if (!Render.wasRecentlyTouched() && !isExistingPiece && !this.state.selectedPiece) {
                     clearTimeout(this._holdTimer);
                     this._holdTimer = setTimeout(() => this.showSameNoteHighlight(p, q), this.HOLD_DURATION_MS);
                 }
             }
 
-            if (!isTouch) {
+            if (!Render.wasRecentlyTouched()) {
                 this.state.isPanning = true;
                 this.state.lastMouse = { x: e.clientX, y: e.clientY };
             }
         };
 
         window.onmousemove = (e) => {
-            if (!isTouch && this.state.isPanning) {
+            if (!Render.wasRecentlyTouched() && this.state.isPanning) {
                 clearTimeout(this._holdTimer); // real movement means this isn't a hold-in-place
                 this.clearNoteHighlight();
                 const dx = e.clientX - this.state.lastMouse.x;

@@ -571,6 +571,66 @@ onStartCommit with that note's id, exactly once, on release".
 
 ---
 
+### INV-56: mouse-vs-touch disambiguation is always a PER-EVENT check, never a device-capability check
+
+Real regression, reported live: "I can pan/zoom [...] but not pan" in Melody, then confirmed in
+Sandbox and Compose too, on a real desktop machine. Root cause (post-mortem): `js/melody.js`,
+`js/sandbox.js`, `js/compose.js`, and `js/timeline.js` each independently computed
+`const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;` ONCE at setup time,
+then gated their own `svg.onmousedown`/`window.onmousemove`-based pan/drag logic on `!isTouch`.
+That's a device CAPABILITY check ("can this hardware receive touch input at all"), not a check of
+what actually produced the current event — true on any hybrid touchscreen laptop or 2-in-1
+regardless of whether the person is driving it with a mouse right now, which silently disabled
+mouse-based panning and dragging entirely on such a machine. `js/life.js` never had this problem:
+it uses real Pointer Events (`pointerdown`, whose own `e.pointerType` tells mouse/touch/pen apart
+per event), not this pattern — which is exactly how the bug was diagnosed live ("works in Life,
+doesn't work in Sandbox").
+
+Fixed with a shared, EVENT-DRIVEN check instead of a capability check: `Render.wasRecentlyTouched()`
+(`js/render.js`) reports whether a real `touchstart` fired anywhere in the last 500ms (tracked by
+one `document`-level capture-phase listener, registered once when render.js loads), not whether
+the device merely supports touch. Every `!isTouch`/`isTouch` site in the four files above now
+calls this live, per event, instead of reading a value captured once at setup. This preserves the
+ORIGINAL reason these checks existed at all — suppressing the synthesized compatibility
+mousedown/click a real touch device fires a few hundred ms after an actual touch, so a single
+physical tap doesn't get double-handled — while no longer punishing an ordinary mouse user on
+touch-capable hardware.
+
+A second, related bug found while fixing the first: `js/timeline.js`'s `setupDrag()` had
+`scrollEl.addEventListener('touchmove', (e) => { if (!dragging) return; ...})` — `dragging` was
+never declared anywhere in the file (should have been `this._dragging`), so every real touchmove
+during a marker drag threw a `ReferenceError`, silently aborting the drag after its initial
+touchstart placement. This is very likely what an earlier live report ("having trouble dragging
+the start marker") was actually hitting.
+
+**Post-mortem, why existing tests missed both bugs for so long:** `tests/invariants.spec.js`'s
+own INV-9/INV-12 test already drove a REAL `page.mouse` drag on every pannable mode and asserted
+game state didn't corrupt afterward — but never asserted the view had actually MOVED. A pan
+handler that silently does nothing at all also leaves state untouched, satisfying that exact
+assertion for the wrong reason. Fixed by adding `expect(centerAfterPan).not.toEqual(centerBeforePan)`
+to the same, already-general, already-looped-over-every-pannable-mode test, rather than writing
+new one-off per-mode tests — this is what actually caught the bug on Tablet/Mobile Chrome's own
+`hasTouch: true` device profiles (a real `page.mouse.*` action always dispatches literal mouse
+events regardless of that setting, so it was already the right scenario — it just wasn't being
+checked). Separately, `tests/mobile.spec.js`'s own "tapping the same empty board cell twice never
+places a piece" test used `.click({force:true})` to simulate a mobile tap — but Playwright's
+`.click()` never synthesizes touch events even in a `hasTouch: true` context, so it was
+unknowingly exercising the MOUSE path the whole time; it only ever passed because the old
+capability-based `isTouch` check happened to swallow those plain clicks too, for the wrong
+reason. Fixed by switching it to this file's own established real dispatched
+`Touch`/`TouchEvent` convention, and a new sibling test drives the actual scenario this whole
+mechanism exists for: a real touch tap followed by a synthesized compatibility `mousedown`
+shortly after, confirming it doesn't ALSO place a piece.
+
+**Test:** `tests/invariants.spec.js` — "INV-9/INV-12: every mode's state survives resize, view
+rotation, and (where pannable) panning" (strengthened). `tests/mobile.spec.js` — "tapping the
+same empty board cell twice never places a piece" (rewritten to use real touch dispatch), "a
+synthesized compatibility mousedown shortly after a real touch tap does not also place a piece"
+(new), "a real single-finger touch drag moves the scrub marker to the touched note" (already
+existed; this is what caught the `timeline.js` `dragging` `ReferenceError` once actually run).
+
+---
+
 ### INV-27: A documented input-method promise (e.g. "Shift-G / Click: Place/Pick up") must stay true for every method it names
 
 Sandbox's desktop-only instructional text (`#placement-controls`, next to the board) reads
