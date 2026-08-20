@@ -3248,6 +3248,10 @@ test('Gravity: a falling mass that brushes past an unrelated settled piece keeps
     GravityMode.state.linesCleared = 0;
     GravityMode.state.isPaused = false;
     GravityMode.state.isGameOver = false;
+    // Difficulty 4: no rest-time welding (#93 follow-up) -- this test is specifically about the
+    // ORIGINAL disconnection bug (unrelated groups incorrectly fusing), a different thing from the
+    // NEW deliberate weld feature default difficulty would now also trigger here.
+    GravityMode.state.difficulty = 4;
     GravityMode.spawnPiece();
     GravityMode.state.p = 20; GravityMode.state.q = 40; // active piece parked well out of the way
 
@@ -3454,6 +3458,50 @@ test('Gravity: a fragment surviving a line clear falls using its piece\'s true a
   // behavior (anchor = the true pivot (3,1), an ODD-q cell): the pair falls straight down to the
   // floor, resting at ['2,1','3,0'].
   expect(result.finalKeys).toEqual(['2,1', '3,0']);
+});
+
+// Requested live (#93 follow-up, "static electricity... if you happen to be touching another
+// piece... choose that", difficulty-gated per the same conversation): difficulty 1-3 welds a
+// group into whatever it comes to rest touching, so pieces that end up flush against each other
+// stay one mass on later clears instead of independently splitting apart. Difficulty 4 keeps the
+// existing (pre-this-feature) independent-piece behavior -- deliberately embracing the "confusing
+// fissures" as a feature at the hardest level.
+test('Gravity: difficulty 1-3 welds a group to whatever it rests touching; difficulty 4 does not', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    GravityMode.spawnPiece();
+    GravityMode.state.p = -100; GravityMode.state.q = 200; // parked out of the way
+
+    const setupPair = () => {
+      GravityBoard.cells.clear();
+      GravityBoard.fillCells([{ p: 0, q: 0 }], 'X', '#fff'); // resting on the floor
+      GravityMode._assignGroupId([{ p: 0, q: 0 }]);
+      GravityBoard.fillCells([{ p: 0, q: 1 }], 'Y', '#000'); // directly above -- will land flush on it
+      GravityMode._assignGroupId([{ p: 0, q: 1 }]);
+    };
+
+    setupPair();
+    GravityMode.state.difficulty = 3;
+    GravityMode.tick();
+    const weldedIds = [GravityBoard.cells.get('0,0').groupId, GravityBoard.cells.get('0,1') ? GravityBoard.cells.get('0,1').groupId : null];
+
+    setupPair();
+    GravityMode.state.difficulty = 4;
+    GravityMode.tick();
+    const unweldedIds = [...GravityBoard.cells.values()].map((v) => v.groupId);
+
+    return { weldedIds, unweldedIds };
+  });
+  // Difficulty 3: the falling cell lands flush on the resting one and welds into the SAME group.
+  expect(result.weldedIds[0]).not.toBeNull();
+  expect(result.weldedIds[0]).toBe(result.weldedIds[1]);
+  // Difficulty 4: blocked straight down, it slides away diagonally instead (still can't occupy
+  // the same cell) and keeps its OWN separate group id -- never merged.
+  expect(new Set(result.unweldedIds).size).toBe(2);
 });
 
 // checkActivePlacement lets a piece overhang the side wall while steering, as long as it keeps a
@@ -3667,13 +3715,14 @@ test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly
     expect(cellCount, `${mode}: lattice should render`).toBeGreaterThan(0);
     // ...and, for Blast/Gravity, the difficulty control lit up correctly (proof
     // setupEvents/DifficultyBarbell ran, not just that currentMode flipped). Reads the mode's own
-    // configured levelCount rather than a bare literal, so it can't silently drift if a mode's
-    // level count ever changes.
+    // actual default state.difficulty rather than assuming it equals levelCount -- true for Blast
+    // (default IS its highest/only level), but Gravity's own level 4 (#93 follow-up, welding-only,
+    // not a harder piece tier) is opt-in, so its default stays 3 even though levelCount is 4.
     if (mode === 'blast' || mode === 'gravity') {
-      const levelCount = await page.evaluate((m) =>
-        (m === 'blast' ? BlastMode : GravityMode)._difficultyBarbell.levelCount, mode);
+      const defaultDifficulty = await page.evaluate((m) =>
+        (m === 'blast' ? BlastMode : GravityMode).state.difficulty, mode);
       const lit = await page.locator(`#${mode}-difficulty .weight-icon.lit`).count();
-      expect(lit, `${mode}: default (highest) difficulty should light all ${levelCount} weights`).toBe(levelCount);
+      expect(lit, `${mode}: default difficulty should light ${defaultDifficulty} weights`).toBe(defaultDifficulty);
     }
     expect(errors, `${mode}: no page errors`).toEqual([]);
     page.removeAllListeners('pageerror');
@@ -3821,6 +3870,30 @@ test.describe('Piece-size difficulty presets (Blast/Gravity)', () => {
     });
   }
 });
+
+// Gravity-only: level 4 (#93 follow-up) is welding-only, not a piece-size tier -- same tetrahex
+// pool as level 3 (Pieces.DIFFICULTY_KEYS has no 4th entry; randomPiece falls through to
+// TETRAHEX_KEYS, which level 3 already uses), and the barbell grows to 4 weights for Gravity only
+// (Blast has no weld concept and stays at 3, covered by the shared describe block above).
+test('Gravity: difficulty level 4 keeps level 3\'s tetrahex piece pool and lights a 4th barbell weight', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+  const level4Sizes = await page.evaluate(() => {
+    GravityMode.setDifficulty(4);
+    const sizes = new Set();
+    for (let i = 0; i < 300; i++) sizes.add(Pieces.TYPES[GravityMode.randomPiece()].cells.length);
+    return [...sizes].sort();
+  });
+  expect(level4Sizes).toEqual([4]);
+
+  await page.click('#gravity-difficulty .weight-icon[data-difficulty="4"]');
+  const state = await page.evaluate(() => GravityMode.state.difficulty);
+  expect(state).toBe(4);
+  const litCount = await page.$$eval('#gravity-difficulty .weight-icon.lit', (els) => els.length);
+  expect(litCount).toBe(4);
+});
+
 // #46 note-timeline redesign, parts 3-5: a real loaded song (not Random) renders its full
 // timeline up front, gets measure ticks, and drives the spaced-repetition auto-advance. All four
 // tests load the real bundled midi/frere-jacques.mid (32 notes, 120bpm/4-4 -- 2s/measure) rather

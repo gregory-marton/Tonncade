@@ -131,6 +131,8 @@ const Pieces = {
     //   1 -> 1-3 cells (monohex, domino, the three trihexes) -- lots of placement freedom
     //   2 -> 3-4 cells (trihexes + the tetrahexes)
     //   3 -> 4 cells only (the ten tetrahexes -- the historical default game)
+    // Gravity alone goes to a 4th level (js/gravity.js's own setDifficulty) -- unrelated to piece
+    // size (falls through to level 3's own pool here), it's whether rest-time welding is on.
     DIFFICULTY_KEYS: [
         ['.', '-', 'V', '|', '>'],
         ['V', '|', '>', 'P', 'Q', 'L', 'J', 'S', 'Z', 'I', 'O', 'C', 'X'],

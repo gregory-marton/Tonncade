@@ -146,15 +146,21 @@ const GravityMode = {
         this.refreshUI();
     },
 
+    // Level 4 has no entry in the shared Pieces.DIFFICULTY_KEYS (that array is also Blast's, which
+    // has no weld concept and stays capped at 3) -- the lookup falls through to TETRAHEX_KEYS,
+    // the SAME pool level 3 already uses, since level 4 is only about welding (see setDifficulty),
+    // not piece size.
     randomPiece: function() {
         const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty - 1] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
     },
 
-    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Persisted, and
-    // reflected in the shared DifficultyBarbell control.
+    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Level 4 (#93
+    // follow-up) keeps level 3's piece pool but turns off settleFloatingCellsStep's rest-time weld
+    // -- Gravity-only, so bounded at 4 here rather than sharing Blast's own DIFFICULTY_KEYS.length
+    // bound. Persisted, and reflected in the shared DifficultyBarbell control.
     setDifficulty: function(level) {
-        if (!Pieces.DIFFICULTY_KEYS[level - 1]) return;
+        if (level < 1 || level > 4) return;
         this.state.difficulty = level;
         try { localStorage.setItem('tonncade_gravity_difficulty', String(level)); } catch (e) {}
         this._difficultyBarbell.setLevel(level);
@@ -489,6 +495,12 @@ const GravityMode = {
     // persistent groupId each cell was stamped with at lock/paste time (_assignGroupId) gives
     // exactly that: pieces keep the shape they fell with, forever, and a line clear changes
     // nothing about how already-settled pieces relate to each other -- it only deletes cells.
+    //
+    // The one deliberate exception: difficulty 1-3 welds a group to whatever it comes to rest
+    // touching (_weldIfTouching, called from settleFloatingCellsStep) -- a real merge, not the old
+    // fresh-adjacency-every-tick bug, since it only fires once, at the moment a group is BLOCKED
+    // from moving further, and the result still splits correctly on a later clear via
+    // _resplitGroups the same as any other group. Difficulty 4 skips welding entirely.
     _boardComponents: function() {
         const byGroup = new Map();
         GravityBoard.cells.forEach((val, key) => {
@@ -497,6 +509,43 @@ const GravityMode = {
             byGroup.get(val.groupId).push({ p, q, val, key });
         });
         return [...byGroup.values()];
+    },
+
+    // Welds `comp` (a group that just settled and is now genuinely blocked from moving further)
+    // into one shared group with every DIFFERENT group any of its cells directly touches --
+    // requested live: "if you happen to be touching another piece... choose that" (as a rest-time
+    // weld, not a fall-time preference, which is the simpler half of that idea to build first).
+    // Preserves comp's own anchor (see _assignGroupId) so its established fall direction carries
+    // over to the merged mass unchanged; if comp itself was never anchored (shouldn't normally
+    // happen -- every group gets one at creation), falls back to _assignGroupId's own comp[0]
+    // default. Marks the new merged id (and comp's OLD id, now defunct) as processed in the
+    // caller's `processedGroupIds` set, so if the just-absorbed group's own turn hasn't come up
+    // yet in this same settleFloatingCellsStep() pass, it's skipped rather than re-processed under
+    // its now-stale, incomplete comp array.
+    _weldIfTouching: function(comp, processedGroupIds) {
+        const ownGroupId = comp[0].val.groupId;
+        const touchingGroupIds = new Set();
+        comp.forEach((c) => {
+            for (const n of Tonnetz.getNeighbors(c.p, c.q)) {
+                const nv = GravityBoard.cells.get(`${n.p},${n.q}`);
+                if (nv && nv.groupId !== ownGroupId) touchingGroupIds.add(nv.groupId);
+            }
+        });
+        if (touchingGroupIds.size === 0) return;
+        const allCells = [];
+        GravityBoard.cells.forEach((v, key) => {
+            if (v.groupId === ownGroupId || touchingGroupIds.has(v.groupId)) {
+                const [p, q] = key.split(',').map(Number);
+                allCells.push({ p, q });
+            }
+        });
+        const anchor = comp.find((c) => c.val.isAnchor);
+        this._assignGroupId(allCells, anchor ? `${anchor.p},${anchor.q}` : null);
+        // allCells[0]'s value object is live -- its groupId now reads whatever _assignGroupId
+        // just stamped it with, so this is the actual merged id, not comp's old (now defunct) one.
+        if (processedGroupIds && allCells.length) {
+            processedGroupIds.add(GravityBoard.cells.get(`${allCells[0].p},${allCells[0].q}`).groupId);
+        }
     },
 
     // Advance every currently-floating connected component of the LOCKED pile by exactly ONE row
@@ -530,7 +579,14 @@ const GravityMode = {
     settleFloatingCellsStep: function() {
         let moved = false;
         const movedMidis = [];
+        // A group already welded (or absorbed INTO one) earlier in THIS tick's loop must not be
+        // processed again under its own now-stale comp array -- see _weldIfTouching's note.
+        const processedGroupIds = new Set();
         for (const comp of this._boardComponents()) {
+            const liveGroupId = comp[0].val.groupId;
+            if (processedGroupIds.has(liveGroupId)) continue;
+            processedGroupIds.add(liveGroupId);
+
             const ref = comp.find((c) => c.val.isAnchor) || comp[0];
             const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
             const canOffset = (dp, dq) => comp.every((c) => {
@@ -548,7 +604,16 @@ const GravityMode = {
             if (!canOffset(dp, dq)) {
                 const slide = (ref.q % 2 !== 0) ? { p: ref.p + 1, q: ref.q - 1 } : { p: ref.p, q: ref.q - 1 };
                 dp = slide.p - ref.p; dq = slide.q - ref.q;
-                if (!canOffset(dp, dq)) continue;
+                if (!canOffset(dp, dq)) {
+                    // Genuinely at rest -- difficulty 1-3 welds it to whatever it's now resting
+                    // against (see _weldIfTouching); difficulty 4 leaves it independent, so pieces
+                    // that merely happen to end up touching can keep splitting apart on later
+                    // clears instead of fusing into one mass (#93 follow-up, requested live:
+                    // "static electricity... you could even imagine this being difficulty-
+                    // controlled" -- easy stays tidy, hard embraces the confusing fissures).
+                    if (this.state.difficulty <= 3) this._weldIfTouching(comp, processedGroupIds);
+                    continue;
+                }
             }
 
             const moves = comp.map((c) => ({ nk: (c.p + dp) + ',' + (c.q + dq), val: GravityBoard.cells.get(c.p + ',' + c.q) }));
@@ -799,11 +864,12 @@ const GravityMode = {
         // set the piece-size level.
         this._difficultyBarbell = DifficultyBarbell.create({
             containerId: 'gravity-difficulty',
-            levelCount: 3,
+            levelCount: 4,
             labels: [
                 { title: 'Easy — small pieces', ariaLabel: 'Easy' },
                 { title: 'Medium', ariaLabel: 'Medium' },
                 { title: 'Hard — full four-cell pieces', ariaLabel: 'Hard' },
+                { title: 'Chaos — hard pieces, no welding at rest', ariaLabel: 'Chaos' },
             ],
             onSelect: (level) => this.setDifficulty(level),
         });
