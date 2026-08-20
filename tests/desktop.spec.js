@@ -3379,6 +3379,83 @@ test('Gravity: locking a piece whose off-board middle gets trimmed leaves two in
   expect(result.groupIds[0]).not.toBe(result.groupIds[1]);
 });
 
+// Reported live, precisely, against a real captured session: a 2-cell fragment visibly drifted
+// one column further right than it should have while falling with nothing blocking it. Root
+// cause: settleFloatingCellsStep picked its "down" direction from comp[0] -- whichever cell
+// happened to be first in the group's own array -- not the piece's TRUE anchor (state.p,
+// state.q). The hex grid has two valid "straight down" offsets depending on q's parity;
+// different cells of the same rigid group can have different parities, so anchoring on the
+// WRONG cell picks the wrong offset and drags the whole shape a column off from where the
+// piece's own anchor (matching how it fell before it ever locked) would have carried it.
+test('Gravity: a locked piece\'s TRUE anchor (state.p/q), not an arbitrary cell, drives which cell survives with isAnchor', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // The 'L' piece's own relative-cell list puts (-1,+1) BEFORE the (0,0) pivot -- so at
+    // p=3,q=1, the piece's absolute cells are [(2,2), (3,1), (4,0), (5,0)] in THAT order, with
+    // (3,1) -- not the first entry -- being the true anchor.
+    GravityMode.state.activePiece = 'L';
+    GravityMode.state.p = 3; GravityMode.state.q = 1; GravityMode.state.rotation = 0;
+    GravityMode.state.isGameOver = false;
+    GravityMode.lockActivePiece();
+    return [...GravityBoard.cells.entries()].map(([k, v]) => ({ key: k, isAnchor: !!v.isAnchor }));
+  });
+  const anchors = result.filter((c) => c.isAnchor).map((c) => c.key);
+  expect(anchors).toEqual(['3,1']); // the true pivot, not (2,2) (array-order-first but NOT the pivot)
+});
+
+// The full real scenario, end to end: lock the piece above (its rightmost cell overhangs and
+// gets trimmed), complete and clear the row its bottom cell fills, and confirm the surviving
+// fragment settles using the preserved TRUE anchor's own fall direction -- not the old
+// arbitrary-comp[0] drift.
+test('Gravity: a fragment surviving a line clear falls using its piece\'s true anchor, not an arbitrary drift', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.linesCleared = 0;
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+
+    GravityMode.state.activePiece = 'L';
+    GravityMode.state.p = 3; GravityMode.state.q = 1; GravityMode.state.rotation = 0;
+    GravityMode.lockActivePiece(); // cells (2,2),(3,1),(4,0) survive; (5,0) trimmed off-board
+
+    const filler = [];
+    for (let col = -5; col <= 4; col++) {
+      const p = col - Math.floor(0 / 2);
+      if (p === 4) continue; // that's the piece's own (4,0)
+      filler.push({ p, q: 0 });
+    }
+    GravityBoard.fillCells(filler, 'X', '#fff');
+    GravityMode._assignGroupId(filler);
+
+    GravityMode.spawnPiece();
+    GravityMode.state.p = -100; GravityMode.state.q = 200; // parked out of the way
+
+    GravityMode.tick(); // triggers the clear of q=0, removing (4,0) among others
+    const linesCleared = GravityMode.state.linesCleared;
+    const survivorGroupId = GravityBoard.cells.get('2,2') ? GravityBoard.cells.get('2,2').groupId : null;
+
+    for (let i = 0; i < 10; i++) GravityMode.tick();
+
+    const finalKeys = [...GravityBoard.cells.entries()]
+      .filter(([, v]) => v.groupId === survivorGroupId)
+      .map(([k]) => k).sort();
+    return { linesCleared, finalKeys };
+  });
+  expect(result.linesCleared).toBe(1);
+  // Old buggy behavior (arbitrary comp[0] = (2,2), an EVEN-q cell): the pair drifts via (2,2)'s
+  // own offset each rigid step, ending up net one column further RIGHT than the anchor-preserving
+  // fall -- e.g. resting at ['3,1','4,0'] instead of directly beneath where it started. Correct
+  // behavior (anchor = the true pivot (3,1), an ODD-q cell): the pair falls straight down to the
+  // floor, resting at ['2,1','3,0'].
+  expect(result.finalKeys).toEqual(['2,1', '3,0']);
+});
+
 // checkActivePlacement lets a piece overhang the side wall while steering, as long as it keeps a
 // toe-hold on the real playable columns (js/board.js) -- locking that way used to leave the
 // overhanging cells in GravityBoard.cells PERMANENTLY (findFullLines never scans past col 4 to

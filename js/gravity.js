@@ -258,7 +258,11 @@ const GravityMode = {
         const offBoardCells = cells.filter(isOffBoard);
         const inBoundsCells = cells.filter((c) => !isOffBoard(c));
         if (offBoardCells.length) GravityBoard.clearCells(offBoardCells);
-        this._assignGroupId(inBoundsCells);
+        // The piece's TRUE anchor is (state.p, state.q) itself -- the absolute position of
+        // whichever of its cells has relative offset (0,0) -- not just whichever cell happens to
+        // be first in Pieces.TYPES' own cell-list order (see _assignGroupId's own note on why
+        // this matters).
+        this._assignGroupId(inBoundsCells, `${this.state.p},${this.state.q}`);
 
         // Solid placement chord
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
@@ -397,7 +401,19 @@ const GravityMode = {
     // (lockActivePiece), leaving two disconnected in-bounds fragments. Both used to get welded
     // into one group just because they were assigned together, freezing whichever one wasn't
     // itself blocked the instant the OTHER one hit anything.
-    _assignGroupId: function(cells) {
+    //
+    // preferredAnchorKey (optional, "p,q"): each resulting component's settleFloatingCellsStep
+    // reference cell (see its own note) defaults to comp[0] -- whichever cell happened to be
+    // first in `cells`' own order -- but for a just-locked piece that's an ARBITRARY cell, not
+    // its true anchor (state.p, state.q), and reported live, that distinction is visible: it
+    // determines which of the hex grid's two "straight down" offsets a group uses, so anchoring
+    // on the wrong cell can drift the whole shape a column off from where the piece's own anchor
+    // would have carried it. Whichever component actually CONTAINS preferredAnchorKey uses it;
+    // components that don't (including every component when the preferred cell was itself
+    // trimmed as off-board, or absent for a non-piece caller like pasteClipboard) fall back to
+    // comp[0] -- there's no "true" anchor to prefer once it's gone, so any consistent pick is the
+    // best available.
+    _assignGroupId: function(cells, preferredAnchorKey) {
         if (cells.length === 0) return;
         const byKey = new Map(cells.map((c) => [`${c.p},${c.q}`, c]));
         const visited = new Set();
@@ -421,9 +437,17 @@ const GravityMode = {
         }
         components.forEach((comp) => {
             const gid = this.state.nextGroupId++;
-            comp.forEach((c) => {
+            const preferredIdx = preferredAnchorKey != null
+                ? comp.findIndex((c) => `${c.p},${c.q}` === preferredAnchorKey)
+                : -1;
+            const anchorPos = preferredIdx >= 0 ? preferredIdx : 0;
+            comp.forEach((c, i) => {
                 const v = GravityBoard.cells.get(`${c.p},${c.q}`);
-                if (v) v.groupId = gid;
+                if (!v) return;
+                v.groupId = gid;
+                // Reset explicitly (not just "set true on the chosen index") since a resplit can
+                // reuse cells that carried an isAnchor flag from their OLD, now-defunct group.
+                v.isAnchor = (i === anchorPos);
             });
         });
     },
@@ -436,17 +460,21 @@ const GravityMode = {
     // Re-splits each group that just lost at least one cell -- _assignGroupId's own connectivity
     // split (see above) handles the rest. Groups the clear didn't touch are left alone -- "a line
     // clear shouldn't change already-settled pieces' relative relationship to each other" still
-    // holds for every piece the clear didn't gut.
+    // holds for every piece the clear didn't gut. Passes through whichever surviving cell was
+    // already this group's anchor, so a clear that doesn't happen to remove the anchor itself
+    // doesn't lose it -- same reasoning as lockActivePiece's own preferredAnchorKey.
     _resplitGroups: function(groupIds) {
         groupIds.forEach((gid) => {
             const members = [];
+            let anchorKey = null;
             GravityBoard.cells.forEach((v, key) => {
                 if (v.groupId !== gid) return;
+                if (v.isAnchor) anchorKey = key;
                 const [p, q] = key.split(',').map(Number);
                 members.push({ p, q });
             });
             if (members.length <= 1) return;
-            this._assignGroupId(members);
+            this._assignGroupId(members, anchorKey);
         });
     },
 
@@ -483,11 +511,27 @@ const GravityMode = {
     // whether to sound/redraw. This used to loop to completion in one silent jump (right after a
     // paste) -- now every fall, pasted or otherwise, is this same one-row-per-tick step, so nothing
     // a player didn't cause moves without them seeing and hearing it happen.
+    //
+    // ref MUST be the group's own persistent anchor (_assignGroupId's isAnchor flag), not just
+    // "whichever cell happens to be comp[0] this tick" -- reported live, precisely: a 2-tall
+    // fragment visibly drifted one column further right than it should have while falling
+    // unobstructed. Root cause: the hex grid has two equally valid "straight down" offsets
+    // ((p,q-1) or (p+1,q-1)) depending on q's parity, and DIFFERENT cells of the same rigid group
+    // can have different parities -- getDown(ref) picks whichever offset matches ref's own q, and
+    // applies it to the WHOLE group uniformly (correct rigid translation, given a ref). But
+    // GravityBoard.cells is a Map; every move deletes and re-inserts each cell, which can silently
+    // reorder which cell iteration encounters FIRST, so an unflagged comp[0] could pick a
+    // DIFFERENT reference cell (and therefore a different offset) from one tick to the next even
+    // though nothing about the group itself changed -- an unintended, incidental drift, not a
+    // deliberate diagonal-slide (that fallback only fires when the primary offset is blocked; this
+    // was the primary offset, just computed from the wrong cell). A stable anchor, chosen once at
+    // group-creation time and carried forward on the cell's own value object (moved along with it,
+    // no separate bookkeeping needed), makes the choice consistent for the group's entire life.
     settleFloatingCellsStep: function() {
         let moved = false;
         const movedMidis = [];
         for (const comp of this._boardComponents()) {
-            const ref = comp[0];
+            const ref = comp.find((c) => c.val.isAnchor) || comp[0];
             const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
             const canOffset = (dp, dq) => comp.every((c) => {
                 const nk = (c.p + dp) + ',' + (c.q + dq);
