@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * STORY TESTS
@@ -36,6 +38,28 @@ const { test, expect } = require('@playwright/test');
  * The only liberties taken from the real recorded events: dropping the leading `resize` (the
  * viewport is set directly instead) and the trailing `#report-bug-link` click (reporting the
  * session isn't part of playing it).
+ *
+ * Gravity's own story adds two more things, both load-bearing:
+ *
+ * 3. Deterministic tick replay. Real-time drop intervals (js/gravity.js's updateSpeed) make
+ *    wall-clock timing an unreliable way to reconstruct which automatic GravityMode.tick()
+ *    advances had fired between two recorded keydowns. js/replay.js's Replay.recordTick() stamps
+ *    every event with the running tick count instead, so replay just catches up to that exact
+ *    count (calling tick() directly, no timing involved) before applying each event -- the same
+ *    mechanism scripts/replay-to-gif.js uses for its own faithful replays.
+ * 4. A committed fixture file (tests/fixtures/), not an inline literal. Blast's own story embeds
+ *    its ~140 events directly in this file (see above); Gravity sessions run far longer (this one
+ *    is 2843 keydowns across 2873 ticks, ending in a genuine Game Over), so the events alone are
+ *    ~290KB -- unwieldy as hand-reviewable source. The fixture is still the real, unedited capture
+ *    (seed + events only; the CLI-only sound-verification trace is dropped, since this test
+ *    asserts final board state instead), just stored where a large real asset belongs -- the same
+ *    reasoning as desktop.spec.js's loadFrereJacques fetching a real bundled .mid rather than
+ *    inlining its bytes.
+ *
+ * This session started already inside Gravity via a deep link (`#gravity` in the address bar) --
+ * Replay.log only records real events, so a session that opens straight into a non-default mode
+ * never has an actual mode-switch click to replay. `?seed=` and `#gravity` in the same navigation
+ * is exactly what following a real shared deep-link looks like.
  */
 
 test.describe('Story tests', () => {
@@ -126,5 +150,76 @@ test.describe('Story tests', () => {
     expect(final.isGameOver).toBe(false);
 
     await page.screenshot({ path: 'test-results/blast-story-final.png' });
+  });
+
+  test('Gravity story: a real captured session plays through to Game Over deterministically', async ({ page }) => {
+    // 2843 real keydowns, each its own round-trip -- comfortably over the default 30s.
+    test.setTimeout(120000);
+    const fixturePath = path.join(__dirname, 'fixtures', 'gravity-story-20260820053007.json');
+    const { seed, events } = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+
+    // events[0] is the real resize -- viewport set directly (see file header).
+    const viewport = events[0];
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    // Freeze real time BEFORE navigating -- Gravity's own timer (js/gravity.js's startTimer, a
+    // real setInterval) would otherwise keep firing tick() on actual wall-clock time throughout
+    // this test's own real execution time, advancing the game uncontrolled and IN ADDITION to the
+    // explicit tick catch-up below (confirmed live: without this, the same session reached only
+    // linesCleared=20 before an early Game Over, not the real 79 -- extra, untracked ticks fired
+    // by the real timer let pieces free-fall further than the recorded player ever steered them).
+    await page.clock.install({ time: 0 });
+
+    // Deep-link straight into Gravity, same navigation as the seed -- see file header on why
+    // there's no mode-switch click to replay for this particular session.
+    await page.goto(`/?seed=${seed}#gravity`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.mode-option[data-mode="gravity"]')).toHaveClass(/active/);
+    // Freeze at whatever the (real-time-ticking-since-install) fake clock currently reads --
+    // jumping it backward to a fixed value like 0 would move Date.now() into the past.
+    const loadedAt = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(loadedAt);
+
+    // Deterministic tick replay (see file header) -- catch up to each event's own recorded tick
+    // count before applying it. Drops events[0] (resize, handled above) and the final two events
+    // (the report-bug-link pointerdown/pointerup -- reporting the session isn't part of playing
+    // it, see file header); every remaining event in this particular capture is a keydown.
+    let lastTickSeq = events[0].tick || 0;
+    for (let i = 1; i < events.length - 2; i++) {
+      const ev = events[i];
+      const ticksDue = (typeof ev.tick === 'number' ? ev.tick : lastTickSeq) - lastTickSeq;
+      if (ticksDue > 0) {
+        await page.evaluate((n) => { for (let j = 0; j < n; j++) GravityMode.tick(); }, ticksDue);
+      }
+      lastTickSeq = typeof ev.tick === 'number' ? ev.tick : lastTickSeq;
+      if (ev.type === 'keydown') {
+        const keyName = ev.code === 'Space' ? 'Space' : ev.key;
+        if (ev.shiftKey) {
+          await page.keyboard.down('Shift');
+          await page.keyboard.press(keyName);
+          await page.keyboard.up('Shift');
+        } else {
+          await page.keyboard.press(keyName);
+        }
+      }
+    }
+
+    // The exact real outcome of replaying this exact real session -- verified by actually running
+    // it (not derived by hand), so this is a regression baseline covering Gravity's falling
+    // physics as a whole (piece-origin rigidity, rest-time welding, off-board recovery, whole-line
+    // clearing) across a full game reaching a genuine Game Over, not any one mechanism in
+    // isolation.
+    const final = await page.evaluate(() => ({
+      linesCleared: GravityMode.state.linesCleared,
+      cellCount: GravityBoard.cells.size,
+      isGameOver: GravityMode.state.isGameOver,
+      difficulty: GravityMode.state.difficulty,
+    }));
+    expect(final.linesCleared).toBe(79);
+    expect(final.cellCount).toBe(82);
+    expect(final.isGameOver).toBe(true);
+    expect(final.difficulty).toBe(3);
+
+    await page.screenshot({ path: 'test-results/gravity-story-final.png' });
   });
 });
