@@ -46,6 +46,13 @@
  *   --no-gif             Skip GIF assembly (ffmpeg not required if this is set)
  *   --no-viewer          Skip HTML viewer generation
  *   --base-url=<url>     App URL to replay against (default: http://localhost:8001)
+ *   --start-hash=<mode>  Mode the session actually started in when no click ever switched to it
+ *                        (e.g. a deep link) -- Replay.log only records real events, so a session
+ *                        that opened straight into a non-default mode via URL hash leaves no
+ *                        trace of that in the JSON. Applied right after load, before any replayed
+ *                        event, via a real hashchange (js/main.js's own router), same as a user
+ *                        clicking a shared deep-link. Omit for sessions that began at the default
+ *                        mode or that DO contain their own mode-switch click.
  *   --speed=<n>          Playback speed multiplier (default: 1 -- real recorded timing).
  *                        Only affects the wall-clock fallback path (see above); ignored when
  *                        the replay has tick-count data, since that path has no timing to scale.
@@ -77,6 +84,7 @@ function parseArgs(argv) {
         if (key === 'out') opts.out = val;
         else if (key === 'viewer-out') opts.viewerOut = val;
         else if (key === 'base-url') opts.baseUrl = val;
+        else if (key === 'start-hash') opts.startHash = val;
         else if (key === 'speed') opts.speed = parseFloat(val);
         else if (key === 'max-wait') opts.maxWait = parseInt(val, 10);
         else if (key === 'frame-delay') opts.frameDelay = parseInt(val, 10);
@@ -386,6 +394,12 @@ async function run(opts) {
 
     await page.goto(`${opts.baseUrl}/?seed=${data.seed}`);
     await page.waitForLoadState('networkidle');
+    if (opts.startHash) {
+        // A real hashchange, same as a user clicking a shared deep-link -- js/main.js's own
+        // router (_applyHashRoute) picks it up and switches modes for us.
+        await page.evaluate((h) => { location.hash = '#' + h; }, opts.startHash);
+        await page.waitForFunction((h) => location.hash === '#' + h, opts.startHash);
+    }
     // Freeze at whatever the (real-time-ticking-since-install) fake clock currently reads --
     // jumping it backward to a fixed value like 0 would move Date.now() into the past.
     const loadedAt = await page.evaluate(() => Date.now());

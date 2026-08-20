@@ -281,11 +281,17 @@ const GravityMode = {
         const lines = GravityBoard.findFullLines();
         if (lines.length === 0) return false;
         const allNotes = [];
+        const affectedGroupIds = new Set();
         lines.forEach((line) => {
-            line.forEach((c) => allNotes.push(Tonnetz.getMidi(c.p, c.q)));
+            line.forEach((c) => {
+                allNotes.push(Tonnetz.getMidi(c.p, c.q));
+                const v = GravityBoard.cells.get(`${c.p},${c.q}`);
+                if (v) affectedGroupIds.add(v.groupId);
+            });
             GravityBoard.clearCells(line);
             this.state.linesCleared++;
         });
+        this._resplitGroups(affectedGroupIds);
         Synth.playChord([...new Set(allNotes)], false, 0.22, 1.5);
         this.updateSpeed();
         return true;
@@ -380,15 +386,67 @@ const GravityMode = {
         Synth.playChord(midis, false, 0.12, 0.9); // soft confirmation
     },
 
-    // Stamps every cell in `cells` with the SAME new group id, overwriting GravityBoard.cells'
-    // stored value in place. Cells that share a group id always move together as one rigid mass in
-    // settleFloatingCellsStep, regardless of whether they currently happen to touch anything else --
-    // membership is assigned once, at lock/paste time, and never recomputed from geometry.
+    // Stamps `cells` with fresh group ids, one per CONNECTED component within them (BFS over
+    // Tonnetz.getNeighbors -- the same 6-direction adjacency Gravity's own getDown/settle logic
+    // already uses), never one shared id for the whole input regardless of whether it's actually
+    // one contiguous shape. Cells that share a group id always move together as one rigid mass in
+    // settleFloatingCellsStep, so this matters whenever a caller's `cells` might not be contiguous
+    // -- reported live, twice, from two different call sites: a line clear can remove the one cell
+    // bridging two parts of an already-settled piece (see _resplitGroups below), and separately, a
+    // piece locked while overhanging the wall can have its OFF-BOARD middle trimmed away
+    // (lockActivePiece), leaving two disconnected in-bounds fragments. Both used to get welded
+    // into one group just because they were assigned together, freezing whichever one wasn't
+    // itself blocked the instant the OTHER one hit anything.
     _assignGroupId: function(cells) {
-        const gid = this.state.nextGroupId++;
-        cells.forEach((c) => {
-            const v = GravityBoard.cells.get(`${c.p},${c.q}`);
-            if (v) v.groupId = gid;
+        if (cells.length === 0) return;
+        const byKey = new Map(cells.map((c) => [`${c.p},${c.q}`, c]));
+        const visited = new Set();
+        const components = [];
+        for (const start of cells) {
+            const startKey = `${start.p},${start.q}`;
+            if (visited.has(startKey)) continue;
+            const comp = [];
+            const stack = [start];
+            visited.add(startKey);
+            while (stack.length) {
+                const cur = stack.pop();
+                comp.push(cur);
+                for (const n of Tonnetz.getNeighbors(cur.p, cur.q)) {
+                    const nk = `${n.p},${n.q}`;
+                    const neighbor = byKey.get(nk);
+                    if (neighbor && !visited.has(nk)) { visited.add(nk); stack.push(neighbor); }
+                }
+            }
+            components.push(comp);
+        }
+        components.forEach((comp) => {
+            const gid = this.state.nextGroupId++;
+            comp.forEach((c) => {
+                const v = GravityBoard.cells.get(`${c.p},${c.q}`);
+                if (v) v.groupId = gid;
+            });
+        });
+    },
+
+    // A line clear can remove the one cell bridging two parts of an already-settled piece --
+    // reported live (a real captured play session, not a synthetic repro): the survivors kept
+    // the OLD shared groupId even though the clear physically severed them, so a totally
+    // disconnected fragment stayed welded to (and blocked by) whatever the OTHER fragment
+    // happened to be resting on, freezing debris that no longer had anything in common with it.
+    // Re-splits each group that just lost at least one cell -- _assignGroupId's own connectivity
+    // split (see above) handles the rest. Groups the clear didn't touch are left alone -- "a line
+    // clear shouldn't change already-settled pieces' relative relationship to each other" still
+    // holds for every piece the clear didn't gut.
+    _resplitGroups: function(groupIds) {
+        groupIds.forEach((gid) => {
+            const members = [];
+            GravityBoard.cells.forEach((v, key) => {
+                if (v.groupId !== gid) return;
+                const [p, q] = key.split(',').map(Number);
+                members.push({ p, q });
+            });
+            if (members.length <= 1) return;
+            this._assignGroupId(members);
         });
     },
 

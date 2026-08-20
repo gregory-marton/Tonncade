@@ -3295,6 +3295,90 @@ test('Gravity: a falling mass that brushes past an unrelated settled piece keeps
   expect(result.massQsByTick[result.massQsByTick.length - 1]).toBeNull(); // consumed by the 2nd clear, not frozen mid-air
 });
 
+// Reported live, against a REAL captured play session (not a synthetic repro): the freeze fix
+// above wasn't enough -- a real pile still froze solid. Root cause, confirmed by direct diagnosis
+// of the replayed session's final board state: a line clear can remove the ONE cell bridging two
+// parts of an already-settled piece (e.g. a 3-tall piece straddling the row that clears loses its
+// middle cell). The two surviving fragments kept the SAME old groupId even though they were no
+// longer touching -- rigid-body movement then required BOTH fragments to move together, so the
+// instant either one hit anything, the OTHER froze too, however far away and disconnected it was.
+test('Gravity._resplitGroups: severing a piece\'s bridging cell splits the survivors into independent groups', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+
+    // Build the REAL 3-cell chain (0,5)-(0,6)-(0,7) as one genuinely connected group (this is
+    // what _assignGroupId's own connectivity split leaves alone -- one component in, one id out),
+    // then delete the middle cell directly, the same way a line clear's GravityBoard.clearCells
+    // would: the two survivors keep the OLD shared id even though clearCells itself has no idea
+    // it just severed a piece -- that's exactly the state _resplitGroups exists to repair.
+    const chain = [{ p: 0, q: 5 }, { p: 0, q: 6 }, { p: 0, q: 7 }];
+    GravityBoard.fillCells(chain, 'X', '#fff');
+    GravityMode._assignGroupId(chain);
+    const sharedGroupId = GravityBoard.cells.get('0,5').groupId;
+    GravityBoard.clearCells([{ p: 0, q: 6 }]);
+
+    // A control pair that's genuinely still connected after its own clear -- must NOT be split.
+    const pair = [{ p: 3, q: 2 }, { p: 3, q: 3 }, { p: 3, q: 4 }];
+    GravityBoard.fillCells(pair, 'Y', '#000');
+    GravityMode._assignGroupId(pair);
+    const connectedGroupId = GravityBoard.cells.get('3,2').groupId;
+    GravityBoard.clearCells([{ p: 3, q: 4 }]); // trims an END cell -- (3,2)-(3,3) stay connected
+
+    GravityMode._resplitGroups(new Set([sharedGroupId, connectedGroupId]));
+
+    return {
+      severedIds: [GravityBoard.cells.get('0,5').groupId, GravityBoard.cells.get('0,7').groupId],
+      connectedIds: [GravityBoard.cells.get('3,2').groupId, GravityBoard.cells.get('3,3').groupId],
+    };
+  });
+  // The two disconnected survivors must now carry DIFFERENT group ids...
+  expect(result.severedIds[0]).not.toBe(result.severedIds[1]);
+  // ...but a pair that's still genuinely touching must be left exactly as it was (same id, no
+  // pointless re-splitting of pieces the clear didn't actually break).
+  expect(result.connectedIds[0]).toBe(result.connectedIds[1]);
+});
+
+// Reported live AGAIN, against a second real captured play session -- the two fixes above still
+// weren't enough: a lone cell was floating disconnected with visible empty space beneath it. Root
+// cause, traced live by instrumenting _assignGroupId during a full faithful replay: lockActivePiece
+// trims a piece's OFF-BOARD cells (wall-overhang) BEFORE grouping, but if the trimmed-away cell was
+// the one bridging two IN-BOUNDS parts of the piece, the two survivors got handed to _assignGroupId
+// TOGETHER and (before this fix) were stamped with one shared id regardless of whether they still
+// touched each other -- the exact same disconnected-but-fused bug as the line-clear case, just
+// arriving from a different call site. Fixed at the root: _assignGroupId itself now always splits
+// by connectivity, so every caller gets this for free.
+test('Gravity: locking a piece whose off-board middle gets trimmed leaves two independent fragments, not one fused group', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+
+    // A 3-cell chain positioned so its MIDDLE cell is off-board (col > 4) while both ends are
+    // in-bounds: (3,3) col=4 (in), (4,2) col=5 (off-board -- gets trimmed), (4,1) col=4 (in).
+    // (3,3)-(4,2) and (4,2)-(4,1) are each direct neighbors; (3,3)-(4,1) is NOT.
+    GravityMode.state.activePiece = null;
+    const cells = [{ p: 3, q: 3 }, { p: 4, q: 2 }, { p: 4, q: 1 }];
+    GravityBoard.fillCells(cells, 'X', '#fff');
+    const isOffBoard = (c) => { const col = c.p + Math.floor(c.q / 2); return col < -5 || col > 4; };
+    const offBoard = cells.filter(isOffBoard);
+    const inBounds = cells.filter((c) => !isOffBoard(c));
+    GravityBoard.clearCells(offBoard);
+    GravityMode._assignGroupId(inBounds);
+
+    return {
+      offBoardCols: offBoard.map((c) => c.p + Math.floor(c.q / 2)),
+      groupIds: [GravityBoard.cells.get('3,3').groupId, GravityBoard.cells.get('4,1').groupId],
+    };
+  });
+  expect(result.offBoardCols).toEqual([5]); // confirms (4,2) really was the off-board one trimmed
+  // (3,3) and (4,1) are no longer touching anything -- they must NOT share a group id.
+  expect(result.groupIds[0]).not.toBe(result.groupIds[1]);
+});
+
 // checkActivePlacement lets a piece overhang the side wall while steering, as long as it keeps a
 // toe-hold on the real playable columns (js/board.js) -- locking that way used to leave the
 // overhanging cells in GravityBoard.cells PERMANENTLY (findFullLines never scans past col 4 to
