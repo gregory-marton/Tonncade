@@ -3345,42 +3345,218 @@ test('Gravity._resplitGroups: severing a piece\'s bridging cell splits the survi
   expect(result.connectedIds[0]).toBe(result.connectedIds[1]);
 });
 
-// Reported live AGAIN, against a second real captured play session -- the two fixes above still
-// weren't enough: a lone cell was floating disconnected with visible empty space beneath it. Root
-// cause, traced live by instrumenting _assignGroupId during a full faithful replay: lockActivePiece
-// trims a piece's OFF-BOARD cells (wall-overhang) BEFORE grouping, but if the trimmed-away cell was
-// the one bridging two IN-BOUNDS parts of the piece, the two survivors got handed to _assignGroupId
-// TOGETHER and (before this fix) were stamped with one shared id regardless of whether they still
-// touched each other -- the exact same disconnected-but-fused bug as the line-clear case, just
-// arriving from a different call site. Fixed at the root: _assignGroupId itself now always splits
-// by connectivity, so every caller gets this for free.
-test('Gravity: locking a piece whose off-board middle gets trimmed leaves two independent fragments, not one fused group', async ({ page }) => {
+// Reported live AGAIN, against a THIRD real captured play session: trimming off-board cells at
+// lock time (the fix that used to live here) turned out to be the wrong call. checkActivePlacement
+// lets a piece overhang the wall while STEERING (a toe-hold is enough) and still slide -- the SAME
+// piece, one tick later, having just locked with no change in player input, used to go rigid the
+// instant it touched down, because settleFloatingCellsStep's own canOffset required EVERY cell
+// in-bounds, not just a toe-hold. Deleting the overhang was correctness overkill for a danger
+// that's actually handled at its root now (_assignGroupId's connectivity split, not by never
+// letting anything sit off-grid) -- and it silently discarded a real recovery path: an overhanging
+// piece sliding back within the wall over later ticks to land in a gap only reachable from that
+// angle. Fixed by making canOffset toe-hold-tolerant too (see its own note), and reverting the
+// trim entirely -- an off-board middle cell no longer needs special handling; it's just a normal
+// part of one physically connected piece.
+test('Gravity: a piece locked overhanging the wall keeps ALL its cells, including the off-board one', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
     App.currentMode = 'gravity';
     GravityBoard.cells.clear();
-
-    // A 3-cell chain positioned so its MIDDLE cell is off-board (col > 4) while both ends are
-    // in-bounds: (3,3) col=4 (in), (4,2) col=5 (off-board -- gets trimmed), (4,1) col=4 (in).
-    // (3,3)-(4,2) and (4,2)-(4,1) are each direct neighbors; (3,3)-(4,1) is NOT.
-    GravityMode.state.activePiece = null;
-    const cells = [{ p: 3, q: 3 }, { p: 4, q: 2 }, { p: 4, q: 1 }];
-    GravityBoard.fillCells(cells, 'X', '#fff');
-    const isOffBoard = (c) => { const col = c.p + Math.floor(c.q / 2); return col < -5 || col > 4; };
-    const offBoard = cells.filter(isOffBoard);
-    const inBounds = cells.filter((c) => !isOffBoard(c));
-    GravityBoard.clearCells(offBoard);
-    GravityMode._assignGroupId(inBounds);
-
+    // The '-' domino at p=5,q=0: absolute cells (4,0) col=4 (in, the toe-hold) and (5,0) col=5
+    // (one past the right wall).
+    GravityMode.state.activePiece = '-';
+    GravityMode.state.p = 5; GravityMode.state.q = 0; GravityMode.state.rotation = 0;
+    GravityMode.state.isGameOver = false;
+    const placementLegal = GravityBoard.checkActivePlacement('-', 5, 0, 0);
+    GravityMode.lockActivePiece();
     return {
-      offBoardCols: offBoard.map((c) => c.p + Math.floor(c.q / 2)),
-      groupIds: [GravityBoard.cells.get('3,3').groupId, GravityBoard.cells.get('4,1').groupId],
+      placementLegal,
+      groupIds: [GravityBoard.cells.get('4,0') ? GravityBoard.cells.get('4,0').groupId : null,
+                 GravityBoard.cells.get('5,0') ? GravityBoard.cells.get('5,0').groupId : null],
     };
   });
-  expect(result.offBoardCols).toEqual([5]); // confirms (4,2) really was the off-board one trimmed
-  // (3,3) and (4,1) are no longer touching anything -- they must NOT share a group id.
-  expect(result.groupIds[0]).not.toBe(result.groupIds[1]);
+  expect(result.placementLegal).toBe(true); // confirms this really is the overhang scenario
+  // Both cells survive, sharing the SAME group -- still one physically connected piece.
+  expect(result.groupIds[0]).not.toBeNull();
+  expect(result.groupIds[1]).not.toBeNull();
+  expect(result.groupIds[0]).toBe(result.groupIds[1]);
+});
+
+// The actual recovery mechanic: an overhanging piece, once locked, keeps obeying the SAME
+// toe-hold-tolerant rule it always did as an active piece -- so if its straight-down path is
+// blocked, it can take the diagonal slide, which SHIFTS COLUMN (unlike straight-down, which
+// preserves it), potentially walking a previously off-board cell back within the wall.
+test('Gravity: an overhanging piece can slide back within the wall on a later tick, not freeze rigid at lock', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    GravityMode.spawnPiece();
+    GravityMode.state.p = -100; GravityMode.state.q = 200; // parked out of the way
+
+    // The '-' domino locked overhanging at q=4: (2,4) col=4 (in) and (3,4) col=5 (off-board).
+    GravityMode.state.activePiece = '-';
+    GravityMode.state.p = 3; GravityMode.state.q = 4; GravityMode.state.rotation = 0;
+    GravityMode.lockActivePiece();
+    const colsBefore = [...GravityBoard.cells.keys()].filter((k) => k !== '-100,200').map((k) => {
+      const [p, q] = k.split(',').map(Number);
+      return p + Math.floor(q / 2);
+    }).sort((a, b) => a - b);
+
+    // A single blocker cell directly in the domino's primary (straight-down) path -- forces the
+    // diagonal-slide fallback on the very next tick, which is the one that shifts column.
+    GravityBoard.fillCells([{ p: 4, q: 3 }], 'X', '#fff');
+    GravityMode._assignGroupId([{ p: 4, q: 3 }]);
+
+    GravityMode.tick();
+    const colsAfter = [...GravityBoard.cells.entries()]
+      .filter(([k, v]) => v.type === '-')
+      .map(([k]) => { const [p, q] = k.split(',').map(Number); return p + Math.floor(q / 2); })
+      .sort((a, b) => a - b);
+
+    return { colsBefore, colsAfter };
+  });
+  expect(result.colsBefore).toEqual([4, 5]); // one in bounds, one overhanging, as locked
+  // After the forced slide, BOTH cells shifted one column left -- the previously off-board one
+  // (col 5) is now col 4, back within the wall.
+  expect(result.colsAfter).toEqual([3, 4]);
+});
+
+// Requested live: "if I clear a line, clear the *whole* line, in or out of the cup." findFullLines
+// only checks col -5..4 (a line's own definition never needed the overhang), but clearing now
+// sweeps any off-board cells sharing the completed row's q too, not just the in-bounds portion.
+test('Gravity: clearing a line sweeps off-board cells sharing that row too, not just the in-bounds portion', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.linesCleared = 0;
+
+    // A complete row at q=0 (cols -5..4)...
+    const line = [];
+    for (let col = -5; col <= 4; col++) line.push({ p: col, q: 0 });
+    GravityBoard.fillCells(line, 'X', '#fff');
+    GravityMode._assignGroupId(line);
+    // ...plus an off-board cell sharing the SAME q, connected to the row (part of one piece that
+    // overhung when it locked).
+    GravityBoard.fillCells([{ p: 5, q: 0 }], 'X', '#fff');
+    GravityMode._assignGroupId(line.concat([{ p: 5, q: 0 }]));
+    // And an UNRELATED off-board cell at a DIFFERENT q, which must survive untouched.
+    GravityBoard.fillCells([{ p: 5, q: 3 }], 'Y', '#000');
+    GravityMode._assignGroupId([{ p: 5, q: 3 }]);
+
+    const sizeBefore = GravityBoard.cells.size;
+    const cleared = GravityMode.checkForClears();
+    return { sizeBefore, cleared, remaining: [...GravityBoard.cells.keys()].sort() };
+  });
+  expect(result.sizeBefore).toBe(12); // 10-cell row + 1 off-board rider + 1 unrelated
+  expect(result.cleared).toBe(true);
+  // The whole row (10 in-bounds + the 1 off-board rider sharing its q) is gone; the unrelated
+  // off-board cell at a different q survives.
+  expect(result.remaining).toEqual(['5,3']);
+});
+
+// Requested live, precisely: "let everybody settle." A group that ends up ENTIRELY off-board
+// (zero cells with a valid column) used to freeze the instant it got there -- canOffset required
+// at least ONE cell to land in-bounds for ANY move, so a group with no in-bounds cells at all
+// could never move again, stuck floating forever with visible empty space beneath it. canOffset
+// no longer checks walls at all (see its own note) -- only the true floor and real collisions --
+// so a fully off-board group keeps falling to the floor exactly like anything else.
+test('Gravity: a fully off-board group keeps falling to the floor, not stuck floating', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+    GravityMode.spawnPiece();
+    GravityMode.state.p = -100; GravityMode.state.q = 200; // parked out of the way
+
+    // Two cells, both off-board (col 5), floating unsupported at q=5/6 -- nothing below them.
+    const cells = [{ p: 5, q: 5 }, { p: 5, q: 6 }];
+    GravityBoard.fillCells(cells, 'X', '#fff');
+    GravityMode._assignGroupId(cells);
+
+    const qsBefore = cells.map((c) => c.q).sort((a, b) => a - b);
+    for (let i = 0; i < 15; i++) GravityMode.tick();
+    const qsAfter = [...GravityBoard.cells.entries()]
+      .filter(([, v]) => v.type === 'X')
+      .map(([k]) => +k.split(',')[1])
+      .sort((a, b) => a - b);
+
+    return { qsBefore, qsAfter };
+  });
+  expect(result.qsBefore).toEqual([5, 6]);
+  // It fell all the way to the true floor (q=0/1), not stuck at its starting height.
+  expect(result.qsAfter).toEqual([0, 1]);
+});
+
+// Requested live: "line clearing feels slow." tick()'s own checkForClears() runs BEFORE the
+// active piece's movement/lock step, so a row a LOCK just completed used to sit there, visibly
+// full, for up to one whole dropInterval before clearing on the NEXT tick. Fixed by checking
+// immediately inside lockActivePiece itself -- no tick() call needed for the clear to happen.
+test('Gravity: locking a piece that completes a line clears it immediately, not on the next tick', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    GravityMode.state.linesCleared = 0;
+    GravityMode.state.isPaused = false;
+    GravityMode.state.isGameOver = false;
+
+    // Every column except one at q=0.
+    for (let col = -5; col <= 4; col++) {
+      if (col === 0) continue;
+      GravityBoard.fillCells([{ p: col, q: 0 }], 'X', '#fff');
+      GravityMode._assignGroupId([{ p: col, q: 0 }]);
+    }
+    // Lock the '.' monohex into the exact missing spot -- no tick() call anywhere in this test.
+    GravityMode.state.activePiece = '.';
+    GravityMode.state.p = 0; GravityMode.state.q = 0; GravityMode.state.rotation = 0;
+    GravityMode.lockActivePiece();
+
+    return {
+      linesCleared: GravityMode.state.linesCleared,
+      rowStillPresent: [...GravityBoard.cells.keys()].some((k) => k.endsWith(',0')),
+    };
+  });
+  expect(result.linesCleared).toBe(1);
+  expect(result.rowStillPresent).toBe(false);
+});
+
+// Requested live: linear (20ms/line) hit the 100ms floor by line 45, ramping up too fast. Log
+// decay keeps the early game feeling snappy but takes roughly 4x as many lines to bottom out.
+test('Gravity: drop-interval speed decays logarithmically toward the 100ms floor, not linearly', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    const sample = (n) => {
+      GravityMode.state.linesCleared = n;
+      GravityMode.updateSpeed();
+      return GravityMode.state.dropInterval;
+    };
+    const at0 = sample(0);
+    const at45 = sample(45);
+    let floorReachedAt = null;
+    for (let n = 0; n <= 1000 && floorReachedAt === null; n++) {
+      if (sample(n) <= 100) floorReachedAt = n;
+    }
+    return { at0, at45, floorReachedAt };
+  });
+  expect(result.at0).toBe(1000);
+  // The OLD linear formula hit the 100ms floor by line 45 -- the new curve must still be well
+  // above it at that point...
+  expect(result.at45).toBeGreaterThan(300);
+  // ...but should still reach the floor eventually, well beyond the old 45-line mark.
+  expect(result.floorReachedAt).toBeGreaterThan(150);
+  expect(result.floorReachedAt).toBeLessThan(250);
 });
 
 // Reported live, precisely, against a real captured session: a 2-cell fragment visibly drifted
@@ -3502,39 +3678,6 @@ test('Gravity: difficulty 1-3 welds a group to whatever it rests touching; diffi
   // Difficulty 4: blocked straight down, it slides away diagonally instead (still can't occupy
   // the same cell) and keeps its OWN separate group id -- never merged.
   expect(new Set(result.unweldedIds).size).toBe(2);
-});
-
-// checkActivePlacement lets a piece overhang the side wall while steering, as long as it keeps a
-// toe-hold on the real playable columns (js/board.js) -- locking that way used to leave the
-// overhanging cells in GravityBoard.cells PERMANENTLY (findFullLines never scans past col 4 to
-// clear them). Harmless under the old physics; a hazard under per-tick connected-component
-// falling (see the test above) -- so lockActivePiece now trims them at lock time instead.
-test('Gravity: a piece locked while overhanging the wall has its off-grid cells trimmed, not left as permanent debris', async ({ page }) => {
-  await page.goto('/');
-  const result = await page.evaluate(() => {
-    document.querySelector('.mode-option[data-mode="gravity"]').click();
-    App.currentMode = 'gravity';
-    GravityBoard.cells.clear();
-    // The '-' domino at p=5,q=0: absolute cells (4,0) and (5,0). col = p+floor(q/2) = p at q=0,
-    // so cols 4 (in bounds, the toe-hold) and 5 (one past the right wall, col<=4 is the limit).
-    GravityMode.state.activePiece = '-';
-    GravityMode.state.p = 5;
-    GravityMode.state.q = 0;
-    GravityMode.state.rotation = 0;
-    GravityMode.state.isGameOver = false;
-    const placementLegal = GravityBoard.checkActivePlacement('-', 5, 0, 0);
-    GravityMode.lockActivePiece();
-    const keys = [...GravityBoard.cells.keys()];
-    const anyOffBoard = keys.some((k) => {
-      const [p, q] = k.split(',').map(Number);
-      const col = p + Math.floor(q / 2);
-      return col < -5 || col > 4;
-    });
-    return { placementLegal, keys, anyOffBoard };
-  });
-  expect(result.placementLegal).toBe(true);      // confirms this really is the overhang scenario
-  expect(result.keys).toContain('4,0');           // the in-bounds toe-hold cell survives
-  expect(result.anyOffBoard).toBe(false);          // the overhanging (5,0) cell was trimmed, not kept
 });
 
 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),

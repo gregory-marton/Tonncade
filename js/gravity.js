@@ -192,8 +192,11 @@ const GravityMode = {
     },
 
     updateSpeed: function() {
-        // Decrease drop interval by 20ms per cleared line, min 100ms
-        this.state.dropInterval = Math.max(100, 1000 - this.state.linesCleared * 20);
+        // Logarithmic decay from 1000ms toward a 100ms floor, not linear -- requested live: linear
+        // (20ms/line) hit the floor by line 45, too soon. Log decay front-loads the speedup (still
+        // feels snappy in the first ~20 lines) but takes roughly 4x as many lines (~200) to
+        // actually bottom out, so the late game keeps getting incrementally harder for much longer.
+        this.state.dropInterval = Math.max(100, Math.round(1000 - 170 * Math.log(1 + this.state.linesCleared)));
         this.startTimer();
     },
 
@@ -252,30 +255,37 @@ const GravityMode = {
         GravityBoard.fillCells(cells, this.state.activePiece, Pieces.TYPES[this.state.activePiece].color);
 
         // checkActivePlacement lets a piece overhang the side wall while steering (a "toe-hold" is
-        // enough) -- if it locks that way, the overhanging cells land outside col -5..4, where
-        // findFullLines never looks, so they used to sit there forever as permanent, invisible
-        // clutter. Harmless under the old instant-shift line-clearing; actively dangerous under
-        // per-tick connected-component falling (settleFloatingCellsStep) -- reported live: any
-        // later debris whose descent merely brushed past one of these permanent off-grid
-        // fragments got welded to it and froze solid, even though the fragment had nothing to do
-        // with the row that cleared. Trimmed at lock time instead: an overhanging cell is
-        // discarded the moment its piece settles, same as falling off the edge of a real table.
-        const isOffBoard = (c) => { const col = c.p + Math.floor(c.q / 2); return col < -5 || col > 4; };
-        const offBoardCells = cells.filter(isOffBoard);
-        const inBoundsCells = cells.filter((c) => !isOffBoard(c));
-        if (offBoardCells.length) GravityBoard.clearCells(offBoardCells);
+        // enough) -- findFullLines never looks past col -5..4, so an overhanging cell can never be
+        // part of a completed row, but it's real board state, not deleted: it can still fall back
+        // into bounds later exactly the way it got there, via settleFloatingCellsStep's own
+        // canOffset (which has no wall check at all -- see that function's note) -- reported live:
+        // a piece overhanging on one side would settle, over several later ticks, diagonally back
+        // within the wall and land exactly in a gap only reachable from that angle. An earlier
+        // version of this function deleted the overhanging cells immediately at lock time, which
+        // silently discarded that recovery path along with the piece's own material -- correctness
+        // overkill for a danger (unrelated debris welding to permanent off-grid clutter) that's now
+        // handled at its actual root (_assignGroupId's connectivity split), not by never letting
+        // anything sit off-grid in the first place.
+        //
         // The piece's TRUE anchor is (state.p, state.q) itself -- the absolute position of
         // whichever of its cells has relative offset (0,0) -- not just whichever cell happens to
         // be first in Pieces.TYPES' own cell-list order (see _assignGroupId's own note on why
         // this matters).
-        this._assignGroupId(inBoundsCells, `${this.state.p},${this.state.q}`);
+        this._assignGroupId(cells, `${this.state.p},${this.state.q}`);
 
         // Solid placement chord
         const midis = cells.map(c => Tonnetz.getMidi(c.p, c.q));
         Synth.playChord(midis, true, 0.16, 1.2);
 
-        // Any line THIS piece completed is caught by the next tick's checkForClears() -- same as
-        // a line completed by debris settling, nothing special about a piece lock specifically.
+        // Checked immediately, not deferred to the next scheduled tick -- reported live, line
+        // clearing felt slow specifically because of this gap: tick()'s own checkForClears() call
+        // runs BEFORE the active piece's movement/lock step, so a row THIS lock just completed
+        // used to sit there, visibly full, for up to one whole dropInterval (as slow as 1000ms at
+        // the start of a game) before clearing. Debris-triggered completions (settleFloatingCellsStep)
+        // don't have this gap -- tick() already checks right after settling, same tick -- so this
+        // is the one place a completion could go unnoticed until later than it should.
+        this.checkForClears();
+
         if (!this.state.isGameOver) {
             this.spawnPiece();
             this.refreshUI();
@@ -287,18 +297,37 @@ const GravityMode = {
     // per-tick settleFloatingCellsStep (see tick()), exactly like any other loose pile cell, not a
     // special instant cascade. Called every tick, so a row completed by debris settling is caught
     // exactly the same way as one completed by a piece locking. Returns true if anything cleared.
+    //
+    // findFullLines only checks col -5..4 (a line's own definition never needed the overhang), but
+    // clearing sweeps the WHOLE row, off-board cells included -- requested live: "if I clear a
+    // line, clear the *whole* line, in or out of the cup." This also fixes a real bug the same
+    // conversation surfaced: an overhanging piece's off-board cells are kept (not trimmed, so they
+    // can slide back into bounds -- see settleFloatingCellsStep's own note), but if only its
+    // IN-BOUNDS cells were part of a completed row, clearing just those could leave the off-board
+    // remainder disconnected from whatever it was resting through, with ZERO wall toe-hold of its
+    // own -- permanently stuck, since nothing can ever move it back in from there. Sweeping the
+    // whole row removes the stuck fragment along with the row it was riding on, the same tick.
     checkForClears: function() {
         const lines = GravityBoard.findFullLines();
         if (lines.length === 0) return false;
         const allNotes = [];
         const affectedGroupIds = new Set();
         lines.forEach((line) => {
-            line.forEach((c) => {
+            const q = line[0].q;
+            const offBoardAtQ = [];
+            GravityBoard.cells.forEach((v, key) => {
+                const [p, cq] = key.split(',').map(Number);
+                if (cq !== q) return;
+                const col = p + Math.floor(cq / 2);
+                if (col < -5 || col > 4) offBoardAtQ.push({ p, q: cq });
+            });
+            const fullLine = line.concat(offBoardAtQ);
+            fullLine.forEach((c) => {
                 allNotes.push(Tonnetz.getMidi(c.p, c.q));
                 const v = GravityBoard.cells.get(`${c.p},${c.q}`);
                 if (v) affectedGroupIds.add(v.groupId);
             });
-            GravityBoard.clearCells(line);
+            GravityBoard.clearCells(fullLine);
             this.state.linesCleared++;
         });
         this._resplitGroups(affectedGroupIds);
@@ -401,12 +430,14 @@ const GravityMode = {
     // already uses), never one shared id for the whole input regardless of whether it's actually
     // one contiguous shape. Cells that share a group id always move together as one rigid mass in
     // settleFloatingCellsStep, so this matters whenever a caller's `cells` might not be contiguous
-    // -- reported live, twice, from two different call sites: a line clear can remove the one cell
-    // bridging two parts of an already-settled piece (see _resplitGroups below), and separately, a
-    // piece locked while overhanging the wall can have its OFF-BOARD middle trimmed away
-    // (lockActivePiece), leaving two disconnected in-bounds fragments. Both used to get welded
-    // into one group just because they were assigned together, freezing whichever one wasn't
-    // itself blocked the instant the OTHER one hit anything.
+    // -- reported live: a line clear can remove the one cell bridging two parts of an already-
+    // settled piece (see _resplitGroups below), leaving two disconnected in-bounds fragments that
+    // used to get welded into one group just because they were assigned together, freezing
+    // whichever one wasn't itself blocked the instant the OTHER one hit anything. (An earlier,
+    // reverted version of lockActivePiece trimmed a piece's off-board overhang before grouping,
+    // which could split it the same way -- no longer applies now that overhanging cells are kept,
+    // but the underlying connectivity-safety this function provides is still exactly what a
+    // resplit needs.)
     //
     // preferredAnchorKey (optional, "p,q"): each resulting component's settleFloatingCellsStep
     // reference cell (see its own note) defaults to comp[0] -- whichever cell happened to be
@@ -416,11 +447,15 @@ const GravityMode = {
     // on the wrong cell can drift the whole shape a column off from where the piece's own anchor
     // would have carried it. Whichever component actually CONTAINS preferredAnchorKey uses it;
     // components that don't (including every component when the preferred cell was itself
-    // trimmed as off-board, or absent for a non-piece caller like pasteClipboard) fall back to
-    // comp[0] -- there's no "true" anchor to prefer once it's gone, so any consistent pick is the
-    // best available.
-    _assignGroupId: function(cells, preferredAnchorKey) {
-        if (cells.length === 0) return;
+    // removed by the clear that triggered a resplit, or absent for a non-piece caller like
+    // pasteClipboard) fall back to comp[0] -- there's no "true" anchor to prefer once it's gone,
+    // so any consistent pick is the best available.
+    // Splits `cells` into arrays of mutually-connected cells (BFS over Tonnetz.getNeighbors --
+    // the same 6-direction adjacency Gravity's own getDown/settle logic already uses). Shared by
+    // _assignGroupId (which stamps one fresh group id per component) and _resplitGroups (which
+    // ALSO needs each component on its own, to check wall toe-hold per fragment rather than across
+    // the whole -- possibly still-disconnected -- survivor set).
+    _connectedComponents: function(cells) {
         const byKey = new Map(cells.map((c) => [`${c.p},${c.q}`, c]));
         const visited = new Set();
         const components = [];
@@ -441,7 +476,12 @@ const GravityMode = {
             }
             components.push(comp);
         }
-        components.forEach((comp) => {
+        return components;
+    },
+
+    _assignGroupId: function(cells, preferredAnchorKey) {
+        if (cells.length === 0) return;
+        this._connectedComponents(cells).forEach((comp) => {
             const gid = this.state.nextGroupId++;
             const preferredIdx = preferredAnchorKey != null
                 ? comp.findIndex((c) => `${c.p},${c.q}` === preferredAnchorKey)
@@ -477,10 +517,13 @@ const GravityMode = {
                 if (v.groupId !== gid) return;
                 if (v.isAnchor) anchorKey = key;
                 const [p, q] = key.split(',').map(Number);
-                members.push({ p, q });
+                members.push({ p, q, key });
             });
-            if (members.length <= 1) return;
-            this._assignGroupId(members, anchorKey);
+            if (members.length === 0) return;
+            this._connectedComponents(members).forEach((comp) => {
+                const preferredKey = comp.some((c) => c.key === anchorKey) ? anchorKey : null;
+                this._assignGroupId(comp, preferredKey);
+            });
         });
     },
 
@@ -555,11 +598,24 @@ const GravityMode = {
     // translation preserves shape; moving cells individually would shear the mass, #6) -- straight
     // down first, then the same diagonal-slide fallback the active piece's own tick() tries if
     // that's blocked, so debris settles exactly as far as a normal falling piece would each tick,
-    // nothing special. A component rests when both offsets would take any of its cells out of the
-    // cup or onto a cell that isn't its own. Returns true if anything moved, so callers can decide
-    // whether to sound/redraw. This used to loop to completion in one silent jump (right after a
-    // paste) -- now every fall, pasted or otherwise, is this same one-row-per-tick step, so nothing
-    // a player didn't cause moves without them seeing and hearing it happen.
+    // nothing special. A component rests when both offsets would take any of its cells below the
+    // true floor (q<0, absolute) or onto a cell that isn't its own. Returns true if anything moved,
+    // so callers can decide whether to sound/redraw. This used to loop to completion in one silent
+    // jump (right after a paste) -- now every fall, pasted or otherwise, is this same one-row-per-
+    // tick step, so nothing a player didn't cause moves without them seeing and hearing it happen.
+    //
+    // canOffset has NO wall check at all, unlike board.js's checkActivePlacement -- the col -5..4
+    // boundary only matters for STEERING legality (a player can't park the active piece entirely
+    // outside the cup) and for line-clear eligibility (findFullLines only scans col -5..4). Once a
+    // piece is locked, resting debris falls on floor and collision alone, in or out of the cup,
+    // exactly the same either way -- requested live, after two narrower attempts at this each
+    // proved incomplete: first a toe-hold-tolerant version of this same check (an overhanging piece
+    // used to freeze the instant it locked, since the ORIGINAL all-cells-in-bounds version was
+    // stricter than the rule the same piece just obeyed as an active piece one tick earlier), which
+    // fixed pieces that KEPT some in-bounds cell but still left a piece that drifted fully off-board
+    // stuck floating (zero cells could ever satisfy "one cell in bounds" again). No wall check at
+    // all is both simpler and correct: every piece keeps falling to the floor or a real collision,
+    // regardless of column, the same as it always did before any of this -- "let everybody settle."
     //
     // ref MUST be the group's own persistent anchor (_assignGroupId's isAnchor flag), not just
     // "whichever cell happens to be comp[0] this tick" -- reported live, precisely: a 2-tall
@@ -590,8 +646,10 @@ const GravityMode = {
             const ref = comp.find((c) => c.val.isAnchor) || comp[0];
             const selfKeys = new Set(comp.map((c) => c.p + ',' + c.q));
             const canOffset = (dp, dq) => comp.every((c) => {
-                const nk = (c.p + dp) + ',' + (c.q + dq);
-                return GravityBoard.isInBounds(c.p + dp, c.q + dq) && (selfKeys.has(nk) || !GravityBoard.cells.has(nk));
+                const np = c.p + dp, nq = c.q + dq;
+                if (nq < 0) return false; // the floor is absolute; there is no wall check at all
+                const nk = np + ',' + nq;
+                return selfKeys.has(nk) || !GravityBoard.cells.has(nk);
             });
 
             // Straight down first (getDown's zigzag); if blocked, the SAME diagonal-slide fallback
