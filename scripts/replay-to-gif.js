@@ -299,60 +299,27 @@ async function resolveAndClick(page, ev, recordedViewport) {
         await tap(page, ev.x, ev.y);
         return;
     }
-    // The mode-option row is a small, fixed, always-present set (sandbox/melody/compose/snake/
-    // blast/gravity/life, in that DOM order as of this writing -- read live below rather than
-    // hardcoded, since this list has already grown once) -- getting this one right matters more
-    // than any other ambiguous target, since picking the wrong mode makes the rest of the replay
-    // meaningless. Even "nearest live bounding-box center" (the general fallback below) can pick
-    // the wrong button here: headless Chromium's font metrics can render this row with different
-    // button widths than the recording device widely enough that the WRONG button is genuinely
-    // closer in the replay environment, not just at some ambiguous boundary. Found live: a real
+    // The mode-option row is a small, fixed, always-present set (sandbox/midi/snake/blast/
+    // gravity, in that DOM order) -- getting this one right matters more than any other
+    // ambiguous target, since picking the wrong mode makes the rest of the replay meaningless.
+    // Even "nearest live bounding-box center" (the general fallback below) can pick the wrong
+    // button here: headless Chromium's font metrics can render this row with different button
+    // widths than the recording device widely enough that the WRONG button is genuinely closer
+    // in the replay environment, not just at some ambiguous boundary. Found live: a real
     // session's mode-option tap at x=365 (of 411px) resolved to "blast" by nearest-center in
     // headless, when the recorded session was verifiably in "gravity" (see the js/main.js:291
     // 'v'-keydown trick used to confirm this during investigation). Dividing the RECORDED
     // viewport width into N equal buckets and indexing into the live DOM by position instead
     // sidesteps the cross-environment rendering discrepancy entirely, since it never asks the
-    // current browser where the buttons actually are. N must be the LIVE button count, not a
-    // hardcoded literal -- a stale "5" (from when there were 5 modes) was found live resolving a
-    // real Snake-mode click to "blast" once the app grew to 7 modes.
+    // current browser where the buttons actually are.
     if (target === 'div.mode-option' && recordedViewport) {
         // See resolveModeOptionIndex's comment for why this can't just check width > height.
-        // Bucket by position WITHIN the live .mode-slider box, not across the full viewport --
-        // on desktop the slider is a fixed-width (400px) control, not a full-width bar, so it
-        // typically sits off-center (found live: right-aligned in the header). Dividing the raw
-        // viewport width into N equal slices ignores that entirely and can resolve a real click
-        // to a completely different button (found live: a genuine Snake-mode click at 88% of a
-        // 1807px-wide viewport resolved to "Life", the last button, purely because the slider
-        // itself only occupies roughly the right-hand quarter of that width). The live rect is
-        // trustworthy here because the box's layout position is CSS-determined by viewport size
-        // alone, not by font metrics -- unlike individual button widths, which is what the
-        // "don't trust the live DOM" warning above was originally about.
-        const numOptions = await page.evaluate(() => document.querySelectorAll('.mode-option').length);
-        const rect = await page.evaluate(() => {
-            const el = document.querySelector('.mode-slider');
-            if (!el) return null;
-            const r = el.getBoundingClientRect();
-            return { left: r.left, top: r.top, width: r.width, height: r.height };
-        });
-        // Orientation (row vs. column) still comes from the recorded DEVICE viewport, matching
-        // Render.isMobileLandscape -- the box's own shape can't be used for this decision, since
-        // a desktop-row box (400x~36) and a mobile-column box are both "wider than tall" in some
-        // cases, so checking the box's aspect ratio instead would reintroduce the exact bug
-        // resolveModeOptionIndex's tests guard against, just one level down.
-        const isMobileLandscape = recordedViewport.width <= 950 && recordedViewport.width > recordedViewport.height;
-        const localCoord = isMobileLandscape
-            ? ev.y - (rect ? rect.top : 0)
-            : ev.x - (rect ? rect.left : 0);
-        const localSpan = isMobileLandscape
-            ? (rect ? rect.height : recordedViewport.height)
-            : (rect ? rect.width : recordedViewport.width);
-        const idx = Math.max(0, Math.min(numOptions - 1, Math.floor((localCoord / localSpan) * numOptions)));
         const clicked = await page.evaluate(({ idx }) => {
             const els = Array.from(document.querySelectorAll('.mode-option'));
             if (els.length === 0 || idx >= els.length) return false;
             els[idx].click();
             return true;
-        }, { idx });
+        }, { idx: resolveModeOptionIndex(ev, recordedViewport, 5) });
         if (clicked) return;
         await tap(page, ev.x, ev.y);
         return;
@@ -499,18 +466,6 @@ async function run(opts) {
                 }, ticksDue);
             }
             lastTickSeq = typeof ev.tick === 'number' ? ev.tick : lastTickSeq;
-            // Snake's gem-eating flourish (js/snake.js's playFlourish) pauses tick()-driven
-            // movement and resumes it via a real setTimeout, not the tick counter -- with the
-            // clock frozen for deterministic replay, that timeout never fires on its own, so
-            // isFlourishing would stay true forever and every later tick() call would silently
-            // no-op (reported live: a session with any gem-eating froze completely at the first
-            // one). Advance the frozen clock past it explicitly, using playFlourish's own
-            // duration formula (snake.length * 100ms + 250ms).
-            const flourishDuration = await page.evaluate(() => (
-                typeof SnakeMode !== 'undefined' && SnakeMode.state.isFlourishing
-                    ? SnakeMode.state.snake.length * 100 + 250 : 0
-            ));
-            if (flourishDuration > 0) await page.clock.runFor(flourishDuration);
         } else if (lastT !== null) {
             // Advance virtual time to THIS event's own timestamp before applying its action, not
             // after -- any automatic timers due during a real recorded pause must fire BEFORE the
