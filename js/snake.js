@@ -155,6 +155,10 @@ const SnakeMode = {
 
         this.setupKeyboardEvents();
         this.startTimer();
+
+        if (typeof Replay !== 'undefined') {
+            Replay.record({ type: 'reset', t: Date.now() });
+        }
     },
 
     // Icon-only transport: ⏸ while running (click pauses), ▶ while paused (click resumes) --
@@ -345,11 +349,18 @@ const SnakeMode = {
         }
     },
 
+    // Recorded directly into the replay log at the moment it happens (tick-stamped, like every
+    // other Replay.record() call) rather than left for a replay tool to notice indirectly --
+    // the cause (wall vs. self) is deducible from the snake's head position and heading at this
+    // exact tick, already present in the log; this just marks WHEN a game actually ended.
     gameOver: function() {
         this.state.isGameOver = true;
         if (this.state.timer) {
             clearInterval(this.state.timer);
             this.state.timer = null;
+        }
+        if (typeof Replay !== 'undefined') {
+            Replay.record({ type: 'gameover', t: Date.now(), score: this.state.score });
         }
 
         // Play sad game over note
