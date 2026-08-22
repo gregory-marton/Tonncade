@@ -37,9 +37,10 @@ const SnakeMode = {
         isGameOver: false,
         isPaused: false,
         isFlourishing: false,  // True during gem eating arpeggio
+        flourishStep: 0,       // Index of the next arpeggio note to play (0..snake.length == tail pause)
+        flourishTimeoutId: null, // The ONE pending chained flourish-step timeout, if any
         speed: 700,            // Tick speed in ms
         timer: null,           // Movement interval timer ID
-        flourishTimeouts: [],  // Scheduled timeouts for arpeggio
         lastHighlightTimeouts: [] // Highlighting timeouts
     },
 
@@ -88,15 +89,26 @@ const SnakeMode = {
     cleanup: function() {
         // Leaving mid-game pauses (INV-48) -- reflect that in isPaused/the icon too, so
         // returning shows an accurate "Resume" rather than a "Pause" that would actually start it
-        // from a dead stop.
-        if (this.state.timer) {
-            clearInterval(this.state.timer);
-            this.state.timer = null;
+        // from a dead stop. Covers mid-flourish too (this.state.flourishTimeoutId): the flourish
+        // is a resumable step sequence (see playFlourish/_scheduleFlourishTick), so leaving here
+        // just clears the ONE pending step timeout without touching isFlourishing/flourishStep --
+        // returning and unpausing continues from the exact next note, same as a normal in-progress
+        // move resumes from where it was left. Previously this branch only fired when a normal
+        // move-timer was running (this.state.timer), which is null while flourishing -- leaving
+        // mid-flourish silently skipped marking isPaused at all AND cancelled the flourish's only
+        // path back to isFlourishing=false, permanently freezing tick() from that point on.
+        if (this.state.timer || this.state.flourishTimeoutId) {
+            if (this.state.timer) {
+                clearInterval(this.state.timer);
+                this.state.timer = null;
+            }
+            if (this.state.flourishTimeoutId) {
+                clearTimeout(this.state.flourishTimeoutId);
+                this.state.flourishTimeoutId = null;
+            }
             this.state.isPaused = true;
             this.setPauseIcon(true);
         }
-        this.state.flourishTimeouts.forEach(tId => clearTimeout(tId));
-        this.state.flourishTimeouts = [];
         this.state.lastHighlightTimeouts.forEach(tId => clearTimeout(tId));
         this.state.lastHighlightTimeouts = [];
 
@@ -144,6 +156,7 @@ const SnakeMode = {
         this.state.isGameOver = false;
         this.state.isPaused = false;
         this.state.isFlourishing = false;
+        this.state.flourishStep = 0;
         this.state.speed = 700;
 
         this.updateScoreUI();
@@ -174,8 +187,12 @@ const SnakeMode = {
         btn.setAttribute('aria-label', label);
     },
 
+    // Pausing/resuming mid-flourish now works the same as mid-move: it just clears/reschedules
+    // the ONE pending flourish-step timeout, leaving flourishStep exactly where it was, so
+    // resuming continues from the same note with fresh 100ms/250ms timing measured from the
+    // moment of resume -- never rushes through skipped steps to "catch up" on a long real pause.
     togglePause: function() {
-        if (this.state.isGameOver || this.state.isFlourishing) return;
+        if (this.state.isGameOver) return;
 
         this.state.isPaused = !this.state.isPaused;
 
@@ -184,10 +201,18 @@ const SnakeMode = {
                 clearInterval(this.state.timer);
                 this.state.timer = null;
             }
+            if (this.state.flourishTimeoutId) {
+                clearTimeout(this.state.flourishTimeoutId);
+                this.state.flourishTimeoutId = null;
+            }
             this.setPauseIcon(true);
         } else {
             this.setPauseIcon(false);
-            this.startTimer();
+            if (this.state.isFlourishing) {
+                this._scheduleFlourishTick();
+            } else {
+                this.startTimer();
+            }
         }
     },
 
@@ -198,9 +223,19 @@ const SnakeMode = {
         }, this.state.speed);
     },
 
+    // The one uniform entry point for every automatic advance -- movement AND flourish steps
+    // alike -- so Replay.recordTick()'s count (and therefore replay-to-gif.js's existing tick-
+    // count catch-up loop) already covers flourish steps for free, with no separate mechanism
+    // needed. See playFlourish/_scheduleFlourishTick/_runFlourishStep for how flourishing drives
+    // this same tick() at a fixed 100ms cadence instead of via the normal move interval.
     tick: function() {
         if (typeof Replay !== 'undefined') Replay.recordTick();
-        if (this.state.isGameOver || this.state.isPaused || this.state.isFlourishing) return;
+        if (this.state.isGameOver || this.state.isPaused) return;
+
+        if (this.state.isFlourishing) {
+            this._runFlourishStep();
+            return;
+        }
 
         // Apply heading update
         this.state.direction = this.state.nextDirection;
@@ -257,41 +292,57 @@ const SnakeMode = {
         this.refreshBoard();
     },
 
+    // Real setTimeouts are notoriously fragile to depend on directly (they don't survive a
+    // frozen/mocked clock -- e.g. deterministic replay -- and N independently-scheduled ones
+    // can drift/overlap under real tab throttling). So the flourish is a resumable step
+    // sequence instead: flourishStep is real, inspectable state (not just something implicit in
+    // a pending closure), advanced one step at a time by tick() itself -- the SAME entry point
+    // (and Replay.recordTick() call) normal movement uses, just driven by a fixed 100ms cadence
+    // instead of the move interval while flourishing. Pausing/leaving mid-flourish (togglePause,
+    // cleanup) only ever has to clear the ONE pending chained timeout; nothing about progress is
+    // ever lost or force-completed.
     playFlourish: function() {
         this.state.isFlourishing = true;
+        this.state.flourishStep = 0;
 
-        // Pause normal timer
+        // Pause normal timer -- flourishing and moving never happen at the same time.
         if (this.state.timer) {
             clearInterval(this.state.timer);
             this.state.timer = null;
         }
 
-        const notes = this.state.snake.map(segment => ({
-            p: segment.p,
-            q: segment.q,
-            midi: Tonnetz.getMidi(segment.p, segment.q)
-        }));
+        this._scheduleFlourishTick();
+    },
 
-        const noteDelay = 100; // ms between notes
-        notes.forEach((note, index) => {
-            const tId = setTimeout(() => {
-                const playableMidi = Math.max(21, Math.min(108, note.midi));
-                Synth.playNote(playableMidi, 0, 0.4, 0.18);
-                this.highlightSegment(note.p, note.q, 300);
-            }, index * noteDelay);
-            this.state.flourishTimeouts.push(tId);
-        });
+    // flourishStep counts 0..snake.length-1 as "play this segment's note", and one extra value
+    // (snake.length) as the 250ms tail pause before normal ticking resumes -- that tail pause is
+    // itself a real, counted tick() advance (see tick()'s dispatch), not a bolt-on afterward.
+    _scheduleFlourishTick: function() {
+        const isTailStep = this.state.flourishStep >= this.state.snake.length;
+        const delay = this.state.flourishStep === 0 ? 0 : (isTailStep ? 250 : 100);
+        this.state.flourishTimeoutId = setTimeout(() => {
+            this.state.flourishTimeoutId = null;
+            this.tick();
+        }, delay);
+    },
 
-        // Resume timer after flourish ends
-        const totalDuration = notes.length * noteDelay + 250;
-        const tIdFinish = setTimeout(() => {
+    _runFlourishStep: function() {
+        if (this.state.flourishStep < this.state.snake.length) {
+            const segment = this.state.snake[this.state.flourishStep];
+            const midi = Tonnetz.getMidi(segment.p, segment.q);
+            const playableMidi = Math.max(21, Math.min(108, midi));
+            Synth.playNote(playableMidi, 0, 0.4, 0.18);
+            this.highlightSegment(segment.p, segment.q, 300);
+            this.state.flourishStep++;
+            this._scheduleFlourishTick();
+        } else {
+            // The tail step: no note, just finish and resume normal ticking.
             this.state.isFlourishing = false;
-            this.state.flourishTimeouts = [];
+            this.state.flourishStep = 0;
             if (!this.state.isGameOver && !this.state.isPaused) {
                 this.startTimer();
             }
-        }, totalDuration);
-        this.state.flourishTimeouts.push(tIdFinish);
+        }
     },
 
     spawnGem: function() {
@@ -373,6 +424,15 @@ const SnakeMode = {
             clearInterval(this.state.timer);
             this.state.timer = null;
         }
+        // spawnGem() (which calls victory() when the board is full) runs synchronously right
+        // after playFlourish() in tick()'s gem-eating branch, so a flourish step can still be
+        // pending here -- cancel it, or the arpeggio would keep playing after the game's over.
+        if (this.state.flourishTimeoutId) {
+            clearTimeout(this.state.flourishTimeoutId);
+            this.state.flourishTimeoutId = null;
+        }
+        this.state.isFlourishing = false;
+        this.state.flourishStep = 0;
 
         // Play celebratory arpeggio
         const victoryNotes = [60, 64, 67, 72, 76, 79, 84];
@@ -402,7 +462,10 @@ const SnakeMode = {
     // reliably steer straight at it -- an intentional, accepted shortcut per the report, not a
     // bug to guard against.
     handleMidiNote: function(midi) {
-        if (this.state.isGameOver || this.state.isPaused || this.state.isFlourishing) return;
+        // Steering (turnTo) during a flourish is allowed on purpose -- it queues nextDirection
+        // and brightens the corresponding button same as any other time, it just doesn't move
+        // the snake until the flourish itself finishes and normal ticking resumes.
+        if (this.state.isGameOver || this.state.isPaused) return;
         const head = this.state.snake[0];
         if (!head) return;
 
@@ -441,7 +504,8 @@ const SnakeMode = {
             }
 
             if (this.state.isGameOver) return;
-            if (this.state.isPaused || this.state.isFlourishing) return;
+            // Steering during a flourish is allowed on purpose -- see handleMidiNote's comment.
+            if (this.state.isPaused) return;
 
             // Map keys surrounding G:
             // T: Up-Left (p:-1, q:1), Y: Up-Right (p:0, q:1)

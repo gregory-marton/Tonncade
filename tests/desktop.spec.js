@@ -3744,6 +3744,247 @@ test('Snake: head note sounds its true pitch, not a clamped one', async ({ page 
   expect(out.played).not.toContain(108);     // ...not the old clamped value
 });
 
+// A shared starting point for the flourish tests below: a small snake heading right, with a gem
+// immediately in front of it so the very first SnakeMode.tick() eats it and triggers a flourish.
+async function setUpSnakeAboutToEatAGem(page, snakeLength = 3) {
+  await page.evaluate((len) => {
+    document.querySelector('.mode-option[data-mode="snake"]').click();
+    const snake = [];
+    for (let i = 0; i < len; i++) snake.push({ p: -i, q: 0 });
+    SnakeMode.state.snake = snake;
+    SnakeMode.state.direction = { p: 1, q: 0 };
+    SnakeMode.state.nextDirection = { p: 1, q: 0 };
+    SnakeMode.state.isPaused = false;
+    SnakeMode.state.isGameOver = false;
+    SnakeMode.state.isFlourishing = false;
+    SnakeMode.state.gem = { p: 1, q: 0 };
+    SnakeMode.state.extraGems = [];
+  }, snakeLength);
+}
+
+// Real, live-reproduced bug (not fabricated): leaving Snake mode mid-flourish and returning used
+// to freeze tick()-driven movement forever, since cleanup() only marked isPaused=true when a
+// normal move-timer was running (null while flourishing), and separately cancelled the one
+// pending timeout that would ever have cleared isFlourishing.
+test('Snake: leaving mid-flourish and returning resumes it, does not freeze movement forever', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => SnakeMode.tick()); // eats the gem -> isFlourishing becomes true
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+  await page.evaluate(() => SnakeMode.togglePause()); // leaving mid-game pauses (INV-48); resume it
+  // Bounded, not a big arbitrary window: long enough for the flourish to finish (~550ms for a
+  // 3-length snake grown to 4) but short of the NEXT regular tick (~694ms later) -- running much
+  // longer would let the still-heading-right snake run itself straight into the wall (radius 7)
+  // within a handful of real ticks, which is unrelated to what this test is actually checking.
+  await page.clock.runFor(600);
+
+  const isFlourishingAfter = await page.evaluate(() => SnakeMode.state.isFlourishing);
+  expect(isFlourishingAfter).toBe(false);
+
+  const headBefore = await page.evaluate(() => SnakeMode.state.snake[0]);
+  await page.evaluate(() => SnakeMode.tick());
+  const headAfter = await page.evaluate(() => SnakeMode.state.snake[0]);
+  expect(headAfter).not.toEqual(headBefore); // movement actually resumed
+});
+
+test('Snake: flourish steps advance one at a time, in order, one note per step', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page, 4);
+
+  // Eating already grows the snake by one (unshift with no pop), so the flourish plays one note
+  // per segment of the NOW-grown body. The eat and the stub install happen in ONE evaluate() call,
+  // atomically: playFlourish's first step is scheduled at a 0ms delay, which -- being a real
+  // setTimeout -- can't fire synchronously, but COULD fire in the round-trip gap between two
+  // separate page.evaluate() calls, sneaking past a stub installed a moment "later". `capturing`
+  // only flips on AFTER the whole synchronous tick() call returns -- excluding both the eating
+  // tick's own head-move note AND spawnGem's 3-note confirmation chime (spawnGem runs right after
+  // playFlourish in the same synchronous call, while isFlourishing already reads true, so gating
+  // on that flag alone isn't precise enough). Nothing genuinely async (a real flourish step) can
+  // fire before this synchronous call finishes, so this cutoff is exact, not approximate.
+  const expectedMidis = await page.evaluate(() => {
+    window.__played = [];
+    window.__origPlayNote = Synth.playNote;
+    let capturing = false;
+    Synth.playNote = (m) => { if (capturing) window.__played.push(m); };
+    SnakeMode.tick(); // eat -> isFlourishing true, flourishStep 0
+    capturing = true;
+    return SnakeMode.state.snake.map((s) => Math.max(21, Math.min(108, Tonnetz.getMidi(s.p, s.q))));
+  });
+  // Bounded tightly to just the flourish (5 notes * 100ms + 250ms tail = 650ms): running well
+  // past that would let normal movement resume and play its own head-move note too, polluting
+  // this capture with a note that isn't part of the flourish at all.
+  await page.clock.runFor(700);
+
+  const result = await page.evaluate(() => {
+    Synth.playNote = window.__origPlayNote;
+    return { played: window.__played, isFlourishing: SnakeMode.state.isFlourishing };
+  });
+  expect(result.played).toEqual(expectedMidis); // exactly once each, in body order
+  expect(result.isFlourishing).toBe(false);
+});
+
+test('Snake: pausing mid-flourish and resuming continues from the same step, not from the start', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page, 4);
+  await page.evaluate(() => SnakeMode.tick()); // eat -> isFlourishing true, flourishStep 0
+
+  await page.clock.runFor(150); // step 0 (delay 0) and step 1 (delay 100) both fire
+  // Read the step AND pause in the SAME evaluate() call (not two separate round-trips): found
+  // live, rarely (~1 in 15 runs), that a step already fully due by the end of one runFor() window
+  // can finish executing in the round-trip GAP BETWEEN two separate page.evaluate() calls -- a
+  // Playwright/sinon fake-clock precision quirk (confirmed via direct instrumentation:
+  // flourishTimeoutId is reliably null-if-and-only-if nothing is pending; it's only ever the
+  // exact boundary step that occasionally resolves a beat early, specifically in that gap, not
+  // within the runFor() window itself). Reading the step first and pausing after, as two
+  // separate calls, would still be exposed to that same gap; doing both atomically closes it.
+  const stepWhenPaused = await page.evaluate(() => {
+    const step = SnakeMode.state.flourishStep;
+    SnakeMode.togglePause();
+    return step;
+  });
+  expect(stepWhenPaused).toBeGreaterThanOrEqual(1);
+
+  await page.clock.runFor(5000); // the pending step timeout was cancelled, not just delayed
+  expect(await page.evaluate(() => SnakeMode.state.flourishStep)).toBe(stepWhenPaused); // unchanged
+
+  await page.evaluate(() => SnakeMode.togglePause());
+  await page.clock.runFor(120); // fresh 100ms delay for the next step, measured from THIS resume
+  expect(await page.evaluate(() => SnakeMode.state.flourishStep)).toBe(stepWhenPaused + 1); // continued, didn't restart at 0
+});
+
+test('Snake: resuming a long-paused flourish waits a fresh step delay, does not rush through it', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page, 4);
+  await page.evaluate(() => SnakeMode.tick());
+  await page.clock.runFor(150); // flourishStep -> ~2
+  // Read the step AND pause atomically in one evaluate() call -- see the sibling pause/resume
+  // test's comment for why (a rare fake-clock precision quirk in the round-trip gap between two
+  // separate evaluate() calls, not within the runFor() window itself).
+  const stepWhenPaused = await page.evaluate(() => {
+    const step = SnakeMode.state.flourishStep;
+    SnakeMode.togglePause();
+    return step;
+  });
+  expect(stepWhenPaused).toBeGreaterThanOrEqual(1);
+  await page.clock.runFor(60000); // a full real minute paused
+
+  await page.evaluate(() => SnakeMode.togglePause()); // resume
+  const immediatelyAfterResume = await page.evaluate(() => SnakeMode.state.flourishStep);
+  expect(immediatelyAfterResume).toBe(stepWhenPaused); // hasn't jumped ahead just because resume was clicked
+
+  // 120ms: comfortably past the one 100ms step due, comfortably short of the next one at 200ms.
+  await page.clock.runFor(120);
+  const afterFreshDelay = await page.evaluate(() => SnakeMode.state.flourishStep);
+  expect(afterFreshDelay).toBe(stepWhenPaused + 1); // now it advances, on its own fresh 100ms
+});
+
+test('Snake: movement stays paused for the whole flourish, resumes automatically once it completes', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => SnakeMode.tick());
+  const headDuring = await page.evaluate(() => SnakeMode.state.snake[0]);
+
+  await page.clock.runFor(50); // still mid-flourish
+  expect(await page.evaluate(() => SnakeMode.state.snake[0])).toEqual(headDuring);
+
+  await page.clock.runFor(2000); // let it finish uninterrupted
+  expect(await page.evaluate(() => SnakeMode.state.isFlourishing)).toBe(false);
+  expect(await page.evaluate(() => !!SnakeMode.state.timer)).toBe(true); // normal timer restarted itself
+});
+
+test('Snake: leaving mid-flourish marks isPaused and the pause icon, same as leaving mid-move', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => SnakeMode.tick());
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+  expect(await page.evaluate(() => SnakeMode.state.isPaused)).toBe(true);
+
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+  const label = await page.evaluate(() => document.getElementById('snake-start-pause').getAttribute('aria-label'));
+  expect(label).toBe('Resume');
+});
+
+test('Snake: each flourish step is one countable Replay.recordTick() advance', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page, 3); // eating grows it to 4 before the flourish counts it
+  const before = await page.evaluate(() => Replay.tickSeq);
+  await page.evaluate(() => SnakeMode.tick()); // the eating tick itself: +1
+  // Bounded tightly to just the flourish (4 notes * 100ms + 250ms tail = 650ms, minus the first
+  // note's 0ms delay = 550ms): running well past that would let normal movement resume and add
+  // its own uncounted ticks to the delta, which isn't what this test is checking.
+  await page.clock.runFor(600); // 4 note-steps (grown length) + 1 tail step: +5
+  const after = await page.evaluate(() => Replay.tickSeq);
+  expect(after - before).toBe(6);
+});
+
+test('Snake: a direction key pressed mid-flourish is queued, applied once movement resumes', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => SnakeMode.tick()); // eat -> isFlourishing true
+
+  await page.keyboard.press('v'); // Down-Left -- not a reversal of the current heading (right)
+  expect(await page.evaluate(() => SnakeMode.state.nextDirection)).toEqual({ p: 0, q: -1 });
+  expect(await page.evaluate(() => SnakeMode.state.direction)).toEqual({ p: 1, q: 0 }); // not applied yet
+
+  await page.clock.runFor(2000); // finish the flourish, movement resumes
+  await page.evaluate(() => SnakeMode.tick());
+  expect(await page.evaluate(() => SnakeMode.state.direction)).toEqual({ p: 0, q: -1 }); // queued turn took effect
+});
+
+test('Snake: a MIDI note played mid-flourish also queues its steered direction', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => SnakeMode.tick()); // eat -> isFlourishing true
+
+  await page.evaluate(() => {
+    const head = SnakeMode.state.snake[0];
+    const dr = Tonnetz.getNeighbors(head.p, head.q).find((n) => n.p === head.p + 1 && n.q === head.q - 1);
+    SnakeMode.handleMidiNote(Tonnetz.getMidi(dr.p, dr.q));
+  });
+  expect(await page.evaluate(() => SnakeMode.state.nextDirection)).toEqual({ p: 1, q: -1 });
+});
+
+test('Snake: the on-screen keypad brightens whichever direction is queued, at any time -- including mid-flourish and via MIDI', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  await setUpSnakeAboutToEatAGem(page);
+  await page.evaluate(() => { SnakeMode.state.gem = { p: -5, q: 0 }; }); // elsewhere -- no eat yet
+
+  await page.keyboard.press('y'); // Up-Right
+  expect(await page.evaluate(() => document.getElementById('snake-btn-ur').classList.contains('active-direction'))).toBe(true);
+
+  await page.evaluate(() => {
+    // Reset back to heading right -- the queued Up-Right from above would otherwise actually
+    // apply on the very next tick() (direction is only applied AT tick time, not on keypress),
+    // steering the snake away from the gem placed dead ahead of a rightward heading.
+    SnakeMode.state.direction = { p: 1, q: 0 };
+    SnakeMode.state.nextDirection = { p: 1, q: 0 };
+    SnakeMode.state.gem = { p: 1, q: 0 };
+    SnakeMode.tick(); // eat -> isFlourishing true
+  });
+  await page.keyboard.press('v'); // Down-Left, mid-flourish
+  expect(await page.evaluate(() => document.getElementById('snake-btn-dl').classList.contains('active-direction'))).toBe(true);
+
+  await page.evaluate(() => {
+    const head = SnakeMode.state.snake[0];
+    const dr = Tonnetz.getNeighbors(head.p, head.q).find((n) => n.p === head.p + 1 && n.q === head.q - 1);
+    SnakeMode.handleMidiNote(Tonnetz.getMidi(dr.p, dr.q));
+  });
+  expect(await page.evaluate(() => document.getElementById('snake-btn-dr').classList.contains('active-direction'))).toBe(true);
+});
+
 // #92: Melody's next three notes each get a distinct colour in the timeline, mirrored by
 // glow-next-0/1/2 on the matching Tonnetz cells -- linking board and timeline. No frequency shown.
 test('Melody: the next three notes are tri-coloured in the timeline and on the Tonnetz', async ({ page }) => {
