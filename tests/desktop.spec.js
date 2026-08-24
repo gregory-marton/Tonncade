@@ -4014,6 +4014,29 @@ test('Snake: the on-screen keypad brightens whichever direction is queued, at an
   expect(await page.evaluate(() => document.getElementById('snake-btn-dr').classList.contains('active-direction'))).toBe(true);
 });
 
+// Real gap reported live: a narrow desktop window (e.g. a low-res Chromebook) with no touch
+// capability at all is still narrow enough to trigger the mobile CSS layout (Render.
+// isMobileViewport() is purely width-based), so the on-screen D-pad renders and is visible --
+// but js/main.js's setupMobileControls only bound the buttons' click handlers when isTouch was
+// true, so on a real no-touch narrow desktop the visible D-pad did nothing when clicked. This
+// project's own "Desktop Chrome" Playwright project has no hasTouch, so a narrow viewport here
+// is exactly this real scenario.
+test('Snake: the on-screen D-pad works via mouse click on a narrow no-touch desktop, not just touch', async ({ page }) => {
+  await page.setViewportSize({ width: 500, height: 800 });
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+
+  await expect(page.locator('#snake-mobile-controls')).toBeVisible();
+
+  await page.evaluate(() => {
+    SnakeMode.state.direction = { p: 0, q: 0 };
+    SnakeMode.state.nextDirection = { p: 0, q: 0 };
+  });
+  await page.locator('#snake-btn-ur').click();
+  const nextDir = await page.evaluate(() => SnakeMode.state.nextDirection);
+  expect(nextDir).toEqual({ p: 0, q: 1 });
+});
+
 // #92: Melody's next three notes each get a distinct colour in the timeline, mirrored by
 // glow-next-0/1/2 on the matching Tonnetz cells -- linking board and timeline. No frequency shown.
 test('Melody: the next three notes are tri-coloured in the timeline and on the Tonnetz', async ({ page }) => {

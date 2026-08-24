@@ -549,7 +549,6 @@ const App = {
     },
 
     setupMobileControls: function() {
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         const mobileContainer = document.getElementById('mobile-controls');
         
         const isMobileWidth = Render.isMobileViewport();
@@ -571,7 +570,15 @@ const App = {
             }
         }
 
-        if (isTouch && mobileContainer && !this.mobileControlsBound) {
+        // Binding no longer checks touch capability: visibility already covers whether these
+        // buttons should even be shown (isMobileWidth, above), and .onclick alone handles a real
+        // click/tap correctly either way -- .ontouchstart is only bound in addition for a
+        // snappier response on genuine touch devices, never a prerequisite. Reported live: a
+        // narrow desktop window (e.g. a low-res Chromebook) with no touch capability at all is
+        // still narrow enough to trigger this same mobile layout, so the D-pad rendered and was
+        // visible, but every button was a dead click -- gating binding on touch skipped
+        // attaching any handler to it at all.
+        if (mobileContainer && !this.mobileControlsBound) {
             this.mobileControlsBound = true;
             const bindBtn = (id, key, code = '', shiftKey = false) => {
                 const btn = document.getElementById(id);
