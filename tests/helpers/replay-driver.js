@@ -34,7 +34,7 @@ for the JavaScript code in this file.
  * would have silently missed it. Watching a session live and turning it into a story test later
  * must never diverge in what either would catch.
  *
- * Faithfulness notes (see tests/stories.spec.js's own file header for the full history/reasoning
+ * Faithfulness notes (see tests/stories.desktop.spec.js's own file header for the full history/reasoning
  * behind each of these):
  *   - Deterministic tick catch-up when `opts.tickFn` is given: `ev.tick` deltas -> that many
  *     direct calls to the named tick function, no timing involved. This is what makes a

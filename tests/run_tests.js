@@ -1314,7 +1314,7 @@ try {
     // resulting SOUND was recorded (via wrapSynth above), indistinguishable from the app's own
     // auto-play (both funnel through the same Synth.playNote). wrapMidiInput records the raw
     // note-on itself, as a real event in the same input-event log as keydown/pointerdown, so a
-    // captured session can actually be replayed (tests/stories.spec.js), not just sound-checked.
+    // captured session can actually be replayed (tests/stories.desktop.spec.js), not just sound-checked.
     console.log("Running Replay.wrapMidiInput() note-on recording test...");
     ReplayObj.log = [];
     const MidiInputObj = vm.runInContext("MidiInput", context);

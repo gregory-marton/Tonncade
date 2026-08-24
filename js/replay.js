@@ -207,7 +207,7 @@ const Replay = {
     // only its resulting sound did (via wrapSynth above), and that's indistinguishable from the
     // app's own auto-play (Melody's target-sequence playback, both funnel through the same
     // Synth.playNote). A session driven by a real MIDI keyboard therefore couldn't become a
-    // faithful story test (tests/stories.spec.js): there was nothing to actually replay, only a
+    // faithful story test (tests/stories.desktop.spec.js): there was nothing to actually replay, only a
     // sound trace that mixed the player's real presses with the app's own audio. Wrapping
     // handleNoteOn (the one place every live note-on already funnels through, regardless of
     // which mode routes it where -- see js/midi-input.js's own handleNoteOn) records the raw

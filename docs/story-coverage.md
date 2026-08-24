@@ -24,7 +24,7 @@ here, or a ✅ here with no matching test). It's a planning aid, not a CI gate �
 a build.
 
 Building a new one: capture a real session (the "report a bug" link's download/copy), then follow
-`tests/stories.spec.js`'s file header for what makes a replay faithful, and
+`tests/stories.desktop.spec.js`'s file header for what makes a replay faithful, and
 `tests/helpers/replay-driver.js` for the shared mechanism every story (and
 `scripts/replay-live.js`'s headed CLI viewer) actually replays through. Title it per the
 convention in that same file header, then flip its cell above from 🔲 to ✅ and add it to the

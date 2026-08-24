@@ -21,7 +21,7 @@ const path = require('path');
  */
 
 // Simple seeded PRNG (mulberry32) so a failing run's seed can be logged and replayed exactly —
-// same principle as controlling which piece comes next in stories.spec.js.
+// same principle as controlling which piece comes next in stories.desktop.spec.js.
 function mulberry32(seed) {
   return function () {
     seed |= 0; seed = (seed + 0x6D2B79F5) | 0;

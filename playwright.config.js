@@ -26,8 +26,10 @@ if (hasChromium) {
       name: 'Desktop Chrome',
       // Also generates the desktop profile of the screenshots/ fixture (exploratory), so the
       // viewer shows how the app renders on a real desktop layout, not only mobile/tablet.
+      // stories.desktop.spec.js is already covered by the "desktop" alternative below -- no
+      // separate "stories" alternative needed once every story file carries an interface suffix.
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /.*(desktop|stories|exploratory)\.spec\.js/,
+      testMatch: /.*(desktop|exploratory)\.spec\.js/,
     },
     {
       name: 'Mobile Chrome',
@@ -36,9 +38,9 @@ if (hasChromium) {
         hasTouch: true,
       },
       // stories.mobile.spec.js doesn't exist yet (no real mobile-recorded session to build one
-      // from) -- matched in advance, same as desktop.spec.js/stories.spec.js already are for
-      // Desktop Chrome, so a story built for this interface actually runs under ITS real project
-      // (touch emulation, mobile UA, mobile viewport) instead of just a narrowed desktop one.
+      // from) -- matched in advance, same as stories.desktop.spec.js already is for Desktop
+      // Chrome, so a story built for this interface actually runs under ITS real project (touch
+      // emulation, mobile UA, mobile viewport) instead of just a narrowed desktop one.
       testMatch: /.*(mobile|invariants|exploratory|stories\.mobile)\.spec\.js/,
     },
     {

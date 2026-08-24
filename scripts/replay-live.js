@@ -131,7 +131,7 @@ async function main() {
     await page.clock.pauseAt(loadedAt);
 
     // Drop the leading resize (viewport already set above) and any trailing #report-bug-link
-    // click, same liberties every story test takes -- see tests/stories.spec.js's file header.
+    // click, same liberties every story test takes -- see tests/stories.desktop.spec.js's file header.
     const startIdx = events[0].type === 'resize' ? 1 : 0;
     let endIdx = events.length;
     while (endIdx > startIdx && typeof events[endIdx - 1].target === 'string'
