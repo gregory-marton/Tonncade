@@ -35,7 +35,11 @@ if (hasChromium) {
         ...devices['Pixel 5'],
         hasTouch: true,
       },
-      testMatch: /.*(mobile|invariants|exploratory)\.spec\.js/,
+      // stories.mobile.spec.js doesn't exist yet (no real mobile-recorded session to build one
+      // from) -- matched in advance, same as desktop.spec.js/stories.spec.js already are for
+      // Desktop Chrome, so a story built for this interface actually runs under ITS real project
+      // (touch emulation, mobile UA, mobile viewport) instead of just a narrowed desktop one.
+      testMatch: /.*(mobile|invariants|exploratory|stories\.mobile)\.spec\.js/,
     },
     {
       name: 'Tablet Chrome',
@@ -43,7 +47,8 @@ if (hasChromium) {
         ...devices['Galaxy Tab S4'],
         hasTouch: true,
       },
-      testMatch: /.*(mobile|invariants|exploratory)\.spec\.js/,
+      // stories.tablet.spec.js: same reasoning as Mobile Chrome's testMatch above.
+      testMatch: /.*(mobile|invariants|exploratory|stories\.tablet)\.spec\.js/,
     }
   );
 } else {
@@ -61,7 +66,12 @@ if (hasWebkit) {
     use: {
       ...devices['iPhone 13'],
     },
-    testMatch: /.*exploratory\.spec\.js/,
+    // stories.mobile.spec.js (once one exists) also runs here -- it's a mobile-interface story,
+    // not a Chrome-specific one, so it belongs on the one non-Chromium engine too. Doesn't share
+    // Mobile Chrome's exclusion of the full mobile/invariants suite (see the comment above): a
+    // story test just drives + asserts on real gameplay outcomes, no File System Access API or
+    // other Chromium-only feature involved, so it's not subject to the same WebKit gap.
+    testMatch: /.*(exploratory|stories\.mobile)\.spec\.js/,
   });
 } else {
   console.warn('[playwright] WebKit is not installed -- skipping the iOS (Safari) fixture profile. This is optional; the rest of the suite runs without it. Install it with `npx playwright install webkit` to include the iOS screenshots.');
