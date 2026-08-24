@@ -222,4 +222,89 @@ test.describe('Story tests', () => {
 
     await page.screenshot({ path: 'test-results/gravity-story-final.png' });
   });
+
+  test('Snake story: a real captured session plays through to a genuine wall death, deterministically', async ({ page }) => {
+    // The real recorded session was actually TWO games back to back (a reset in between), but a
+    // real gap in the second game's own recorded event log (something real happened between two
+    // consecutive keydowns that didn't make it into Replay.log -- confirmed live by tracing the
+    // tick math step by step; not a bug in this replay mechanism) makes it impossible to
+    // faithfully reconstruct. Using the real, complete, verified FIRST game only -- a genuine
+    // contiguous prefix of the actual capture, not a fabricated or edited sequence.
+    const seed = 1495698635;
+
+    // The real session's own initial viewport (975x1309 portrait) was resized to 1807x1309
+    // landscape within the same first tick, before any real gameplay -- set directly to the
+    // settled size rather than replaying the resize, same liberty taken with the leading resize
+    // in every other story here. Keyboard-only input doesn't depend on viewport-relative pixel
+    // resolution the way Blast's polygon taps do, so this doesn't affect determinism.
+    await page.setViewportSize({ width: 1807, height: 1309 });
+
+    // Freeze real time BEFORE navigating -- same reasoning as Gravity's story above: Snake's own
+    // timer (js/snake.js's startTimer, a real setInterval) would otherwise keep firing tick() on
+    // actual wall-clock time throughout this test's own execution, in addition to the explicit
+    // tick catch-up below. This also makes flourish steps (js/snake.js's playFlourish/tick, driven
+    // at a fixed 100ms cadence while isFlourishing) replay correctly for free: they're driven
+    // through this SAME tick() entry point and counted by the SAME Replay.recordTick(), so calling
+    // tick() directly the recorded number of times reconstructs them without any special-casing.
+    await page.clock.install({ time: 0 });
+
+    // Deep-linked straight into Snake (`#snake`) -- no mode-switch click to replay, same as
+    // Gravity's story above. The real session's own leading events -- a Space press (toggling
+    // pause once before any real move) and the automatic `reset` marker from first entry -- are
+    // dropped: the reset already happens naturally via SnakeMode.init() on this navigation, and
+    // isn't itself a replayable input (see js/snake.js's reset()/gameOver(), which record it as a
+    // side-effect marker, not something a replay tool should try to re-trigger directly).
+    await page.goto(`/?seed=${seed}#snake`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.mode-option[data-mode="snake"]')).toHaveClass(/active/);
+    const loadedAt = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(loadedAt);
+
+    // Exactly window.replay()'s events for this real session's first game (from the first real
+    // keydown after the automatic reset, through the `gameover` marker that ends it) -- minus the
+    // leading resize/reset and trailing second game (see comments above).
+    const gameplayEvents = [{"type":"keydown","t":1787447980650,"key":" ","code":"Space","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982298,"key":"Meta","code":"MetaLeft","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982334,"key":"Alt","code":"AltLeft","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982703,"key":"Ű","code":"KeyI","shiftKey":false,"tick":1},{"type":"resize","t":1787447982722,"width":1807,"height":1309,"orientation":"landscape","tick":1},{"type":"keydown","t":1787447985569,"key":" ","code":"Space","shiftKey":false,"tick":1},{"type":"keydown","t":1787447988206,"key":"b","code":"KeyB","shiftKey":false,"tick":4},{"type":"keydown","t":1787447988974,"key":"f","code":"KeyF","shiftKey":false,"tick":5},{"type":"keydown","t":1787447990181,"key":"v","code":"KeyV","shiftKey":false,"tick":7},{"type":"keydown","t":1787447994631,"key":"h","code":"KeyH","shiftKey":false,"tick":18},{"type":"keydown","t":1787447996113,"key":"y","code":"KeyY","shiftKey":false,"tick":20},{"type":"keydown","t":1787448000170,"key":"t","code":"KeyT","shiftKey":false,"tick":26},{"type":"keydown","t":1787448003491,"key":"f","code":"KeyF","shiftKey":false,"tick":35},{"type":"keydown","t":1787448006526,"key":"v","code":"KeyV","shiftKey":false,"tick":40},{"type":"keydown","t":1787448009530,"key":"t","code":"KeyT","shiftKey":false,"tick":50},{"type":"keydown","t":1787448010711,"key":"y","code":"KeyY","shiftKey":false,"tick":52},{"type":"keydown","t":1787448014034,"key":"h","code":"KeyH","shiftKey":false,"tick":57},{"type":"keydown","t":1787448017122,"key":"v","code":"KeyV","shiftKey":false,"tick":68},{"type":"keydown","t":1787448018848,"key":"f","code":"KeyF","shiftKey":false,"tick":71},{"type":"keydown","t":1787448022189,"key":"y","code":"KeyY","shiftKey":false,"tick":75},{"type":"keydown","t":1787448023217,"key":"f","code":"KeyF","shiftKey":false,"tick":77},{"type":"keydown","t":1787448023885,"key":"y","code":"KeyY","shiftKey":false,"tick":78},{"type":"keydown","t":1787448024931,"key":"h","code":"KeyH","shiftKey":false,"tick":86},{"type":"keydown","t":1787448027437,"key":"b","code":"KeyB","shiftKey":false,"tick":91},{"type":"keydown","t":1787448029219,"key":"y","code":"KeyY","shiftKey":false,"tick":100},{"type":"keydown","t":1787448031881,"key":"h","code":"KeyH","shiftKey":false,"tick":109},{"type":"keydown","t":1787448032546,"key":"b","code":"KeyB","shiftKey":false,"tick":116},{"type":"keydown","t":1787448035335,"key":"v","code":"KeyV","shiftKey":false,"tick":120},{"type":"keydown","t":1787448037297,"key":"t","code":"KeyT","shiftKey":false,"tick":123},{"type":"keydown","t":1787448039189,"key":"y","code":"KeyY","shiftKey":false,"tick":126},{"type":"keydown","t":1787448039616,"key":"t","code":"KeyT","shiftKey":false,"tick":127},{"type":"keydown","t":1787448041457,"key":"v","code":"KeyV","shiftKey":false,"tick":140},{"type":"keydown","t":1787448044061,"key":"b","code":"KeyB","shiftKey":false,"tick":144},{"type":"keydown","t":1787448045217,"key":"v","code":"KeyV","shiftKey":false,"tick":145},{"type":"keydown","t":1787448045581,"key":"b","code":"KeyB","shiftKey":false,"tick":146},{"type":"keydown","t":1787448050610,"key":"y","code":"KeyY","shiftKey":false,"tick":161},{"type":"keydown","t":1787448054497,"key":"t","code":"KeyT","shiftKey":false,"tick":171},{"type":"keydown","t":1787448059672,"key":"v","code":"KeyV","shiftKey":false,"tick":190},{"type":"keydown","t":1787448063092,"key":"b","code":"KeyB","shiftKey":false,"tick":196},{"type":"keydown","t":1787448066204,"key":"y","code":"KeyY","shiftKey":false,"tick":207},{"type":"keydown","t":1787448070406,"key":"h","code":"KeyH","shiftKey":false,"tick":220},{"type":"keydown","t":1787448072843,"key":"t","code":"KeyT","shiftKey":false,"tick":230},{"type":"keydown","t":1787448077105,"key":"f","code":"KeyF","shiftKey":false,"tick":244},{"type":"keydown","t":1787448082555,"key":"b","code":"KeyB","shiftKey":false,"tick":267},{"type":"keydown","t":1787448090001,"key":"y","code":"KeyY","shiftKey":false,"tick":285},{"type":"keydown","t":1787448093513,"key":"t","code":"KeyT","shiftKey":false,"tick":299},{"type":"keydown","t":1787448095029,"key":"y","code":"KeyY","shiftKey":false,"tick":308},{"type":"keydown","t":1787448098237,"key":"t","code":"KeyT","shiftKey":false,"tick":334},{"type":"keydown","t":1787448102452,"key":"v","code":"KeyV","shiftKey":false,"tick":346},{"type":"keydown","t":1787448107651,"key":"b","code":"KeyB","shiftKey":false,"tick":355},{"type":"keydown","t":1787448109470,"key":"y","code":"KeyY","shiftKey":false,"tick":360},{"type":"keydown","t":1787448110334,"key":"h","code":"KeyH","shiftKey":false,"tick":369},{"type":"keydown","t":1787448114467,"key":"y","code":"KeyY","shiftKey":false,"tick":383},{"type":"keydown","t":1787448116847,"key":"f","code":"KeyF","shiftKey":false,"tick":387},{"type":"keydown","t":1787448118216,"key":"y","code":"KeyY","shiftKey":false,"tick":390},{"type":"keydown","t":1787448119200,"key":"t","code":"KeyT","shiftKey":false,"tick":391},{"type":"keydown","t":1787448120394,"key":"v","code":"KeyV","shiftKey":false,"tick":393},{"type":"keydown","t":1787448120872,"key":"t","code":"KeyT","shiftKey":false,"tick":394},{"type":"keydown","t":1787448121566,"key":"v","code":"KeyV","shiftKey":false,"tick":395},{"type":"keydown","t":1787448121902,"key":"t","code":"KeyT","shiftKey":false,"tick":396},{"type":"keydown","t":1787448124396,"key":"f","code":"KeyF","shiftKey":false,"tick":409},{"type":"keydown","t":1787448128794,"key":"y","code":"KeyY","shiftKey":false,"tick":432},{"type":"keydown","t":1787448132396,"key":"h","code":"KeyH","shiftKey":false,"tick":451},{"type":"keydown","t":1787448137425,"key":"v","code":"KeyV","shiftKey":false,"tick":478},{"type":"keydown","t":1787448138689,"key":"f","code":"KeyF","shiftKey":false,"tick":481},{"type":"keydown","t":1787448139738,"key":"b","code":"KeyB","shiftKey":false,"tick":483},{"type":"keydown","t":1787448140540,"key":"y","code":"KeyY","shiftKey":false,"tick":484},{"type":"gameover","t":1787448140585,"score":20,"tick":485}];
+
+    // Deterministic tick replay (see file header / Gravity's story above) -- catch up to each
+    // event's own recorded tick count before applying it.
+    let lastTickSeq = 0; // the dropped `reset` marker (not included above) was tick=0
+    for (let i = 0; i < gameplayEvents.length; i++) {
+      const ev = gameplayEvents[i];
+      const ticksDue = (typeof ev.tick === 'number' ? ev.tick : lastTickSeq) - lastTickSeq;
+      if (ticksDue > 0) {
+        await page.evaluate((n) => { for (let j = 0; j < n; j++) SnakeMode.tick(); }, ticksDue);
+      }
+      lastTickSeq = typeof ev.tick === 'number' ? ev.tick : lastTickSeq;
+
+      if (ev.type === 'keydown') {
+        const keyName = ev.code === 'Space' ? 'Space' : ev.key;
+        try {
+          await page.keyboard.press(keyName);
+        } catch (e) {
+          // Meta/Alt/a composed accented character, all real, all from the player opening
+          // DevTools (Cmd+Option+I) mid-recording -- none are recognized game controls
+          // (js/snake.js only matches t/y/f/h/v/b/space/escape/p), so falling back to the raw
+          // key code (still a genuine keydown, just not the exact composed character Playwright
+          // can't name) preserves timing without affecting game state either way.
+          await page.keyboard.press(ev.code);
+        }
+      }
+      // 'resize' (the real mid-session one, already accounted for above) and 'gameover' (a
+      // marker, not an input -- see comment above) need no action.
+    }
+
+    // The exact real outcome of replaying this exact real session -- verified by actually running
+    // it (not derived by hand) -- covering movement, gem-eating/growth, the flourish arpeggio
+    // (driven through the same tick() entry point as movement), and a genuine wall death.
+    const final = await page.evaluate(() => ({
+      score: SnakeMode.state.score,
+      isGameOver: SnakeMode.state.isGameOver,
+      snakeLength: SnakeMode.state.snake.length,
+    }));
+    expect(final.score).toBe(20);
+    expect(final.isGameOver).toBe(true);
+    expect(final.snakeLength).toBe(23);
+
+    await page.screenshot({ path: 'test-results/snake-story-final.png' });
+  });
 });
