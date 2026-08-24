@@ -124,9 +124,13 @@ async function resolvePointerdown(page, ev, recordedViewport) {
  *   breakpoint, matching Render.isMobileLandscape.
  * @param {number} [opts.startTick] - the tick count of whatever leading event was dropped by the
  *   caller (default 0 -- true for every session captured so far, all of which start at tick 0).
+ * @param {number} [opts.delayMs] - real wall-clock pause after each dispatched event (default 0,
+ *   i.e. no pacing -- story tests want this instant). scripts/replay-live.js sets this so a human
+ *   can actually watch a session play out; has no effect on the deterministic tick/game-state
+ *   reconstruction itself, which never depends on real time (see the tick catch-up above).
  */
 async function replayEvents(page, events, opts = {}) {
-    const { tickFn = null, recordedViewport = null, startTick = 0 } = opts;
+    const { tickFn = null, recordedViewport = null, startTick = 0, delayMs = 0 } = opts;
     let lastTickSeq = startTick;
 
     for (const ev of events) {
@@ -175,6 +179,8 @@ async function replayEvents(page, events, opts = {}) {
             await page.setViewportSize({ width: ev.width, height: ev.height }).catch(() => {});
         }
         // 'pointerup', 'reset', 'gameover': no action -- see file header.
+
+        if (delayMs > 0) await page.waitForTimeout(delayMs);
     }
 }
 
