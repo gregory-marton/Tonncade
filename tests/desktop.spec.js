@@ -3744,6 +3744,35 @@ test('Snake: head note sounds its true pitch, not a clamped one', async ({ page 
   expect(out.played).not.toContain(108);     // ...not the old clamped value
 });
 
+// Real bug reported live: a snake tight enough to chase its own tail should be able to, since
+// the tail vacates its cell the SAME tick the head would move into it (simultaneous, not a
+// collision) -- but the self-collision check ran against the snake's full CURRENT body, tail
+// segment included, before it gets popped later in the same tick() call. A snake occupying
+// all 6 cells of one hex ring around a center, moving to close the loop back onto its own tail,
+// demonstrates this exactly: the move doesn't eat a gem, so the tail is about to vacate.
+test('Snake: closing a tight loop onto its own about-to-vacate tail succeeds, not a false self-collision', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="snake"]').click();
+    App.currentMode = 'snake';
+    // The 6 neighbors of (0,0), in ring (rotational) order -- each consecutive pair is exactly
+    // one lattice-step apart, forming a proper closed hexagon body.
+    const T = { p: -1, q: 1 }, Y = { p: 0, q: 1 }, H = { p: 1, q: 0 };
+    const B = { p: 1, q: -1 }, V = { p: 0, q: -1 }, F = { p: -1, q: 0 };
+    SnakeMode.state.snake = [T, Y, H, B, V, F]; // head=T, tail=F
+    SnakeMode.state.direction = { p: -1, q: 0 };     // F -- heading that arrived at T (from Y)
+    SnakeMode.state.nextDirection = { p: 0, q: -1 }; // V -- turns the head onto the tail's own cell
+    SnakeMode.state.isPaused = false; SnakeMode.state.isGameOver = false; SnakeMode.state.isFlourishing = false;
+    SnakeMode.state.gem = { p: -5, q: -5 };      // elsewhere -- this move doesn't grow the snake
+    SnakeMode.state.extraGems = [];
+    SnakeMode.tick();
+    return { isGameOver: SnakeMode.state.isGameOver, snake: SnakeMode.state.snake };
+  });
+  expect(out.isGameOver).toBe(false);
+  expect(out.snake[0]).toEqual({ p: -1, q: 0 }); // head moved onto the vacated tail cell
+  expect(out.snake.length).toBe(6); // unchanged length -- moved, didn't grow
+});
+
 // A shared starting point for the flourish tests below: a small snake heading right, with a gem
 // immediately in front of it so the very first SnakeMode.tick() eats it and triggers a flourish.
 async function setUpSnakeAboutToEatAGem(page, snakeLength = 3) {

@@ -252,8 +252,18 @@ const SnakeMode = {
             return;
         }
 
-        // Collision check: Self collision
-        if (this.state.snake.some(segment => segment.p === newHead.p && segment.q === newHead.q)) {
+        // Whether this move grows the snake (eats a gem) has to be known BEFORE the self-collision
+        // check below, not just after: a move that doesn't grow the snake pops its tail this same
+        // tick, so the tail's CURRENT cell is being vacated simultaneously with the head arriving --
+        // not a real collision. Reported live: a snake tight enough to chase its own tail in a
+        // closed loop could never legally do so, since the tail was still counted as occupied for
+        // one tick longer than it actually was.
+        const extraIdx = this.state.extraGems.findIndex(g => g.p === newHead.p && g.q === newHead.q);
+        const grows = (newHead.p === this.state.gem.p && newHead.q === this.state.gem.q) || extraIdx >= 0;
+
+        // Collision check: Self collision (excluding the about-to-vacate tail on a non-growing move)
+        const body = grows ? this.state.snake : this.state.snake.slice(0, -1);
+        if (body.some(segment => segment.p === newHead.p && segment.q === newHead.q)) {
             this.gameOver();
             return;
         }
@@ -267,7 +277,6 @@ const SnakeMode = {
         this.highlightSegment(newHead.p, newHead.q, 300);
 
         // Check food collision -- the main gem, or any pasted extra gem
-        const extraIdx = this.state.extraGems.findIndex(g => g.p === newHead.p && g.q === newHead.q);
         if (newHead.p === this.state.gem.p && newHead.q === this.state.gem.q) {
             // Eat gem! Grow (don't pop tail)
             this.state.score++;
