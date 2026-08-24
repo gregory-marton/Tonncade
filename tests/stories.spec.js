@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
+const { replayEvents } = require('./helpers/replay-driver');
 
 /**
  * STORY TESTS
@@ -35,9 +36,16 @@ const path = require('path');
  *    manual mouse.move()/down()/up(), which is both less robust and no more faithful (the
  *    coordinates only ever mattered as a way to name which cell was tapped).
  *
- * The only liberties taken from the real recorded events: dropping the leading `resize` (the
- * viewport is set directly instead) and the trailing `#report-bug-link` click (reporting the
- * session isn't part of playing it).
+ * The only liberty taken from the real recorded events: dropping the trailing `#report-bug-link`
+ * click (reporting the session isn't part of playing it). The leading `resize` is still set
+ * directly (it's always the very first event, before navigation can even happen) -- but any
+ * LATER resize in a session (a deliberate window/orientation change mid-play) genuinely replays
+ * now, via tests/helpers/replay-driver.js's shared `replayEvents()`, not dropped as a liberty.
+ * That module is also what every story below actually calls to dispatch its events -- see its own
+ * file header for the full faithfulness reasoning (tick catch-up, key/click resolution, resize),
+ * extracted there once several stories needed the identical logic. It's deliberately the SAME
+ * mechanism scripts/replay-live.js's headed CLI viewer uses too, so a session that plays correctly
+ * live and a story test built from it never diverge in what they'd catch.
  *
  * Gravity's own story adds two more things, both load-bearing:
  *
@@ -107,25 +115,9 @@ test.describe('Story tests', () => {
     await page.locator('.mode-option[data-mode="blast"]').click();
     await expect(page.locator('.mode-option[data-mode="blast"]')).toHaveClass(/active/);
 
-    for (let i = 1; i < gameplayEvents.length; i++) {
-      const ev = gameplayEvents[i];
-      if (ev.type === 'pointerdown') {
-        // Resolve to the real cell that was actually under this coordinate, then click THAT
-        // element -- exactly what js/blast.js's own svg.onmousedown reads (data-p/data-q), and
-        // more robust than replaying the raw pixel.
-        const cell = await page.evaluate(({ x, y }) => {
-          const el = document.elementFromPoint(x, y);
-          if (!el || el.tagName.toLowerCase() !== 'polygon') return null;
-          return { p: el.getAttribute('data-p'), q: el.getAttribute('data-q') };
-        }, { x: ev.x, y: ev.y });
-        if (cell) {
-          await page.locator(`polygon[data-p="${cell.p}"][data-q="${cell.q}"]`).first().click({ force: true });
-        }
-      } else if (ev.type === 'keydown') {
-        await page.keyboard.press(ev.code === 'Space' ? 'Space' : ev.key);
-      }
-      // pointerup needs no separate action -- .click() above already completed the gesture.
-    }
+    // No tick data on this older capture -- replayEvents skips catch-up entirely (tickFn: null),
+    // dispatching pointerdown('polygon')/keydown as fast as Playwright itself can go.
+    await replayEvents(page, gameplayEvents.slice(1), { tickFn: null });
 
     // The exact real outcome of replaying this exact real session -- verified by actually
     // running it (not derived by hand), so this is a regression baseline: if a future change to
@@ -180,29 +172,15 @@ test.describe('Story tests', () => {
     const loadedAt = await page.evaluate(() => Date.now());
     await page.clock.pauseAt(loadedAt);
 
-    // Deterministic tick replay (see file header) -- catch up to each event's own recorded tick
-    // count before applying it. Drops events[0] (resize, handled above) and the final two events
-    // (the report-bug-link pointerdown/pointerup -- reporting the session isn't part of playing
-    // it, see file header); every remaining event in this particular capture is a keydown.
-    let lastTickSeq = events[0].tick || 0;
-    for (let i = 1; i < events.length - 2; i++) {
-      const ev = events[i];
-      const ticksDue = (typeof ev.tick === 'number' ? ev.tick : lastTickSeq) - lastTickSeq;
-      if (ticksDue > 0) {
-        await page.evaluate((n) => { for (let j = 0; j < n; j++) GravityMode.tick(); }, ticksDue);
-      }
-      lastTickSeq = typeof ev.tick === 'number' ? ev.tick : lastTickSeq;
-      if (ev.type === 'keydown') {
-        const keyName = ev.code === 'Space' ? 'Space' : ev.key;
-        if (ev.shiftKey) {
-          await page.keyboard.down('Shift');
-          await page.keyboard.press(keyName);
-          await page.keyboard.up('Shift');
-        } else {
-          await page.keyboard.press(keyName);
-        }
-      }
-    }
+    // Deterministic tick replay (see file header / replay-driver.js) -- catch up to each event's
+    // own recorded tick count before applying it. Drops events[0] (resize, handled above) and the
+    // final two events (the report-bug-link pointerdown/pointerup -- reporting the session isn't
+    // part of playing it, see file header); every remaining event in this particular capture is a
+    // keydown.
+    await replayEvents(page, events.slice(1, events.length - 2), {
+      tickFn: 'GravityMode.tick',
+      startTick: events[0].tick || 0,
+    });
 
     // The exact real outcome of replaying this exact real session -- verified by actually running
     // it (not derived by hand), so this is a regression baseline covering Gravity's falling
@@ -232,12 +210,12 @@ test.describe('Story tests', () => {
     // contiguous prefix of the actual capture, not a fabricated or edited sequence.
     const seed = 1495698635;
 
-    // The real session's own initial viewport (975x1309 portrait) was resized to 1807x1309
-    // landscape within the same first tick, before any real gameplay -- set directly to the
-    // settled size rather than replaying the resize, same liberty taken with the leading resize
-    // in every other story here. Keyboard-only input doesn't depend on viewport-relative pixel
-    // resolution the way Blast's polygon taps do, so this doesn't affect determinism.
-    await page.setViewportSize({ width: 1807, height: 1309 });
+    // The real session's own initial viewport was 975x1309 portrait -- start there; the resize to
+    // the settled 1807x1309 landscape happens naturally when replayEvents reaches the real
+    // recorded `resize` event a moment into the session (see below), not set directly the way
+    // every other story here still does with its own leading resize (those don't carry a resize
+    // event this far into gameplay; this one does, so it gets to actually replay it).
+    await page.setViewportSize({ width: 975, height: 1309 });
 
     // Freeze real time BEFORE navigating -- same reasoning as Gravity's story above: Snake's own
     // timer (js/snake.js's startTimer, a real setInterval) would otherwise keep firing tick() on
@@ -265,33 +243,12 @@ test.describe('Story tests', () => {
     // leading resize/reset and trailing second game (see comments above).
     const gameplayEvents = [{"type":"keydown","t":1787447980650,"key":" ","code":"Space","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982298,"key":"Meta","code":"MetaLeft","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982334,"key":"Alt","code":"AltLeft","shiftKey":false,"tick":1},{"type":"keydown","t":1787447982703,"key":"Ű","code":"KeyI","shiftKey":false,"tick":1},{"type":"resize","t":1787447982722,"width":1807,"height":1309,"orientation":"landscape","tick":1},{"type":"keydown","t":1787447985569,"key":" ","code":"Space","shiftKey":false,"tick":1},{"type":"keydown","t":1787447988206,"key":"b","code":"KeyB","shiftKey":false,"tick":4},{"type":"keydown","t":1787447988974,"key":"f","code":"KeyF","shiftKey":false,"tick":5},{"type":"keydown","t":1787447990181,"key":"v","code":"KeyV","shiftKey":false,"tick":7},{"type":"keydown","t":1787447994631,"key":"h","code":"KeyH","shiftKey":false,"tick":18},{"type":"keydown","t":1787447996113,"key":"y","code":"KeyY","shiftKey":false,"tick":20},{"type":"keydown","t":1787448000170,"key":"t","code":"KeyT","shiftKey":false,"tick":26},{"type":"keydown","t":1787448003491,"key":"f","code":"KeyF","shiftKey":false,"tick":35},{"type":"keydown","t":1787448006526,"key":"v","code":"KeyV","shiftKey":false,"tick":40},{"type":"keydown","t":1787448009530,"key":"t","code":"KeyT","shiftKey":false,"tick":50},{"type":"keydown","t":1787448010711,"key":"y","code":"KeyY","shiftKey":false,"tick":52},{"type":"keydown","t":1787448014034,"key":"h","code":"KeyH","shiftKey":false,"tick":57},{"type":"keydown","t":1787448017122,"key":"v","code":"KeyV","shiftKey":false,"tick":68},{"type":"keydown","t":1787448018848,"key":"f","code":"KeyF","shiftKey":false,"tick":71},{"type":"keydown","t":1787448022189,"key":"y","code":"KeyY","shiftKey":false,"tick":75},{"type":"keydown","t":1787448023217,"key":"f","code":"KeyF","shiftKey":false,"tick":77},{"type":"keydown","t":1787448023885,"key":"y","code":"KeyY","shiftKey":false,"tick":78},{"type":"keydown","t":1787448024931,"key":"h","code":"KeyH","shiftKey":false,"tick":86},{"type":"keydown","t":1787448027437,"key":"b","code":"KeyB","shiftKey":false,"tick":91},{"type":"keydown","t":1787448029219,"key":"y","code":"KeyY","shiftKey":false,"tick":100},{"type":"keydown","t":1787448031881,"key":"h","code":"KeyH","shiftKey":false,"tick":109},{"type":"keydown","t":1787448032546,"key":"b","code":"KeyB","shiftKey":false,"tick":116},{"type":"keydown","t":1787448035335,"key":"v","code":"KeyV","shiftKey":false,"tick":120},{"type":"keydown","t":1787448037297,"key":"t","code":"KeyT","shiftKey":false,"tick":123},{"type":"keydown","t":1787448039189,"key":"y","code":"KeyY","shiftKey":false,"tick":126},{"type":"keydown","t":1787448039616,"key":"t","code":"KeyT","shiftKey":false,"tick":127},{"type":"keydown","t":1787448041457,"key":"v","code":"KeyV","shiftKey":false,"tick":140},{"type":"keydown","t":1787448044061,"key":"b","code":"KeyB","shiftKey":false,"tick":144},{"type":"keydown","t":1787448045217,"key":"v","code":"KeyV","shiftKey":false,"tick":145},{"type":"keydown","t":1787448045581,"key":"b","code":"KeyB","shiftKey":false,"tick":146},{"type":"keydown","t":1787448050610,"key":"y","code":"KeyY","shiftKey":false,"tick":161},{"type":"keydown","t":1787448054497,"key":"t","code":"KeyT","shiftKey":false,"tick":171},{"type":"keydown","t":1787448059672,"key":"v","code":"KeyV","shiftKey":false,"tick":190},{"type":"keydown","t":1787448063092,"key":"b","code":"KeyB","shiftKey":false,"tick":196},{"type":"keydown","t":1787448066204,"key":"y","code":"KeyY","shiftKey":false,"tick":207},{"type":"keydown","t":1787448070406,"key":"h","code":"KeyH","shiftKey":false,"tick":220},{"type":"keydown","t":1787448072843,"key":"t","code":"KeyT","shiftKey":false,"tick":230},{"type":"keydown","t":1787448077105,"key":"f","code":"KeyF","shiftKey":false,"tick":244},{"type":"keydown","t":1787448082555,"key":"b","code":"KeyB","shiftKey":false,"tick":267},{"type":"keydown","t":1787448090001,"key":"y","code":"KeyY","shiftKey":false,"tick":285},{"type":"keydown","t":1787448093513,"key":"t","code":"KeyT","shiftKey":false,"tick":299},{"type":"keydown","t":1787448095029,"key":"y","code":"KeyY","shiftKey":false,"tick":308},{"type":"keydown","t":1787448098237,"key":"t","code":"KeyT","shiftKey":false,"tick":334},{"type":"keydown","t":1787448102452,"key":"v","code":"KeyV","shiftKey":false,"tick":346},{"type":"keydown","t":1787448107651,"key":"b","code":"KeyB","shiftKey":false,"tick":355},{"type":"keydown","t":1787448109470,"key":"y","code":"KeyY","shiftKey":false,"tick":360},{"type":"keydown","t":1787448110334,"key":"h","code":"KeyH","shiftKey":false,"tick":369},{"type":"keydown","t":1787448114467,"key":"y","code":"KeyY","shiftKey":false,"tick":383},{"type":"keydown","t":1787448116847,"key":"f","code":"KeyF","shiftKey":false,"tick":387},{"type":"keydown","t":1787448118216,"key":"y","code":"KeyY","shiftKey":false,"tick":390},{"type":"keydown","t":1787448119200,"key":"t","code":"KeyT","shiftKey":false,"tick":391},{"type":"keydown","t":1787448120394,"key":"v","code":"KeyV","shiftKey":false,"tick":393},{"type":"keydown","t":1787448120872,"key":"t","code":"KeyT","shiftKey":false,"tick":394},{"type":"keydown","t":1787448121566,"key":"v","code":"KeyV","shiftKey":false,"tick":395},{"type":"keydown","t":1787448121902,"key":"t","code":"KeyT","shiftKey":false,"tick":396},{"type":"keydown","t":1787448124396,"key":"f","code":"KeyF","shiftKey":false,"tick":409},{"type":"keydown","t":1787448128794,"key":"y","code":"KeyY","shiftKey":false,"tick":432},{"type":"keydown","t":1787448132396,"key":"h","code":"KeyH","shiftKey":false,"tick":451},{"type":"keydown","t":1787448137425,"key":"v","code":"KeyV","shiftKey":false,"tick":478},{"type":"keydown","t":1787448138689,"key":"f","code":"KeyF","shiftKey":false,"tick":481},{"type":"keydown","t":1787448139738,"key":"b","code":"KeyB","shiftKey":false,"tick":483},{"type":"keydown","t":1787448140540,"key":"y","code":"KeyY","shiftKey":false,"tick":484},{"type":"gameover","t":1787448140585,"score":20,"tick":485}];
 
-    // Deterministic tick replay (see file header / Gravity's story above) -- catch up to each
-    // event's own recorded tick count before applying it.
-    let lastTickSeq = 0; // the dropped `reset` marker (not included above) was tick=0
-    for (let i = 0; i < gameplayEvents.length; i++) {
-      const ev = gameplayEvents[i];
-      const ticksDue = (typeof ev.tick === 'number' ? ev.tick : lastTickSeq) - lastTickSeq;
-      if (ticksDue > 0) {
-        await page.evaluate((n) => { for (let j = 0; j < n; j++) SnakeMode.tick(); }, ticksDue);
-      }
-      lastTickSeq = typeof ev.tick === 'number' ? ev.tick : lastTickSeq;
-
-      if (ev.type === 'keydown') {
-        const keyName = ev.code === 'Space' ? 'Space' : ev.key;
-        try {
-          await page.keyboard.press(keyName);
-        } catch (e) {
-          // Meta/Alt/a composed accented character, all real, all from the player opening
-          // DevTools (Cmd+Option+I) mid-recording -- none are recognized game controls
-          // (js/snake.js only matches t/y/f/h/v/b/space/escape/p), so falling back to the raw
-          // key code (still a genuine keydown, just not the exact composed character Playwright
-          // can't name) preserves timing without affecting game state either way.
-          await page.keyboard.press(ev.code);
-        }
-      }
-      // 'resize' (the real mid-session one, already accounted for above) and 'gameover' (a
-      // marker, not an input -- see comment above) need no action.
-    }
+    // Deterministic tick replay (see file header / Gravity's story above / replay-driver.js) --
+    // catch up to each event's own recorded tick count before applying it. The mid-session resize
+    // in here (portrait -> landscape) now genuinely replays too (see replay-driver.js), though for
+    // THIS particular session it's a same-size no-op either way, since the starting viewport above
+    // is already the settled 1807x1309.
+    await replayEvents(page, gameplayEvents, { tickFn: 'SnakeMode.tick', startTick: 0 });
 
     // The exact real outcome of replaying this exact real session -- verified by actually running
     // it (not derived by hand) -- covering movement, gem-eating/growth, the flourish arpeggio
