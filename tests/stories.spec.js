@@ -68,6 +68,13 @@ const { replayEvents } = require('./helpers/replay-driver');
  * Replay.log only records real events, so a session that opens straight into a non-default mode
  * never has an actual mode-switch click to replay. `?seed=` and `#gravity` in the same navigation
  * is exactly what following a real shared deep-link looks like.
+ *
+ * Title convention: `'<Mode> story (<Interface>): <what it verifies>'`, Interface being one of
+ * Desktop/Mobile/Tablet/Safari, matching playwright.config.js's project names (Mobile Safari's
+ * device profile just gets called "Safari" here for brevity). scripts/check-story-coverage.js
+ * parses titles against this pattern to cross-check docs/story-coverage.md's matrix, so keep new
+ * stories -- here or in the per-interface stories.mobile.spec.js/stories.tablet.spec.js siblings
+ * -- titled this way.
  */
 
 test.describe('Story tests', () => {
@@ -93,7 +100,7 @@ test.describe('Story tests', () => {
     });
   });
 
-  test('Blast story: a real captured session plays through deterministically', async ({ page }) => {
+  test('Blast story (Desktop): a real captured session plays through deterministically', async ({ page }) => {
     const seed = 2251539051;
     await page.setViewportSize({ width: 1179, height: 868 });
     await page.goto(`/?seed=${seed}`);
@@ -144,7 +151,7 @@ test.describe('Story tests', () => {
     await page.screenshot({ path: 'test-results/blast-story-final.png' });
   });
 
-  test('Gravity story: a real captured session plays through to Game Over deterministically', async ({ page }) => {
+  test('Gravity story (Desktop): a real captured session plays through to Game Over deterministically', async ({ page }) => {
     // 2843 real keydowns, each its own round-trip -- comfortably over the default 30s.
     test.setTimeout(120000);
     const fixturePath = path.join(__dirname, 'fixtures', 'gravity-story-20260820053007.json');
@@ -201,7 +208,7 @@ test.describe('Story tests', () => {
     await page.screenshot({ path: 'test-results/gravity-story-final.png' });
   });
 
-  test('Snake story: a real captured session plays through to a genuine wall death, deterministically', async ({ page }) => {
+  test('Snake story (Desktop): a real captured session plays through to a genuine wall death, deterministically', async ({ page }) => {
     // The real recorded session was actually TWO games back to back (a reset in between), but a
     // real gap in the second game's own recorded event log (something real happened between two
     // consecutive keydowns that didn't make it into Replay.log -- confirmed live by tracing the
