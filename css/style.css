@@ -2111,6 +2111,23 @@ button:hover {
 
     #m-btn-action-2 {
         display: flex;
+        /* DOM order (action-2, cw, right) is what portrait's shared row depends on -- unwrapped
+           via .gravity-pad-cluster's display:contents there, it's what keeps that row's real
+           button (arrow, rotate, down, rotate, arrow) mirror-symmetric. Landscape's own down-at-
+           the-bottom requirement (matching the left cluster, top to bottom: arrow, rotate, down)
+           conflicts with that DOM order directly -- reordering the markup itself to fix landscape
+           broke portrait's symmetry instead (found live). `order` re-sequences this cluster's
+           column ONLY here, in the one place that visual order needs to differ from DOM order,
+           without touching the markup portrait's row depends on. */
+        order: 3;
+    }
+
+    #m-btn-cw {
+        order: 2;
+    }
+
+    #m-btn-right {
+        order: 1;
     }
 
     /* Gravity's next-piece queue, in the one landscape width range (768-950px) where it was

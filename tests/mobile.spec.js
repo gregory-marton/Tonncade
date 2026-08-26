@@ -1763,6 +1763,26 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(visibleButtons).toBe(5);
   });
 
+  // Real regression, reported live: fixing landscape's column order (both clusters' down button
+  // at the bottom, see the next test) by reordering the right cluster's DOM broke THIS portrait
+  // row instead -- .gravity-pad-cluster's display:contents here means portrait's row order IS
+  // the clusters' shared DOM order, so a DOM-level fix for landscape's column inherently changes
+  // portrait's row too. Fixed with CSS `order` (landscape-only) instead of a markup change, so
+  // this arrow/rotate/down/rotate/arrow mirror symmetry keeps working regardless.
+  test('gravity mobile pad: the portrait row stays mirror-symmetric (arrow, rotate, down, rotate, arrow)', async ({ page }) => {
+    const width = page.viewportSize().width;
+    if (width >= 768) return;
+
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const ids = ['#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right'];
+    const xs = [];
+    for (const id of ids) xs.push((await page.locator(id).boundingBox()).x);
+    for (let i = 1; i < xs.length; i++) {
+      expect(xs[i], `${ids[i]} should sit to the right of ${ids[i - 1]}`).toBeGreaterThan(xs[i - 1]);
+    }
+  });
+
   test('gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
