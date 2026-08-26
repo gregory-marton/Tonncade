@@ -215,6 +215,54 @@ test('INV-27: Sandbox (desktop) -- clicking a cell with an existing piece still 
   expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBe('.');
 });
 
+// Real bug reported live (issue #24): a picked-up piece is still "the current candidate," sitting
+// over the very cell it just vacated -- which is now empty and valid again. selectFromCarousel's
+// commit-then-switch behavior (deliberate for the NORMAL case: chaining fresh carousel placements
+// without an extra tap) couldn't tell a fresh selection apart from a piece just picked up, so
+// tapping ANY other piece type immediately re-placed the picked-up one right back where it came
+// from -- making it impossible to actually remove a piece via pickup-then-switch, only pickup-
+// then-explicit-place (the wedge) or pickup-then-note-tool (which bypasses the commit entirely).
+test('Sandbox: picking up a piece then selecting a different type removes it, does not silently re-place it', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  await page.evaluate(() => {
+    SandboxMode.state.placedPieces.push({ type: '.', p: 5, q: 5, rotation: 0 });
+    SandboxMode.refreshLattice();
+  });
+
+  const cell = page.locator('polygon.placed-piece[data-p="5"][data-q="5"]');
+  await cell.hover();
+  await cell.click(); // picks it up -- ghost now hovers exactly over (5,5), the cell it vacated
+
+  await page.locator('.piece-item[data-key="-"]').click(); // select a DIFFERENT piece type
+
+  const stillThere = await page.evaluate(() =>
+    SandboxMode.state.placedPieces.some((pc) => pc.p === 5 && pc.q === 5)
+  );
+  expect(stillThere, 'the picked-up piece should be gone, not silently re-placed at (5,5)').toBe(false);
+  expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBe('-'); // new selection took
+});
+
+// Regression guard for the fix above: a FRESH carousel selection (not a pickup) must still
+// auto-commit on the next carousel tap -- that chaining is the deliberate, unaffected case.
+test('Sandbox: selecting a fresh candidate then a different one still commits the first (unaffected by the pickup fix)', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+  await page.locator('.piece-item[data-key="."]').click();
+  const cell = page.locator('polygon.cell:not(.ghost)[data-p="4"][data-q="4"]');
+  await cell.hover(); // moves the ghost onto this cell, same as a real cursor would
+
+  await page.locator('.piece-item[data-key="-"]').click(); // switch to a different fresh type
+
+  const committed = await page.evaluate(() =>
+    SandboxMode.state.placedPieces.some((pc) => pc.type === '.' && pc.p === 4 && pc.q === 4)
+  );
+  expect(committed, 'the first selection should still auto-commit where the ghost was hovering').toBe(true);
+  expect(await page.evaluate(() => SandboxMode.state.selectedPiece)).toBe('-');
+});
+
 test('midi note list fades past notes progressively by recency', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());

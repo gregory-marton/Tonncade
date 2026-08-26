@@ -35,6 +35,7 @@ const SandboxMode = {
         viewY: null,
         zoom: null,
         selectedPiece: null,
+        justPickedUp: false, // see commitBeforeSwitch's comment
         rotation: 0,
         placedPieces: [], // { type, p, q, rotation }
         placedCells: [],  // { p, q } -- individual cells pasted in (not carousel pieces); #copy/paste
@@ -218,8 +219,9 @@ const SandboxMode = {
     // Instead it commits whatever candidate is currently held (a no-op if nothing is, or if
     // the ghost isn't over a valid cell), then picks up the tapped piece as the new candidate.
     // Same behavior on mobile and desktop; placing-then-selecting reads naturally either way.
+    // commitBeforeSwitch, not placeActiveGhost directly -- see its own comment for why.
     selectFromCarousel: function(key) {
-        this.placeActiveGhost();
+        this.commitBeforeSwitch();
         this.selectPiece(key);
         this.updateGhost();
         if (typeof App !== 'undefined' && App.collapseMobileDrawer) {
@@ -240,13 +242,32 @@ const SandboxMode = {
     },
 
     // Places the current candidate at its current ghost position, same as swipe-down — no-op
-    // if the ghost's position isn't actually a valid placement.
+    // if the ghost's position isn't actually a valid placement. Always an explicit "yes, place
+    // THIS" gesture (the place wedge, swipe-down) -- callers that instead auto-commit as a SIDE
+    // EFFECT of switching to a new candidate (selectFromCarousel, dragging a new piece out) must
+    // go through commitBeforeSwitch below instead, not this directly.
     placeActiveGhost: function() {
         if (!this.state.selectedPiece) return;
         const { p, q } = this.state.hoverCell;
         if (this.canPlace(this.state.selectedPiece, p, q, this.state.rotation)) {
             this.placePiece(p, q);
         }
+    },
+
+    // Real bug reported live (issue #24): the current candidate is still "selected" immediately
+    // after a pickup, sitting right over the cell it just vacated -- which is now empty and
+    // valid again. Auto-committing it there (placeActiveGhost's normal job when switching
+    // candidates, deliberate so a fresh carousel selection can chain straight into the next one
+    // with no extra tap) silently undid the pickup, making it impossible to actually remove a
+    // piece via pickup-then-switch: selecting ANY other type just re-placed the one just picked
+    // up, right back where it was. One skip is enough -- any further switch (nothing else sets
+    // justPickedUp true) commits normally again.
+    commitBeforeSwitch: function() {
+        if (this.state.justPickedUp) {
+            this.state.justPickedUp = false;
+            return;
+        }
+        this.placeActiveGhost();
     },
 
     updatePaletteHighlight: function() {
@@ -524,6 +545,7 @@ const SandboxMode = {
             const piece = this.state.placedPieces.splice(pieceIndex, 1)[0];
             this.state.undoStack.push(() => { this.state.placedPieces.push(piece); }); // #17
             this.selectPiece(piece.type);
+            this.state.justPickedUp = true; // see commitBeforeSwitch's comment
             this.state.rotation = piece.rotation;
             this.refreshLattice();
             // Anchor the ghost (and the sound updateGhost triggers) to the piece's own true
@@ -582,6 +604,7 @@ const SandboxMode = {
             const piece = this.state.placedPieces.splice(pieceIndex, 1)[0];
             this.state.undoStack.push(() => { this.state.placedPieces.push(piece); }); // #17
             this.selectPiece(piece.type);
+            this.state.justPickedUp = true; // see commitBeforeSwitch's comment
             this.state.rotation = piece.rotation;
             this.refreshLattice();
             // Anchor the ghost (and the sound updateGhost triggers) to the piece's own true
@@ -797,8 +820,10 @@ const SandboxMode = {
                     // Starting a new candidate this way commits whatever's currently active
                     // first — a piece mid-placement is cheap to pick back up if it lands
                     // wrong, and dragging a new piece out is an unambiguous "I'm done with
-                    // this one" signal.
-                    this.placeActiveGhost();
+                    // this one" signal. commitBeforeSwitch, not placeActiveGhost directly --
+                    // see its own comment for why (a just-picked-up piece shouldn't auto-commit
+                    // back to the cell it just vacated).
+                    this.commitBeforeSwitch();
                     isPlacingDrag = true;
                     this.state.selectedPiece = dragInfo.key;
                     this.state.rotation = dragInfo.rotation;
