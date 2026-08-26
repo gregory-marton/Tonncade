@@ -47,12 +47,12 @@
  *   --no-viewer          Skip HTML viewer generation
  *   --base-url=<url>     App URL to replay against (default: http://localhost:8001)
  *   --start-hash=<mode>  Mode the session actually started in when no click ever switched to it
- *                        (e.g. a deep link) -- Replay.log only records real events, so a session
- *                        that opened straight into a non-default mode via URL hash leaves no
- *                        trace of that in the JSON. Applied right after load, before any replayed
- *                        event, via a real hashchange (js/main.js's own router), same as a user
- *                        clicking a shared deep-link. Omit for sessions that began at the default
- *                        mode or that DO contain their own mode-switch click.
+ *                        (e.g. a deep link). Auto-detected from the replay's own meta.startHash
+ *                        (recorded by js/replay.js's recordMeta) when present -- only needed as an
+ *                        explicit override for older recordings that predate that field, or to
+ *                        force a different start than what was recorded. Applied right after load,
+ *                        before any replayed event, via a real hashchange (js/main.js's own
+ *                        router), same as a user clicking a shared deep-link.
  *   --speed=<n>          Playback speed multiplier (default: 1 -- real recorded timing).
  *                        Only affects the wall-clock fallback path (see above); ignored when
  *                        the replay has tick-count data, since that path has no timing to scale.
@@ -60,23 +60,28 @@
  *                        (default: 300000 = 5min). Only affects the wall-clock fallback path.
  *   --frame-delay=<ms>   GIF per-frame display time (default: 700)
  *   --keep-frames        Don't delete the intermediate numbered PNGs
+ *   --no-open            Don't open the viewer in your default browser when done (it opens by
+ *                         default -- "run one command, get the replay in front of me" is the
+ *                         actual point of this script; `file://` viewer.html sitting on disk
+ *                         unopened doesn't satisfy that on its own).
  */
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 const { chromium } = require('playwright');
 
 function parseArgs(argv) {
     const opts = {
         baseUrl: 'http://localhost:8001', speed: 1, maxWait: 300000, frameDelay: 700,
-        keepFrames: false, makeGif: true, makeViewer: true,
+        keepFrames: false, makeGif: true, makeViewer: true, openViewer: true,
     };
     const positional = [];
     for (const arg of argv) {
         if (arg === '--keep-frames') { opts.keepFrames = true; continue; }
         if (arg === '--no-gif') { opts.makeGif = false; continue; }
         if (arg === '--no-viewer') { opts.makeViewer = false; continue; }
+        if (arg === '--no-open') { opts.openViewer = false; continue; }
         const m = arg.match(/^--([a-z-]+)=(.*)$/);
         if (!m) { positional.push(arg); continue; }
         const key = m[1];
@@ -353,6 +358,14 @@ async function resolveAndClick(page, ev, recordedViewport) {
 
 async function run(opts) {
     const data = JSON.parse(fs.readFileSync(opts.replayPath, 'utf8'));
+
+    // Auto-detect a deep-linked starting mode from meta.startHash (recorded by js/replay.js's
+    // recordMeta) when the caller didn't pass --start-hash explicitly. Older recordings predate
+    // this field and fall back to requiring the explicit flag, same as before.
+    if (!opts.startHash && data.meta && data.meta.startHash) {
+        opts.startHash = data.meta.startHash;
+    }
+
     const events = data.events.filter(e => e.target !== '#report-bug-link');
     const firstResize = events.find(e => e.type === 'resize');
     const viewport = firstResize
@@ -569,6 +582,14 @@ async function run(opts) {
     if (opts.makeViewer) {
         fs.writeFileSync(opts.viewerOut, buildViewerHtml(frameLog, data.seed));
         written.push(opts.viewerOut);
+        if (opts.openViewer) {
+            // Platform-appropriate "open in default browser" -- detached so this script can exit
+            // without waiting on (or accidentally killing) the browser it just launched.
+            const openCmd = process.platform === 'darwin' ? 'open'
+                : process.platform === 'win32' ? 'start'
+                : 'xdg-open';
+            spawn(openCmd, [opts.viewerOut], { detached: true, stdio: 'ignore' }).unref();
+        }
     }
 
     if (!opts.keepFrames) {

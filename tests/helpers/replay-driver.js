@@ -26,9 +26,9 @@ for the JavaScript code in this file.
  * page fixture or a plain page from a standalone `chromium.launch()` -- faithfully replays a
  * captured session's events (js/replay.js's window.replay() output) against it.
  *
- * Deliberately the ONE mechanism used both by every story test (tests/stories*.spec.js) and by
- * scripts/replay-live.js's headed CLI viewer. That's load-bearing, not just DRY: the Snake
- * flourish freeze (see js/snake.js's playFlourish history) was originally found because the
+ * Deliberately the ONE mechanism used by every story test (tests/stories*.spec.js). That's
+ * load-bearing, not just DRY: the Snake flourish freeze (see js/snake.js's playFlourish history)
+ * was originally found because the
  * RECONSTRUCTION mechanism itself was buggy under a frozen replay clock, not because the game was
  * broken -- a simpler/different live-replay path would never have exercised the same code and
  * would have silently missed it. Watching a session live and turning it into a story test later
@@ -124,13 +124,9 @@ async function resolvePointerdown(page, ev, recordedViewport) {
  *   breakpoint, matching Render.isMobileLandscape.
  * @param {number} [opts.startTick] - the tick count of whatever leading event was dropped by the
  *   caller (default 0 -- true for every session captured so far, all of which start at tick 0).
- * @param {number} [opts.delayMs] - real wall-clock pause after each dispatched event (default 0,
- *   i.e. no pacing -- story tests want this instant). scripts/replay-live.js sets this so a human
- *   can actually watch a session play out; has no effect on the deterministic tick/game-state
- *   reconstruction itself, which never depends on real time (see the tick catch-up above).
  */
 async function replayEvents(page, events, opts = {}) {
-    const { tickFn = null, recordedViewport = null, startTick = 0, delayMs = 0 } = opts;
+    const { tickFn = null, recordedViewport = null, startTick = 0 } = opts;
     let lastTickSeq = startTick;
 
     for (const ev of events) {
@@ -179,8 +175,6 @@ async function replayEvents(page, events, opts = {}) {
             await page.setViewportSize({ width: ev.width, height: ev.height }).catch(() => {});
         }
         // 'pointerup', 'reset', 'gameover': no action -- see file header.
-
-        if (delayMs > 0) await page.waitForTimeout(delayMs);
     }
 }
 

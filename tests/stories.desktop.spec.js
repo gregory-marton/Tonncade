@@ -43,9 +43,7 @@ const { replayEvents } = require('./helpers/replay-driver');
  * now, via tests/helpers/replay-driver.js's shared `replayEvents()`, not dropped as a liberty.
  * That module is also what every story below actually calls to dispatch its events -- see its own
  * file header for the full faithfulness reasoning (tick catch-up, key/click resolution, resize),
- * extracted there once several stories needed the identical logic. It's deliberately the SAME
- * mechanism scripts/replay-live.js's headed CLI viewer uses too, so a session that plays correctly
- * live and a story test built from it never diverge in what they'd catch.
+ * extracted there once several stories needed the identical logic.
  *
  * Gravity's own story adds two more things, both load-bearing:
  *

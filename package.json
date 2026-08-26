@@ -14,8 +14,7 @@
     "test": "node scripts/check-dom-ids.js && node tests/run_tests.js && npx playwright test",
     "test:dom-ids": "node scripts/check-dom-ids.js",
     "test:librejs": "node scripts/check-librejs.js",
-    "replay:gif": "node scripts/replay-to-gif.js",
-    "replay:live": "node scripts/replay-live.js"
+    "replay:gif": "node scripts/replay-to-gif.js"
   },
   "repository": {
     "type": "git",

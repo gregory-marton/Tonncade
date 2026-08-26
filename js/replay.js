@@ -163,13 +163,19 @@ const Replay = {
     // changes over time, so replaying against the wrong checkout can behave differently even
     // with the right seed/inputs. devicePixelRatio doesn't affect game logic (which works in
     // CSS-pixel/logical coordinates), but is cheap and worth keeping for anyone visually
-    // comparing screenshots against a replay.
+    // comparing screenshots against a replay. startHash captures a deep link straight into a
+    // non-default mode (e.g. #blast) -- Replay.log only records real events, so a session that
+    // never clicked a mode tab (it was already in the target mode from the URL) would otherwise
+    // leave no trace of which mode that was; a reconstruction tool has to default to Sandbox (the
+    // app's real no-hash default) and gets it wrong. Read once, here, before anything has a
+    // chance to change location.hash itself.
     recordMeta: function() {
         this.meta = {
             version: (typeof GIT_VERSION !== 'undefined') ? GIT_VERSION : 'local',
             userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'unknown',
             maxTouchPoints: (typeof navigator !== 'undefined' && navigator.maxTouchPoints) || 0,
-            devicePixelRatio: (typeof window !== 'undefined' && window.devicePixelRatio) || 1
+            devicePixelRatio: (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
+            startHash: (typeof location !== 'undefined' && location.hash) ? location.hash.slice(1) : ''
         };
     },
 
