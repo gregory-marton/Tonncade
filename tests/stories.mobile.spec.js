@@ -86,4 +86,64 @@ test.describe('Mobile story tests', () => {
 
     await page.screenshot({ path: 'test-results/blast-mobile-story-final.png' });
   });
+
+  test('Gravity story (Mobile): a real captured session plays through to Game Over deterministically', async ({ page }) => {
+    // 2447 real events, each a real tick catch-up + dispatch round-trip.
+    test.setTimeout(120000);
+
+    // Filed live via the bug-report link (github.com/gregory-marton/Tonncade/issues/22) with no
+    // written description -- a good real session, not a bug report (see issue #20's own story for
+    // the same pattern). Same underlying continuous play session as the Snake mobile story below
+    // (identical seed and start timestamp -- the player kept going after this report and filed a
+    // second one once they'd moved into Snake); this one covers just the Gravity portion.
+    const fixturePath = path.join(__dirname, 'fixtures', 'gravity-mobile-story-20260825225923.json');
+    const { seed, events } = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+
+    // events[0] is the real resize -- viewport set directly (see tests/stories.desktop.spec.js's
+    // file header). Freeze real time BEFORE navigating -- same reasoning as every other
+    // tick-based story here: Gravity's own timer would otherwise keep firing tick() on actual
+    // wall-clock time throughout this test's own execution, in addition to the explicit tick
+    // catch-up below.
+    const viewport = events[0];
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.clock.install({ time: 0 });
+
+    // Deep-linked straight into Gravity (no mode-switch click anywhere in the whole capture) --
+    // same reasoning as the Desktop Gravity story's file header.
+    await page.goto(`/?seed=${seed}#gravity`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.mode-option[data-mode="gravity"]')).toHaveClass(/active/);
+    const loadedAt = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(loadedAt);
+
+    // The captured session's own tail -- a couple of incidental UI taps opening the drawer to
+    // reach the bug-report link -- isn't part of playing it, same liberty taken everywhere else.
+    let endIdx = events.length;
+    while (endIdx > 1 && typeof events[endIdx - 1].target === 'string'
+      && (events[endIdx - 1].target.includes('report-bug-link') || events[endIdx - 1].target === '#drawer-handle')) {
+      endIdx--;
+    }
+    const gameplayEvents = events.slice(1, endIdx);
+
+    // recordedViewport is needed here (unlike the other stories): this real session includes
+    // three more real resizes right after the first (address-bar show/hide adjustments) -- now
+    // genuinely replayed by replayEvents rather than dropped, per tests/helpers/replay-driver.js's
+    // resize handling.
+    await replayEvents(page, gameplayEvents, { tickFn: 'GravityMode.tick', recordedViewport: viewport });
+
+    // The exact real outcome of replaying this exact real session -- verified by actually
+    // running it (not derived by hand).
+    const final = await page.evaluate(() => ({
+      linesCleared: GravityMode.state.linesCleared,
+      cellCount: GravityBoard.cells.size,
+      isGameOver: GravityMode.state.isGameOver,
+      difficulty: GravityMode.state.difficulty,
+    }));
+    expect(final.linesCleared).toBe(0);
+    expect(final.cellCount).toBe(88);
+    expect(final.isGameOver).toBe(true);
+    expect(final.difficulty).toBe(3);
+
+    await page.screenshot({ path: 'test-results/gravity-mobile-story-final.png' });
+  });
 });

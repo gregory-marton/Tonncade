@@ -13,7 +13,7 @@ never a hand-written move sequence) exist per mode × interface, and which are s
 | Compose |   🔲    |   🔲   |   🔲   |      🔲       |
 | Snake   |   ✅    |   🔲   |   🔲   |      🔲       |
 | Blast   |   ✅    |   ✅   |   🔲   |      🔲       |
-| Gravity |   ✅    |   🔲   |   🔲   |      🔲       |
+| Gravity |   ✅    |   ✅   |   🔲   |      🔲       |
 | Life    |   🔲    |   🔲   |   🔲   |      🔲       |
 
 ✅ exists · 🔲 desired, not yet built · — not applicable
@@ -73,7 +73,7 @@ hand-formatted table is too fragile to regex reliably. Each value is one of `"do
   "Compose": { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
   "Snake":   { "Desktop": "done",    "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
   "Blast":   { "Desktop": "done",    "Mobile": "done",    "Tablet": "desired", "Safari": "desired" },
-  "Gravity": { "Desktop": "done",    "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
+  "Gravity": { "Desktop": "done",    "Mobile": "done",    "Tablet": "desired", "Safari": "desired" },
   "Life":    { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" }
 }
 ```
