@@ -2354,4 +2354,26 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(afterIn).toBeGreaterThan(afterOut);
     await page.evaluate((pts) => window.__dispatchMultiTouch('touchend', pts), pinch);
   });
+
+  // Real bug, reported live with screenshots (issue #25): the header's copy and undo buttons
+  // used obscure Unicode symbols (U+29C9 "⧉", U+21B6 "↶") that have no glyph in many fonts --
+  // including the reporter's real Android device and this project's own exploratory screenshots.
+  // Missing glyphs paint nothing at all (not even a tofu box), while the button's own box model,
+  // sizing, and click handling stay completely intact -- so the icon just silently vanishes
+  // rather than erroring or reflowing. Confirmed via this project's own headless screenshots
+  // (PNG byte size collapses to a near-blank ~250-260 bytes for these two, vs 800+ for every
+  // other, working header icon at the same font size) -- reproducing the same gap seen live.
+  // Every OTHER header icon is a standard, broadly-supported real emoji (U+1F300+); the fix swaps
+  // these two for glyphs from that same well-supported range instead of Unicode's much sparser
+  // technical-symbol/arrow blocks. Pin the exact glyphs directly rather than re-deriving
+  // "does this render" per browser/font at test time, which is exactly the kind of environment-
+  // dependent signal that made this bug hard to reproduce in the first place.
+  test('Header icons: copy and undo use broadly-supported emoji, not obscure symbols with sparse font coverage', async ({ page }) => {
+    const glyphs = await page.evaluate(() => ({
+      copy: document.getElementById('copy-btn').textContent.trim(),
+      undo: document.getElementById('undo-btn').textContent.trim(),
+    }));
+    expect(glyphs.copy, 'copy-btn must not regress to U+29C9 "⧉", which has no glyph on many real devices').toBe('\u{1F4C4}');
+    expect(glyphs.undo, 'undo-btn must not regress to U+21B6 "↶", which has no glyph on many real devices').toBe('↩️');
+  });
 });
