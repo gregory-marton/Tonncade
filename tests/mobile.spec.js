@@ -1793,6 +1793,25 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(qAfter).toBeLessThan(qBefore);
   });
 
+  // Real bug reported live: the left cluster's DOM order (left-arrow, ccw, down) puts down at
+  // the bottom, matching thumb reach, but the right cluster's order (down, cw, right-arrow) --
+  // copied without mirroring when the duplicate button was added -- put IT at the top instead.
+  // .gravity-pad-cluster is flex-direction: column in landscape (css/style.css), so vertical
+  // position is purely DOM order; both clusters should end with their own down button at the
+  // bottom, mirroring each other, not just the left one.
+  test('gravity mobile pad: both landscape clusters put their own down button at the bottom, mirrored', async ({ page }) => {
+    await page.setViewportSize({ width: 852, height: 393 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+    const leftBox = await page.locator('#m-btn-action').boundingBox();
+    const leftArrowBox = await page.locator('#m-btn-left').boundingBox();
+    const rightBox = await page.locator('#m-btn-action-2').boundingBox();
+    const rightArrowBox = await page.locator('#m-btn-right').boundingBox();
+
+    expect(leftBox.y, 'left cluster: down sits below its own arrow button').toBeGreaterThan(leftArrowBox.y);
+    expect(rightBox.y, 'right cluster: down sits below its own arrow button, mirroring the left').toBeGreaterThan(rightArrowBox.y);
+  });
+
   test('Snake and Gravity mobile pads clear iOS-style bottom browser chrome in portrait', async ({ page }) => {
     const width = page.viewportSize().width;
     const height = page.viewportSize().height;
