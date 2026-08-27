@@ -150,4 +150,55 @@ test.describe('Mobile story tests', () => {
 
     await page.screenshot({ path: 'test-results/gravity-mobile-story-final.png' });
   });
+
+  test('Snake story (Mobile): a real two-game captured session plays through deterministically', async ({ page }) => {
+    // 283 real events -- fast enough not to need an extended timeout.
+
+    // Filed live via the bug-report link (github.com/gregory-marton/Tonncade/issues/23) captioned
+    // "Another attempt at a snake story" -- the first two attempts on this same issue (both
+    // long, messy multi-mode sessions) turned out to have a real, unrecoverable-in-hindsight gap:
+    // reconstructing them required replaying everything since the true start just to consume the
+    // same number of Math.random() draws in the same order, and that replay itself depended on
+    // UI that had since changed (a virtual D-pad button whose visibility differs by mode) -- see
+    // js/replay.js's rngCalls field, added specifically because of this investigation. This
+    // session is clean by contrast: starts fresh in Sandbox, switches to Snake once, and both
+    // games replay to their exact real recorded outcomes with no divergence.
+    const fixturePath = path.join(__dirname, 'fixtures', 'snake-mobile-story-20260827160611.json');
+    const { seed, events } = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+
+    const viewport = events[0];
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.clock.install({ time: 0 });
+    await page.goto(`/?seed=${seed}`);
+    await page.waitForLoadState('networkidle');
+    const loadedAt = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(loadedAt);
+
+    // The captured session's own tail -- opening the drawer to reach the bug-report link --
+    // isn't part of playing it, same liberty taken everywhere else. Everything else, including
+    // the real mode-switch tap into Snake and a couple of incidental Sandbox UI taps right
+    // before it, is real and replayed as-is.
+    let endIdx = events.length;
+    while (endIdx > 1 && typeof events[endIdx - 1].target === 'string'
+      && (events[endIdx - 1].target.includes('report-bug-link') || events[endIdx - 1].target === '#drawer-handle')) {
+      endIdx--;
+    }
+    const gameplayEvents = events.slice(1, endIdx);
+
+    await replayEvents(page, gameplayEvents, { tickFn: 'SnakeMode.tick', recordedViewport: viewport });
+
+    // The exact real outcome of replaying this exact real session -- verified by actually running
+    // it (not derived by hand). Two full games: the first reaches score 33 before a real death,
+    // the second (after a real in-game Reset tap) reaches score 6 before ending the session.
+    const final = await page.evaluate(() => ({
+      score: SnakeMode.state.score,
+      isGameOver: SnakeMode.state.isGameOver,
+      snakeLength: SnakeMode.state.snake.length,
+    }));
+    expect(final.score).toBe(6);
+    expect(final.isGameOver).toBe(true);
+    expect(final.snakeLength).toBe(9);
+
+    await page.screenshot({ path: 'test-results/snake-mobile-story-final.png' });
+  });
 });

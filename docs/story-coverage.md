@@ -11,7 +11,7 @@ never a hand-written move sequence) exist per mode × interface, and which are s
 | Sandbox |   🔲    |   🔲   |   🔲   |      🔲       |
 | Melody  |   🔲    |   🔲   |   🔲   |      🔲       |
 | Compose |   🔲    |   🔲   |   🔲   |      🔲       |
-| Snake   |   ✅    |   🔲   |   🔲   |      🔲       |
+| Snake   |   ✅    |   ✅   |   🔲   |      🔲       |
 | Blast   |   ✅    |   ✅   |   🔲   |      🔲       |
 | Gravity |   ✅    |   ✅   |   🔲   |      🔲       |
 | Life    |   🔲    |   🔲   |   🔲   |      🔲       |
@@ -71,7 +71,7 @@ hand-formatted table is too fragile to regex reliably. Each value is one of `"do
   "Sandbox": { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
   "Melody":  { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
   "Compose": { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
-  "Snake":   { "Desktop": "done",    "Mobile": "desired", "Tablet": "desired", "Safari": "desired" },
+  "Snake":   { "Desktop": "done",    "Mobile": "done",    "Tablet": "desired", "Safari": "desired" },
   "Blast":   { "Desktop": "done",    "Mobile": "done",    "Tablet": "desired", "Safari": "desired" },
   "Gravity": { "Desktop": "done",    "Mobile": "done",    "Tablet": "desired", "Safari": "desired" },
   "Life":    { "Desktop": "desired", "Mobile": "desired", "Tablet": "desired", "Safari": "desired" }
