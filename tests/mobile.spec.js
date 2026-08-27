@@ -2376,4 +2376,36 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(glyphs.copy, 'copy-btn must not regress to U+29C9 "⧉", which has no glyph on many real devices').toBe('\u{1F4C4}');
     expect(glyphs.undo, 'undo-btn must not regress to U+21B6 "↶", which has no glyph on many real devices').toBe('↩️');
   });
+
+  // Real bug reported live (issue #23): board over-zoomed with the D-pad off-screen after
+  // rotating right after a game-over -- self-corrected only by starting a new game. Root cause:
+  // the fit reads the D-pad's own bounding rects (Render.getSnakeChromeRects), which settle via a
+  // separate listener (js/main.js's window 'resize' -> setupMobileControls) not ordered relative
+  // to the board's own resize observer; a game in progress papers over a bad ordering because the
+  // next automatic tick() refits again, but game-over stops that timer, leaving nothing to ever
+  // retry a fit landed against stale D-pad geometry. Verifies the fix directly at the DOM level
+  // (which elements SnakeMode's observer actually registers) rather than through ResizeObserver
+  // delivery timing, which proved unreliable to script deterministically even for an independent
+  // observer on the same element in this environment.
+  test('Snake: the board resize observer also watches the D-pad chrome, not just the game container', async ({ page }) => {
+    await page.setViewportSize({ width: 411, height: 761 });
+    // A plain evaluate() (not addInitScript, which only applies to a NAVIGATION after it's
+    // registered -- this test's beforeEach already loaded the page, and switching modes below
+    // doesn't navigate again) patches the already-running page directly.
+    await page.evaluate(() => {
+      window.__observedTargets = [];
+      const realObserve = ResizeObserver.prototype.observe;
+      ResizeObserver.prototype.observe = function(target, ...rest) {
+        window.__observedTargets.push(target);
+        return realObserve.call(this, target, ...rest);
+      };
+    });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
+    await page.waitForTimeout(200);
+
+    const observed = await page.evaluate(() => window.__observedTargets.map((el) => el.id || el.className));
+    expect(observed).toContain('game-container');
+    expect(observed.some((d) => String(d).includes('snake-pad-cluster')), `expected a snake-pad-cluster target among observed elements, got: ${JSON.stringify(observed)}`).toBe(true);
+    expect(observed).toContain('snake-controls');
+  });
 });

@@ -79,10 +79,26 @@ const SnakeMode = {
         // shape is often height-bound, so its fitted size doesn't change even though its centered
         // X-offset should) -- found live via the mobile drawer's open/close animation leaving the
         // board offset stuck mid-transition, never settling back to its pre-open position.
+        // Real bug reported live (issue #23): board over-zoomed with the D-pad off-screen after
+        // rotating right after a game-over. fitContentBox's shape-aware fit reads the D-pad's OWN
+        // bounding rects (getSnakeChromeRects) to know how much room to leave for it, but that
+        // geometry settles via a SEPARATE listener (js/main.js's window 'resize' ->
+        // setupMobileControls, which shows/repositions the D-pad for the new orientation) that
+        // isn't ordered relative to this observer's own #game-container callback -- a resize can
+        // land this fit against the D-pad's pre-rotation geometry. While a game is running, the
+        // very next automatic tick() calls refreshBoard() again, self-correcting before a player
+        // could ever notice; game-over stops that timer, so a stale fit computed right then has
+        // nothing left to ever retry it -- exactly why starting a new game (whose reset() forces
+        // its own fresh refreshBoard()) was the only way out. Observing the D-pad's own chrome
+        // elements too means their real settled geometry is what triggers the correcting refit,
+        // regardless of whether a game happens to be running to paper over the race.
         if (!this._resizeObserver && typeof ResizeObserver !== 'undefined' && Render.svg) {
             this._resizeObserver = new ResizeObserver(() => this.refreshBoard());
             const container = document.getElementById('game-container');
             this._resizeObserver.observe(container || Render.svg);
+            const controls = document.getElementById('snake-controls');
+            if (controls) this._resizeObserver.observe(controls);
+            document.querySelectorAll('.snake-pad-cluster').forEach((el) => this._resizeObserver.observe(el));
         }
     },
 
