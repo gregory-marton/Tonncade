@@ -1194,6 +1194,33 @@ try {
     }
     console.log("PASS: Replay.seedRandom()'s recorded seed exactly reproduces its Math.random() sequence!");
 
+    // rngCalls lets a replay tool jump straight to any later point in a session (e.g. deriving
+    // the equivalent ?seed= for "right before this specific mode started" deep inside a long
+    // recording) without replaying everything before it -- see the file header. mulberry32's
+    // update step is a plain additive counter, so this must be EXACT: reseeding with the derived
+    // value must reproduce bit-for-bit the same continuing sequence the original session had after
+    // that many draws, not just "close" from a similar-but-wrong internal state.
+    console.log("Running Replay.rngCallCount derived-seed-jump test...");
+    ReplayObj.seedRandom();
+    const jumpFromSeed = ReplayObj.seed;
+    Math.random(); Math.random(); Math.random(); // 3 draws whose continuation we'll jump past
+    if (ReplayObj.rngCallCount !== 3) {
+        console.error(`FAIL: Replay.rngCallCount should count every Math.random() draw since seedRandom(), got ${ReplayObj.rngCallCount} after 3 draws!`);
+        process.exit(1);
+    }
+    const expectedNext = Math.random(); // the 4th draw, real continuation
+    const INC = 0x6D2B79F5n;
+    const derivedSeed = Number((BigInt(jumpFromSeed) + 3n * INC) & 0xFFFFFFFFn);
+    global.location.search = `?seed=${derivedSeed}`;
+    ReplayObj.seedRandom();
+    const actualNext = Math.random(); // a FRESH session's first draw, from the derived seed
+    global.location.search = '';
+    if (actualNext !== expectedNext) {
+        console.error(`FAIL: a fresh session seeded from the derived jump-point should reproduce the exact 4th draw of the original sequence! Got ${actualNext}, expected ${expectedNext}`);
+        process.exit(1);
+    }
+    console.log("PASS: Replay.rngCallCount + the derived-seed formula exactly reproduces a session's later Math.random() draws, no replay needed!");
+
     // Recording a seed is only half of "full recreation" -- the other half is being able to
     // feed a previously-recorded seed back in via ?seed= and actually get it to take effect.
     console.log("Running Replay.seedRandom() ?seed= forcing test...");

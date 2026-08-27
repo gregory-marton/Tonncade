@@ -53,12 +53,26 @@ for the JavaScript code in this file.
  * calling tick() directly that many times between events, rather than inferring it from
  * wall-clock deltas -- which turned out to be fragile for long sessions with real thinking-pauses
  * (small timing differences during replay compounded into a completely different outcome).
+ *
+ * Every recorded event also carries an `rngCalls` count (see seedRandom) -- how many Math.random()
+ * draws have happened so far. mulberry32's update step is a plain additive counter (`state = state
+ * + 0x6D2B79F5` each call), so the RNG state after N draws is exactly derivable from the seed
+ * alone: `(seed + N * 0x6D2B79F5) & 0xFFFFFFFF`. A replay tool can therefore jump straight to any
+ * later point in a session -- e.g. the start of a specific mode deep inside a long recording --
+ * by computing that derived value and passing it as a fresh `?seed=`, without needing to actually
+ * replay every real input from the true start just to consume the same number of draws in the
+ * same order. Found necessary live: reconstructing which cell a piece/gem randomly landed on deep
+ * into a long session by re-simulating everything before it is slow (tens of minutes for a
+ * ~2500-event prefix) AND fragile (a real recorded input can silently stop triggering its game
+ * action in a later app version -- e.g. a control whose visibility changed -- silently under-
+ * consuming draws with no way to detect the drift from the replay alone).
  */
 const Replay = {
     MAX_EVENTS: 5000,
     log: [],
     seed: null,
     tickSeq: 0,
+    rngCallCount: 0,
 
     // Sound events get their own, much larger ring buffer, entirely separate from `log` (raw
     // input events). They're a fundamentally different kind of data -- a dense, high-frequency
@@ -100,6 +114,7 @@ const Replay = {
         // timing differences during replay, changing the eventual outcome completely), a replay
         // tool can just call tick() this many times directly, with no timing involved at all.
         entry.tick = this.tickSeq;
+        entry.rngCalls = this.rngCallCount;
         this.log.push(entry);
         this.trimToCapacity(this.log, this.MAX_EVENTS);
     },
@@ -140,8 +155,21 @@ const Replay = {
                 ? crypto.getRandomValues(new Uint32Array(1))[0]
                 : (Date.now() ^ (Math.random() * 0xFFFFFFFF)) >>> 0;
 
+        // rngCallCount tracks how many draws Math.random() has produced -- stamped onto every
+        // recorded event (record()) the same way tick is, since it's exactly the same problem:
+        // reconstructing a session's RNG-dependent state (piece/gem randomness) currently means
+        // faithfully re-dispatching every real input from the true start just to consume the same
+        // number of draws in the same order, which for a long session is both slow and fragile
+        // (real events can silently fail to trigger their game action in a later app version,
+        // under- or over-consuming draws with no way to detect it). With the true count recorded
+        // directly, `state` after N draws is exactly `(seed + N * 0x6D2B79F5) & 0xFFFFFFFF` --
+        // mulberry32's update step is a plain additive counter, so this is exact, not
+        // approximated -- letting a replay tool jump straight to any point via a derived
+        // `?seed=` value instead of re-simulating everything before it.
+        this.rngCallCount = 0;
         let state = this.seed;
-        Math.random = function() {
+        Math.random = () => {
+            this.rngCallCount++;
             state |= 0; state = (state + 0x6D2B79F5) | 0;
             let t = Math.imul(state ^ (state >>> 15), 1 | state);
             t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
