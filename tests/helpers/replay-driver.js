@@ -135,9 +135,19 @@ async function resolvePointerdown(page, ev, recordedViewport) {
  * @param {number} [opts.startTick] - the tick count of whatever leading event was dropped by the
  *   caller (default 0 -- true for every session captured so far, all of which start at tick 0).
  */
+// A virtual D-pad button's tap dispatches its own keydown synchronously (js/main.js's bindBtn),
+// which Replay.record()'s window-level keydown listener also captures as its own log entry -- one
+// physical tap leaves both a pointerdown AND a keydown in the log, even though they're the same
+// action. Match by id pattern so that echoed keydown can be skipped during replay, exactly as
+// scripts/replay-to-gif.js's isVirtualButtonTarget already does.
+function isVirtualButtonTarget(target) {
+    return typeof target === 'string' && /^#(m-btn-|snake-btn-)/.test(target);
+}
+
 async function replayEvents(page, events, opts = {}) {
     const { tickFn = null, recordedViewport = null, startTick = 0 } = opts;
     let lastTickSeq = startTick;
+    let lastVirtualClickT = null;
 
     for (const ev of events) {
         if (tickFn) {
@@ -159,28 +169,32 @@ async function replayEvents(page, events, opts = {}) {
         }
 
         if (ev.type === 'keydown') {
-            const keyName = ev.code === 'Space' ? 'Space' : ev.key;
-            if (ev.shiftKey) {
-                await page.keyboard.down('Shift');
-                try {
-                    await page.keyboard.press(keyName);
-                } catch (e) {
-                    await page.keyboard.press(ev.code);
-                }
-                await page.keyboard.up('Shift');
-            } else {
-                try {
-                    await page.keyboard.press(keyName);
-                } catch (e) {
-                    // A handful of real sessions carry non-game keys Playwright can't name (e.g.
-                    // a composed accented character from a DevTools Cmd+Option+I shortcut) --
-                    // falling back to the raw code is still a genuine keydown, just not the exact
-                    // composed character, which doesn't matter since neither is a game control.
-                    await page.keyboard.press(ev.code);
+            const isEcho = lastVirtualClickT !== null && Math.abs(ev.t - lastVirtualClickT) < 50;
+            if (!isEcho) {
+                const keyName = ev.code === 'Space' ? 'Space' : ev.key;
+                if (ev.shiftKey) {
+                    await page.keyboard.down('Shift');
+                    try {
+                        await page.keyboard.press(keyName);
+                    } catch (e) {
+                        await page.keyboard.press(ev.code);
+                    }
+                    await page.keyboard.up('Shift');
+                } else {
+                    try {
+                        await page.keyboard.press(keyName);
+                    } catch (e) {
+                        // A handful of real sessions carry non-game keys Playwright can't name (e.g.
+                        // a composed accented character from a DevTools Cmd+Option+I shortcut) --
+                        // falling back to the raw code is still a genuine keydown, just not the exact
+                        // composed character, which doesn't matter since neither is a game control.
+                        await page.keyboard.press(ev.code);
+                    }
                 }
             }
         } else if (ev.type === 'pointerdown') {
             await resolvePointerdown(page, ev, recordedViewport);
+            if (isVirtualButtonTarget(ev.target)) lastVirtualClickT = ev.t;
         } else if (ev.type === 'resize') {
             await page.setViewportSize({ width: ev.width, height: ev.height }).catch(() => {});
         }

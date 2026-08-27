@@ -132,7 +132,11 @@ test.describe('Mobile story tests', () => {
     await replayEvents(page, gameplayEvents, { tickFn: 'GravityMode.tick', recordedViewport: viewport });
 
     // The exact real outcome of replaying this exact real session -- verified by actually
-    // running it (not derived by hand).
+    // running it (not derived by hand). cellCount was 88 before replay-driver.js's fix for a real
+    // double-fire bug (a virtual D-pad button's tap dispatches its own keydown synchronously,
+    // which the recorder also captures as a separate log entry -- replaying BOTH double-applied
+    // every rotation press). 84 is the corrected, more faithful outcome; the fix's own regression
+    // test lives in stories.desktop.spec.js.
     const final = await page.evaluate(() => ({
       linesCleared: GravityMode.state.linesCleared,
       cellCount: GravityBoard.cells.size,
@@ -140,7 +144,7 @@ test.describe('Mobile story tests', () => {
       difficulty: GravityMode.state.difficulty,
     }));
     expect(final.linesCleared).toBe(0);
-    expect(final.cellCount).toBe(88);
+    expect(final.cellCount).toBe(84);
     expect(final.isGameOver).toBe(true);
     expect(final.difficulty).toBe(3);
 

@@ -269,4 +269,50 @@ test.describe('Story tests', () => {
 
     await page.screenshot({ path: 'test-results/snake-story-final.png' });
   });
+
+  // Real bug found while investigating issue #23/#29: a virtual D-pad button's click handler
+  // (js/main.js's bindBtn) dispatches its own synthetic keydown SYNCHRONOUSLY, which
+  // Replay.record()'s window-level keydown listener also captures as its own separate log entry
+  // -- so one physical tap leaves BOTH a pointerdown and a keydown in the log, even though they're
+  // the same action, not two inputs. scripts/replay-to-gif.js already accounts for this
+  // (isVirtualButtonTarget + a 50ms "echo" window that skips the redundant keydown), but this
+  // shared replayEvents() never did, silently double-firing every #m-btn-*/#snake-btn-* press.
+  // Snake's steering (an assignment, not an increment) and Gravity's wall-clamped movement happen
+  // to be idempotent enough that this stayed invisible in the existing stories above -- Blast's
+  // free-roaming, unclamped hoverCell (this.state.hoverCell.p += move.p) is not: double-firing a
+  // movement press compounds every single time, and a long D-pad-heavy session drifts the hover
+  // cell far off-board within a few hundred presses (found live while deriving a seed for a
+  // Snake mobile story, via a Blast session's own board state visibly running away to
+  // p=-32,q=-263). Uses Gravity's rotation (a real increment, `(rotation+1)%6`) as the smallest
+  // reproducible case of the same underlying bug.
+  test('replayEvents does not double-fire a virtual D-pad button\'s action from its echoed keydown', async ({ page }) => {
+    // #m-btn-cw only exists (is visible/clickable) on a mobile-width viewport (.mobile-only) --
+    // on desktop's default viewport the pointerdown's own .click() silently no-ops (caught by
+    // resolvePointerdown's .catch()), leaving only the explicit keydown to apply a single,
+    // falsely-reassuring rotation that looks correct by accident, not because double-firing
+    // isn't happening. Found live debugging this exact test.
+    await page.setViewportSize({ width: 411, height: 761 });
+    await page.clock.install({ time: 0 });
+    await page.goto('/#gravity');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.mode-option[data-mode="gravity"]')).toHaveClass(/active/);
+    const loadedAt = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(loadedAt);
+
+    const before = await page.evaluate(() => GravityMode.state.rotation);
+    // Exactly what a real recorded #m-btn-cw press looks like: pointerdown (which itself
+    // dispatches this same keydown synchronously via bindBtn), the echoed keydown, pointerup.
+    await replayEvents(page, [
+      { type: 'pointerdown', t: 1000, target: '#m-btn-cw' },
+      { type: 'keydown', t: 1000, key: ' ', code: 'Space', shiftKey: true },
+      { type: 'pointerup', t: 1050, target: '#m-btn-cw' },
+    ], {});
+    const after = await page.evaluate(() => GravityMode.state.rotation);
+
+    // Gravity's shiftKey=true handler applies (rotation + 5) % 6 per press (see js/gravity.js) --
+    // a real screen-coordinate-vs-lattice-rotation-direction quirk, not a typo (see js/main.js's
+    // own "rotation direction" comment next to this same bindBtn call). One real press should
+    // land here; double-firing would instead give (5+5)%6 = 4.
+    expect((after - before + 6) % 6, 'one recorded press should rotate exactly once, not twice').toBe(5);
+  });
 });
