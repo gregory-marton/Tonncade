@@ -86,10 +86,19 @@ async function resolveModeOptionClick(page, ev, recordedViewport) {
     }
 }
 
+// Every locator click below is speculative -- the recorded target may not exist or may not be
+// actionable in this reconstruction (a transient/conditional element, e.g. a state-gated button).
+// Playwright's default actionability wait is 30s; left uncapped, a session with even a handful of
+// such misses turns a normal-length replay into a multi-minute-or-more hang, one silent 30s wait
+// at a time (found live: a ~2500-event session took long enough to look hung outright). A short
+// explicit timeout keeps a genuine miss cheap without weakening the SUCCESSFUL case, which
+// resolves almost immediately regardless of the cap.
+const CLICK_TIMEOUT_MS = 2000;
+
 async function resolvePointerdown(page, ev, recordedViewport) {
     const target = ev.target;
     if (typeof target === 'string' && target.startsWith('#')) {
-        await page.locator(target).click().catch(() => {});
+        await page.locator(target).click({ timeout: CLICK_TIMEOUT_MS }).catch(() => {});
         return;
     }
     if (target === 'polygon') {
@@ -99,7 +108,8 @@ async function resolvePointerdown(page, ev, recordedViewport) {
             return { p: el.getAttribute('data-p'), q: el.getAttribute('data-q') };
         }, { x: ev.x, y: ev.y });
         if (cell) {
-            await page.locator(`polygon[data-p="${cell.p}"][data-q="${cell.q}"]`).first().click({ force: true }).catch(() => {});
+            await page.locator(`polygon[data-p="${cell.p}"][data-q="${cell.q}"]`).first()
+                .click({ force: true, timeout: CLICK_TIMEOUT_MS }).catch(() => {});
         }
         return;
     }
