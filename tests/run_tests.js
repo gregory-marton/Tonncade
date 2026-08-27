@@ -29,6 +29,24 @@ global.window.matchMedia = function(query) {
 // threw "getBoundingClientRect is not a function" and broke `npm test`'s node step outright.
 const ZERO_RECT = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0 });
 
+// A real DOMTokenList backs add/remove/toggle/contains with actual membership -- the drawer
+// redesign's toggleDrawer()/collapseMobileDrawer() logic reads back .contains('expanded') right
+// after calling .toggle(), so a stub that no-ops (or is missing .contains/.toggle outright) either
+// throws "not a function" or silently mis-tracks state.
+const mockClassList = () => {
+    const set = new Set();
+    return {
+        add: (...classes) => classes.forEach((c) => set.add(c)),
+        remove: (...classes) => classes.forEach((c) => set.delete(c)),
+        toggle: (c, force) => {
+            const want = force === undefined ? !set.has(c) : force;
+            if (want) set.add(c); else set.delete(c);
+            return want;
+        },
+        contains: (c) => set.has(c)
+    };
+};
+
 global.document = {
     createElement: (tag) => ({
         style: {},
@@ -36,6 +54,7 @@ global.document = {
         appendChild: () => {},
         addEventListener: () => {},
         getBoundingClientRect: ZERO_RECT,
+        classList: mockClassList(),
         querySelector: () => ({ setAttribute: () => {}, appendChild: () => {}, addEventListener: () => {} })
     }),
     createElementNS: (ns, tag) => ({
@@ -44,7 +63,7 @@ global.document = {
         appendChild: () => {},
         addEventListener: () => {},
         getBoundingClientRect: ZERO_RECT,
-        classList: { add: () => {}, remove: () => {} }
+        classList: mockClassList()
     }),
     getElementById: (id) => {
         if (id === 'tonnetz-svg') {
@@ -56,7 +75,7 @@ global.document = {
                     svgListeners[type] = callback;
                 },
                 getBoundingClientRect: ZERO_RECT,
-                classList: { add: () => {}, remove: () => {} },
+                classList: mockClassList(),
                 querySelectorAll: () => []
             };
         }
@@ -67,7 +86,7 @@ global.document = {
             insertBefore: () => {},
             addEventListener: () => {},
             getBoundingClientRect: ZERO_RECT,
-            classList: { add: () => {}, remove: () => {} },
+            classList: mockClassList(),
             querySelectorAll: () => []
         };
     },
@@ -77,7 +96,7 @@ global.document = {
             // data-mode from live, unlike the Playwright tests' own getModes() helper) -- keep in
             // sync with index.html's .mode-option list by hand.
             return ['sandbox', 'melody', 'snake', 'blast', 'gravity', 'compose', 'life'].map((mode) => (
-                { getAttribute: () => mode, classList: { add: () => {}, remove: () => {} } }
+                { getAttribute: () => mode, classList: mockClassList() }
             ));
         }
         return [];
@@ -85,7 +104,7 @@ global.document = {
     querySelector: (selector) => {
         return {
             style: {},
-            classList: { add: () => {}, remove: () => {} },
+            classList: mockClassList(),
             getBoundingClientRect: ZERO_RECT,
         };
     },
