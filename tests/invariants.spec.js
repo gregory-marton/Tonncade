@@ -303,21 +303,31 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
-    const sawOffFrame = await page.evaluate(async () => {
-      const midi = Tonnetz.getMidi(0, 0);
-      const cell = document.querySelector(`polygon[data-midi="${midi}"]`);
-      Render.highlightByMidi(midi, 400);
-      await new Promise((r) => setTimeout(r, 150)); // well within the first call's own 400ms window
-      Render.highlightByMidi(midi, 400); // a second, same-pitch call, as two same-pitch notes in a row would produce
-      const rightAfter = cell.classList.contains('active-note');
-      await new Promise((r) => requestAnimationFrame(r));
-      const after1Raf = cell.classList.contains('active-note');
-      await new Promise((r) => requestAnimationFrame(r));
-      const after2Rafs = cell.classList.contains('active-note');
-      return { rightAfter, after1Raf, after2Rafs };
-    });
-    expect(sawOffFrame.rightAfter, 'removed immediately on the second call').toBe(false);
-    expect(sawOffFrame.after2Rafs, 're-added again after yielding to a real paint').toBe(true);
+    // A fake clock, installed only now (after the real-timer-driven auto-play sequence above has
+    // already settled) -- found live: the un-faked version of this test raced two INDEPENDENT
+    // requestAnimationFrame chains against each other (the app's own double-rAF inside
+    // highlightByMidi -- see its own comment for why two, not one -- and this test's separate
+    // polling rAFs), with no ordering guarantee between them; two back-to-back isolated runs of
+    // the exact same test, same code, passed once and failed once under real frame-timing
+    // jitter. page.clock.runFor() advances a fake clock AND fires whatever real timers/rAF
+    // callbacks would have landed in that span, in a single deterministic pass, instead of
+    // racing wall-clock frames.
+    await page.clock.install();
+
+    const midi = await page.evaluate(() => Tonnetz.getMidi(0, 0));
+    await page.evaluate((midi) => Render.highlightByMidi(midi, 400), midi);
+    await page.clock.runFor(150); // well within the first call's own 400ms window
+
+    // A second, same-pitch call, as two same-pitch notes in a row would produce.
+    await page.evaluate((midi) => Render.highlightByMidi(midi, 400), midi);
+    const rightAfter = await page.evaluate((midi) =>
+      document.querySelector(`polygon[data-midi="${midi}"]`).classList.contains('active-note'), midi);
+    expect(rightAfter, 'removed immediately on the second call').toBe(false);
+
+    await page.clock.runFor(50); // comfortably more than two real frames' worth
+    const after2Frames = await page.evaluate((midi) =>
+      document.querySelector(`polygon[data-midi="${midi}"]`).classList.contains('active-note'), midi);
+    expect(after2Frames, 're-added again after yielding to a real paint').toBe(true);
   });
 
   // ────────────────────────────────────────────────────────────────────────
