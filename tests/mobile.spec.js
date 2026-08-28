@@ -1632,6 +1632,27 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   // E. Drawer and Device Layout
   // ────────────────────────────────────────────────────────────────────────
 
+  test('collapsed landscape drawer leaves no blank gap between the rail and the actual content', async ({ page }) => {
+    await page.setViewportSize({ width: 824, height: 549 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
+
+    await page.locator('#drawer-toggle').click();
+    await expect(page.locator('#top-drawer')).toHaveClass(/collapsed/);
+    await page.waitForTimeout(350); // let the max-width collapse transition finish
+
+    // #top-header (rail + collapsed #top-drawer) should be barely wider than the rail itself --
+    // found live via screenshots/index.html: #top-drawer's base horizontal padding (20px each
+    // side, for the portrait/desktop title bar) was never zeroed for landscape's collapse, which
+    // uses max-width:0 rather than height:0 (unlike the portrait collapse, which DOES zero it,
+    // since a zero-HEIGHT box hides leftover horizontal padding regardless). Left uncleared, that
+    // padding rendered as real width on the "collapsed" drawer, pushing #notation-bar/the board
+    // to the right and leaving a wide blank gap between the rail and everything else.
+    const headerBox = await page.locator('#top-header').boundingBox();
+    const railBox = await page.locator('#drawer-handle').boundingBox();
+    expect(headerBox.width, `collapsed #top-header width (${headerBox.width}) vs rail width (${railBox.width})`)
+      .toBeLessThan(railBox.width + 10);
+  });
+
   test('drawer and carousel initialize correctly at landscape widths between the portrait and landscape breakpoints (768-950px)', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
