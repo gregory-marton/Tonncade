@@ -38,20 +38,15 @@ test.describe('Invariant tests', () => {
     for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }, { width: 1280, height: 800 }]) {
       await page.setViewportSize(viewport);
 
-      // The mode list lives inside the collapsible #top-drawer by design (a hamburger-menu
-      // pattern) on mobile/tablet widths — it must be opened before mode buttons are reachable,
-      // and selecting a mode collapses it again (see INV-20), so it has to be reopened before
-      // each subsequent switch. Desktop shows it uncollapsed throughout. This mirrors the real
-      // interaction sequence a user follows, not a workaround for a bug.
-      const isMobile = await page.evaluate(() => Render.isMobileViewport());
-
+      // The mode list lives inside the collapsible #top-drawer (a hamburger-menu pattern), which
+      // now defaults OPEN at every viewport and no longer collapses on mode-select (see INV-20)
+      // — only reopen it here as a defensive fallback in case a prior test/interaction left it
+      // collapsed, not as an expected step in the normal flow.
       for (const mode of MODES) {
-        if (isMobile) {
-          const drawer = page.locator('#top-drawer');
-          if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-            await page.locator('#drawer-handle').click();
-            await expect(drawer).toHaveClass(/expanded/);
-          }
+        const drawer = page.locator('#top-drawer');
+        if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
+          await page.locator('#drawer-toggle').click();
+          await expect(drawer).toHaveClass(/expanded/);
         }
 
         // No {force:true} — Playwright's actionability checks require the element to be
@@ -72,20 +67,21 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     const drawer = page.locator('#top-drawer');
-    const handle = page.locator('#drawer-handle');
+    const toggle = page.locator('#drawer-toggle');
 
     // BUG (found live): 'expanded'/'collapsed' are two sides of one state, not independent
-    // flags -- setting them via two separate classList.toggle() calls can desync, since the
-    // drawer starts with NEITHER class present (see index.html), so the very first toggle adds
-    // BOTH at once instead of just one. Checking exact class equality (not just "contains
-    // expanded") catches that desync; the old assertion here would have passed even with both
-    // classes present simultaneously.
-    await handle.click();
+    // flags -- setting them via two separate classList.toggle() calls can desync. Checking exact
+    // class equality (not just "contains expanded") catches that desync; the old assertion here
+    // would have passed even with both classes present simultaneously. The drawer now defaults
+    // open (index.html's #top-drawer starts with class="expanded"), so the first click here
+    // collapses it rather than expanding it.
     await expect(drawer).toHaveClass('expanded');
-    await handle.click();
+    await toggle.click();
     await expect(drawer).toHaveClass('collapsed');
-    await handle.click();
+    await toggle.click();
     await expect(drawer).toHaveClass('expanded');
+    await toggle.click();
+    await expect(drawer).toHaveClass('collapsed');
   });
 
   test('INV-2: the chord guide, once populated with results, can always be cleared', async ({ page }) => {
@@ -115,33 +111,30 @@ test.describe('Invariant tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
-  // INV-3: No dead click targets — an element JS explicitly relocates into the mobile
-  // "always-visible" area (implying "this should now be reachable") is never left unreachable
-  // by a hidden ancestor. This is the converse of INV-2 and catches the exact bug
-  // #chord-guide-reset had: JS moved the <select> and results into #mobile-always-visible but
-  // left the reset button behind inside a container that then got display:none'd, silently
-  // orphaning it.
+  // INV-3: No dead click targets — anything inside an "always visible" area is never left
+  // unreachable by a hidden ancestor. This is the converse of INV-2 and catches the exact bug
+  // #chord-guide-reset once had: JS moved the <select> and results into the (now-retired)
+  // #mobile-always-visible dock, but left the reset button behind inside a container that then
+  // got display:none'd, silently orphaning it.
   //
-  // Scoped to #mobile-always-visible specifically, not every hidden button app-wide — most
-  // hidden buttons (e.g. #gravity-controls's Pause/Restart while in Sandbox mode) are
-  // correctly hidden because they belong to an inactive mode's own panel, which is normal and
-  // not a bug; #mobile-always-visible is the one container whose whole point is "always
-  // visible," so anything inside it staying hidden is always wrong.
+  // The drawer redesign retired that JS-relocation pattern entirely (Sandbox no longer moves its
+  // chord guide or palette anywhere — both stay in #sidebar, matching Snake's/Life's own panels).
+  // The one remaining "always visible regardless of mode or drawer state" area is #drawer-handle
+  // itself (chevron + mode indicator + action icon toolbar), which is native markup rather than
+  // JS-relocated, but the same invariant still applies: anything inside it must never end up
+  // behind a hidden ancestor for any mode.
   // ────────────────────────────────────────────────────────────────────────
 
-  test('INV-3: nothing moved into the always-visible mobile area is left unreachable by a hidden ancestor', async ({ page }) => {
+  test('INV-3: nothing in the always-visible drawer rail is left unreachable by a hidden ancestor', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const MODES = await getModes(page);
 
-    // Only Sandbox populates #mobile-always-visible's panel now -- Melody's own whole control
-    // panel travels into #notation-bar instead (see js/main.js's updateNotationBar), at every
-    // viewport, not this always-visible dock. Snake/Blast/Gravity correctly leave it
-    // display:none too, which is not what this invariant is about.
-    for (const [mode, panelId] of [['sandbox', 'sandbox-mobile-tools']]) {
+    for (const mode of MODES) {
       await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
-      const problems = await page.evaluate((id) => {
-        const panel = document.getElementById(id);
+      const problems = await page.evaluate(() => {
+        const panel = document.getElementById('drawer-handle');
         const found = [];
-        panel.querySelectorAll('button, select, input').forEach(el => {
+        panel.querySelectorAll('button, a, select, input').forEach(el => {
           if (el.style.display === 'none') return; // intentionally self-hidden, not orphaned
           let ancestor = el.parentElement;
           while (ancestor && ancestor !== document.body) {
@@ -153,7 +146,7 @@ test.describe('Invariant tests', () => {
           }
         });
         return found;
-      }, panelId);
+      });
       expect(problems, `mode=${mode}`).toEqual([]);
     }
   });
@@ -780,14 +773,10 @@ test.describe('Invariant tests', () => {
       // 2. Rotate the lattice view -- Gravity is the one documented exception (INV-24: always
       // renders at 0deg, no rotate control at all), so it's skipped here, not silently failed.
       if (mode !== 'gravity') {
-        // The rotate button only needs to be REACHABLE, not permanently visible -- open the
-        // collapsible drawer first, same as a real player would (mirrors INV-13's own pattern).
-        // Skipping this is what made an earlier version of this test misread an unopened
-        // drawer's clipped-away button as a genuine overlap with #chord-guide-select.
-        const drawer = page.locator('#top-drawer');
-        if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-          await page.locator('#drawer-handle').click();
-        }
+        // #rotate-view-btn lives in #header-icons on the always-visible drawer rail now (the
+        // drawer redesign moved the action-icon toolbar out of the collapsible part), so it's
+        // reachable regardless of the drawer's own expand/collapse state -- no need to open it
+        // first the way earlier versions of this test had to.
         const rotateBtn = page.locator('#rotate-view-btn');
         if (await rotateBtn.count() > 0 && await rotateBtn.isVisible()) {
           await rotateBtn.click();
@@ -944,7 +933,7 @@ test.describe('Invariant tests', () => {
         // collapsible drawer first, same as a real player would (mirrors INV-1's pattern).
         const drawer = page.locator('#top-drawer');
         if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-          await page.locator('#drawer-handle').click();
+          await page.locator('#drawer-toggle').click();
           await expect(drawer).toHaveClass(/expanded/);
         }
 
@@ -1273,17 +1262,8 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
     await page.keyboard.press('ArrowLeft');
 
-    // The link lives inside the collapsible #top-drawer on mobile/tablet widths (see INV-1) —
-    // open it first, same as any real player would.
-    const isMobile = await page.evaluate(() => Render.isMobileViewport());
-    if (isMobile) {
-      const drawer = page.locator('#top-drawer');
-      if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-        await page.locator('#drawer-handle').click();
-        await expect(drawer).toHaveClass(/expanded/);
-      }
-    }
-
+    // #report-bug-link lives in #header-icons on the always-visible drawer rail now, reachable
+    // regardless of the drawer's own expand/collapse state.
     const downloadPromise = page.waitForEvent('download');
     await page.locator('#report-bug-link').click();
     const download = await downloadPromise;
@@ -1329,15 +1309,8 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
     await page.keyboard.press('ArrowLeft');
 
-    const isMobile = await page.evaluate(() => Render.isMobileViewport());
-    if (isMobile) {
-      const drawer = page.locator('#top-drawer');
-      if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-        await page.locator('#drawer-handle').click();
-        await expect(drawer).toHaveClass(/expanded/);
-      }
-    }
-
+    // #report-bug-link lives in #header-icons on the always-visible drawer rail now, reachable
+    // regardless of the drawer's own expand/collapse state.
     await page.locator('#report-bug-link').click();
 
     // reportBug() awaits the clipboard write before calling window.open(), so once __openedUrl
@@ -1406,25 +1379,39 @@ test.describe('Invariant tests', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────
-  // INV-20: On mobile, picking a mode from the drawer must collapse it afterward. Found via a
-  // real bug report's replayed session: App.collapseMobileDrawer() exists and is already wired
-  // up for the Sandbox chord-guide picker (js/sandbox.js), but was never called from the
-  // mode-option click handler itself (js/main.js's setMode) -- so opening the drawer to switch
-  // modes left it expanded, permanently occupying screen space, for the rest of the session.
+  // INV-20: The drawer defaults open at every viewport (docs/invariants.md's redesign) and no
+  // longer collapses when a mode is picked -- that used to fight with defaulting it open, since
+  // every mode switch would immediately hide it again. Instead, on small viewports only, the
+  // FIRST real interaction with the game surface itself (a board tap or D-pad press, both routed
+  // through #main-content) collapses it to reclaim screen space. Larger viewports never
+  // auto-collapse this way.
   // ────────────────────────────────────────────────────────────────────────
 
-  test('INV-20: selecting a mode from the mobile drawer collapses the drawer afterward', async ({ page }) => {
+  test('INV-20: on small viewports, the first game interaction collapses the drawer -- selecting a mode does not', async ({ page }) => {
     const isMobile = await page.evaluate(() => Render.isMobileViewport());
-    test.skip(!isMobile, 'the drawer only exists at mobile/tablet widths');
+    test.skip(!isMobile, 'auto-collapse-on-interaction only applies at mobile/tablet widths');
 
     const drawer = page.locator('#top-drawer');
-    await page.locator('#drawer-handle').click();
+    // Open by default -- selecting a mode must NOT collapse it.
+    await expect(drawer).toHaveClass(/expanded/);
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
     await expect(drawer).toHaveClass(/expanded/);
 
-    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
-
-    await expect(drawer).not.toHaveClass(/expanded/);
+    // The first tap on the game surface itself collapses it instead.
+    await page.locator('#tonnetz-svg').click({ position: { x: 5, y: 5 }, force: true });
     await expect(drawer).toHaveClass(/collapsed/);
+  });
+
+  test('INV-20: at desktop width, interacting with the game surface never auto-collapses the drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const isMobile = await page.evaluate(() => Render.isMobileViewport());
+    expect(isMobile).toBe(false);
+
+    const drawer = page.locator('#top-drawer');
+    await expect(drawer).toHaveClass(/expanded/);
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.locator('#main-content').click({ position: { x: 5, y: 5 }, force: true });
+    await expect(drawer).toHaveClass(/expanded/);
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -1717,6 +1704,16 @@ test.describe('Invariant tests', () => {
       await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
       await page.waitForTimeout(300);
 
+      // The drawer defaults open now (drawer UX redesign) and eats real vertical room at these
+      // short portrait heights -- this invariant is about the board-fit LOGIC, independent of
+      // that transient UI state, so collapse it before measuring, same as pre-redesign geometry
+      // (drawer collapsed) assumed.
+      const drawer = page.locator('#top-drawer');
+      if (await drawer.evaluate(el => el.classList.contains('expanded'))) {
+        await page.locator('#drawer-toggle').click();
+        await page.waitForTimeout(350);
+      }
+
       const info = await page.evaluate(() => {
         const cells = [];
         for (let p = -7; p <= 7; p++) for (let q = -7; q <= 7; q++) if (SnakeMode.isInBounds(p, q)) cells.push({ p, q });
@@ -1765,6 +1762,17 @@ test.describe('Invariant tests', () => {
         await page.setViewportSize(vp);
         await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
         await page.waitForTimeout(200);
+
+        // The drawer defaults open now (drawer UX redesign) and eats real room at some of these
+        // sizes -- this invariant is about the viewBox-fit LOGIC, independent of that transient
+        // UI state, so collapse it before measuring, same as pre-redesign geometry (drawer
+        // collapsed) assumed.
+        const drawer = page.locator('#top-drawer');
+        if (await drawer.evaluate(el => el.classList.contains('expanded'))) {
+          await page.locator('#drawer-toggle').click();
+          await page.waitForTimeout(300);
+        }
+
         const { viewAspect, containerAspect } = await page.evaluate(() => {
           const vb = Render.svg.getAttribute('viewBox').split(/\s+/).map(Number);
           const gc = document.getElementById('game-container').getBoundingClientRect();

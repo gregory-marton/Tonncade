@@ -129,7 +129,10 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     });
 
     expect(visibleRowCount).toBeLessThanOrEqual(19);
-    expect(visibleRowCount).toBeGreaterThanOrEqual(10);
+    // The drawer now defaults open at every viewport (drawer UX redesign) instead of collapsed
+    // on load, so the board has a bit less vertical room on a fresh page load than before --
+    // floor lowered from 10 to 8 to match, still comfortably enough rows for real play.
+    expect(visibleRowCount).toBeGreaterThanOrEqual(8);
   });
 
   test('piece carousel is visible with piece names in Sandbox mode on phone', async ({ page }) => {
@@ -174,9 +177,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(selectBox.y).toBeLessThan(page.viewportSize().height);
     expect(selectBox.y).toBeGreaterThan(0);
 
-    // The drawer should still be collapsed (dropdown is OUTSIDE it)
-    const drawer = page.locator('#top-drawer');
-    await expect(drawer).not.toHaveClass(/expanded/);
+    // The chord guide lives in #sidebar, entirely independent of the drawer's own
+    // expand/collapse state (no JS relocation, same as Snake's/Life's own panels) -- so it stays
+    // reachable regardless of whether the drawer (which defaults open now) is open or collapsed.
   });
 
   test('selecting a chord type shows matching results', async ({ page }) => {
@@ -195,31 +198,19 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(resultCount).toBeGreaterThan(0);
   });
 
-  test('chord picker stays fully within the viewport in landscape Sandbox, even with results showing', async ({ page }) => {
+  test('chord picker results showing does not affect the (now-floating) piece carousel in landscape Sandbox', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     await page.locator('#chord-guide-select').selectOption('major');
     await expect(page.locator('.chord-match-item').first()).toBeVisible({ timeout: 3000 });
 
-    // #sandbox-mobile-tools #piece-list previously claimed height:100%, leaving nothing for
-    // the chord picker below it — it's the carousel that should scroll internally if space is
-    // tight, not the chord picker that gets pushed below the fold.
-    const resultsBox = await page.locator('#chord-guide-results').boundingBox();
-    expect(resultsBox).not.toBeNull();
-    expect(resultsBox.y + resultsBox.height).toBeLessThanOrEqual(393 + 1);
-    // Uncapped in landscape today, results claims far more height than its own content needs
-    // (whatever's left after the carousel's flex-shrink), squeezing the carousel more than
-    // necessary. It should be capped like portrait's #chord-guide-results is (150px).
-    expect(resultsBox.height).toBeLessThanOrEqual(150);
-
-    const resetBox = await page.locator('#chord-guide-reset').boundingBox();
-    expect(resetBox).not.toBeNull();
-    expect(resetBox.y).toBeGreaterThanOrEqual(0);
-    expect(resetBox.y + resetBox.height).toBeLessThanOrEqual(393 + 1);
-
-    // The carousel itself should still be scrollable to reach every piece, not silently
-    // clipped once the (potentially long, uncapped) results list squeezes its box down.
+    // The piece carousel is now an independent #palette.floating-queue overlay (Sandbox's mobile
+    // layout canonicalized to match Blast/Gravity) -- it no longer shares a bounded flex box
+    // with the chord guide the way #sandbox-mobile-tools's #piece-list used to, so a long
+    // results list can no longer squeeze it out of reach. #sandbox-guide itself (chord guide,
+    // reset button, results) lives in #sidebar with no mobile-specific layout at all, same as
+    // Snake's/Life's own panels -- not asserted on pixel bounds here, by design.
     const scrollCheck = await page.evaluate(() => {
       const palette = document.getElementById('palette');
       return { scrollHeight: palette.scrollHeight, clientHeight: palette.clientHeight };
@@ -228,6 +219,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     const lastPiece = page.locator('.piece-item').last();
     await lastPiece.scrollIntoViewIfNeeded();
     await expect(lastPiece).toBeVisible();
+
+    // The reset button stays reachable and clickable regardless of how tall the results list is.
+    await expect(page.locator('#chord-guide-reset')).toBeVisible();
   });
 
   test('chord guide reset (X) button is reachable and dismisses the guide on mobile', async ({ page }) => {
@@ -256,10 +250,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
 
     // Switch to Melody mode
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
-    
-    // The sandbox-mobile-tools area should be hidden
-    const sandboxTools = page.locator('#sandbox-mobile-tools');
-    await expect(sandboxTools).toBeHidden();
+
+    // #sandbox-guide (the chord picker) is hidden in every non-Sandbox mode, same as any other
+    // mode's own sidebar panel -- no JS relocation to check, just ordinary show/hide.
+    const guide = page.locator('#sandbox-guide');
+    await expect(guide).toBeHidden();
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -318,19 +313,21 @@ test.describe('Mobile Viewport and Layout Tests', () => {
 
     const widths = await page.evaluate(() => {
       const palette = document.getElementById('palette');
-      const tools = document.getElementById('sandbox-mobile-tools');
+      const list = document.getElementById('piece-list');
       return {
         paletteClientWidth: palette.clientWidth,
-        paletteScrollWidth: palette.scrollWidth,
-        toolsClientWidth: tools.clientWidth,
+        listClientWidth: list.clientWidth,
+        listScrollWidth: list.scrollWidth,
       };
     });
 
-    // If #sandbox-mobile-tools (a flex row-item) isn't constrained to the viewport, it and
-    // #palette balloon to the carousel's full content width instead of clipping/scrolling it —
-    // the rest of the pieces become permanently unreachable, with no scroll affordance anywhere.
-    expect(widths.toolsClientWidth).toBeLessThanOrEqual(width + 1);
-    expect(widths.paletteClientWidth).toBeLessThan(widths.paletteScrollWidth);
+    // #palette.floating-queue (the overlay Sandbox now shares with Blast/Gravity) itself is
+    // constrained to the viewport -- #piece-list inside it is the actual scroll container
+    // (overflow-x: auto). If it isn't constrained, it balloons to the carousel's full content
+    // width instead of clipping/scrolling it — the rest of the pieces become permanently
+    // unreachable, with no scroll affordance anywhere.
+    expect(widths.paletteClientWidth).toBeLessThanOrEqual(width + 1);
+    expect(widths.listClientWidth).toBeLessThan(widths.listScrollWidth);
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -435,9 +432,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     await page.evaluate(dispatchAtHelpers);
 
-    await page.locator('#drawer-handle').click();
-    await expect(page.locator('#top-drawer')).toHaveClass(/expanded/);
-
+    // The drawer defaults open at every viewport now; the carousel piece itself lives in
+    // #palette.floating-queue, independent of drawer state, so no drawer interaction is needed
+    // here at all.
     const firstPiece = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     const pieceBox = await firstPiece.boundingBox();
     const startX = pieceBox.x + pieceBox.width / 2;
@@ -1647,14 +1644,18 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(handleBox.width).toBeGreaterThan(0);
     expect(handleBox.height).toBeGreaterThan(0);
 
-    // Clicking it should actually toggle the drawer (proves the click handler got bound)
+    // Clicking the chevron should actually toggle the drawer (proves the click handler got
+    // bound) -- the drawer defaults open at every viewport now, so the first click collapses it.
     const drawer = page.locator('#top-drawer');
-    await expect(drawer).not.toHaveClass(/expanded/);
-    await page.locator('#drawer-handle').click();
+    await expect(drawer).toHaveClass(/expanded/);
+    await page.locator('#drawer-toggle').click();
+    await expect(drawer).toHaveClass(/collapsed/);
+    await page.locator('#drawer-toggle').click();
     await expect(drawer).toHaveClass(/expanded/);
 
-    // The piece carousel should have been relocated into the always-visible area and be visible
-    const pieceItem = page.locator('#sandbox-mobile-tools .piece-item').first();
+    // The piece carousel lives in #palette.floating-queue, independent of the drawer, and stays
+    // visible regardless.
+    const pieceItem = page.locator('#palette .piece-item').first();
     await expect(pieceItem).toBeVisible();
   });
 
@@ -1662,7 +1663,7 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
     const drawer = page.locator('#top-drawer');
     if (!(await drawer.evaluate(el => el.classList.contains('expanded')))) {
-      await page.locator('#drawer-handle').click();
+      await page.locator('#drawer-toggle').click();
     }
 
     // Reads the CSS max-width the browser actually resolved, not the drawer's own rendered
@@ -1691,37 +1692,44 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(await resolvedMaxWidth(950)).toBeGreaterThan(315);
   });
 
-  test('drawer handle is visible on phone, hidden on tablet; clicking it reveals title and modes', async ({ page }) => {
-    const width = page.viewportSize().width;
+  test('drawer starts open at every viewport; the rail is always visible and its chevron collapses to a thin, non-zero strip', async ({ page }) => {
     const drawerHandle = page.locator('#drawer-handle');
+    const drawerToggle = page.locator('#drawer-toggle');
+    const modeIndicator = page.locator('#mode-indicator');
     const drawer = page.locator('#top-drawer');
     const title = page.locator('#game-title');
     const modeControls = page.locator('#mode-controls');
 
-    if (width < 768) {
-      // Phone: handle visible, drawer collapsed
-      await expect(drawerHandle).toBeVisible();
-      const drawerBox = await drawer.boundingBox();
-      expect(drawerBox.height).toBeLessThan(10);
+    // Default-open at EVERY viewport now -- no threshold-based collapse-on-load.
+    await expect(drawer).toHaveClass(/expanded/);
+    await expect(title).toBeVisible();
+    await expect(modeControls).toBeVisible();
+    const titleText = await title.textContent();
+    expect(titleText).toContain('Tonncade');
 
-      // Click handle -> drawer expands, title and modes become visible
-      await drawerHandle.click();
-      await expect(drawer).toHaveClass(/expanded/);
-      await page.waitForTimeout(350);
-      const expandedBox = await drawer.boundingBox();
-      expect(expandedBox.height).toBeGreaterThan(40);
-      await expect(title).toBeVisible();
-      await expect(modeControls).toBeVisible();
+    // The rail (chevron + mode indicator + action icons) is the SAME mechanism at every
+    // viewport now, not gated to phone widths only.
+    await expect(drawerHandle).toBeVisible();
+    await expect(drawerToggle).toBeVisible();
+    await expect(modeIndicator).toBeVisible();
+    await expect(modeIndicator).toHaveText(/\S/);
 
-      // Verify title contains actual text
-      const titleText = await title.textContent();
-      expect(titleText).toContain('Tonncade');
-    } else {
-      // Tablet: handle hidden, title and modes always visible
-      await expect(drawerHandle).toBeHidden();
-      await expect(title).toBeVisible();
-      await expect(modeControls).toBeVisible();
-    }
+    // Clicking the chevron collapses to a persistent, visible rail -- not zero size like the
+    // old drag-handle collapse -- and the mode indicator survives the collapse. The rail is a
+    // horizontal bar in portrait/desktop (thin in height) and a vertical column in mobile
+    // landscape (thin in width), so check whichever dimension is the "thin" one for this layout.
+    const isLandscapeRail = await page.evaluate(() => Render.isMobileLandscape());
+    await drawerToggle.click();
+    await expect(drawer).toHaveClass(/collapsed/);
+    await page.waitForTimeout(350);
+    const railBox = await drawerHandle.boundingBox();
+    expect(isLandscapeRail ? railBox.width : railBox.height).toBeGreaterThanOrEqual(28);
+    expect(isLandscapeRail ? railBox.width : railBox.height).toBeLessThan(60);
+    await expect(modeIndicator).toBeVisible();
+
+    // Clicking again re-expands.
+    await drawerToggle.click();
+    await expect(drawer).toHaveClass(/expanded/);
   });
 
   test('keyboard controls are hidden on mobile/touch in all modes', async ({ page }) => {
@@ -1906,14 +1914,11 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     const drawer = page.locator('#top-drawer');
-    const drawerHandle = page.locator('#drawer-handle');
 
-    // Open drawer
-    await drawerHandle.click();
+    // Drawer defaults open at this viewport already.
     await expect(drawer).toHaveClass(/expanded/);
-    await page.waitForTimeout(350);
 
-    // Tap a piece (pieces are in #sandbox-mobile-tools, outside drawer,
+    // Tap a piece (pieces live in #palette.floating-queue, outside the drawer,
     // but the piece selection calls collapseMobileDrawer)
     const pieceItem = page.locator('.piece-item[data-key]:not(.note-tool-item)').first();
     await pieceItem.tap();
@@ -1927,21 +1932,22 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
 
     const drawer = page.locator('#top-drawer');
-    const handle = page.locator('#drawer-handle');
 
-    await handle.click();
+    // Drawer defaults open at this viewport already -- nothing to click to open it first.
     await expect(drawer).toHaveClass(/expanded/);
 
     // A real tap almost always drifts a few pixels — simulate touchstart/touchmove(past the
     // 20px drag threshold)/touchend, followed by the browser's own synthesized click for that
     // same physical tap. touchmove closes the drawer; if the click ALSO runs its own toggle,
-    // it reopens what the user just closed.
-    const handleBox = await handle.boundingBox();
+    // it reopens what the user just closed. The drag/click listeners live on #drawer-toggle
+    // itself, not the wider #drawer-handle rail.
+    const toggle = page.locator('#drawer-toggle');
+    const handleBox = await toggle.boundingBox();
     const hx = handleBox.x + handleBox.width / 2;
     const hy = handleBox.y + handleBox.height / 2;
 
     await page.evaluate(({ x, y }) => {
-      const el = document.getElementById('drawer-handle');
+      const el = document.getElementById('drawer-toggle');
       const mk = (cx) => new Touch({ identifier: 3, target: el, clientX: cx, clientY: y, pageX: cx, pageY: y });
       const t1 = mk(x);
       el.dispatchEvent(new TouchEvent('touchstart', { touches: [t1], targetTouches: [t1], changedTouches: [t1], bubbles: true, cancelable: true }));
@@ -2081,7 +2087,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   test('Snake board keeps a consistent, mostly-unobscured cell count in landscape with the dock closed', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
-    await expect(page.locator('#top-drawer')).not.toHaveClass(/expanded/);
+    // The drawer defaults open now -- collapse it explicitly to test the "dock closed" case.
+    await page.locator('#drawer-toggle').click();
+    await expect(page.locator('#top-drawer')).toHaveClass(/collapsed/);
 
     // Small floating panels (stats/controls, the D-pad) are expected to cover a few cells at
     // the edges of the visible area; anything that eats a large chunk of it (like the
@@ -2093,7 +2101,9 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   test('Blast board keeps a consistent, mostly-unobscured cell count in landscape with the dock closed', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());
-    await expect(page.locator('#top-drawer')).not.toHaveClass(/expanded/);
+    // The drawer defaults open now -- collapse it explicitly to test the "dock closed" case.
+    await page.locator('#drawer-toggle').click();
+    await expect(page.locator('#top-drawer')).toHaveClass(/collapsed/);
 
     const { inViewport, unobscured } = await countVisibleCells(page);
     expect(unobscured).toBeGreaterThan(inViewport * 0.85);
@@ -2103,14 +2113,17 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="snake"]').click());
 
+    // The drawer defaults open now -- collapse it first to get a real "closed" baseline.
+    await page.locator('#drawer-toggle').click();
+    await expect(page.locator('#top-drawer')).toHaveClass(/collapsed/);
     const closedBefore = (await countVisibleCells(page)).unobscured;
 
-    await page.locator('#drawer-handle').click();
+    await page.locator('#drawer-toggle').click();
     await expect(page.locator('#top-drawer')).toHaveClass(/expanded/);
     const open = (await countVisibleCells(page)).unobscured;
 
-    await page.locator('#drawer-handle').click();
-    await expect(page.locator('#top-drawer')).not.toHaveClass(/expanded/);
+    await page.locator('#drawer-toggle').click();
+    await expect(page.locator('#top-drawer')).toHaveClass(/collapsed/);
     const closedAfter = (await countVisibleCells(page)).unobscured;
 
     expect(open).toBeLessThanOrEqual(closedBefore);

@@ -20,7 +20,52 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
 <body>
     <div id="app">
         <header id="top-header">
-            <div id="top-drawer">
+            <!-- The always-visible rail: evolved from the old drag-only drawer-handle. Deliberately
+                 #top-header's FIRST child (true screen edge -- left in the landscape side-column
+                 layout, top in portrait/desktop's horizontal layout) so it's never sandwiched
+                 behind other header content the way the old #mobile-always-visible was. Shown at
+                 every viewport now (no .mobile-only) -- one collapse/expand mechanism everywhere,
+                 not a separate desktop-only design. -->
+            <div id="drawer-handle">
+                <button type="button" id="drawer-toggle" aria-label="Toggle menu" title="Toggle menu">
+                    <span class="chevron" aria-hidden="true">&#x25BE;</span>
+                </button>
+                <span id="mode-indicator" aria-hidden="true">Sandbox</span>
+                <div id="header-icons">
+                    <a href="#" id="report-bug-link"
+                       aria-label="Report a bug on GitHub" title="Report a bug on GitHub"
+                       style="text-decoration: none; opacity: 0.6; transition: opacity 0.15s ease;"
+                       onmouseover="this.style.opacity='1'"
+                       onmouseout="this.style.opacity='0.6'">&#x1F99F;</a>
+                    <button type="button" id="midi-connect-btn"
+                       aria-label="Connect a MIDI keyboard" title="Connect a MIDI keyboard"
+                       style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease; vertical-align: middle;"
+                       onmouseover="this.style.opacity='1'"
+                       onmouseout="this.style.opacity=this.classList.contains('connected') ? '1' : '0.6'">&#x1F3B9;</button>
+                    <button type="button" id="rotate-view-btn"
+                       aria-label="Rotate the Tonnetz view" title="Rotate the Tonnetz view"
+                       style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
+                       onmouseover="this.style.opacity='1'"
+                       onmouseout="this.style.opacity='0.6'">&#x1F504;</button>
+                    <button type="button" id="copy-btn"
+                       aria-label="Copy placed cells (Ctrl/Cmd+C)" title="Copy placed cells (Ctrl/Cmd+C)"
+                       style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
+                       onmouseover="this.style.opacity='1'"
+                       onmouseout="this.style.opacity='0.6'">&#x1F4C4;</button>
+                    <button type="button" id="paste-btn"
+                       aria-label="Paste cells here (Ctrl/Cmd+V)" title="Paste cells here (Ctrl/Cmd+V)"
+                       style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
+                       onmouseover="this.style.opacity='1'"
+                       onmouseout="this.style.opacity='0.6'">&#x1F4CB;</button>
+                    <button type="button" id="undo-btn"
+                       aria-label="Undo (Ctrl/Cmd+Z)" title="Undo (Ctrl/Cmd+Z)"
+                       style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
+                       onmouseover="if (!this.disabled) this.style.opacity='1'"
+                       onmouseout="this.style.opacity=this.disabled ? '0.25' : '0.6'">&#x21A9;&#xFE0F;</button>
+                </div>
+            </div>
+
+            <div id="top-drawer" class="expanded">
                 <div class="header-left" id="menu-toggle" style="display: flex; flex-direction: column; justify-content: center; gap: 2px;">
                     <h1 id="game-title" style="margin: 0; line-height: 1.1; font-size: 24px;">Tonncade
                         <a href="https://github.com/gregory-marton/Tonncade" target="_blank" rel="noopener noreferrer" id="see-the-code-link"
@@ -28,36 +73,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                            style="color: var(--dim); text-decoration: none; transition: color 0.15s ease;"
                            onmouseover="this.style.color='var(--accent)'"
                            onmouseout="this.style.color='var(--dim)'">&lt;/&gt; <span class="version-tag">local</span></a>
-                        <a href="#" id="report-bug-link"
-                           aria-label="Report a bug on GitHub" title="Report a bug on GitHub"
-                           style="text-decoration: none; opacity: 0.6; transition: opacity 0.15s ease;"
-                           onmouseover="this.style.opacity='1'"
-                           onmouseout="this.style.opacity='0.6'">&#x1F99F;</a>
-                        <button type="button" id="midi-connect-btn"
-                           aria-label="Connect a MIDI keyboard" title="Connect a MIDI keyboard"
-                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease; vertical-align: middle;"
-                           onmouseover="this.style.opacity='1'"
-                           onmouseout="this.style.opacity=this.classList.contains('connected') ? '1' : '0.6'">&#x1F3B9;</button>
-                        <button type="button" id="rotate-view-btn"
-                           aria-label="Rotate the Tonnetz view" title="Rotate the Tonnetz view"
-                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
-                           onmouseover="this.style.opacity='1'"
-                           onmouseout="this.style.opacity='0.6'">&#x1F504;</button>
-                        <button type="button" id="copy-btn"
-                           aria-label="Copy placed cells (Ctrl/Cmd+C)" title="Copy placed cells (Ctrl/Cmd+C)"
-                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
-                           onmouseover="this.style.opacity='1'"
-                           onmouseout="this.style.opacity='0.6'">&#x1F4C4;</button>
-                        <button type="button" id="paste-btn"
-                           aria-label="Paste cells here (Ctrl/Cmd+V)" title="Paste cells here (Ctrl/Cmd+V)"
-                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
-                           onmouseover="this.style.opacity='1'"
-                           onmouseout="this.style.opacity='0.6'">&#x1F4CB;</button>
-                        <button type="button" id="undo-btn"
-                           aria-label="Undo (Ctrl/Cmd+Z)" title="Undo (Ctrl/Cmd+Z)"
-                           style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;"
-                           onmouseover="if (!this.disabled) this.style.opacity='1'"
-                           onmouseout="this.style.opacity=this.disabled ? '0.25' : '0.6'">&#x21A9;&#xFE0F;</button>
                     </h1>
                     <a href="https://en.wikipedia.org/wiki/Special:MyLanguage/Tonnetz" target="_blank" rel="noopener noreferrer"
                        style="color: var(--dim); font-size: 11px; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.2); transition: color 0.15s ease; width: fit-content;"
@@ -80,12 +95,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 </div>
                 <div id="drawer-injected-tools" style="display: none; padding: 10px; border-top: 1px solid var(--border);"></div>
             </div>
-            
-            <div id="mobile-always-visible" class="mobile-only" style="width: 100%;">
-                <div id="sandbox-mobile-tools" style="display: none;"></div>
-            </div>
-            
-            <div id="drawer-handle" class="mobile-only"></div>
         </header>
 
         <div id="main-content">

@@ -18,6 +18,10 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
        of the bottom viewport than the home-indicator safe area alone accounts for, so this
        combines a generous static floor with env(safe-area-inset-bottom) on top for the rest. */
     --mobile-pad-safe-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    /* Same reasoning, top edge: a notch/status-bar/address-bar can cover the title/drawer even
+       with viewport-fit=cover's env() alone accounted for on some devices -- a small static
+       floor plus env(safe-area-inset-top) on top, mirroring the bottom property above. */
+    --mobile-pad-safe-top: calc(4px + env(safe-area-inset-top, 0px));
 }
 
 body {
@@ -32,33 +36,116 @@ body {
     display: flex;
     flex-direction: column;
     width: 100vw;
-    height: 100vh;
+    /* dvh (not vh): tracks the ACTUAL visible viewport as mobile browser chrome (address bar)
+       shows/hides, instead of vh's "as if chrome were never there" static value -- was already
+       true for the landscape mobile layout's own #main-content/#top-header rules, now true at
+       the #app level everywhere so #main-content's flex-fill sizing (below) is never stale. */
+    height: 100dvh;
 }
 
+/* No longer a fixed height: sized by its own content (the always-visible rail plus whatever
+   height #top-drawer currently needs, zero when collapsed) so the collapsed rail can be its own
+   real, small height instead of leaving dead space or requiring a second, separately-maintained
+   height constant. Safe-area-top padding lives here, once, rather than on each child. */
 #top-header {
-    height: 60px;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
+    flex-direction: column;
     box-sizing: border-box;
+    padding-top: var(--mobile-pad-safe-top);
     z-index: 15;
 }
 
+/* The always-visible rail -- see index.html's own comment on why it's #top-header's first
+   child. 32px: enough for real icon buttons (task from live feedback), not just a grip mark. */
+#drawer-handle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    flex-shrink: 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+#drawer-handle .chevron {
+    display: inline-block;
+    transition: transform 0.25s ease;
+}
+
+/* Points down (expanded, "collapse me") by default; flips to point right once collapsed
+   ("expand me") -- standard sidebar-toggle convention. */
+#drawer-handle.drawer-expanded .chevron {
+    transform: rotate(0deg);
+}
+#drawer-handle:not(.drawer-expanded) .chevron {
+    transform: rotate(-90deg);
+}
+
+#drawer-toggle {
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    /* Beat the global `button { width: 100% }` (css line ~740) -- without this the button
+       stretches to fill the row (flex-basis:auto resolves to that 100%), swallowing the space
+       #mode-indicator needs. Same fix as .icon-btn's own (see that rule's comment). */
+    width: auto;
+}
+
+#mode-indicator {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#header-icons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+/* #top-drawer's own height carries the expand/collapse animation now (#top-header itself just
+   sizes to whatever its children need) -- 60px matches the header's own historical fixed
+   height, now scoped to just the part that actually collapses. */
 #top-drawer {
     display: flex;
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    height: 60px;
+    padding: 0 20px;
+    box-sizing: border-box;
+    overflow: hidden;
+    transition: height 0.3s ease, opacity 0.2s ease;
 }
 
+#top-drawer.collapsed {
+    height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+/* flex:1 (not a hardcoded height calc) so this always fills whatever #top-header didn't use --
+   correct automatically as the header's own height changes (rail-only when collapsed, rail +
+   60px when expanded), instead of a second place that has to agree with #top-header's height. */
 #main-content {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 60px);
+    flex: 1;
+    min-height: 0;
     width: 100%;
 }
 
@@ -121,10 +208,6 @@ body {
     min-width: 0; /* let it shrink below its content's natural width instead of overflowing */
 }
 
-.mobile-only {
-    display: none !important;
-}
-
 #sidebar {
     width: 300px;
     height: 100%;
@@ -154,9 +237,13 @@ h1 { font-size: 20px; margin: 0; }
     overflow-y: auto;
 }
 
+/* Single column, scrolling (via #palette's own overflow-y:auto) instead of a 2-column grid --
+   "1xN instead of 2xN, let folks scroll" (live feedback). The mobile .floating-queue variant
+   already does the equivalent (a single scrollable row) in its own orientation; this is just the
+   base/sidebar case. */
 #piece-list {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(1, 1fr);
     gap: 10px;
 }
 
@@ -1122,13 +1209,7 @@ button:hover {
 /* Responsive UI: Stacks side-by-side components on mobile phones */
 @media (max-width: 767px) {
     #top-header {
-        height: auto;
-        flex-direction: column;
         align-items: stretch;
-        padding: 0;
-        gap: 0;
-        background: var(--panel);
-        border-bottom: 1px solid var(--border);
         position: relative;
         z-index: 120;
     }
@@ -1136,11 +1217,13 @@ button:hover {
     #top-drawer {
         display: flex;
         flex-direction: column;
+        height: auto;
         max-height: 0;
         overflow: hidden;
         transition: max-height 0.3s ease;
         background: var(--bg);
         border-bottom: 1px solid var(--border);
+        padding: 0;
     }
 
     .header-left {
@@ -1154,11 +1237,6 @@ button:hover {
 
     .header-left a {
         display: none; /* Hide the wikipedia link on mobile */
-    }
-
-    #report-bug-link {
-        display: inline; /* Exception: mobile is exactly where this link matters most, since
-                             there's no console access without a second, tethered computer. */
     }
 
     #mode-controls {
@@ -1185,60 +1263,6 @@ button:hover {
         overflow-y: auto;
     }
 
-    #drawer-handle {
-        width: 100%;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: transparent;
-        cursor: ns-resize;
-        touch-action: none; /* Prevent scrolling when dragging */
-    }
-
-    #drawer-handle::after {
-        content: '';
-        width: 40px;
-        height: 4px;
-        background: var(--dim);
-        border-radius: 2px;
-        opacity: 0.6;
-    }
-
-    #sandbox-mobile-tools #palette {
-        overflow-y: hidden;
-        overflow-x: auto;
-        padding-bottom: 5px;
-        flex-grow: 0;
-        -webkit-overflow-scrolling: touch;
-        touch-action: pan-x; /* Allow native horizontal scrolling */
-    }
-
-    #sandbox-mobile-tools #piece-list {
-        display: flex;
-        flex-direction: row;
-        gap: 10px;
-        width: max-content;
-    }
-
-    #sandbox-mobile-tools .piece-item {
-        width: 60px;
-        padding: 5px;
-        flex-shrink: 0;
-    }
-    
-    #sandbox-mobile-tools .piece-preview {
-        height: 40px;
-    }
-
-    #sandbox-mobile-tools .note-tool-glyph {
-        line-height: 40px;
-    }
-
-    #sandbox-mobile-tools .piece-name {
-        font-size: 10px;
-    }
-
     #mode-controls {
         height: auto;
         padding: 10px;
@@ -1247,48 +1271,11 @@ button:hover {
         box-sizing: border-box;
     }
 
-    #sandbox-mobile-tools {
-        padding: 0 10px 10px 10px;
-        border-top: 1px solid var(--border);
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        min-width: 0; /* Allow this flex row-item to shrink to its container's width instead of
-                         growing to fit the carousel's full unscrolled content width */
-    }
-
-    /* Chord guide dropdown always-visible on mobile */
-    #sandbox-mobile-tools #chord-guide-select {
-        flex: 1;
-        min-width: 0;
-        padding: 6px;
-        background: #1c202a;
-        border: 1px solid var(--border);
-        color: #fff;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 13px;
-        touch-action: manipulation;
-    }
-
-    #sandbox-mobile-tools #chord-guide-results {
-        font-size: 12px;
-        color: var(--dim);
-        line-height: 1.4;
-        max-height: 150px;
-        overflow-y: auto;
-    }
-
-    #sandbox-mobile-tools h3 {
-        display: none !important;
-    }
-
     #main-content {
         position: relative; /* Containing block for floating overlays like #blast-stats and
                                 .floating-queue — without this they fall back to the viewport
                                 and land near/behind the header instead of over the board. */
         flex-direction: column;
-        height: calc(100dvh - 40px);
     }
 
     /* #notation-bar shows at every viewport (not much room on a narrow phone, but the same
@@ -1449,6 +1436,21 @@ button:hover {
 
     #palette.floating-queue .piece-name {
         font-size: 9px;
+    }
+
+    /* #sandbox-guide (the chord picker) stays plain in-flow content -- no relocation, same as
+       Snake's/Life's own sidebar panels -- but on mobile it lands at the very top of #sidebar's
+       flow, the exact same screen region #palette.floating-queue floats over (position:absolute,
+       top:10px). Found live: with no clearance, the floating queue paints on top and silently
+       swallows clicks meant for the chord guide's own controls (e.g. #chord-guide-reset) even
+       though both are visible. 200px clears the queue's tallest possible state (180px max-height
+       + its own 10px top offset) plus a small gap, without needing to touch the queue's own
+       layout or give Sandbox any bespoke structural relocation. */
+    #app[data-mode="sandbox"] #sandbox-guide {
+        /* !important: index.html's inline style sets its own margin-top: 15px (desktop's
+           spacing from the piece list above it), which otherwise always wins over an external
+           stylesheet rule regardless of specificity or media query. */
+        margin-top: 200px !important;
     }
 
     /* Gravity's queue, moved to a narrow strip beside the board instead of above it (see the
@@ -1967,50 +1969,42 @@ button:hover {
         align-items: flex-start;
         text-align: left;
     }
-    #mobile-always-visible {
-        width: auto !important;
-        height: 100dvh;
-        flex-direction: column;
-        justify-content: flex-start;
-        overflow-y: auto;
-    }
-    #sandbox-mobile-tools {
-        flex-direction: column;
-        height: 100%;
-    }
-    /* piece-list is the flexible, scrollable element here — height:100% previously meant it
-       (and, via default flex-shrink, the chord picker fighting it for space) always exactly
-       filled the container, so an uncapped #chord-guide-results grew to whatever it wanted
-       and squeezed the carousel down to a sliver instead of just scrolling for more room. */
-    #sandbox-mobile-tools #piece-list {
-        flex-direction: column;
-        flex-wrap: nowrap;
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow-y: auto;
-    }
-    #sandbox-mobile-tools .piece-item {
-        margin-bottom: 8px;
-    }
-    #sandbox-mobile-tools .control-group {
-        flex-shrink: 0;
-    }
-    #sandbox-mobile-tools #chord-guide-results {
-        flex-shrink: 0;
-        max-height: 150px;
-        overflow-y: auto;
-    }
+    /* Vertical rail: same content as the horizontal rail (base rule), stacked top-to-bottom
+       instead of left-to-right. #mode-indicator's text rotates with writing-mode rather than
+       abbreviating -- still the real mode name, just read top-to-bottom, matching the common
+       vertical-sidebar-label convention instead of inventing new short-form iconography. */
     #drawer-handle {
-        width: 24px;
+        width: 32px;
         height: 100dvh;
-        cursor: ew-resize;
         flex-direction: column;
-        border-top: none;
-        border-left: 1px solid rgba(255, 255, 255, 0.1);
+        gap: 10px;
+        padding: 8px 0;
+        border-right: 1px solid var(--border);
     }
-    #drawer-handle::after {
-        width: 4px;
-        height: 40px;
+    #drawer-handle .chevron {
+        transform: rotate(90deg); /* base rule's "point down" needs a quarter-turn to still mean
+                                      "expand towards where the drawer actually opens" (rightward
+                                      here) instead of downward, which makes no sense sideways. */
+    }
+    #drawer-handle.drawer-expanded .chevron {
+        transform: rotate(90deg);
+    }
+    #drawer-handle:not(.drawer-expanded) .chevron {
+        transform: rotate(-90deg);
+    }
+    #mode-indicator {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        white-space: nowrap;
+        max-height: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #header-icons {
+        flex-direction: column;
+        margin-left: 0;
+        margin-top: auto;
+        gap: 12px;
     }
     #mode-controls {
         flex-direction: column;
@@ -2040,22 +2034,7 @@ button:hover {
     }
 }
 
-@media (max-width: 767px) {
-    .mobile-only {
-        display: flex !important;
-    }
-    #mobile-always-visible.mobile-only {
-        display: flex !important;
-    }
-}
 @media (max-width: 950px) and (orientation: landscape) {
-    .mobile-only {
-        display: flex !important;
-    }
-    #mobile-always-visible.mobile-only {
-        display: flex !important;
-    }
-
     /* Real-device feedback: a vertically-centered pad sat "half way up" the screen and its
        upper buttons were obscured by the device/browser frame near the top edge. Anchor the
        clusters toward the bottom instead, and give the side edges the same env()-based

@@ -221,8 +221,8 @@ test.describe('Exploratory tests (prototype)', () => {
       if (!isMobile) return;
       const drawer = page.locator('#top-drawer');
       const expanded = await drawer.evaluate(el => el.classList.contains('expanded'));
-      if (drawerOpen && !expanded) await page.locator('#drawer-handle').click();
-      if (!drawerOpen && expanded) await page.locator('#drawer-handle').click();
+      if (drawerOpen && !expanded) await page.locator('#drawer-toggle').click();
+      if (!drawerOpen && expanded) await page.locator('#drawer-toggle').click();
     };
     await openDrawerIfNeeded();
 

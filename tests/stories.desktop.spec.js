@@ -129,21 +129,21 @@ test.describe('Story tests', () => {
     // Blast's placement, rotation, or collision logic ever alters what this specific real
     // sequence of taps and rotations produces, this is the test that catches it.
     //
-    // These values changed under #48 (aspect-matched viewBox fit, matching Gravity's #44): each
-    // pointerdown is resolved to a cell via document.elementFromPoint() at the ORIGINAL recorded
-    // pixel coordinates, so any change to how the board's viewBox maps pixels to cells shifts
-    // which cell each recorded coordinate now lands on -- inherent to pinning a test to raw
-    // screen pixels rather than app state. Originally this session reached a genuine Game Over
-    // (linesCleared: 2, cellCount: 63); under the corrected fit the same real taps now land on
-    // different cells and the session ends earlier without clearing a line. Coverage of the
-    // Game Over path is lost until a fresh real session is captured under the new layout.
+    // These values changed under #48 (aspect-matched viewBox fit, matching Gravity's #44), and
+    // again under the drawer UX redesign: each pointerdown is resolved to a cell via
+    // document.elementFromPoint() at the ORIGINAL recorded pixel coordinates, so any change to
+    // the header's height (the new always-visible drawer rail adds 32px on desktop, where it was
+    // previously .mobile-only and added nothing) shifts the board down by that much, which
+    // shifts which cell each recorded coordinate now lands on -- inherent to pinning a test to
+    // raw screen pixels rather than app state. cellCount 40 -> 32 under this change; linesCleared
+    // stays 0 (no line was cleared in either layout).
     const final = await page.evaluate(() => ({
       linesCleared: BlastMode.state.linesCleared,
       cellCount: Board.cells.size,
       isGameOver: BlastMode.state.isGameOver,
     }));
     expect(final.linesCleared).toBe(0);
-    expect(final.cellCount).toBe(40);
+    expect(final.cellCount).toBe(32);
     expect(final.isGameOver).toBe(false);
 
     await page.screenshot({ path: 'test-results/blast-story-final.png' });

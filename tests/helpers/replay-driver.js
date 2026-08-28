@@ -148,6 +148,15 @@ async function replayEvents(page, events, opts = {}) {
     const { tickFn = null, recordedViewport = null, startTick = 0 } = opts;
     let lastTickSeq = startTick;
     let lastVirtualClickT = null;
+    // The drawer's own auto-collapse-on-first-interaction is a real one-shot (see
+    // App.setupDrawerAutoCollapse's comment) -- checked at most once here too, not re-evaluated
+    // on every subsequent event. That matters beyond just avoiding redundant waits: under a
+    // frozen page clock (tickFn callers -- page.clock.install/pauseAt), the app's own deferred
+    // setTimeout(..., 0) collapse never actually fires at all (setTimeout is faked/frozen too),
+    // so the drawer stays expanded for the WHOLE session -- without this flag, the "might
+    // collapse" check below would stay true forever and pay its ~1s settle-wait on every single
+    // polygon tap in the session instead of at most once.
+    let autoCollapseChecked = false;
 
     for (const ev of events) {
         if (tickFn) {
@@ -193,8 +202,43 @@ async function replayEvents(page, events, opts = {}) {
                 }
             }
         } else if (ev.type === 'pointerdown') {
+            // A tap can trigger an async, browser-scheduled resize refit that the recorded log
+            // has no event for at all -- the drawer auto-collapsing on mobile's first game
+            // interaction (drawer UX redesign) is the one case today: old fixtures were captured
+            // before that existed, so nothing here "knows" to wait for it the way the explicit
+            // `resize` branch below does for a recorded resize. Found live: a long polygon-heavy
+            // replay (tests/stories.mobile.spec.js's Blast story) landed on a different final
+            // cell count from one run to the next under real machine load, because whether the
+            // ResizeObserver-driven board refit this triggers had already applied by the time
+            // the NEXT event's elementFromPoint ran was a race, not because the app itself is
+            // nondeterministic. Checked BEFORE dispatch (this tap is what would collapse it) and
+            // scoped to just that one-shot case -- unconditionally settling after every one of a
+            // 6000+-event session turned a 15s replay into minutes for no benefit on the other
+            // ~99.9% of events, which never resize anything.
+            const mightAutoCollapseDrawer = !autoCollapseChecked && await page.evaluate(() => {
+                const d = document.getElementById('top-drawer');
+                return !!(d && d.classList.contains('expanded') && typeof Render !== 'undefined' && Render.isMobileViewport());
+            });
+            if (mightAutoCollapseDrawer) autoCollapseChecked = true;
             await resolvePointerdown(page, ev, recordedViewport);
             if (isVirtualButtonTarget(ev.target)) lastVirtualClickT = ev.t;
+            if (mightAutoCollapseDrawer) {
+                // Real wall-clock waits (page.waitForTimeout, and { polling: <ms> } here instead
+                // of the default rAF-based polling), not requestAnimationFrame -- the
+                // Gravity/Snake stories freeze the page's own clock (page.clock.install/pauseAt)
+                // for deterministic tick-based catch-up, which also freezes the page's rAF, so a
+                // page-side rAF promise (and default rAF-driven waitForFunction polling) would
+                // simply hang forever there rather than settle or time out.
+                await page.waitForFunction(() => {
+                    const d = document.getElementById('top-drawer');
+                    return !d || !d.classList.contains('expanded');
+                }, null, { timeout: 1000, polling: 20 }).catch(() => {});
+                // A little real time for the ResizeObserver callback the collapse's own reflow
+                // triggers (spec-guaranteed before the next paint, but paint itself isn't
+                // gated by the page's frozen clock) to land and any board redraw it causes to
+                // actually apply.
+                await page.waitForTimeout(50);
+            }
         } else if (ev.type === 'resize') {
             await page.setViewportSize({ width: ev.width, height: ev.height }).catch(() => {});
         }

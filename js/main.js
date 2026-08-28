@@ -266,6 +266,7 @@ const App = {
         });
         
         this.setupMobileControls();
+        this.setupDrawerAutoCollapse();
         this.setupTouchGestures();
         this.setupZoomGestures();
         this.updateVersionTag();
@@ -302,6 +303,22 @@ const App = {
                     if (typeof Render !== 'undefined' && !Render.RESTRICTED_MODES.includes(this.currentMode)) {
                         const refresh = this.modeRefreshFns[this.currentMode];
                         if (refresh) refresh();
+                        // Sandbox's refreshLattice rebuilds the SVG from placedPieces alone --
+                        // the ghost overlay (an in-progress pickup/placement) is separate,
+                        // ephemeral UI state that rebuild doesn't know about, so a resize here
+                        // (e.g. the drawer auto-collapsing on the very first board tap) would
+                        // otherwise silently wipe it. Re-running updateGhost() with the SAME
+                        // piece/hoverCell/rotation it already had is deduped by its own
+                        // _lastGhostSoundKey check, so this restores the visual without
+                        // replaying its pickup/placement sound.
+                        if (this.currentMode === 'sandbox' && typeof SandboxMode !== 'undefined') {
+                            SandboxMode.updateGhost();
+                        }
+                        // Same reasoning, for Melody's own transient tap-highlight (see
+                        // MelodyMode.restoreHighlightIfActive's own comment).
+                        if (this.currentMode === 'melody' && typeof MelodyMode !== 'undefined') {
+                            MelodyMode.restoreHighlightIfActive();
+                        }
                     }
                 });
                 this._panResizeObserver.observe(gc);
@@ -350,17 +367,17 @@ const App = {
     positionModeSliderPill: function(idx) {
         const activePill = document.querySelector('.mode-slider-active');
         if (!activePill) return;
-        const isLandscape = window.innerWidth <= 950 && window.innerWidth > window.innerHeight;
+        const isLandscape = Render.isMobileLandscape();
         activePill.style.transform = isLandscape ? `translateY(${idx * 100}%)` : `translateX(${idx * 100}%)`;
     },
 
     setMode: function(mode, idx) {
         if (this.currentMode === mode) return;
 
-        // Picking a mode is "done with the menu" -- same as selecting a piece from the Sandbox
-        // chord-guide (js/sandbox.js), the drawer should get out of the way afterward instead of
-        // permanently occupying screen space on mobile.
-        this.collapseMobileDrawer();
+        // The drawer no longer auto-collapses on mode-select -- it defaults open at every
+        // viewport now (see setupMobileControls's drawer-default logic and the #main-content
+        // interaction listener in setupTouchGestures, which collapses it on the first real game
+        // interaction instead, only at mobile viewport widths).
 
         const stats = document.getElementById('blast-stats');
         const sandboxCtrls = document.getElementById('sandbox-controls');
@@ -372,6 +389,12 @@ const App = {
         options[idx].classList.add('active');
 
         this.positionModeSliderPill(idx);
+
+        // Keep the always-visible rail's compact mode indicator in sync -- the pill itself only
+        // shows once the drawer is expanded, so this is what carries mode discoverability while
+        // collapsed.
+        const modeIndicator = document.getElementById('mode-indicator');
+        if (modeIndicator) modeIndicator.textContent = options[idx].textContent;
 
         // Clean up global listeners
         window.onkeydown = null;
@@ -647,139 +670,109 @@ const App = {
         // with NEITHER class present, so the very first toggle adds both at once instead of
         // just one), landing on "expanded collapsed" simultaneously. Always derive the target
         // from one boolean and set both classes to match it.
+        const drawerHandle = document.getElementById('drawer-handle');
+        const drawerToggleBtn = document.getElementById('drawer-toggle');
+
+        // 'expanded'/'collapsed' are two sides of one state, not independent flags -- setting
+        // them via two separate classList.toggle() calls can desync (e.g. the drawer starts
+        // with NEITHER class present, so the very first toggle adds both at once instead of
+        // just one), landing on "expanded collapsed" simultaneously. Always derive the target
+        // from one boolean and set both classes to match it. Also mirrors the state onto
+        // #drawer-handle itself (the always-visible rail) so its chevron can rotate to match --
+        // #drawer-handle is #top-header's FIRST child (the true screen edge) and #top-drawer
+        // comes after it in DOM order, so a `~` sibling selector keyed off #top-drawer's own
+        // class can't reach backwards to style it; toggling a class here directly sidesteps that.
         const toggleDrawer = () => {
             const nowExpanded = !topDrawer.classList.contains('expanded');
             topDrawer.classList.toggle('expanded', nowExpanded);
             topDrawer.classList.toggle('collapsed', !nowExpanded);
+            if (drawerHandle) drawerHandle.classList.toggle('drawer-expanded', nowExpanded);
         };
 
-        if (topDrawer && menuToggle) {
-            if (isMobileWidth) {
-                // Initialize drawer interactions once
-                if (!this.topDrawerInitialized) {
-                    this.topDrawerInitialized = true;
+        if (topDrawer && menuToggle && !this.topDrawerInitialized) {
+            // Initialize drawer interactions once, at every viewport -- one collapse/expand
+            // mechanism everywhere now, not a mobile-only affordance.
+            this.topDrawerInitialized = true;
 
-                    menuToggle.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleDrawer();
-                    });
+            menuToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleDrawer();
+            });
 
-                    const drawerHandle = document.getElementById('drawer-handle');
-                    if (drawerHandle) {
-                        let dragStartX = 0;
-                        let dragStartY = 0;
-                        // A real tap almost always drifts a few pixels, which the touchmove
-                        // handler below treats as a drag and toggles the drawer on its own. The
-                        // browser then still fires a synthesized click for that same physical
-                        // tap — without this flag, click's own unconditional toggle immediately
-                        // undoes what the drag just did, making the drawer feel impossible to
-                        // close reliably.
-                        let toggledByDrag = false;
-                        drawerHandle.onclick = () => {
-                            if (toggledByDrag) {
-                                toggledByDrag = false;
-                                return;
-                            }
-                            toggleDrawer();
-                        };
-                        drawerHandle.addEventListener('touchstart', (e) => {
-                            dragStartX = e.touches[0].clientX;
-                            dragStartY = e.touches[0].clientY;
-                            toggledByDrag = false;
-                        }, { passive: true });
-                        drawerHandle.addEventListener('touchmove', (e) => {
-                            const dx = e.touches[0].clientX - dragStartX;
-                            const dy = e.touches[0].clientY - dragStartY;
-                            const isLandscape = window.innerWidth > window.innerHeight;
-
-                            const delta = isLandscape ? dx : dy;
-
-                            if (delta > 20 && !topDrawer.classList.contains('expanded')) {
-                                topDrawer.classList.add('expanded');
-                                topDrawer.classList.remove('collapsed');
-                                toggledByDrag = true;
-                            } else if (delta < -20 && topDrawer.classList.contains('expanded')) {
-                                topDrawer.classList.remove('expanded');
-                                topDrawer.classList.add('collapsed');
-                                toggledByDrag = true;
-                            }
-                        }, { passive: true });
+            if (drawerToggleBtn) {
+                let dragStartX = 0;
+                let dragStartY = 0;
+                // A real tap almost always drifts a few pixels, which the touchmove handler
+                // below treats as a drag and toggles the drawer on its own. The browser then
+                // still fires a synthesized click for that same physical tap — without this
+                // flag, click's own unconditional toggle immediately undoes what the drag just
+                // did, making the drawer feel impossible to close reliably.
+                let toggledByDrag = false;
+                drawerToggleBtn.onclick = () => {
+                    if (toggledByDrag) {
+                        toggledByDrag = false;
+                        return;
                     }
-                    
-                    // Prevent clicks inside drawer from passing to grid
-                    ['touchstart', 'touchmove', 'touchend', 'click', 'mousedown', 'mousemove', 'mouseup'].forEach(evtType => {
-                        topDrawer.addEventListener(evtType, (e) => {
-                            e.stopPropagation();
-                        }, { passive: false });
-                    });
-                }
-                
-                // Set up contents of the drawer depending on mode
-                const sandboxTools = document.getElementById('sandbox-mobile-tools');
-                const drawerInjected = document.getElementById('drawer-injected-tools');
-                const palette = document.getElementById('palette');
-                const guide = document.getElementById('sandbox-guide');
-                const sidebar = document.getElementById('sidebar');
+                    toggleDrawer();
+                };
+                drawerToggleBtn.addEventListener('touchstart', (e) => {
+                    dragStartX = e.touches[0].clientX;
+                    dragStartY = e.touches[0].clientY;
+                    toggledByDrag = false;
+                }, { passive: true });
+                drawerToggleBtn.addEventListener('touchmove', (e) => {
+                    const dx = e.touches[0].clientX - dragStartX;
+                    const dy = e.touches[0].clientY - dragStartY;
+                    const delta = Render.isMobileLandscape() ? dx : dy;
 
-                if (drawerInjected) drawerInjected.style.display = 'none';
+                    if (delta > 20 && !topDrawer.classList.contains('expanded')) {
+                        topDrawer.classList.add('expanded');
+                        topDrawer.classList.remove('collapsed');
+                        if (drawerHandle) drawerHandle.classList.add('drawer-expanded');
+                        toggledByDrag = true;
+                    } else if (delta < -20 && topDrawer.classList.contains('expanded')) {
+                        topDrawer.classList.remove('expanded');
+                        topDrawer.classList.add('collapsed');
+                        if (drawerHandle) drawerHandle.classList.remove('drawer-expanded');
+                        toggledByDrag = true;
+                    }
+                }, { passive: true });
+            }
 
-                if (this.currentMode === 'sandbox') {
-                    if (sandboxTools) {
-                        sandboxTools.style.display = 'flex';
-                        if (palette) {
-                            palette.style.display = 'block';
-                            palette.classList.remove('floating-queue');
-                            sandboxTools.appendChild(palette);
-                        }
-                        // Move just the dropdown + its reset button (not the label/instructions)
-                        // into the always-visible area. Moving the whole .control-group (rather
-                        // than just the <select>) brings #chord-guide-reset along with it —
-                        // previously it stayed behind in #sandbox-guide, which gets hidden below,
-                        // orphaning the only way to dismiss/clear the chord guide on mobile.
-                        const chordControlGroup = document.querySelector('#sandbox-guide .control-group');
-                        const chordResults = document.getElementById('chord-guide-results');
-                        if (chordControlGroup && !sandboxTools.contains(chordControlGroup)) {
-                            sandboxTools.appendChild(chordControlGroup);
-                        }
-                        if (chordResults && !sandboxTools.contains(chordResults)) {
-                            sandboxTools.appendChild(chordResults);
-                        }
-                    }
-                    // Hide the full guide in the drawer (label + instruction text stay hidden)
-                    if (guide) guide.style.display = 'none';
-                    if (drawerInjected) drawerInjected.style.display = 'none';
-                } else if (this.currentMode === 'blast' || this.currentMode === 'gravity') {
-                    if (sandboxTools) sandboxTools.style.display = 'none';
-                    // #palette doubles as Blast/Gravity's next-piece queue (their own
-                    // renderNextQueue writes into #piece-list) — return it from wherever a
-                    // previous mode left it and show it as a floating overlay over the board.
-                    if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
-                    if (palette) {
-                        palette.style.display = 'block';
-                        palette.classList.add('floating-queue');
-                    }
-                } else {
-                    if (sandboxTools) sandboxTools.style.display = 'none';
-                    if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
-                    if (palette) {
-                        palette.style.display = 'none';
-                        palette.classList.remove('floating-queue');
-                    }
-                }
+            // Prevent clicks inside drawer from passing to grid
+            ['touchstart', 'touchmove', 'touchend', 'click', 'mousedown', 'mousemove', 'mouseup'].forEach(evtType => {
+                topDrawer.addEventListener(evtType, (e) => {
+                    e.stopPropagation();
+                }, { passive: false });
+            });
+
+            // #drawer-handle starts out reflecting #top-drawer's own default markup state
+            // (expanded) -- keep them in sync from the first paint, not just after the first
+            // toggle.
+            if (drawerHandle) drawerHandle.classList.toggle('drawer-expanded', topDrawer.classList.contains('expanded'));
+        }
+
+        // #palette doubles as the next-piece queue for Blast/Gravity and as Sandbox's own piece
+        // carousel -- float it over the board on mobile in all three (the same canonical
+        // treatment, not Sandbox's own former bespoke relocation into the header). Chord-guide
+        // (#sandbox-guide) no longer relocates anywhere -- it just stays in #sidebar, same as
+        // Snake's/Life's own panels, and ordinary responsive CSS handles its mobile stacking.
+        const palette = document.getElementById('palette');
+        const sidebar = document.getElementById('sidebar');
+        if (palette && sidebar && palette.parentElement !== sidebar) sidebar.appendChild(palette);
+        if (palette) {
+            if (isMobileWidth && (this.currentMode === 'sandbox' || this.currentMode === 'blast' || this.currentMode === 'gravity')) {
+                palette.style.display = 'block';
+                palette.classList.add('floating-queue');
+            } else if (isMobileWidth) {
+                palette.style.display = 'none';
+                palette.classList.remove('floating-queue');
             } else {
-                // On desktop, ensure the drawer doesn't act like a drawer
-                topDrawer.classList.remove('expanded');
-                topDrawer.classList.remove('collapsed');
-
-                // Ensure palette and guide are back in sidebar
-                const palette = document.getElementById('palette');
-                const guide = document.getElementById('sandbox-guide');
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar) {
-                    if (palette && palette.parentElement !== sidebar) sidebar.appendChild(palette);
-                    if (guide && guide.parentElement !== sidebar) sidebar.appendChild(guide);
-                }
+                // Desktop: setMode's own hide/show (block/none per mode, js/main.js:461-464)
+                // already set the right display value -- just make sure the floating-only visual
+                // treatment doesn't linger from a previous mobile-width layout.
+                palette.classList.remove('floating-queue');
             }
         }
 
@@ -1522,6 +1515,43 @@ const App = {
             drawer.classList.remove('expanded');
             drawer.classList.add('collapsed');
         }
+        const drawerHandle = document.getElementById('drawer-handle');
+        if (drawerHandle) drawerHandle.classList.remove('drawer-expanded');
+    },
+
+    // Real UX complaint: the drawer used to auto-collapse on every mode-select, which fought
+    // with defaulting it open (every mode pick would immediately hide it again). Instead, only
+    // collapse on the player's first actual interaction with the game itself -- board taps AND
+    // D-pad presses alike -- and only where screen space is actually tight
+    // (Render.isMobileViewport()). No one-shot flag needed: once collapsed, the drawer's own
+    // 'expanded' class is already gone, so this is naturally a no-op on subsequent taps until
+    // the player reopens it, at which point it's live again.
+    //
+    // Deliberately an ALLOWLIST (the SVG board, D-pad buttons), not "anything inside
+    // #main-content" -- #main-content also contains floated-over-the-board UI controls like
+    // #palette (the piece carousel) that are reachable via mouse/touch but aren't gameplay.
+    // Collapsing the drawer mid-tap on one of those (found live, e.g. #chord-guide-reset)
+    // reflows #main-content WHILE a click on it is still in flight, moving the control out from
+    // under the pointer before the click resolves and silently dropping the interaction.
+    setupDrawerAutoCollapse: function() {
+        const topDrawer = document.getElementById('top-drawer');
+        const svg = document.getElementById('tonnetz-svg');
+        const mobileControls = document.getElementById('mobile-controls');
+        const snakeControls = document.getElementById('snake-mobile-controls');
+        if (!topDrawer) return;
+        const onGameInteraction = () => {
+            if (!Render.isMobileViewport() || !topDrawer.classList.contains('expanded')) return;
+            // Deferred rather than collapsed synchronously: pointerdown fires before
+            // mousedown/mouseup/click (or touchstart before touchend), so collapsing here
+            // immediately would reflow #main-content WHILE this same tap's own click/touch
+            // handling is still in flight, moving the target out from under the pointer before
+            // it resolves (found live on the very first board tap of a session). Deferring to a
+            // later macrotask lets the current tap finish being handled first.
+            setTimeout(() => this.collapseMobileDrawer(), 0);
+        };
+        if (svg) svg.addEventListener('pointerdown', onGameInteraction);
+        if (mobileControls) mobileControls.addEventListener('pointerdown', onGameInteraction);
+        if (snakeControls) snakeControls.addEventListener('pointerdown', onGameInteraction);
     },
 
     updateVersionTag: async function() {

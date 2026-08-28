@@ -76,13 +76,14 @@ surfaced it.
 TBR: INV-ModesReachable
 
 You can always navigate from any mode to any other mode (Sandbox, Melody, Snake, Blast,
-Gravity), regardless of current viewport size or orientation. On mobile/tablet widths the mode
-list lives inside the collapsible `#top-drawer` (open it first); on desktop it's always
-visible. Either way, the path to switching modes must never be blocked.
+Gravity), regardless of current viewport size or orientation. The mode list lives inside the
+collapsible `#top-drawer`, which now defaults **open at every viewport** (drawer UX redesign) —
+so it's reachable from first paint, with no threshold-based collapse to work around.
 
-Selecting a mode collapses the drawer afterward (same as picking a piece from the Sandbox
-chord guide) — it doesn't stay open across multiple selections, so switching modes twice in a
-row on mobile means reopening the drawer each time.
+Selecting a mode no longer collapses the drawer (that was retired along with the old
+collapsed-by-default behavior — the two fought each other, since every mode switch would
+immediately re-hide it). Instead, on small viewports only, the first tap on the game surface
+itself (not a mode pick) collapses it — see INV-20.
 
 **Test:** `tests/invariants.spec.js` — "INV-1: every mode is reachable from every other mode,
 in portrait and landscape"
@@ -139,14 +140,20 @@ candidate piece)
 ### INV-3: No dead click targets
 TBR: Merge with INV-ElementsReachable. 
 
-The converse of INV-2: nothing that JS explicitly relocates into an "always visible" area is
-ever left unreachable because it (or something JS forgot to move alongside it) ends up behind
-a hidden ancestor. This is exactly the bug class `#chord-guide-reset` had — the `<select>` and
-results got moved into `#mobile-always-visible`, but the reset button was left behind inside
-`#sandbox-guide`, which then got hidden, orphaning it.
+The converse of INV-2: nothing inside an "always visible" area is ever left unreachable behind
+a hidden ancestor. This is exactly the bug class `#chord-guide-reset` once had — the `<select>`
+and results got JS-relocated into the (now-retired) `#mobile-always-visible` dock, but the
+reset button was left behind inside `#sandbox-guide`, which then got hidden, orphaning it.
 
-**Test:** `tests/invariants.spec.js` — "INV-3: nothing moved into the always-visible mobile
-area is left unreachable by a hidden ancestor"
+The drawer UX redesign retired that JS-relocation pattern entirely — Sandbox no longer moves
+its chord guide or palette anywhere; both stay in `#sidebar`, matching Snake's/Life's own
+panels. The one remaining "always visible regardless of mode or drawer state" area is
+`#drawer-handle` (chevron + mode indicator + action icon toolbar) — native markup, not
+JS-relocated, but the same invariant applies: nothing inside it may end up behind a hidden
+ancestor for any mode.
+
+**Test:** `tests/invariants.spec.js` — "INV-3: nothing in the always-visible drawer rail is
+left unreachable by a hidden ancestor"
 
 **Follow-up gap, found live:** the test above only checks elements that DID get relocated for
 ending up orphaned afterward — it has no way to catch an element that was supposed to be
@@ -763,6 +770,29 @@ to cover Melody's own Save the moment that ships (`writeMIDI`/`FileFolder.saveFi
 shared and ready for it, per above), and to any future mode that gains one.
 
 ---
+
+### INV-20: On small viewports, the drawer auto-collapses on the first game interaction, never on mode-select
+
+The drawer defaults open at every viewport (INV-1). On small viewports only
+(`Render.isMobileViewport()`), the first tap on the game surface itself — a board cell or a
+D-pad button (`#tonnetz-svg`, `#mobile-controls`, `#snake-mobile-controls`) — collapses it once,
+to reclaim screen space. Picking a mode does NOT collapse it; that used to be the trigger and
+fought with defaulting the drawer open (every mode switch would immediately re-hide it). Larger
+viewports never auto-collapse this way.
+
+Deliberately an allowlist (the SVG board, D-pad buttons) rather than "anything inside
+`#main-content`" — that wrapper also contains floated-over-the-board UI controls like `#palette`
+(the piece carousel) that are reachable via mouse/touch but aren't gameplay; collapsing the
+drawer for a tap on one of those was found live to be surprising. The listener triggers on
+`pointerdown` (to catch drags as well as taps) but defers the actual collapse via `setTimeout`
+rather than acting synchronously — `pointerdown` fires before `mousedown`/`mouseup`/`click` (or
+`touchstart` before `touchend`), so collapsing immediately reflows `#main-content` WHILE that
+same tap's own click/touch handling is still in flight, moving the target out from under the
+pointer before it resolves. Found live on the very first board tap of a session, where it
+silently dropped a piece pickup.
+
+**Test:** `tests/invariants.spec.js` — the two "INV-20: ..." tests (small-viewport collapse,
+desktop non-collapse)
 
 ### INV-29: The mode-slider's active-pill background exactly matches the active option's position, for however many modes there are
 

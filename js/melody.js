@@ -535,16 +535,35 @@ const MelodyMode = {
             polygon.classList.remove('active-note');
             void polygon.offsetWidth; // Force layout flush to register class removal
             polygon.classList.add('active-note');
-            
+
             if (polygon.activeTimeoutId) {
                 clearTimeout(polygon.activeTimeoutId);
             }
-            
+
             polygon.activeTimeoutId = setTimeout(() => {
                 polygon.classList.remove('active-note');
                 polygon.activeTimeoutId = null;
+                if (this._activeHighlight && this._activeHighlight.p === p && this._activeHighlight.q === q) {
+                    this._activeHighlight = null;
+                }
             }, duration);
         }
+        // Tracked separately from the polygon's own timeout so a resize-triggered refreshBoard
+        // (main.js's ResizeObserver on #game-container -- e.g. the drawer auto-collapsing on the
+        // very first board tap) can re-apply the highlight to the freshly redrawn polygon; a
+        // full redraw creates new elements, silently discarding the class (and pending timeout)
+        // on the old one. See restoreHighlightIfActive below.
+        this._activeHighlight = { p, q, expiresAt: Date.now() + duration };
+    },
+
+    // Called after a resize-triggered refreshBoard (see js/main.js's ResizeObserver) --
+    // refreshBoard rebuilds the lattice's polygon elements from scratch, which would otherwise
+    // silently drop an in-flight highlightCell flash mid-animation. No-ops once the highlight's
+    // own duration has actually elapsed.
+    restoreHighlightIfActive: function() {
+        const h = this._activeHighlight;
+        if (!h || Date.now() >= h.expiresAt) return;
+        this.highlightCell(h.p, h.q, h.expiresAt - Date.now());
     },
 
     updateStreak: function(streak) {
