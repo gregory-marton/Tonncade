@@ -58,6 +58,20 @@ for the same reasoning applied elsewhere in this project).
     background: #1c1f28;
   }
   figcaption { margin-top: 4px; font-size: 12px; color: #9aa0ad; }
+  /* The filename itself, shown as a plain selectable/copyable line -- the identifier to paste
+     back into conversation when talking about one specific shot ("what's up with
+     mobile-chrome__sandbox_drawer-open_..._0.png"). Small and monospace so it reads as an id,
+     not prose. */
+  .filename {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #6b7280;
+    word-break: break-all;
+    user-select: all;
+    cursor: text;
+  }
   /* A scenario whose board fills too little of the viewport (tonnetz-share below its floor) --
      the "fill gap" cases to eyeball (next_steps.md #76). Flagged with a red frame + share. */
   figure.below-floor img { border-color: #e0555f; }
@@ -221,7 +235,11 @@ for the same reasoning applied elsewhere in this project).
           (entry.edgeReaches != null ? ` <span class="share${edgeFail ? ' low' : ''}" style="${edgeFail ? '' : 'color:#6b7280'}">${entry.edgeReaches}/4 edges${edgeFail ? ' ⚠' : ''}</span>` : '')
         : '';
       const cc = entry.cellCount != null ? ` <span style="color:#6b7280">${entry.cellCount} cells</span>` : '';
-      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}${cc}`;
+      // entry.file is the actual on-disk filename (already globally unique -- profile + mode +
+      // drawer state + size + sample index) -- shown as plain text so it can be selected (a
+      // single click-drag or triple-click grabs the whole thing, see .filename's
+      // user-select:all) and pasted back into conversation to name one specific shot precisely.
+      caption.innerHTML = `drawer ${entry.drawerOpen ? 'open' : 'closed'} — ${entry.width}×${entry.height}${bf}${cc}<span class="filename">${entry.file}</span>`;
       figure.appendChild(img);
       figure.appendChild(caption);
       row.appendChild(figure);
