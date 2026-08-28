@@ -891,6 +891,38 @@ test.describe('Invariant tests', () => {
     }
   });
 
+  // Life's default-loaded automaton's own initial live cells sit right at the origin, which the
+  // pannable view centers by default (Render.panView) -- if #life-controls' own mobile panel
+  // grows wide/tall enough, it can cover exactly that center point even while the generic
+  // 20-cell INV-11 floor above still passes (plenty of OTHER cells stay visible around the
+  // edges). Found live via screenshots/index.html (mobile-safari__life_drawer-closed_897x888):
+  // the starting pattern's live cells were invisible, sitting right under the control panel.
+  test('Life: the automaton\'s own initial live cells are visible, not hidden under the control panel', async ({ page }) => {
+    await page.setViewportSize({ width: 897, height: 888 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+    await page.waitForTimeout(300);
+    await page.locator('#life-source').selectOption({ label: '3,5 / 2' });
+    await page.waitForTimeout(300);
+
+    const result = await page.evaluate(() => {
+      const svgRect = document.getElementById('tonnetz-svg').getBoundingClientRect();
+      let visible = 0;
+      for (const [key] of LifeMode.state.initial) {
+        const [p, q] = key.split(',').map(Number);
+        const cell = document.querySelector(`#tonnetz-svg polygon.cell[data-p="${p}"][data-q="${q}"]`);
+        if (!cell) continue;
+        const rect = cell.getBoundingClientRect();
+        const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
+        if (cx < svgRect.left || cy < svgRect.top || cx > svgRect.right || cy > svgRect.bottom) continue;
+        const hit = document.elementFromPoint(cx, cy);
+        if (hit && hit.closest('#tonnetz-svg')) visible++;
+      }
+      return { total: LifeMode.state.initial.length, visible };
+    });
+    expect(result.visible, `${result.visible}/${result.total} initial cells visible and unobscured`).toBe(result.total);
+  });
+
   // INV-12 (view persists across an unrelated interaction) is now folded into the unified
   // INV-9/INV-12 matrix above, over every mode rather than just Sandbox/Melody -- see there.
 

@@ -1512,6 +1512,46 @@ button:hover {
         padding-top: 8px !important;
     }
 
+    /* Life -- like Sandbox, an unrestricted/pannable mode, so the Tonnetz is meant to fill most
+       of the screen (INV-11/the exploratory suite's tonnetzShare metric: >50% for unrestricted
+       modes) -- had ZERO mobile-specific treatment for #life-controls (accepted at the time as
+       matching Snake's own sidebar panel, which is fine for Snake since Snake is a small,
+       restricted board that doesn't compete with the Tonnetz for space the same way). #life-controls
+       is NOT small, though: a filename, transport buttons, and a whole scrollable YAML rule
+       display, all in normal flow, ended up claiming most of the screen (found live via
+       screenshots/index.html -- the Tonnetz squeezed into a narrow strip). Same floating-panel
+       treatment as Sandbox's #sidebar override above, sized for Life's own wider/taller content.
+       max-height first tried 45vh (#notation-bar's own established cap for Melody/Compose) but
+       that's a DIFFERENT mechanism -- #notation-bar DISPLACES the board (normal flow, board
+       starts below it, never overlapping), while this panel OVERLAYS on top of it
+       (position:absolute); the same vh-relative number that's safe when nothing underneath is
+       ever covered is unsafe once overlap is possible -- on a tall portrait phone (e.g.
+       390x844), 45vh reached #tonnetz-svg's own center point (INV-13 caught it). A flat 220px,
+       like Sandbox's own flat cap right above, keeps this safe the same way regardless of
+       viewport height. Width also trimmed from an initial 70% to 55% (matching Sandbox's own
+       cap) -- 70% left INV-11's floor (20 visible Tonnetz cells, every mode) flaky at some
+       narrow/short viewports, occasionally dipping just under it. */
+    #app[data-mode="life"] #sidebar {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        max-width: 55%;
+        width: auto;
+        height: auto;
+        max-height: 220px;
+        z-index: 100;
+        overflow-y: auto;
+        background: rgba(20, 22, 28, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+
     /* Gravity's queue, moved to a narrow strip beside the board instead of above it (see the
        #gravity-controls comment above) -- vertically fills the same top/bottom band the board
        itself fits within (the --chrome-inset-* custom properties Render.updateChromeInsets()
