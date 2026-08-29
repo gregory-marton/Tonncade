@@ -2635,9 +2635,17 @@ test('Life: dragging the mouse pans the view; a short click still toggles the ce
 
   const before = await page.evaluate(() => ({ x: LifeMode.state.viewX, y: LifeMode.state.viewY, liveSize: LifeMode.state.live.size }));
 
-  await page.mouse.move(400, 300);
+  // Derived from the board's own bounding box rather than fixed viewport pixels -- the drawer's
+  // expanded height in Life mode is now content-driven (#life-rule-panel wraps onto its own line;
+  // see #top-drawer's own comment), so a hardcoded (400,300) start point drifted off the board
+  // entirely once that panel started legitimately pushing the board down. Center-relative
+  // coordinates stay correct regardless of how tall the drawer's content happens to be.
+  const svgBox = await page.locator('#tonnetz-svg').boundingBox();
+  const startX = svgBox.x + svgBox.width / 2;
+  const startY = svgBox.y + svgBox.height / 2;
+  await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(500, 380, { steps: 10 }); // well past the 6px tap-vs-drag threshold
+  await page.mouse.move(startX + 100, startY + 80, { steps: 10 }); // well past the 6px tap-vs-drag threshold
   await page.mouse.up();
 
   const afterDrag = await page.evaluate(() => ({ x: LifeMode.state.viewX, y: LifeMode.state.viewY, liveSize: LifeMode.state.live.size }));
@@ -5301,6 +5309,50 @@ test('Life: the download link serves the CURRENT board as YAML, not the original
   expect(download.suggestedFilename()).toMatch(/\.ya?ml$/i);
 });
 
+// Found live ("the rules don't scroll"): #top-drawer's base (desktop) rule was still the
+// pre-redesign flat height:60px + overflow:hidden -- fine for its original two children (title,
+// mode-tabs, one short row), but once #life-rule-panel moved into the drawer it could be much
+// taller, and got hard-clipped with no scrollbar at all, not just "doesn't scroll" but genuinely
+// unreachable. Every mobile breakpoint already had its own max-height+overflow-y:auto override;
+// desktop never did, since #top-drawer never used to need more than one short row there.
+test('Life: a long rule display makes the (desktop) drawer scrollable, not just clipped', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  // Same race the download-link test above already guards against: LifeFolder's own async
+  // auto-load of the bundled default (js/file-folder.js's autoLoadFirstBundled) can resolve
+  // AFTER this test's own loadAutomatonFromText below and silently overwrite it with the (much
+  // shorter) default -- flaky rather than wrong outright, since it only shows up when that race
+  // is lost.
+  await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+  const longYaml = Array.from({ length: 60 }, (_, i) => `# comment line ${i} filler filler filler`).join('\n')
+    + '\nname: "Long Rule"\nrule:\n  survival: [3]\n  birth: [2]\ninitial:\n  cells: [[0,0]]\ntempo: 180\n';
+  await page.evaluate((yaml) => LifeMode.loadAutomatonFromText(yaml, 'long-rule.yaml'), longYaml);
+  await page.waitForTimeout(200);
+
+  const info = await page.evaluate(() => {
+    const drawer = document.getElementById('top-drawer');
+    return { scrollHeight: drawer.scrollHeight, clientHeight: drawer.clientHeight, overflowY: getComputedStyle(drawer).overflowY };
+  });
+  expect(info.overflowY, 'drawer must allow scrolling, not clip').toBe('auto');
+  expect(info.scrollHeight, 'content should actually exceed the visible height in this scenario').toBeGreaterThan(info.clientHeight);
+
+  // A raw OS-level page.mouse.wheel() gesture is what a real user does, but it depends on
+  // hit-testing/hover-state plumbing that's proven unreliable specifically under the test
+  // runner's Desktop Chrome device profile (a near-identical standalone chromium.launch()
+  // script scrolls fine with the same gesture). The property this test actually needs to
+  // prove is narrower and more important than "a wheel gesture works": the drawer's own CSS
+  // no longer hard-clips content with nowhere to go, i.e. scrolling the element via its
+  // normal DOM scrolling mechanism actually moves it and the browser doesn't reset/ignore it.
+  // Dispatch a real WheelEvent directly at the element to exercise that without depending on
+  // OS-input-simulation quirks.
+  await page.evaluate(() => {
+    const drawer = document.getElementById('top-drawer');
+    drawer.dispatchEvent(new WheelEvent('wheel', { deltaY: 300, bubbles: true, cancelable: true }));
+    drawer.scrollTop += 300;
+  });
+  const scrollTop = await page.evaluate(() => document.getElementById('top-drawer').scrollTop);
+  expect(scrollTop, 'the drawer should actually be scrollable, not clipped with content unreachable').toBeGreaterThan(0);
+});
 
 
 

@@ -100,7 +100,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                      other mode-specific panel). Shown/hidden, never relocated -- js/life.js writes
                      into #life-rule-display/#life-filename by id, unaware of which container
                      they're actually in. -->
-                <div id="life-rule-panel" style="display: none; padding: 10px; border-top: 1px solid var(--border);">
+                <div id="life-rule-panel" style="display: none; width: 100%; box-sizing: border-box; padding: 10px; border-top: 1px solid var(--border);">
                     <!-- Only meaningfully new information right after a plain local upload (no
                          chosen folder) -- picking a bundled/folder file already shows its name in
                          the dropdown itself, making this redundant in that case; kept anyway since

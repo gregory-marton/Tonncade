@@ -135,15 +135,17 @@ test.describe('Story tests', () => {
     // the header's height (the new always-visible drawer rail adds 32px on desktop, where it was
     // previously .mobile-only and added nothing) shifts the board down by that much, which
     // shifts which cell each recorded coordinate now lands on -- inherent to pinning a test to
-    // raw screen pixels rather than app state. cellCount 40 -> 32 under this change; linesCleared
-    // stays 0 (no line was cleared in either layout).
+    // raw screen pixels rather than app state. cellCount 40 -> 32 under that change; then back to
+    // 40 once #top-drawer's own height became content-driven (height:auto, capped) instead of a
+    // flat 60px -- verified stable across repeated runs before updating. linesCleared stays 0 (no
+    // line was cleared in any of these layouts).
     const final = await page.evaluate(() => ({
       linesCleared: BlastMode.state.linesCleared,
       cellCount: Board.cells.size,
       isGameOver: BlastMode.state.isGameOver,
     }));
     expect(final.linesCleared).toBe(0);
-    expect(final.cellCount).toBe(32);
+    expect(final.cellCount).toBe(40);
     expect(final.isGameOver).toBe(false);
 
     await page.screenshot({ path: 'test-results/blast-story-final.png' });

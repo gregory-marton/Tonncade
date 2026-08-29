@@ -215,6 +215,13 @@ test.describe('Exploratory tests (prototype)', () => {
     await page.goto('/');
     await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
     await page.waitForTimeout(150);
+    // Life's default automaton loads asynchronously (LifeFolder.autoLoadFirstBundled) -- without
+    // waiting for it, #life-rule-panel's content (and so whether it's tall enough to trigger the
+    // drawer-clipping check below) can still be a placeholder at measurement time, same async
+    // race several other tests in this codebase already guard against.
+    if (mode === 'life') {
+      await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 }).catch(() => {});
+    }
 
     const openDrawerIfNeeded = async () => {
       const isMobile = await page.evaluate(() => Render.isMobileViewport());
@@ -391,6 +398,106 @@ test.describe('Exploratory tests (prototype)', () => {
       return { largestBlackFrac: +(largest / total).toFixed(2), totalBlackFrac: +(totalBlack / total).toFixed(2), gridSamples: total };
     });
 
+    // Two general layout-correctness checks, covering the exact CLASS of bug behind two real
+    // live reports (Life's rule panel silently wrapped out of the drawer's own visible column at
+    // specific landscape/portrait widths; Sandbox/Life's floating controls panel stretched to
+    // fill the whole screen at a specific landscape width, leaving a big blank gap below the
+    // actual content) -- rather than pinning regression tests to the exact reported viewports
+    // (which only proves THOSE sizes stay fixed), these run for every (mode, drawer-state, size)
+    // scenario the matrix already visits, so a similar defect at some OTHER size gets caught here
+    // instead of needing another live report first.
+    //
+    // A) No visible drawer content clipped out of the drawer's own box. Both real bugs above
+    // stemmed from flex-wrap silently starting a second row/column once content overflowed
+    // #top-drawer's available space, pushing part of it out past the drawer's own bounds (then
+    // clipped away by its overflow-x/y:hidden) -- not actually missing, just invisible. Checking
+    // "every visible child's box is within its own container's box" generalizes past this one
+    // flex-wrap mechanism to any future cause of the same visible symptom.
+    const drawerClipping = await page.evaluate(() => {
+      const drawer = document.getElementById('top-drawer');
+      if (!drawer || !drawer.classList.contains('expanded')) return [];
+      const d = drawer.getBoundingClientRect();
+      if (d.width === 0 || d.height === 0) return [];
+      const offenders = [];
+      drawer.querySelectorAll('*').forEach((el) => {
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+        // Skip anything inside its OWN legitimate horizontal scroller (e.g. portrait's
+        // #mode-controls, overflow-x:auto around a wider .mode-slider, by design) -- found live:
+        // a 337px-wide phone flagged a real, correctly-horizontally-scrolling .mode-option as a
+        // false positive. Only #top-drawer's own overflow-x:hidden clipping (nothing between here
+        // and the drawer opts into scrolling itself) is the actual defect this check targets.
+        let ancestor = el.parentElement, ownScroller = false;
+        while (ancestor && ancestor !== drawer) {
+          const acs = getComputedStyle(ancestor);
+          if (acs.overflowX === 'auto' || acs.overflowX === 'scroll') { ownScroller = true; break; }
+          ancestor = ancestor.parentElement;
+        }
+        if (ownScroller) return;
+        // Horizontal containment only, by center-x -- the drawer's own overflow-y:auto makes
+        // vertical scroll-past-the-fold completely normal (content below the visible window is
+        // SUPPOSED to report a rect below the drawer's visible bottom edge; that's not a bug).
+        // The real defect this check exists for -- flex-wrap starting a second COLUMN once
+        // content overflows -- pushes content out HORIZONTALLY instead, past overflow-x:hidden,
+        // which center-x containment catches without false-flagging ordinary scrolled content.
+        // Center point (not edge-touching) so an element merely touching the drawer's edge from
+        // a legitimately-wrapped second column (most of its area still outside) isn't missed.
+        const cx = r.left + r.width / 2;
+        const within = cx >= d.left - 2 && cx <= d.right + 2;
+        if (!within) offenders.push(el.id || el.className || el.tagName);
+      });
+      return [...new Set(offenders)];
+    });
+
+    // A2) The current mode's own control panel (#<mode>-controls) shouldn't dominate a
+    // mobile/tablet viewport -- catches the OTHER shape the same real bug took: at a breakpoint
+    // where the intended floating-panel treatment didn't apply at all (rather than applying but
+    // rendering with blank space, which (B) below catches), #sidebar falls back to
+    // display:contents (zero-sized, invisible to a check ON #sidebar itself) and its real child
+    // -- the actual visible box -- stretches to fill the whole row/column height instead.
+    // Mechanism-agnostic on purpose: whatever CSS produces "the controls panel eats most of the
+    // screen" should be caught here even if a future regression takes a different shape entirely.
+    const controlsDominance = await page.evaluate((m) => {
+      const el = document.getElementById(`${m}-controls`);
+      if (!el || !Render.isMobileViewport()) return null;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none') return null;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return null;
+      // Height fraction, not area: the real defect is stretching to fill the FULL available
+      // height regardless of content (width is already naturally narrow either way, so an
+      // area-based fraction stayed small/inconclusive even in the buggy case).
+      return { id: el.id, heightFrac: +(r.height / window.innerHeight).toFixed(2) };
+    }, mode);
+
+    // B) No floating panel (the position:absolute overlay treatment several modes' #sidebar use
+    // on mobile/tablet -- Sandbox/Life/Blast/Gravity/Snake's own corner cards) with a large blank
+    // gap between its real content and its own rendered bottom edge -- the "controls float, but
+    // stretch to fill a fixed cap regardless of how little they actually contain" defect.
+    const floatingPanelGap = await page.evaluate(() => {
+      const panels = ['sidebar', 'blast-stats', 'gravity-controls', 'snake-controls'].map((id) => document.getElementById(id)).filter(Boolean);
+      let worst = null;
+      panels.forEach((panel) => {
+        const cs = getComputedStyle(panel);
+        if (cs.position !== 'absolute' && cs.position !== 'fixed') return; // only the floating treatment is meant to cap tightly
+        const r = panel.getBoundingClientRect();
+        if (r.width === 0 || r.height === 0) return;
+        let maxBottom = r.top;
+        panel.querySelectorAll('*').forEach((el) => {
+          const ecs = getComputedStyle(el);
+          if (ecs.display === 'none' || ecs.visibility === 'hidden') return;
+          const er = el.getBoundingClientRect();
+          if (er.width === 0 || er.height === 0) return;
+          if (er.bottom > maxBottom) maxBottom = er.bottom;
+        });
+        const blankBelow = r.bottom - maxBottom;
+        if (!worst || blankBelow > worst.blankBelow) worst = { id: panel.id, panelHeight: r.height, blankBelow };
+      });
+      return worst;
+    });
+
     // Captured here, before any random tap has a chance to disturb the layout — a clean view of
     // this exact (mode, drawer-state, size) scenario, the same one the assertions below check.
     if (screenshot) {
@@ -438,6 +545,9 @@ test.describe('Exploratory tests (prototype)', () => {
                                    // per-mode cell-count histogram).
       largestBlackFrac: flood.largestBlackFrac,
       totalBlackFrac: flood.totalBlackFrac,
+      drawerClipping,
+      controlsDominance,
+      floatingPanelGap,
     };
   }
 
@@ -559,9 +669,34 @@ test.describe('Exploratory tests (prototype)', () => {
               tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
               cellCount: result.cellCount, // how many cells are visible in this exact scenario --
                                             // see screenshots/index.html's per-mode histogram.
+              drawerClipping: result.drawerClipping,
+              controlsDominance: result.controlsDominance,
+              floatingPanelGap: result.floatingPanelGap,
             });
 
             console.log(`[${label}] largest-black ${(result.largestBlackFrac*100).toFixed(0)}% (total ${(result.totalBlackFrac*100).toFixed(0)}%)  edges ${result.edgeReaches}/4  ${(result.tonnetzShare*100).toFixed(0)}% taps  ${result.cellCount} cells`);
+            // Layout-correctness checks (not fill-quality/rendering-nuance) -- these describe an
+            // actual CSS bug (content clipped outside its own container; a floating panel
+            // stretched well past its content) regardless of which profile's rendering quirks are
+            // in play, so unlike the fill-quality metrics below, they run on every profile.
+            expect.soft(result.drawerClipping, `[${label}] the expanded drawer's own content should stay within the drawer's box, not wrapped/pushed out of it and clipped away (found: ${JSON.stringify(result.drawerClipping)})`).toEqual([]);
+            if (result.floatingPanelGap) {
+              // 60px tolerance for a panel's own padding/border/gap -- anything past that is real
+              // unused blank space, not chrome. Relative floor too, so a large panel with a
+              // proportionally small gap (ordinary breathing room) doesn't false-positive.
+              const gap = result.floatingPanelGap;
+              expect.soft(gap.blankBelow, `[${label}] #${gap.id} (floating panel) has ${gap.blankBelow.toFixed(0)}px of blank space below its real content (panel height ${gap.panelHeight.toFixed(0)}px) -- it should shrink to fit, not stretch to a fixed cap`)
+                .toBeLessThan(Math.max(60, gap.panelHeight * 0.35));
+            }
+            if (result.controlsDominance) {
+              // 0.75 is a generous ceiling -- legitimately taller control panels (Compose's own
+              // tempo/quantize/transport/stats stack, say) can reasonably use most of the height
+              // at some sizes; the real bug this catches rendered at a flat 1.0 (the entire
+              // viewport height, regardless of how little content there actually was).
+              const cd = result.controlsDominance;
+              expect.soft(cd.heightFrac, `[${label}] #${cd.id} occupies ${(cd.heightFrac*100).toFixed(0)}% of the viewport's height -- it should size to its own content, not stretch to fill whatever's available (the "controls float, but eat the whole screen" defect)`)
+                .toBeLessThanOrEqual(0.75);
+            }
             // Soft assertions (not hard) so a single failing scenario doesn't abort the whole
             // matrix loop -- this test doubles as the screenshots/ fixture generator (see the
             // screenshotDir block above), and a hard throw partway through would leave the fixture

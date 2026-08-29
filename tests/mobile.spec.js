@@ -1632,6 +1632,78 @@ test.describe('Mobile Viewport and Layout Tests', () => {
   // E. Drawer and Device Layout
   // ────────────────────────────────────────────────────────────────────────
 
+  // Reported live: at a landscape tablet width (880x660, inside the 768-950px landscape
+  // breakpoint), Life's controls stretched to fill the ENTIRE right column height, leaving a
+  // huge blank gap below the actual (short) content -- the floating-panel treatment
+  // (#app[data-mode="life"] #sidebar, position:absolute + a flat max-height cap) only lived
+  // inside the max-width:767px-only media block, so it never applied here; the separate
+  // landscape-only block's plain `#sidebar { display: contents }` won instead (lower
+  // specificity, but the mode-scoped rule wasn't in a matching media query at all), leaving
+  // #life-controls an ordinary block-level flex child stretched to its row's full height.
+  test('Life: at landscape widths between the portrait and landscape breakpoints (768-950px), the controls float instead of stretching to fill the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 880, height: 660 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+
+    const sidebarPosition = await page.evaluate(() => getComputedStyle(document.getElementById('sidebar')).position);
+    expect(sidebarPosition, '#sidebar should float (position:absolute), not dissolve via display:contents, at this breakpoint').toBe('absolute');
+
+    const box = await page.locator('#life-controls').boundingBox();
+    expect(box.height, `#life-controls stretched to fill the screen (${box.height}px) instead of floating with a capped height`).toBeLessThan(660 * 0.6);
+  });
+
+  // Same root cause as the Life test above -- Sandbox's own #sidebar floating-panel override
+  // has the identical gap at this breakpoint.
+  test('Sandbox: at landscape widths between the portrait and landscape breakpoints (768-950px), the controls float instead of stretching to fill the screen', async ({ page }) => {
+    await page.setViewportSize({ width: 880, height: 660 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click());
+
+    const sidebarPosition = await page.evaluate(() => getComputedStyle(document.getElementById('sidebar')).position);
+    expect(sidebarPosition, '#sidebar should float (position:absolute), not dissolve via display:contents, at this breakpoint').toBe('absolute');
+  });
+
+  // Reported live (drawer open, Life mode, landscape ~880x660): "the rules appear to be missing
+  // entirely". Root cause: the landscape #top-drawer override sets flex-direction:column but
+  // never resets the BASE rule's flex-wrap:wrap (added for the desktop scroll fix, #top-drawer's
+  // own comment) -- once the mode-slider (280px) + #life-rule-panel together exceed the drawer's
+  // available height, flex-wrap starts a SECOND COLUMN instead of just letting the first one
+  // scroll, pushing #life-rule-panel out past the drawer's own max-width and #top-drawer's
+  // overflow-x:hidden clips nearly all of it away -- not actually missing, just invisible.
+  test('Life: the drawer\'s rule panel stays in the drawer\'s single column (visible), even in landscape when it plus the mode list overflow the drawer\'s height', async ({ page }) => {
+    await page.setViewportSize({ width: 880, height: 660 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+
+    const drawer = page.locator('#top-drawer');
+    await expect(drawer).toHaveClass(/expanded/);
+
+    const drawerBox = await drawer.boundingBox();
+    const rulePanelBox = await page.locator('#life-rule-panel').boundingBox();
+    expect(rulePanelBox, '#life-rule-panel should actually be visible').not.toBeNull();
+    // It should sit within the drawer's own horizontal bounds (a second flex-wrap column would
+    // push it out past drawerBox.x + drawerBox.width, mostly clipped by overflow-x:hidden).
+    expect(rulePanelBox.x, `#life-rule-panel.x (${rulePanelBox.x}) should be within the drawer (${drawerBox.x}-${drawerBox.x + drawerBox.width})`)
+      .toBeGreaterThanOrEqual(drawerBox.x - 1);
+    expect(rulePanelBox.x + rulePanelBox.width, `#life-rule-panel's right edge should be within the drawer's own width`)
+      .toBeLessThanOrEqual(drawerBox.x + drawerBox.width + 1);
+  });
+
+  // Same bug, portrait's own copy of the fix (a separate #top-drawer rule, not shared with
+  // landscape's) -- reported live at 609x633 portrait, right after the landscape report above.
+  test('Life: the drawer\'s rule panel stays in the drawer\'s single column (visible), in portrait too, when it plus the mode list overflow the drawer\'s height', async ({ page }) => {
+    await page.setViewportSize({ width: 609, height: 633 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+    await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 });
+
+    const drawer = page.locator('#top-drawer');
+    await expect(drawer).toHaveClass(/expanded/);
+
+    const rulePanelBox = await page.locator('#life-rule-panel').boundingBox();
+    expect(rulePanelBox, '#life-rule-panel should actually be visible').not.toBeNull();
+    expect(rulePanelBox.x, `#life-rule-panel.x (${rulePanelBox.x}) should be within the viewport, not wrapped off to the right`)
+      .toBeLessThan(609);
+  });
+
   test('collapsed landscape drawer leaves no blank gap between the rail and the actual content', async ({ page }) => {
     await page.setViewportSize({ width: 824, height: 549 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
