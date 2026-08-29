@@ -734,7 +734,33 @@ const GravityMode = {
         const list = document.getElementById('piece-list');
         if (!list) return;
 
-        list.innerHTML = '<h3>Next Pieces</h3>';
+        list.innerHTML = '';
+
+        // The currently-falling piece, shown first -- essential for orientation (which piece is
+        // actually falling right now), matching Blast's own active-item treatment (whose queue
+        // this one was cloned from). Missing entirely was a real regression, not a deliberate
+        // difference (found live via screenshots/index.html). Display-only, unlike Blast's
+        // clickable active-item: Gravity's piece already falls on its own, so there's no
+        // tap-to-place gesture to wire up here yet (see next_steps.md's discussion of some
+        // difficulty levels not auto-dropping, where this WOULD become the drop trigger).
+        if (this.state.activePiece && !this.state.isGameOver) {
+            const piece = Pieces.TYPES[this.state.activePiece];
+            const div = document.createElement('div');
+            div.className = 'piece-item active-item';
+            div.innerHTML = `
+                <svg class="piece-preview"></svg>
+                <div class="piece-name">${piece.name}</div>
+            `;
+            list.appendChild(div);
+
+            const svg = div.querySelector('.piece-preview');
+            SandboxMode.renderPiecePreview(svg, piece.cells, piece.color);
+        }
+
+        const heading = document.createElement('h3');
+        heading.textContent = 'Next Pieces';
+        list.appendChild(heading);
+
         this.state.nextQueue.forEach((key) => {
             const piece = Pieces.TYPES[key];
             const div = document.createElement('div');

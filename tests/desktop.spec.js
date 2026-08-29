@@ -1837,6 +1837,32 @@ test('blast queue shows the active piece as a distinct, clickable item that plac
   expect(placedCount).toBeGreaterThan(0);
 });
 
+// Reported live via screenshots/index.html: Gravity's own queue only ever showed the UPCOMING
+// pieces (state.nextQueue), never the currently-falling one -- a real regression (Blast's own
+// queue, from which Gravity's was cloned, already shows it) that broke orientation ("which piece
+// is actually falling right now"). Display-only here, unlike Blast's clickable active-item:
+// Gravity's active piece already falls on its own, so there's no tap-to-place gesture to wire up
+// (see next_steps.md for the separately-discussed idea of some difficulty levels not
+// auto-dropping, where this WOULD become the drop trigger).
+test('Gravity queue shows the currently-falling piece, not just the upcoming ones', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+
+  const activeItem = page.locator('.piece-item.active-item');
+  await expect(activeItem).toBeVisible();
+  await expect(activeItem.locator('.piece-preview')).toBeVisible();
+
+  // It should reflect the REAL active piece, not just any piece -- change it and confirm the
+  // displayed name tracks it.
+  const nameBefore = await activeItem.locator('.piece-name').textContent();
+  await page.evaluate(() => {
+    GravityMode.state.activePiece = GravityMode.state.nextQueue[0];
+    GravityMode.renderNextQueue();
+  });
+  const nameAfter = await activeItem.locator('.piece-name').textContent();
+  expect(nameAfter).not.toBe(nameBefore);
+});
+
 test('clicking the active queue item does not place when the ghost position is invalid', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="blast"]').click());

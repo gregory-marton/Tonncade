@@ -328,7 +328,7 @@ test.describe('Exploratory tests (prototype)', () => {
         minY = Math.min(minY, r.y); maxY = Math.max(maxY, r.y + r.height);
         n++;
       });
-      if (!n) return { reaches: 0, margins: null };
+      if (!n) return { reaches: 0, reachesLenient: 0, margins: null };
       // One hex diameter on screen, at the current zoom.
       const p1 = svg.createSVGPoint(); p1.x = 0; p1.y = 0;
       const p2 = svg.createSVGPoint(); p2.x = Render.HEX_R * 2; p2.y = 0;
@@ -337,8 +337,15 @@ test.describe('Exploratory tests (prototype)', () => {
         left: (minX - gc.left) / cellPx, right: (gc.right - maxX) / cellPx,
         top: (minY - gc.top) / cellPx, bottom: (gc.bottom - maxY) / cellPx,
       };
+      // Two tiers, deliberately different from each other (live feedback -- several real
+      // screenshots reaching within 3 cell-diameters but not 2 read as genuinely well-filled, not
+      // as defects): `reaches` (<=2) stays the STRICT ideal, still used for the visual yellow flag
+      // in screenshots/index.html so a human reviewer keeps seeing the finer distinction; the
+      // actual pass/fail floor below relaxes to `reachesLenient` (<=3) instead, so "reaches
+      // within 3" no longer fails the automated suite even though it still shows yellow.
       const reaches = [m.left, m.right, m.top, m.bottom].filter(v => v <= 2).length;
-      return { reaches, margins: { left: +m.left.toFixed(1), right: +m.right.toFixed(1), top: +m.top.toFixed(1), bottom: +m.bottom.toFixed(1) }, cells: n };
+      const reachesLenient = [m.left, m.right, m.top, m.bottom].filter(v => v <= 3).length;
+      return { reaches, reachesLenient, margins: { left: +m.left.toFixed(1), right: +m.right.toFixed(1), top: +m.top.toFixed(1), bottom: +m.bottom.toFixed(1) }, cells: n };
     });
 
     // Flood-fill of the EMPTY (black) play area (the user's metric): a well-placed board bisects the
@@ -538,6 +545,7 @@ test.describe('Exploratory tests (prototype)', () => {
       controlsDiscovered: initialControls.length,
       respondedToModeSwitch: modeAfter === nextMode,
       edgeReaches: edge.reaches,
+      edgeReachesLenient: edge.reachesLenient,
       edgeMargins: edge.margins,
       cellCount: edge.cells || 0, // how many cells are actually visible in this exact scenario --
                                    // already computed by the edge-reach measurement above, just
@@ -665,6 +673,10 @@ test.describe('Exploratory tests (prototype)', () => {
               //    edge, leaving the board free to reach two edges itself.
               largestBlackFrac: result.largestBlackFrac, totalBlackFrac: result.totalBlackFrac,
               edgeReaches: result.edgeReaches, edgeMargins: result.edgeMargins,
+              // belowFloor still drives the screenshot viewer's yellow flag at the STRICT <=2
+              // threshold (live feedback: several real screenshots reaching within 3 but not 2
+              // read as genuinely well-filled -- worth a human glance, not worth failing CI over,
+              // so the visual flag stays fine-grained even though the assertion below relaxed).
               belowFloor: result.largestBlackFrac > 0.5 || result.edgeReaches < 2,
               tonnetzShare: Number(result.tonnetzShare.toFixed(2)),
               cellCount: result.cellCount, // how many cells are visible in this exact scenario --
@@ -714,12 +726,17 @@ test.describe('Exploratory tests (prototype)', () => {
             // so it's uniform across every mode. Soft so the loop still captures the whole fixture;
             // look at the attached failure screenshot.
             expect.soft(result.largestBlackFrac, `[${label}] the largest empty (black) region should be <=50% of the play area (was ${(result.largestBlackFrac*100).toFixed(0)}%; the board isn't bisecting the space)`).toBeLessThanOrEqual(0.5);
-            // The edge-reach invariant, applied to EVERY mode: the Tonnetz must come within ~2
+            // The edge-reach invariant, applied to EVERY mode: the Tonnetz must come within ~3
             // cells of at least two screen edges. Whatever chrome doesn't need height (a stats bar,
             // transport buttons) belongs against a single edge, not stacked above AND below the one
             // thing that needs the room. Measured off the drawn cells vs #game-container, in
-            // cell-diameters, so it's zoom/size independent.
-            expect.soft(result.edgeReaches, `[${label}] the Tonnetz should reach at least 2 screen edges (reached ${result.edgeReaches}: margins ${JSON.stringify(result.edgeMargins)} in cell-diameters); move non-height chrome out of the board's way`).toBeGreaterThanOrEqual(2);
+            // cell-diameters, so it's zoom/size independent. Floor relaxed from 2 to 3 cells (live
+            // feedback: several real screenshots reaching within 3 but not 2 -- e.g. Snake at a
+            // narrow-ish landscape width -- read as genuinely well-filled boards, not defects; the
+            // stricter 2-cell threshold still drives the screenshot viewer's yellow flag above, so
+            // that finer distinction stays visible to a human reviewer even though it no longer
+            // fails the automated suite on its own).
+            expect.soft(result.edgeReachesLenient, `[${label}] the Tonnetz should reach at least 2 screen edges within 3 cell-diameters (reached ${result.edgeReachesLenient}: margins ${JSON.stringify(result.edgeMargins)} in cell-diameters); move non-height chrome out of the board's way`).toBeGreaterThanOrEqual(2);
             }
           }
         }

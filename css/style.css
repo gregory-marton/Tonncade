@@ -1677,12 +1677,6 @@ button:hover {
         padding: 4px 8px;
     }
 
-    #app[data-mode="gravity"]:not([data-gravity-sides]) #palette.floating-queue #piece-list {
-        flex-direction: row;
-        gap: 6px;
-        flex-wrap: wrap;
-    }
-
     #app[data-mode="gravity"] #palette.floating-queue h3 {
         display: none;
     }

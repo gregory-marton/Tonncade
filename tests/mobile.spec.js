@@ -1959,6 +1959,25 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(rightBox.y, 'right cluster: down sits below its own arrow button, mirroring the left').toBeGreaterThan(rightArrowBox.y);
   });
 
+  // Reported live via screenshots/index.html: Gravity's own upcoming-pieces queue used a 2-column
+  // wrapping grid in the narrow (non-"sides") portrait layout specifically -- every OTHER carousel
+  // in the app (this same queue's own "sides" variant included) is single-column, per an earlier
+  // explicit ask ("1xN instead of 2xN, let folks scroll") that this one spot never got updated for.
+  test('Gravity: the upcoming-pieces queue is single-column even in the narrow (non-sides) portrait layout', async ({ page }) => {
+    await page.setViewportSize({ width: 379, height: 664 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.waitForFunction(() => document.getElementById('app').getAttribute('data-gravity-sides') !== '1', { timeout: 3000 }).catch(() => {});
+
+    const items = page.locator('#palette.floating-queue #piece-list .piece-item');
+    const count = await items.count();
+    expect(count, 'the queue should show at least 2 pieces to make the column-vs-grid layout meaningful').toBeGreaterThanOrEqual(2);
+    const firstBox = await items.first().boundingBox();
+    for (let i = 1; i < count; i++) {
+      const box = await items.nth(i).boundingBox();
+      expect(box.x, `piece ${i} should be in the same column as the first (x=${firstBox.x}), not wrapped into a second column`).toBeCloseTo(firstBox.x, 0);
+    }
+  });
+
   test('Snake and Gravity mobile pads clear iOS-style bottom browser chrome in portrait', async ({ page }) => {
     const width = page.viewportSize().width;
     const height = page.viewportSize().height;
