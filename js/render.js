@@ -69,6 +69,21 @@ const Render = {
         return window.devicePixelRatio / this._baselineDPR;
     },
 
+    // Shared by any mode's own compact number display (a .stat-bar count, a generation counter,
+    // ...) -- a raw "17,310" doesn't fit the small fixed-width boxes these live in, and a big
+    // number is exactly what a long-running counter (Life's generation, in particular) heads
+    // toward first. Intl.NumberFormat's own 'compact' notation (a real Web platform feature, not
+    // a hand-rolled K/M/B ladder) already handles the locale-aware digit grouping/threshold and
+    // suffix choice correctly, including non-Latin numbering systems -- reuse it rather than
+    // reinventing it per call site. Its own default casing is locale-standard uppercase ("17K",
+    // "3M"); lowercased to match the game-score convention asked for here ("17k", "3m") --
+    // harmless for locales whose compact suffix isn't a letter at all (toLowerCase is a no-op on
+    // digits/symbols/non-cased scripts).
+    formatCompactNumber: function(n) {
+        if (typeof n !== 'number' || !isFinite(n)) return String(n);
+        return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n).toLowerCase();
+    },
+
     init: function(svgId) {
         this.svg = document.getElementById(svgId);
         const stored = parseInt(localStorage.getItem('tonncade_rotation_deg') || '0', 10);

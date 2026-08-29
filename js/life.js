@@ -453,8 +453,10 @@ const LifeMode = {
         this.state.undoStack.push(() => { // #17 -- one tap is one undo (no drag-multi-toggle gesture)
             if (hadKey) this.state.live.set(key, prevVal);
             else this.state.live.delete(key);
+            this.updateControls(); // keep the alive-count badge in sync after an undo too
         });
         this.paintLive();
+        this.updateControls(); // alive-count badge -- a manual toggle changes it just like a step does
     },
 
     // Issue #11: a live MIDI keyboard should have SOME effect in every mode. Life's own action is
@@ -728,7 +730,9 @@ const LifeMode = {
         const pp = document.getElementById('life-play-pause');
         if (pp) { pp.textContent = this.state.running ? '⏸' : '▶'; pp.title = this.state.running ? 'Pause' : 'Play'; }
         const gen = document.getElementById('life-generation');
-        if (gen) gen.textContent = this.state.generation;
+        if (gen) gen.textContent = Render.formatCompactNumber(this.state.generation);
+        const aliveCount = document.getElementById('life-alive-count');
+        if (aliveCount) aliveCount.textContent = Render.formatCompactNumber(this.state.live.size);
         this.updateRuleDisplay();
     },
 

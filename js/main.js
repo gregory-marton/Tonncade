@@ -513,6 +513,8 @@ const App = {
         if (document.getElementById('life-controls')) {
             document.getElementById('life-controls').style.display = 'none';
         }
+        const lifeRulePanel = document.getElementById('life-rule-panel');
+        if (lifeRulePanel) lifeRulePanel.style.display = 'none';
         document.getElementById('placement-controls').style.display = 'none';
         const hexNavControls = document.getElementById('hex-nav-controls');
         if (hexNavControls) hexNavControls.style.display = 'none';
@@ -564,6 +566,7 @@ const App = {
             ComposeMode.init();
         } else if (mode === 'life') {
             document.getElementById('life-controls').style.display = 'block';
+            if (lifeRulePanel) lifeRulePanel.style.display = 'block';
             LifeMode.init();
         }
 

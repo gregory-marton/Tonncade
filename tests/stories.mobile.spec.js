@@ -76,21 +76,22 @@ test.describe('Mobile story tests', () => {
     // are the regression baseline for Blast's placement/rotation/collision/line-clear logic
     // under a long, real, touch-driven mobile session.
     //
-    // linesCleared 1->2, cellCount 52->53 under the drawer UX redesign: each pointerdown is
-    // resolved to a cell via document.elementFromPoint() at the ORIGINAL recorded pixel
-    // coordinates (see replay-driver.js), so the new always-visible drawer rail (now a real
-    // 32px-tall row at every viewport, not just a subtle drag handle below 768px) shifting the
-    // board's on-screen position shifts which cell each recorded coordinate now lands on --
-    // inherent to pinning a test to raw screen pixels rather than app state, same as the desktop
-    // Blast story's own #48-era precedent. Verified stable across repeated isolated runs after
-    // replay-driver.js's own settle-after-auto-collapse fix (see that file for why the value was
-    // flaky before that fix landed).
+    // linesCleared 2->1 (cellCount steady at 53) under the Sandbox/Life mobile-panel pass:
+    // #blast-stats's own .stats-panel lost its redundant nested border/background/padding (it
+    // already sits inside #blast-stats's own already-framed corner card -- "an outline that's
+    // very wide" live feedback, same fix applied to Snake/Gravity/Life), which shifts
+    // #blast-stats's real on-screen box a few pixels. Each pointerdown resolves to a cell via
+    // document.elementFromPoint() at the ORIGINAL recorded pixel coordinates (see
+    // replay-driver.js), so any shift in what's on-screen near those coordinates can shift which
+    // cell a tap actually lands on -- inherent to pinning a test to raw screen pixels rather than
+    // app state, same as the desktop Blast story's own #48-era precedent. Verified stable across
+    // repeated isolated runs (both Tablet Chrome and Mobile Safari) before committing.
     const final = await page.evaluate(() => ({
       linesCleared: BlastMode.state.linesCleared,
       cellCount: Board.cells.size,
       isGameOver: BlastMode.state.isGameOver,
     }));
-    expect(final.linesCleared).toBe(2);
+    expect(final.linesCleared).toBe(1);
     expect(final.cellCount).toBe(53);
     expect(final.isGameOver).toBe(false);
 

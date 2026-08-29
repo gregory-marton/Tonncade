@@ -837,6 +837,17 @@ button:hover {
     margin-bottom: 15px;
 }
 
+/* Life's own row (6 icon buttons + the inline generation badge) is the tightest one of these in
+   the app -- narrow enough panels (e.g. the mobile floating panel's own width cap) clipped the
+   tail end of the row (Clear/Save/Download) with no way to reach them at all. Wrapping to a
+   second line instead of clipping is scoped to Life specifically rather than changing every
+   mode's own .control-buttons row -- Blast/Gravity/Snake's are text-labeled and rely on
+   .control-buttons button's flex:1 to stretch evenly across a single line; wrapping those
+   wasn't asked for and risks looking odd if one of them ever gets this tight too. */
+#life-controls .control-buttons {
+    flex-wrap: wrap;
+}
+
 .control-buttons button {
     flex: 1;
     padding: 6px 10px;
@@ -857,6 +868,57 @@ button:hover {
     font-size: 16px;
     line-height: 1;
     text-align: center;
+    /* #life-download-link is an <a>, not a <button> (needs to be, for its own `download`
+       attribute to work) -- the global `button { background, color, border, ... }` rule (css
+       line ~745) only matches the <button> tag, so it silently never got that teal styling and
+       just sat there as a bare emoji next to its actual <button> siblings (found live: "the
+       download button isn't teal for some reason"). .icon-btn itself now carries its own
+       background/color/border/radius/cursor/no-underline, so it looks the same regardless of
+       which tag a given icon button happens to need to be. Harmless no-op restatement for the
+       <button> ones, which already got all of this from the global rule. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    /* Browsers give <button> (a form control) box-sizing:border-box in their own UA stylesheet
+       by default, but not <a> (found live: "download is super wide" -- #life-download-link's
+       padding was being added ON TOP of its width instead of eating into it, unlike its actual
+       <button> siblings). Stated explicitly so every .icon-btn sizes the same regardless of tag. */
+    box-sizing: border-box;
+}
+
+.icon-btn:hover {
+    opacity: 0.9;
+}
+
+/* Life's live-cells/generation stat, the last item of .control-buttons itself (not its own
+   labeled line, and not a separate row below either -- live feedback: reclaim that vertical
+   space, flow onto whatever line .control-buttons' own flex-wrap has room on), styled like every
+   other mode's own score display -- .stat-bar, shared by Snake/Blast/Gravity/Melody -- so it
+   looks like it belongs instead of being a bespoke one-off. .stat-bar's own width/height are a
+   fixed var(--stat-bar-len)-driven size meant for a corner stats card, not a row of icon
+   buttons -- overridden to auto (sized by its own padding+content, the same approach .icon-btn
+   already uses) so it sits at roughly the same height as its button neighbors, and picks up
+   .control-buttons' own `gap` for spacing instead of carrying its own separate margin. */
+/* Compound selector, not just .life-stat-bar -- .stat-bar's own width/height rule (below this
+   one in the file, equal specificity as a single class selector) otherwise wins on source order
+   alone, silently keeping the fixed 68px card width regardless of this rule (found live: the
+   badge still rendered full-card-width and wrapped to its own line instead of sitting beside
+   Save/Download where there was room). .stat-bar.life-stat-bar has double the specificity of
+   .stat-bar alone, so it wins unconditionally, independent of where either rule sits in the file. */
+.stat-bar.life-stat-bar {
+    flex: 0 0 auto;
+    width: auto;
+    height: auto;
+    min-width: 2.6em;
+    padding: 6px 8px;
+    font-size: 13px;
+    gap: 2px;
 }
 
 .stats-panel {
@@ -1135,6 +1197,11 @@ button:hover {
        Best/Speed, three for Gravity) fall onto a further line rather than spilling past the
        edge -- needed because Blast/Gravity share this band with #palette.floating-queue, which
        Snake (comfortably single-line here) doesn't have to make room for. */
+    /* background/border/radius/padding cleared: .stats-panel's base rule (meant for when it's
+       the ONLY framing, e.g. Compose's desktop sidebar) otherwise doubles up on top of these
+       corner cards' own border/background -- "an outline that's very wide and takes up
+       meaningless space" (live feedback). Scoped to just this nested case -- .stats-panel's base
+       styling is still correct wherever it's the sole frame. */
     #blast-stats .stats-panel, #gravity-controls .stats-panel, #snake-controls .stats-panel {
         display: flex;
         flex-direction: row;
@@ -1143,6 +1210,10 @@ button:hover {
         flex: 0 1 auto;
         min-width: 0;
         max-width: 100%;
+        background: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
     }
 
     #blast-stats .stats-panel p, #gravity-controls .stats-panel p, #snake-controls .stats-panel p {
@@ -1644,6 +1715,11 @@ button:hover {
        Best/Speed, three for Gravity) fall onto a further line rather than spilling past the
        edge -- needed because Blast/Gravity share this band with #palette.floating-queue, which
        Snake (comfortably single-line here) doesn't have to make room for. */
+    /* background/border/radius/padding cleared: .stats-panel's base rule (meant for when it's
+       the ONLY framing, e.g. Compose's desktop sidebar) otherwise doubles up on top of these
+       corner cards' own border/background -- "an outline that's very wide and takes up
+       meaningless space" (live feedback). Scoped to just this nested case -- .stats-panel's base
+       styling is still correct wherever it's the sole frame. */
     #blast-stats .stats-panel, #gravity-controls .stats-panel, #snake-controls .stats-panel {
         display: flex;
         flex-direction: row;
@@ -1652,6 +1728,10 @@ button:hover {
         flex: 0 1 auto;
         min-width: 0;
         max-width: 100%;
+        background: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
     }
 
     #blast-stats .stats-panel p, #gravity-controls .stats-panel p, #snake-controls .stats-panel p {

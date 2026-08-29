@@ -93,7 +93,30 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <div class="mode-option" data-mode="life">Life</div>
                     </div>
                 </div>
-                <div id="drawer-injected-tools" style="display: none; padding: 10px; border-top: 1px solid var(--border);"></div>
+                <!-- Life's own rule reference -- genuinely extra info (read once to understand the
+                     ruleset, then mostly ignored while it runs), same category as the title text
+                     above it, so it lives in the collapsible part rather than the always-visible
+                     panel (js/main.js's setMode shows/hides this per mode, same pattern as every
+                     other mode-specific panel). Shown/hidden, never relocated -- js/life.js writes
+                     into #life-rule-display/#life-filename by id, unaware of which container
+                     they're actually in. -->
+                <div id="life-rule-panel" style="display: none; padding: 10px; border-top: 1px solid var(--border);">
+                    <!-- Only meaningfully new information right after a plain local upload (no
+                         chosen folder) -- picking a bundled/folder file already shows its name in
+                         the dropdown itself, making this redundant in that case; kept anyway since
+                         it's genuinely correct in the upload case and now costs nothing sitting in
+                         the collapsible part. See js/life.js's loadAutomatonFromText comment. -->
+                    <p id="life-filename" style="margin: 0 0 6px 0; font-size: 12px; color: var(--dim);"></p>
+                    <!-- The raw YAML as loaded (or, with no file loaded, LifeMode.toYaml()'s own
+                         equivalent) -- not a re-summarized subset. The rule vocabulary (isotropy,
+                         require/forbid neighbor clauses, the musical axis/tone/semitone selector
+                         names) is too rich for a one-line paraphrase to represent honestly; showing
+                         the real source is what actually lets a player understand and reuse it.
+                         No own max-height/overflow -- #top-drawer itself already scrolls once
+                         expanded (both orientations), so this just flows and lets that handle it. -->
+                    <pre id="life-rule-display" title="Current automaton (YAML)" style="font-size: 11px; color: var(--dim); margin: 0; white-space: pre-wrap; font-family: monospace; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; padding: 6px;"></pre>
+                    <p style="margin: 4px 0 0 0;"><a href="https://gregory-marton.github.io/Tonncade/docs/life-rules.md" target="_blank" rel="noopener" style="font-size: 11px; color: var(--accent);">Rule format reference &#8599;</a></p>
+                </div>
             </div>
         </header>
 
@@ -340,7 +363,6 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             Open Automaton File
                         </label>
                         <input id="life-file-input" type="file" accept=".yaml,.yml" style="display: none;" />
-                        <span id="life-filename"></span>
                     </div>
                     <div class="control-buttons">
                         <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button>
@@ -349,16 +371,18 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                         <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button>
                         <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button>
                         <a id="life-download-link" class="icon-btn" href="#" download="automaton.yaml" title="Download current automaton as .yaml" aria-label="Download current automaton as .yaml">⬇</a>
-                    </div>
-                    <div class="stats-panel">
-                        <p title="Generation">gen <span id="life-generation">0</span></p>
-                        <!-- The raw YAML as loaded (or, with no file loaded, LifeMode.toYaml()'s own
-                             equivalent) -- not a re-summarized subset. The rule vocabulary (isotropy,
-                             require/forbid neighbor clauses, the musical axis/tone/semitone selector
-                             names) is too rich for a one-line paraphrase to represent honestly; showing
-                             the real source is what actually lets a player understand and reuse it. -->
-                        <pre id="life-rule-display" title="Current automaton (YAML)" style="font-size: 11px; color: var(--dim); margin: 4px 0 0 0; max-height: 220px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 4px; padding: 6px;"></pre>
-                        <p style="margin: 4px 0 0 0;"><a href="https://gregory-marton.github.io/Tonncade/docs/life-rules.md" target="_blank" rel="noopener" style="font-size: 11px; color: var(--accent);">Rule format reference &#8599;</a></p>
+                        <!-- Styled like every other mode's own score display (.stat-bar --
+                             Snake/Blast/Gravity/Melody's current/best) -- live cells /
+                             generation, the closest Life has to a "current / reference" pair. No
+                             .stat-bar-fill: there's no natural max for live-cell count to fill
+                             toward the way score-vs-best has one. Last item of .control-buttons
+                             itself (not a separate row below) so it flows onto whatever line
+                             .control-buttons' own flex-wrap has room on, same as the buttons
+                             around it, instead of always claiming a whole new line to itself. -->
+                        <div class="stat-bar life-stat-bar" role="img" aria-label="Live cells and current generation" title="Live cells / generation">
+                            <span class="stat-bar-num"><span id="life-alive-count">0</span></span>
+                            <span class="stat-bar-best">/<span id="life-generation">0</span></span>
+                        </div>
                     </div>
                 </div>
 

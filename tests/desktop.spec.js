@@ -5216,7 +5216,7 @@ test('Life: the automaton source menu offers an "Upload File…" entry that open
 // Birth: 2" paraphrase -- rejected live as hiding exactly the rule vocabulary that matters most
 // for a Tonnetz-based rule (isotropy, require/forbid neighbor clauses, the musical axis/tone/
 // semitone selector names), so it shows the real YAML now instead.
-test('Life: the current rule is displayed underneath the generation counter (falls back to toYaml when no file was loaded)', async ({ page }) => {
+test('Life: the current rule is displayed in the drawer (falls back to toYaml when no file was loaded)', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
   await page.evaluate(() => LifeMode.loadAutomaton({
@@ -5259,8 +5259,12 @@ test('Life: loading a real file shows its exact source YAML, not a re-summarized
 test('Life: a link to the deployed rule-format reference sits next to the rule display', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="life"]').click());
+  // #life-rule-panel, not #life-controls: the rule display (and this link next to it) moved into
+  // the collapsible drawer, alongside the title text -- genuinely extra info, read once to
+  // understand the ruleset, same category as the title/wiki-link above it (live feedback on the
+  // mobile screenshot fixture: Life's own panel was eating too much of a small viewport).
   const href = await page.evaluate(() => {
-    const el = document.querySelector('#life-controls a[href*="life-rules.md"]');
+    const el = document.querySelector('#life-rule-panel a[href*="life-rules.md"]');
     return el ? el.getAttribute('href') : null;
   });
   expect(href).toBe('https://gregory-marton.github.io/Tonncade/docs/life-rules.md');
