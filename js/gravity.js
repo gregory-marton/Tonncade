@@ -101,8 +101,7 @@ const GravityMode = {
             clearInterval(this.state.timer);
             this.state.timer = null;
             this.state.isPaused = true;
-            const pauseBtn = document.getElementById('gravity-start-pause');
-            if (pauseBtn) pauseBtn.textContent = 'Resume';
+            this.setPauseIcon(true);
         }
         if (this._resizeObserver) {
             this._resizeObserver.disconnect();
@@ -117,9 +116,8 @@ const GravityMode = {
         this.state.isPaused = false;
         this.state.dropInterval = 1000;
         this.state.nextQueue = [this.randomPiece(), this.randomPiece(), this.randomPiece()];
-        
-        const pauseBtn = document.getElementById('gravity-start-pause');
-        if (pauseBtn) pauseBtn.textContent = 'Pause';
+
+        this.setPauseIcon(false);
 
         if (this.state.timer) {
             clearInterval(this.state.timer);
@@ -132,18 +130,34 @@ const GravityMode = {
 
     togglePause: function() {
         if (this.state.isGameOver) return;
-        
-        const pauseBtn = document.getElementById('gravity-start-pause');
+
         if (this.state.isPaused) {
             this.state.isPaused = false;
-            if (pauseBtn) pauseBtn.textContent = 'Pause';
+            this.setPauseIcon(false);
             this.startTimer();
         } else {
             this.state.isPaused = true;
-            if (pauseBtn) pauseBtn.textContent = 'Resume';
+            this.setPauseIcon(true);
             if (this.state.timer) clearInterval(this.state.timer);
         }
         this.refreshUI();
+    },
+
+    // Icon-only transport, matching Snake's own setPauseIcon: ⏸ while running (click pauses), ▶
+    // while paused (click resumes) -- the glyph shows the action the click performs. Was plain
+    // English text ("Pause"/"Resume") until now -- besides the i18n bias (task #29) every other
+    // mode's transport already avoided, the full-word label was also what overflowed Gravity's
+    // own narrow side-gutter control panel (#app[data-gravity-sides="1"], css/style.css) at
+    // landscape widths wide enough to earn that layout -- reported live ("the box... was too
+    // narrow to contain [Pause, Restart, score]"). Keep the id and an English title/aria-label for
+    // accessibility and the tests; the visible label is icon-only.
+    setPauseIcon: function(paused) {
+        const btn = document.getElementById('gravity-start-pause');
+        if (!btn) return;
+        btn.textContent = paused ? '▶' : '⏸';
+        const label = paused ? 'Resume' : 'Pause';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
     },
 
     // Level 4 has no entry in the shared Pieces.DIFFICULTY_KEYS (that array is also Blast's, which

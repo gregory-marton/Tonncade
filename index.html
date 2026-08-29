@@ -155,8 +155,8 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                 <!-- Gravity Mode Controls & Stats -->
                 <div id="gravity-controls" style="display: none;">
                     <div class="control-buttons">
-                        <button id="gravity-start-pause">Pause</button>
-                        <button id="gravity-reset">Restart</button>
+                        <button id="gravity-start-pause" class="icon-btn" title="Pause" aria-label="Pause">⏸</button>
+                        <button id="gravity-reset" class="icon-btn" title="Restart" aria-label="Restart">↻</button>
                     </div>
                     <div id="gravity-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"></div>
                     <div class="stats-panel">
@@ -165,7 +165,7 @@ See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>, for detail
                             <span class="stat-bar-num"><span id="gravity-lines-count">0</span></span>
                             <span class="stat-bar-best">/<span id="gravity-best-count">0</span></span>
                         </div>
-                        <p>Speed: <span id="gravity-speed-level">1.0x</span></p>
+                        <p><span class="stat-label">Speed: </span><span id="gravity-speed-level">1.0x</span></p>
                     </div>
                 </div>
 

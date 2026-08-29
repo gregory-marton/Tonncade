@@ -1704,6 +1704,32 @@ test.describe('Mobile Viewport and Layout Tests', () => {
       .toBeLessThan(609);
   });
 
+  // Reported live (via a real desktop-browser repro replay at 832x633 landscape, Gravity mode):
+  // "the box that contains pause, restart, score etc. was too narrow to contain it despite plenty
+  // of blank space." Root cause: #gravity-controls' side-gutter treatment
+  // (#app[data-gravity-sides="1"], css/style.css) is a deliberately narrow 62px column -- correct
+  // by design whenever there's enough width for a D-pad gutter on each side of the cup, REGARDLESS
+  // of how much extra width is left over (the design maximizes the cup's HEIGHT, not the gutter's
+  // width) -- but its content was still the old plain-English "Pause"/"Restart" text buttons and a
+  // "Speed: 1.0x" label, none of which fit a 62px column at any font size that stays legible.
+  // Fixed by converting the transport to icon-only glyphs (matching Snake/Blast's own convention)
+  // and dropping the "Speed:" label in this narrow column, keeping just the value.
+  test('Gravity: the narrow side-gutter control panel contains its own content, nothing overflows past its own box', async ({ page }) => {
+    await page.setViewportSize({ width: 832, height: 633 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.waitForFunction(() => document.getElementById('app').getAttribute('data-gravity-sides') === '1', { timeout: 3000 });
+
+    const panelBox = await page.locator('#gravity-controls').boundingBox();
+    const childIds = ['gravity-start-pause', 'gravity-reset', 'gravity-difficulty', 'gravity-lines-count', 'gravity-speed-level'];
+    for (const id of childIds) {
+      const box = await page.locator(`#${id}`).boundingBox();
+      expect(box, `#${id} should be visible`).not.toBeNull();
+      expect(box.x, `#${id}'s left edge (${box.x}) should be within the panel (${panelBox.x})`).toBeGreaterThanOrEqual(panelBox.x - 1);
+      expect(box.x + box.width, `#${id}'s right edge (${box.x + box.width}) should be within the panel's own width (${panelBox.x + panelBox.width}), not overflowing past it`)
+        .toBeLessThanOrEqual(panelBox.x + panelBox.width + 1);
+    }
+  });
+
   test('collapsed landscape drawer leaves no blank gap between the rail and the actual content', async ({ page }) => {
     await page.setViewportSize({ width: 824, height: 549 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());

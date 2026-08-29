@@ -2093,6 +2093,37 @@ button:hover {
     margin: 0;
     white-space: nowrap;
 }
+/* "Speed: " alone (without its value) is wider than the whole 62px gutter has to give -- found
+   live alongside the Pause/Restart overflow above. Dropping the label and keeping just the value
+   (e.g. "1.0x") fits; the icon-only transport buttons right above already establish that a short
+   value without an English label reads fine in this same narrow column. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stat-label {
+    display: none;
+}
+/* The 4-level difficulty picker (.difficulty-weights, shared with Blast) is a single un-wrapping
+   row of 4 dumbbell icons -- roughly 70px wide, genuinely wider than this whole 62px gutter, not
+   just close to it. Unlike Pause/Restart/Speed above, this one isn't about a label that can be
+   dropped; the icons themselves need the room. #gravity-controls' own `align-items: center`
+   (base rule) was centering every child around this widest one's true (overflowing) extent,
+   which is what actually pushed the OTHER children (the buttons, the stats) out past the panel's
+   own right edge too -- not their own content, despite how it first looked. 2-per-row wrapping
+   keeps every icon a real, tappable size while fitting the gutter, and stops that knock-on shift. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-difficulty {
+    flex-wrap: wrap;
+    max-width: 100%;
+    justify-content: center;
+}
+/* .stat-bar's own base rule (shared by every mode's score display) defaults to a flat 68px --
+   wider than this whole 62px gutter, let alone its ~50px content area. Same class of bug as the
+   difficulty widget above (and, earlier this session, Life's own stat-bar badge in its mobile
+   floating panel): a shared component's default size doesn't know about this one especially
+   narrow container. This selector's own two IDs/attributes already give it far higher specificity
+   than .stat-bar's bare one-class rule, so it wins regardless of file order without needing a
+   doubled-class trick. */
+#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stat-bar {
+    width: 100%;
+    height: auto;
+}
 
 /* Next-piece queue: a narrow column at the top of the RIGHT gutter (above the right
    D-pad cluster). Its center-x sits right of the container center, so
