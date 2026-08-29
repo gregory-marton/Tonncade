@@ -895,6 +895,13 @@ test.describe('Invariant tests', () => {
       await page.setViewportSize(viewport);
       for (const mode of MODES) {
         await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode);
+        // Same settling wait INV-10 above already needed for the identical reason (see its own
+        // comment): fitContentBox's fit can require an async ResizeObserver-driven correction
+        // pass after the synchronous mode-switch call. This test was missing it -- caught live
+        // (mode=blast, 390x844) failing under real load (a long full-suite run) but not
+        // reproducible standalone (0/25 in isolation), consistent with a genuine race that needs
+        // system load/timing pressure to actually lose, not a deterministic bug.
+        await page.waitForTimeout(300);
         const { unobscured } = await measureBoardOcclusion(page);
         expect(unobscured, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBeGreaterThanOrEqual(20);
       }
@@ -2053,9 +2060,19 @@ test.describe('Invariant tests', () => {
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
     await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
 
+    // Root-caused a real (not racy) intermittent failure here: this test's own expected value
+    // used to call Tonnetz.getNoteName(midi) with no key signature, always assuming sharps --
+    // but the real UI (js/notation.js) spells every name via
+    // Tonnetz.getNoteName(midi, MelodyMode.state.keySignature), matching whichever key
+    // Tonnetz.detectKeySignature auto-detected from the melody's own notes. Melody's default is a
+    // genuinely random, unseeded melody each run (js/melody.js's randomMelody), so whenever that
+    // random content happened to best-fit a flat-leaning key, the real UI correctly showed a flat
+    // name ("Eb4") while this test's hardcoded sharp assumption still expected "D#4" -- a real
+    // mismatch, not a timing race, and its failure rate tracked how often a random melody's
+    // detected key came out flat rather than any element of chance in test execution itself.
     const name = await page.evaluate(() => {
       const midi = MelodyMode.state.melody[MelodyMode.state.userIndex].midi;
-      return `${Tonnetz.getNoteName(midi)}${Tonnetz.getOctave(midi)}`; // octave-qualified, e.g. "E4"
+      return `${Tonnetz.getNoteName(midi, MelodyMode.state.keySignature)}${Tonnetz.getOctave(midi)}`; // octave-qualified, e.g. "E4"
     });
 
     const currentSpan = page.locator('#melody-staff-labels [data-note-role="current"]');

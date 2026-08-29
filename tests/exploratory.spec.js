@@ -228,8 +228,15 @@ test.describe('Exploratory tests (prototype)', () => {
       if (!isMobile) return;
       const drawer = page.locator('#top-drawer');
       const expanded = await drawer.evaluate(el => el.classList.contains('expanded'));
-      if (drawerOpen && !expanded) await page.locator('#drawer-toggle').click();
-      if (!drawerOpen && expanded) await page.locator('#drawer-toggle').click();
+      let toggled = false;
+      if (drawerOpen && !expanded) { await page.locator('#drawer-toggle').click(); toggled = true; }
+      if (!drawerOpen && expanded) { await page.locator('#drawer-toggle').click(); toggled = true; }
+      // The collapse/expand transition (#top-drawer's own height/max-width, 0.3s ease) was still
+      // mid-animation when a screenshot/measurement immediately followed a toggle click here --
+      // found live: a scenario captured a transient wide mid-collapse frame as if it were the
+      // settled state (a real user request: "wait longer during screenshot generation so I get
+      // stable screenshots"). 400ms comfortably clears every transition duration this drawer uses.
+      if (toggled) await page.waitForTimeout(400);
     };
     await openDrawerIfNeeded();
 

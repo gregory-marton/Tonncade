@@ -2072,7 +2072,11 @@ button:hover {
     bottom: auto;
     width: 62px;
     max-width: 62px;
-    max-height: 60%;
+    /* Was 60% -- same class of bug as the next-piece queue's own max-height just below (a
+       percentage of available height balloons without bound on a tall viewport). This panel's
+       real content (transport, difficulty pips, score, speed) measures well under 200px even
+       with everything visible; matches the queue's own flat cap for consistency. */
+    max-height: 200px;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -2158,7 +2162,13 @@ button:hover {
     left: auto;
     width: 50px;
     max-width: 50px;
-    max-height: 55%;
+    /* Was 55% -- a percentage of AVAILABLE height, so it balloons without bound on a tall enough
+       viewport even though the actual content (2-3 small piece previews) never needs anywhere
+       near that much room (found live: "a gigantic box showing only part of ONE piece with a
+       scrollbar"). Every other floating overlay panel in the app already learned this lesson --
+       Sandbox/Life's own #sidebar, this same queue's OWN non-sides variant just above -- and uses
+       a flat pixel cap instead. 200px matches those same panels' own established cap. */
+    max-height: 200px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;

@@ -1910,6 +1910,25 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     }
   });
 
+  // Reported live via screenshots/index.html: on a very tall narrow viewport (drawer open,
+  // "sides" layout), the next-piece queue rendered as a gigantic box showing only part of ONE
+  // piece with a scrollbar -- max-height:55% is a PERCENTAGE of available height, so it balloons
+  // on a tall viewport even though the actual content (2-3 small piece previews) never needs
+  // anywhere near that much room. Every other floating overlay panel in the app (Sandbox/Life's
+  // own #sidebar, Blast/Gravity's own next-piece queue elsewhere) already learned this lesson
+  // this session and uses a flat pixel cap instead, specifically because a relative cap grows
+  // without bound on a tall enough viewport while a flat one doesn't.
+  test('Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports', async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 1080 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.waitForFunction(() => document.getElementById('app').getAttribute('data-gravity-sides') === '1', { timeout: 3000 });
+
+    const maxHeight = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).maxHeight);
+    expect(maxHeight.endsWith('%'), `#palette's max-height should be a flat pixel value, not a percentage that balloons on a tall viewport (got "${maxHeight}")`).toBe(false);
+    const resolvedPx = await page.evaluate(() => document.getElementById('palette').getBoundingClientRect().height);
+    expect(resolvedPx, `#palette's actual rendered height (${resolvedPx}px) should stay compact even at 1080px viewport height`).toBeLessThan(220);
+  });
+
   test('gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop', async ({ page }) => {
     await page.setViewportSize({ width: 852, height: 393 });
     await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());

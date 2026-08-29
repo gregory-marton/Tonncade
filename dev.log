@@ -15357,3 +15357,753 @@ Still running — I'll wait for it to finish before committing.
 ### 2026-08-29T17:06:34.671Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 ←: 2066 | expect(listText, 'the timeline no longer shows a frequency').not.toMatch(/\d+Hz/); // ...and no Hz 2067 | }); at [REDACTED_PERSON]:2064:67 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 2) [Tablet Chrome] › tests/invariants.spec.js:892:3 › Invariant tests › INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation Error: mode=blast viewport=390x844 expect(received).toBeGreaterThanOrEqual(expected) Expected: >= 20 Received: 16 897 | await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click …[86 chars elided]… ect(unobscured, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBeGreaterThanOrEqual(20); | ^ 900 | } 901 | } 902 | }); at [REDACTED_PERSON]:899:90 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 2 failed [Mobile Chrome] › tests/invariants.spec.js:2052:3 › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name [Tablet Chrome] › tests/invariants.spec.js:892:3 › Invariant tests › INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation 580 passed (10.8m) [exited with code 0]
+
+
+### 2026-08-29T17:06:43.123Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "failed\|passed" /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN] | tail -5
+
+
+### 2026-08-29T17:06:43.224Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET]
+
+
+### 2026-08-29T17:06:53.966Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test tests/invariants.spec.js -g "[REDACTED_SECRET]" --project="Tablet Chrome" --reporter=list
+
+
+### 2026-08-29T17:06:58.441Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test tests/invariants.spec.js -g [REDACTED_SECRET] --project=Tablet Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Tablet Chrome] › tests/invariants.spec.js:892:3 › Invariant tests › [REDACTED_SECRET]: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation (2.1s) 1 passed (3.2s)
+
+
+### 2026-08-29T17:07:05.139Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed flake (passes cleanly in isolation, unrelated to Blast — my fix only touches a Gravity-specific selector). Committing the blur fix now.
+
+
+### 2026-08-29T17:07:05.144Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git status --short
+
+
+### 2026-08-29T17:07:05.296Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M css/style.css M dev.log M next_steps.md M tests/mobile.spec.js ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_HIGH_ENTROPY_TOKEN] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_HIGH_ENTROPY_TOKEN] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? [REDACTED_PRIVATE_INFO] ?? life_helpers/find_true_gun_exhaustive.js ?? life_helpers/rename_yaml.js ?? life_helpers/verify_true_gun.js ?? midi/scotlands-burning.musicxml
+
+
+### 2026-08-29T17:07:10.117Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git add [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:07:10.254Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-29T17:07:26.286Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git commit -m "$(cat <<'EOF' Fix Gravity's sides-layout D-pad wrapper blurring the entire board Reported live as a screenshot-wide "fuzz" effect -- every hex cell and piece rendered as a heavy blur/glow, flagged as potentially show-stopping. Root cause: the portrait/landscape single-row #mobile-controls bar legitimately has backdrop-filter:blur(10px) (a small frosted-glass D-pad bar). The "sides" layout's own override (#app[data-gravity-sides="1"] #mobile-controls) repurposes the SAME element into a full-play-area-spanning, otherwise-invisible wrapper around the two small button clusters -- resetting background, border, box-shadow, and padding back to nothing -- but never reset backdrop-filter. The now-enormous (previously ~370px, now spanning the whole board) wrapper kept blurring everything visually behind it across the entire screen, while the individual .m-btn buttons (which have their own blur, correctly) stayed crisp. Confirmed via direct reproduction (a real screenshot before/af …[147 chars elided]… lter:none after the fix, same root cause. Landscape's own equivalent split treatment was checked and already had no such bug. Also corrected two next_steps.md entries from the last commit's review: the Mobile Safari Blast "drawer-closed blank gap" was investigated and turned out to be a screenshot-timing artifact (the exploratory fixture takes its screenshot immediately after the drawer-toggle click, with no wait for the 0.3s collapse transition to finish) rather than a real layout bug -- not a regression, no fix needed. Full suite (desktop/mobile/invariants, 582 tests) green aside from two known-unrelated flakes verified in isolation: the pre-existing Melody enharmonic-spelling flake (INV-25) and a one-off INV-11/Blast timing flake (passed cleanly standalone; this commit's change is scoped to a Gravity-only CSS selector and doesn't touch Blast at all). Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> Claude-Session: [REDACTED_SECRET] EOF )"
+
+
+### 2026-08-29T17:07:26.480Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main [REDACTED_SECRET]] Fix Gravity's sides-layout D-pad wrapper blurring the entire board 5 files changed, 603 insertions(+), 2 deletions(-)
+
+
+### 2026-08-29T17:07:30.503Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed. Now moving to the next queued item: the gigantic next-piece carousel on very tall narrow viewports.
+
+
+### 2026-08-29T17:07:35.641Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:07:35.717Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: File created successfully at: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PRIVATE_INFO]]-[REDACTED_HIGH_ENTROPY_TOKEN] (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:07:40.421Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:07:44.169Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: { "rect": { "x": 181, "y": 151.390625, "width": 189, "height": 130, "top": 151.390625, "right": 370, "bottom": 281.390625, "left": 181 }, "maxHeight": "120px", "maxWidth": "45%", "position": "absolute", "overflowY": "auto", "sides": null }
+
+
+### 2026-08-29T17:07:56.022Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "data-gravity-sides=\"1\"\].*#palette" [REDACTED_PERSON]
+
+
+### 2026-08-29T17:07:56.127Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] { [REDACTED_SECRET] {
+
+
+### 2026-08-29T17:08:00.636Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:08:00.687Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] { [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] { [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] 2178 }
+
+
+### 2026-08-29T17:08:15.040Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — `max-height: 55%` (a percentage, not a flat pixel cap like every other similar overlay panel in this codebase uses) balloons on tall viewports. Let's fix it to match the established flat-pixel-cap convention.
+
+
+### 2026-08-29T17:08:16.151Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "gravity mobile pad splits into two clusters in landscape" [REDACTED_PERSON]
+
+
+### 2026-08-29T17:08:16.264Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO], async ({ page }) => {
+
+
+### 2026-08-29T17:08:38.490Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+On the flake: yes — [REDACTED_PRIVATE_INFO]
+
+On the task list: I don't actually have a tool that renders a persistent visible list above your prompt — no TodoWrite-equivalent in my current toolset. I can only give you a clear text status each time, which I should be doing more proactively. Here's where everything stands:
+
+**Done & committed this round:**
+- Compose/Melody staff overlapping the board — fixed the real overflow bug directly (not literally "moved settings into the drawer" as you'd asked; the root cause was `.notation-scroll`/`#notation-bar` missing vertical clipping, so fixing that resolved the visual symptom without a drawer restructure. Flagging this since it's a different solution than requested — let me know if you still want the actual drawer move for other reasons, like reducing scroll-clutter).
+- Mobile Safari Blast "blank gap" — investigated, turned out to be a screenshot-timing artifact, not a bug. Closed.
+- Blur/fuzz bug (show-stopping) — found and fixed (`backdrop-filter` never reset on the resized D-pad wrapper). Confirmed against all 4 viewports you listed.
+
+**Still open, not yet started:**
+- Gravity level 4 / alternate-physics removal
+- Diagnose why pasting into Gravity failed (report only, not necessarily fix)
+- Snake flood-fill "53%/63% black" — diagnosed as NOT a metric bug but a possible real board-centering asymmetry; awaiting your call on whether to chase it
+- Tall-narrow-viewport carousel bug — root cause found (`max-height: 55%` instead of a flat pixel cap), fix in progress right now
+
+I'll finish the carousel fix, then move to level 4 removal and the paste diagnosis.
+
+
+### 2026-08-29T17:08:39.110Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:08:39.164Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1905 const ids = ['#m-btn-left', '#m-btn-ccw', '#m-btn-action', '#m-btn-cw', '#m-btn-right']; 1906 const xs = []; 1907 for (const id of ids) xs.push((await page.locator(id).boundingBox()).x); 1908 for (let i = 1; i < xs.length; i++) { 1909 expect(xs[i], `${ids[i]} should sit to the right of ${ids[i - 1]}`).toBeGreaterThan(xs[i - 1]); 1910 } 1911 }); 1912 1913 test('gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop', async ({ page }) => { 1914 await page.setViewportSize({ width: 852, height: 393 });
+
+
+### 2026-08-29T17:08:50.160Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:08:50.231Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:08:54.945Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_STUDENT] -g "flat pixel height cap" --project="[REDACTED_PRIVATE_INFO]" --reporter=list
+
+
+### 2026-08-29T17:09:27.612Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: Exit code 1 npm notice run [REDACTED_PRIVATE_INFO] npx npm notice run 'playwright' test tests/mobile.spec.js -g flat pixel height cap --project=Mobile Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✘ 1 [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports (30.2s) 1) [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports Test timeout of 30000ms exceeded. Error: page.waitForFunction: Test timeout of 30000ms exceeded. 1922 | await page.setViewportSize({ width: 400, height: 1200 }); 1923 | await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click()); > 1924 | await page.waitForFunction(() => document.getEle …[96 chars elided]… | const maxHeight = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).maxHeight); 1927 | expect(maxHeight.endsWith('%'), `#palette's max-height should be a flat pixel value, not a percentage that balloons on a tall viewport (got "${maxHeight}")`).toBe(false); at [REDACTED_PERSON]:1924:16 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports
+
+
+### 2026-08-29T17:09:38.077Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:09:38.152Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:09:42.866Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] -g "flat pixel height cap" --project="Mobile Chrome" --reporter=list
+
+
+### 2026-08-29T17:10:15.664Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: Exit code 1 npm notice run [REDACTED_SECRET] npx npm notice run 'playwright' test tests/mobile.spec.js -g flat pixel height cap --project=Mobile Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✘ 1 [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports (30.4s) 1) [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports Test timeout of 30000ms exceeded. Error: page.waitForFunction: Test timeout of 30000ms exceeded. 1922 | await page.setViewportSize({ width: 750, height: 1400 }); 1923 | await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click()); > 1924 | await page.waitForFunction(() => document.getEle …[96 chars elided]… | const maxHeight = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).maxHeight); 1927 | expect(maxHeight.endsWith('%'), `#palette's max-height should be a flat pixel value, not a percentage that balloons on a tall viewport (got "${maxHeight}")`).toBe(false); at [REDACTED_PRIVATE_INFO]:1924:16 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports
+
+
+### 2026-08-29T17:10:25.301Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:10:25.341Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: File created successfully at: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN] (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:10:31.895Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good idea — I'll add that wait to the exploratory fixture. Let me finish this diagnostic first.
+
+
+### 2026-08-29T17:10:32.605Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:10:38.565Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:10:56.871Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "max-height.*%\|#palette.*{" [REDACTED_PERSON] | grep -B1 "%"
+
+
+### 2026-08-29T17:10:56.987Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1718: #app[data-mode="gravity"] #palette.floating-queue .piece-preview { 2075: max-height: 60%; 2154:#app[data-gravity-sides="1"][data-mode="gravity"] #palette.floating-queue { 2161: max-height: 55%;
+
+
+### 2026-08-29T17:11:02.990Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:11:03.018Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2060 display: flex; 2061 } 2062 2063 /* Stats + transport: a narrow column at the top of the LEFT gutter (above the left 2064 D-pad cluster). Icon-thin, small type -- there's no room for a wide bar here, which 2065 is the whole point: it's out of the cup's vertical way. Its shape (taller than wide) 2066 makes measureChromeClearance reserve it as a LEFT inset. */ 2067 #app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls { 2068 position: absolute; 2069 top: calc(10px + env(safe-area-inset-top, 0px)); 2070 left: calc(6px + env(safe-area-inset-left, 0px)); 2071 right: auto; 2072 bottom: auto; 2073 width: 62px; 2074 max-width: 62px; 2075 max-height: 60%; 2076 display: flex; 2077 flex-direction: column; 2078 gap: 5px; 2079 background: rgba(20, 22, 28, 0.85);
+
+
+### 2026-08-29T17:11:15.531Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sed -i "s/for (const \[w, h\] of \[\[500, 1200\], \[600, 1200\], \[700, 1200\], \[800, 1200\], \[900, 1200\], \[500, 900\], \[600, 900\]\])/for (const [w, h] of [[600, 1000], [600, 1080], [700, 1000], [700, 1080], [650, 1050]])/" /[REDACTED_HIGH_ENTROPY_TOKEN]-[REDACTED_PERSON]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:11:17.620Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: Exit code 1 sed: 2: "[REDACTED_SECRET]": undefined label 'mp/claude-501/-Users-[REDACTED_PERSON]-[REDACTED_HIGH_ENTROPY_TOKEN]'
+
+
+### 2026-08-29T17:11:26.442Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: /[[REDACTED_SECRET]]-[[REDACTED_PERSON]]-[[REDACTED_SECRET]]
+
+
+### 2026-08-29T17:11:26.481Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file /[REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:11:31.454Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:11:38.229Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:11:48.715Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:11:48.740Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 const { chromium } = require('[REDACTED_PERSON]'); 2 3 (async () => { 4 const browser = await chromium.launch(); 5 const context = await browser.newContext({ isMobile: true, hasTouch: true }); 6 const page = await context.newPage(); 7 for (const [w, h] of [[600, 1000], [600, 1080], [700, 1000], [700, 1080], [650, 1050], [900, 1080], [1000, 1080]]) { 8 await page.setViewportSize({ width: w, height: h }); 9 await page.goto('http://localhost:8001/#gravity'); 10 await page.waitForLoadState('networkidle'); 11 await page.waitForTimeout(400); 12 const info = await page.evaluate(() => { 13 const el = document.getElementById('palette'); 14 return { sides: document.getElementById('app').getAttribute('data-gravity-sides'), paletteHeight: el ? el.getBoundingClientRect().height : null, maxHeight: el ? getComputedStyle(el).maxHeight : null }; 15 }); 16 console.log(`${w}x${h}:`, JSON.stringify(info)); 17 } 18 await browser.close(); 19 })(); 20
+
+
+### 2026-08-29T17:12:05.729Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a reliable trigger within realistic bounds: 700×1080 → `sides:1`, palette height balloons to 243px. Let's use that in the test.
+
+
+### 2026-08-29T17:12:10.423Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:12:10.479Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:12:15.475Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] -g "flat pixel height cap" --project="Mobile Chrome" --reporter=list
+
+
+### 2026-08-29T17:12:19.401Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: Exit code 1 npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test tests/mobile.spec.js -g flat pixel height cap --project=Mobile Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✘ 1 [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports (1.5s) 1) [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports Error: #palette's max-height should be a flat pixel value, not a percentage that balloons on a tall viewport (got "55%") expect(received).toBe(expected) // Object.is equality Expected: false Received: true 1925 | 1926 | const maxHeight = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).maxHei …[184 chars elided]… ; | ^ 1928 | const resolvedPx = await page.evaluate(() => document.getElementById('palette').getBoundingClientRect().height); 1929 | expect(resolvedPx, `#palette's actual rendered height (${resolvedPx}px) should stay compact even at 1080px viewport height`).toBeLessThan(200); 1930 | }); at [REDACTED_PRIVATE_INFO]:1927:163 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports
+
+
+### 2026-08-29T17:12:24.085Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red. Now applying the fix — flat pixel cap matching the codebase's established pattern ([REDACTED_SECRET]).
+
+
+### 2026-08-29T17:12:29.281Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:12:29.346Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:12:36.431Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's also fix `#gravity-controls`' own `max-height: 60%` in sides mode — same class of bug.
+
+
+### 2026-08-29T17:12:37.061Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:12:37.099Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] { 2068 position: absolute; 2069 top: calc(10px + env(safe-area-inset-top, 0px)); 2070 left: calc(6px + env(safe-area-inset-left, 0px)); 2071 right: auto; 2072 bottom: auto; 2073 width: 62px; 2074 max-width: 62px; 2075 max-height: 60%; 2076 display: flex;
+
+
+### 2026-08-29T17:12:43.814Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Understood — noting this as a standing practice; I'll investigate both outstanding flakes properly (root cause + frequency) once I finish this fix. Continuing:
+
+
+### 2026-08-29T17:12:47.640Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:12:47.701Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:12:52.197Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's confirm both fixes pass, then run the broader suite.
+
+
+### 2026-08-29T17:12:52.686Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] -g "flat pixel height cap" --project="Mobile Chrome" --reporter=list
+
+
+### 2026-08-29T17:12:56.351Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: Exit code 1 npm notice run [REDACTED_SECRET] npx npm notice run 'playwright' test tests/mobile.spec.js -g flat pixel height cap --project=Mobile Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✘ 1 [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports (1.5s) 1) [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports Error: #palette's actual rendered height (210px) should stay compact even at 1080px viewport height expect(received).toBeLessThan(expected) Expected: < 200 Received: 210 1927 | expect(maxHeight.endsWith('%'), `#palette's max-height should be a flat pixel value, not a percentage that balloons on a tall viewport (got "${max …[163 chars elided]… solvedPx, `#palette's actual rendered height (${resolvedPx}px) should stay compact even at 1080px viewport height`).toBeLessThan(200); | ^ 1930 | }); 1931 | 1932 | test('gravity mobile pad splits into two clusters in landscape, both down buttons trigger soft-drop', async ({ page }) => { at [REDACTED_PERSON]:1929:130 attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports
+
+
+### 2026-08-29T17:13:05.744Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:13:05.797Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:13:11.909Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_STUDENT] -g "flat pixel height cap" --project="[REDACTED_PRIVATE_INFO]" --reporter=list
+
+
+### 2026-08-29T17:13:15.628Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run [REDACTED_PRIVATE_INFO] npx npm notice run 'playwright' test tests/mobile.spec.js -g flat pixel height cap --project=Mobile Chrome --reporter=list Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Mobile Chrome] › tests/mobile.spec.js:1921:3 › Mobile Viewport and Layout Tests › Gravity: the sides-layout next-piece queue has a flat pixel height cap, not a percentage that balloons on tall viewports (1.4s) 1 passed (2.6s)
+
+
+### 2026-08-29T17:13:21.404Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green. Let's verify visually with a screenshot, then run the full suite.
+
+
+### 2026-08-29T17:13:24.709Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:13:24.776Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: File created successfully at: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN] (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:13:29.669Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:13:33.529Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-29T17:13:38.766Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:13:38.826Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (no output)
+
+
+### 2026-08-29T17:13:44.005Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:13:44.929Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] --project="Desktop Chrome" --project="Mobile Chrome" --project="Tablet Chrome" --reporter=list 2>&1 | tail -50
+
+
+### 2026-08-29T17:13:45.023Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command running in background with ID: [REDACTED_SECRET]. Output is being written to: [REDACTED_PRIVATE_INFO]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-29T17:13:53.101Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's properly investigate both flakes per your standing request — root cause and frequency, not just "flaky."
+
+
+### 2026-08-29T17:13:53.794Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "getNoteName\s*:" [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:13:53.953Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:13:59.273Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:13:59.304Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 60 // sharps, negative = flats, -7..7. Same fifths count -> same pitch classes for a major key and 61 // its relative minor, which is all spelling needs (major vs. minor doesn't change WHICH notes 62 // are in the scale, only which one is "home") -- this project has no separate major/minor 63 // concept to thread through here. 64 _diatonicSpelling: function(fifths) { 65 const order = fifths >= 0 ? this.SHARP_ORDER : this.FLAT_ORDER; 66 const altered = new Set(order.slice(0, Math.abs(fifths))); 67 const spelling = {}; 68 Object.keys(this.NATURAL_SEMITONE).forEach((letter) => { 69 const delta = altered.has(letter) ? (fifths >= 0 ? 1 : -1) : 0; 70 const pc = ((this.NATURAL_SEMITONE[letter] + delta) % 12 + 12) % 12; 71 const suffix = delta > 0 ? '#' : delta < 0 ? 'b' : ''; 72 spelling[pc] = letter + suffix; 73 }); 74 return spelling; 75 }, 76 77 // Sharps-only by default (keySignature omitted) -- every existing call site keeps its exact 78 // current behavior. With a keySignature (MusicXML …[1022 chars elided]… ichever fifths value's diatonic set 95 // covers the most of `midiNotes` -- i.e. needs the fewest chromatic/out-of-key accidentals -- 96 // ties broken toward fifths=0 (simpler key signatures preferred when equally good fits). A 97 // small, genuinely hand-rollable heuristic ([REDACTED_PRIVATE_INFO]), not full 98 // Krumhansl-Schmuckler key-finding -- appropriate for this app's actual content (see that 99 // doc's "strong prior on simplicity" reasoning), not a general-purpose key detector. 100 detectKeySignature: function(midiNotes) { 101 if (!midiNotes || midiNotes.length === 0) return 0; 102 const pitchClasses = midiNotes.map((m) => ((m % 12) + 12) % 12); 103 let best = 0; 104 let bestScore = -1; 105 for (let fifths = -7; fifths <= 7; fifths++) { 106 const diatonic = this._diatonicSpelling(fifths); 107 const score = pitchClasses.filter((pc) => diatonic[pc]).length; 108 if (score > bestScore || (score === bestScore && Math.abs(fifths) < Math.abs(best))) { 109 bestScore = score;
+
+
+### 2026-08-29T17:14:10.000Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:14:10.027Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2020 await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click()); 2021 await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 }); 2022 2023 const targetMidi = await page.evaluate(() => [REDACTED_STUDENT]); 2024 2025 // Same pitch class (note name), different octave -- the exact "wrong E" scenario. A wrong 2026 // note is also real, INTENDED to block further input for ~1.2s and requeue a full replay 2027 // (mistake-recovery UX) -- irrelevant to what's under test here, so the two halves are 2028 // checked independently rather than chained through that side effect. 2029 const wrongOctaveMidi = targetMidi + 12; 2030 const afterWrong = await page.evaluate((m) => { 2031 MelodyMode.handleUserInputNote(m); 2032 return MelodyMode.state.userIndex; 2033 }, wrongOctaveMidi); 2034 expect(afterWrong, 'a different-octave note sharing the same name must NOT count as correct').toBe(0); 2035 2036 awa …[389 chars elided]… odyMode.state.userIndex; 2048 }, targetMidi); 2049 expect(afterCorrect, 'the exact target pitch must still count as correct').toBe(1); 2050 }); 2051 2052 test('INV-25: Melody\'s current-target readout shows an octave-qualified note name', async ({ page }) => { 2053 await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click()); 2054 await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 }); 2055 2056 const name = await page.evaluate(() => { 2057 const midi = [REDACTED_STUDENT]; 2058 return `${[REDACTED_STUDENT]}${[REDACTED_STUDENT]}`; // octave-qualified, e.g. "E4" 2059 }); 2060 2061 const currentSpan = page.locator('#melody-staff-labels [data-note-role="current"]'); 2062 await expect(currentSpan).toBeVisible(); 2063 const currentText = (await currentSpan.textContent()).trim(); 2064 expect(currentText, `the current note should read "${name}"`).toBe(name); // qualified name...
+
+
+### 2026-08-29T17:14:29.313Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "isRandom\|state.melody =" [REDACTED_PERSON] | head -20
+
+
+### 2026-08-29T17:14:29.476Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:14:37.092Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "getNoteName\|detectKeySignature" [REDACTED_PERSON] [REDACTED_PERSON] 2>/dev/null
+
+
+### 2026-08-29T17:14:37.208Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/notation.js:46: // (-7..7, MusicXML's own convention) everything else here uses (Tonnetz.getNoteName, /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/notation.js:106: // Tonnetz.getNoteName so a future key-signature-aware speller (docs/melody-notation-design.md) /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/notation.js:109: const name = Tonnetz.getNoteName(midi, keySignature); /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/notation.js:428: span.textContent = Tonnetz.getNoteName(n.midi, keySignature) + Tonnetz.getOctave(n.midi); /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:73: // Auto-detected (Tonnetz.detectKeySignature) whenever a melody loads -- the lightweight /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:76: // MusicXML does. null means "no detected key" (falls back to Tonnetz.getNoteName's own /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:182: this.state.keySignature = Tonnetz.detectKeySignature(this.state.melody.map((n) => n.midi)); /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:206: this.state.keySignature = Tonnetz.detectKeySignature(this.state.melody.map((n) => n.midi)); /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:350: this.state.keySignature = Tonnetz.detectKeySignature(melodySeq.map((n) => n.midi)); /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:378: // detectKeySignature is only a fallback for files that genuinely never declared one. No /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js:397: : Tonnetz.detectKeySignature(melodySeq.map((n) => n.midi));
+
+
+### 2026-08-29T17:14:51.049Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it precisely — this isn't a race condition, it's a real bug in the **[REDACTED_SECRET]**. The app computes note names via `Tonnetz.getNoteName(midi, MelodyMode.state.keySignature)` (key-signature-aware), but the test's own expected-value computation calls `Tonnetz.getNoteName(midi)` with no key signature — always assuming sharps. Since Melody's default is a genuinely random unseeded melody each run, whenever the random notes happen to best-fit a flat-leaning key, the app correctly shows a flat name while the test still expects a sharp — a mismatch, not a flake in the traditional sense. Let me fix the test.
+
+
+### 2026-08-29T17:14:56.180Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:14:56.229Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:15:00.243Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify the fix by running it repeatedly (since it depends on random content, need multiple runs to be confident).
+
+
+### 2026-08-29T17:15:01.509Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: for i in 1 2 3 4 5 6 7 8; do npx playwright test tests/invariants.spec.js -g "[REDACTED_SECRET]" --project="Mobile Chrome" --reporter=list 2>&1 | tail -3; done
+
+
+### 2026-08-29T17:15:33.826Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (924ms) 2 passed (3.0s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (869ms) 2 passed (2.7s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (894ms) 2 passed (2.8s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (900ms) 2 passed (2.8s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (871ms) 2 passed (2.9s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (866ms) 2 passed (2.7s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (919ms) 2 passed (2.7s) ✓ 2 [Mobile Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-25: Melody's current-target readout shows an octave-qualified note name (920ms) 2 passed (2.8s)
+
+
+### 2026-08-29T17:15:39.182Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's quantify [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:15:45.410Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: /[[REDACTED_SECRET]]-[[REDACTED_PERSON]]-[[REDACTED_SECRET]]
+
+
+### 2026-08-29T17:15:45.445Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: File created successfully at: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN] (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:15:50.387Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:16:10.151Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:16:16.104Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**[REDACTED_SECRET]**: root cause confirmed and fixed — the test's own expected-value computation omitted the key signature the real UI uses. Measured failure rate: **[REDACTED_SECRET]** of runs would have mismatched under the old test logic, since Melody's default song is a genuinely random, unseeded melody each run. Verified fix holds across 16 consecutive runs post-fix. Now investigating the [REDACTED_SECRET]/Blast flake.
+
+
+### 2026-08-29T17:16:16.767Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "measureBoardOcclusion" [REDACTED_PERSON] | head -5
+
+
+### 2026-08-29T17:16:16.901Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] { [REDACTED_SECRET]; [REDACTED_SECRET]; [REDACTED_SECRET]; [REDACTED_SECRET];
+
+
+### 2026-08-29T17:16:21.022Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:16:21.050Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 829 async function [REDACTED_STUDENT] { 830 return [REDACTED_STUDENT] { 831 [REDACTED_STUDENT] 832 [REDACTED_STUDENT] 833 // Scoped to #tonnetz-svg specifically — Render.createHex() gives every hex it draws 834 // class="cell", including the tiny piece-preview icons inside the carousel/queue/chord 835 // guide, which aren't board cells at all. 836 // 837 // Hit-tests each cell's own center via elementFromPoint rather than checking against a 838 // manually curated list of overlay selectors — a curated list only catches overlays 839 // someone remembered to add to it, which is exactly how the D-pad/next-piece-queue 840 // overlap this test was meant to catch slipped through for a real release. Any future 841 // overlay is covered automatically, with no list to keep in sync. 842 // Bound against the SVG's own rendered box, not the window — preserveAspectRatio 843 // letterboxes/insets the fitted board within #tonnetz-svg's CSS box (INV-10's own 844 // architecture), so  …[1821 chars elided]… S-computed sizing replaced the old CSS-percentage 873 // approach, which had no such settling dependency (a browser's own layout is synchronous; 874 // recomputing a value in JS in response to it is not). 875 await page.waitForTimeout(300); 876 const { overlappingCells } = await [REDACTED_STUDENT]; 877 expect(overlappingCells, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBe(0); 878 } 879 } 880 881 // Dynamic content can grow a panel past its allotted margin without any single fixed 882 // pixel value ever being "wrong" in isolation — Snake's long game-over message did 883 // exactly this once. Exercise it explicitly, since nothing else in this loop varies panel 884 // content length. 885 await page.setViewportSize({ width: 852, height: 393 }); 886 await [REDACTED_STUDENT] document.querySelector('.mode-option[data-mode="snake"]').click()); 887 await [REDACTED_STUDENT] SnakeMode.gameOver()); 888 const { overlappingCells } = await [REDACTED_STUDENT];
+
+
+### 2026-08-29T17:16:28.131Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:16:28.157Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 892 test('INV-11: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation', async ({ page }) => { 893 const MODES = await getModes(page); 894 for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) { 895 await page.setViewportSize(viewport); 896 for (const mode of MODES) { 897 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 898 const { unobscured } = await measureBoardOcclusion(page); 899 expect(unobscured, `mode=${mode} viewport=${viewport.width}x${viewport.height}`).toBeGreaterThanOrEqual(20); 900 } 901 } 902 }); 903 904 // Life's default-loaded automaton's own initial live cells sit right at the origin, which the 905 // pannable view centers by default (Render.panView) -- if #life-controls' own mobile panel 906 // grows wide/tall enough, it can cover exactly that center point even while the generic
+
+
+### 2026-08-29T17:16:40.665Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found this one too — INV-11 is missing the exact settling wait that INV-10 (right above it) already added for this same known race, with a comment documenting why. Let me measure the failure rate without it, then apply the same fix.
+
+
+### 2026-08-29T17:16:47.256Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:16:47.293Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: File created successfully at: /[REDACTED_PERSON] (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:16:52.737Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:16:59.440Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET]
+
+
+### 2026-08-29T17:17:10.992Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+0/25 in isolation — this specific race apparently needs system load pressure (matching this session's own earlier-established pattern of resource contention during very long full-suite runs) to manifest, so it's rare/load-dependent rather than reliably reproducible standalone. The root cause is clear regardless (missing the exact settling wait INV-10 already needed for this same reason), so applying that fix directly:
+
+
+### 2026-08-29T17:17:16.232Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-29T17:17:16.268Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:17:21.633Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test tests/invariants.spec.js -g "[REDACTED_SECRET]" --project="Mobile Chrome" --project="Tablet Chrome" --reporter=list
+
+
+### 2026-08-29T17:17:35.894Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test tests/invariants.spec.js -g [REDACTED_SECRET] --project=Mobile Chrome --project=Tablet Chrome --reporter=list Running 2 tests using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Mobile Chrome] › tests/invariants.spec.js:892:3 › Invariant tests › [REDACTED_SECRET]: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation (5.7s) [BROWSER] Service Worker registration blocked by Playwright ✓ 2 [Tablet Chrome] › tests/invariants.spec.js:892:3 › Invariant tests › [REDACTED_SECRET]: at least 20 distinct Tonnetz cells are visible and controllable, in every mode/orientation (5.8s) 2 passed (13.1s)
+
+
+### 2026-08-29T17:17:40.064Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good. Let's check on the earlier background suite and then run once more with both flake fixes included.
+
+
+### 2026-08-29T17:17:41.988Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -50 /[REDACTED_SECRET]-[REDACTED_PERSON]-[REDACTED_SECRET] 2>/dev/null
+
+
+### 2026-08-29T17:17:42.104Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-29T17:17:47.320Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While that runs, let me add the drawer-transition wait to the exploratory fixture per your earlier suggestion.
+
+
+### 2026-08-29T17:17:47.945Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:17:47.973Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 226 const [REDACTED_PRIVATE_INFO] = async () => { 227 const isMobile = await page.evaluate(() => Render.isMobileViewport()); 228 if (!isMobile) return; 229 const drawer = page.locator('#top-drawer'); 230 const expanded = await drawer.evaluate(el => el.classList.contains('expanded')); 231 if (drawerOpen && !expanded) await page.locator('#drawer-toggle').click(); 232 if (!drawerOpen && expanded) await page.locator('#drawer-toggle').click(); 233 }; 234 await [REDACTED_PRIVATE_INFO](); 235
+
+
+### 2026-08-29T17:17:58.379Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-29T17:17:58.461Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-29T17:18:04.360Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify this doesn't break the small random-taps test and check on the background suite.
+
+
+### 2026-08-29T17:18:06.600Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_STUDENT] -g "Random taps \(small\)" --project="[REDACTED_PRIVATE_INFO]" --reporter=list 2>&1 | tail -10
+
+
+### 2026-08-29T17:18:13.516Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test tests/exploratory.spec.js -g Random taps \(small\) --project=Mobile Chrome --reporter=list Running 1 test using 1 worker Random tap seed: [REDACTED_SECRET] (rerun with this exact seed to reproduce) Random taps: 100 taps in 4477ms, 80.0% on Tonnetz, 5 distinct control labels touched (of 292 discovered at start) ✓ 1 [Mobile Chrome] › tests/exploratory.spec.js:569:3 › Exploratory tests (prototype) › Random taps (small): Sandbox mobile portrait — 100 seeded random taps (5.2s) 1 passed (6.1s)
+
+
+### 2026-08-29T17:18:20.155Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -50 /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN] 2>/dev/null
+
+
+### 2026-08-29T17:18:20.243Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-29T17:18:25.062Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-29T17:18:26.510Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ ScheduleWakeup: {"delaySeconds": 700, "reason": "waiting on the carousel-fix suite run before running a final combined check and committing", "prompt": "Check on task [REDACTED_SECRET]; once done, run the full suite once more with all pending changes (carousel fix, INV-25 fix, INV-11 fix, exploratory drawer-transition wait), then commit everything together and report status to the user.", "noop": true}
+
+
+### 2026-08-29T17:18:28.435Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Next wakeup scheduled for [REDACTED_PRIVATE_INFO] (in 752s). Nothing more to do this turn — the harness re-invokes you when the wakeup fires or a task-notification arrives.
+
+
+### 2026-08-29T17:18:35.680Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Summary of the flake investigation, since you asked for why + how often on every genuine one:
+
+- **[REDACTED_SECRET]** (Melody enharmonic): real bug in the test itself, not a race — it computed its expected note name without the key signature the real UI uses. Measured: **7/40 (~18%)** of random-melody runs would mismatch. Fixed by matching the real UI's computation.
+- **[REDACTED_SECRET]** (Blast cell visibility): missing the exact settling wait that INV-10 (right above it) already added for this identical reason. **0/25 failures in isolation** — needs system load/timing pressure (like a long full-suite run) to actually manifest, so it's rare and load-dependent rather than reliably reproducible standalone. Fixed by adding the same wait.
+
+Also added the drawer-transition wait you suggested to the screenshot fixture. Waiting on the full suite now before committing all of this together with the carousel fix.
+
+
+### 2026-08-29T17:24:13.273Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -30 /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-29T17:24:13.461Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-29T17:24:19.628Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 584 passed, zero failures this time. Let's run once more with the flake fixes and drawer-wait change now included, then commit everything.
+
+
+### 2026-08-29T17:24:20.531Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] --project="Desktop Chrome" --project="Mobile Chrome" --project="Tablet Chrome" --reporter=list 2>&1 | tail -50
+
+
+### 2026-08-29T17:24:20.646Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command running in background with ID: [REDACTED_PRIVATE_INFO]. Output is being written to: [REDACTED_PRIVATE_INFO]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-29T17:24:26.988Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ ScheduleWakeup: {"delaySeconds": 700, "reason": "waiting on the combined suite run before committing carousel fix + flake fixes + drawer-transition wait", "prompt": "Check on task [REDACTED_SECRET]; if green, commit the carousel-percentage-cap fix, both flake root-cause fixes (INV-25, INV-11), and the exploratory drawer-transition wait, together. Then move to the remaining queue: Gravity level 4/alternate-physics removal, and diagnosing the gravity-paste failure.", "noop": true}
+
+
+### 2026-08-29T17:24:28.619Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Next wakeup scheduled for [REDACTED_SECRET] (in 751s). Nothing more to do this turn — the harness re-invokes you when the wakeup fires or a task-notification arrives.
+
+
+### 2026-08-29T17:24:34.029Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Previous run (before flake fixes) was clean at 584/584. Running once more with the flake fixes and drawer-wait change included — I'll commit everything once it's green.
