@@ -1940,6 +1940,26 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(qAfter).toBeLessThan(qBefore);
   });
 
+  // Reported live (screenshot showed the whole board rendered as a heavy blur/glow): the "sides"
+  // layout's #mobile-controls override repositions the D-pad wrapper to span the ENTIRE play
+  // area edge-to-edge (an invisible wrapper around the two small button clusters) and resets
+  // background/border/box-shadow/padding back to nothing -- but never resets backdrop-filter, so
+  // the portrait single-row bar's own blur(10px) (correct for ITS small size) keeps applying to
+  // this now-huge, otherwise-invisible box, blurring everything visually behind it across the
+  // whole board.
+  test('Gravity: the sides-layout D-pad wrapper is not itself blurred (only its small button clusters are)', async ({ page }) => {
+    await page.setViewportSize({ width: 465, height: 630 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
+    await page.waitForFunction(() => document.getElementById('app').getAttribute('data-gravity-sides') === '1', { timeout: 3000 });
+
+    const wrapperFilter = await page.evaluate(() => getComputedStyle(document.getElementById('mobile-controls')).backdropFilter);
+    expect(wrapperFilter, `#mobile-controls itself (now spanning the whole play area) should not carry its own blur -- got "${wrapperFilter}"`).toBe('none');
+
+    // The individual buttons should still get their own frosted-glass look, unaffected.
+    const btnFilter = await page.evaluate(() => getComputedStyle(document.getElementById('m-btn-left')).backdropFilter);
+    expect(btnFilter).toContain('blur');
+  });
+
   // Real bug reported live: the left cluster's DOM order (left-arrow, ccw, down) puts down at
   // the bottom, matching thumb reach, but the right cluster's order (down, cw, right-arrow) --
   // copied without mirroring when the duplicate button was added -- put IT at the top instead.

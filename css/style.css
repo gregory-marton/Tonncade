@@ -2031,6 +2031,15 @@ button:hover {
     justify-content: space-between;
     align-items: flex-end; /* D-pad clusters anchor to the BOTTOM of the gutters */
     pointer-events: none;
+    /* The portrait single-row bar's own blur(10px) (mobile breakpoint's #mobile-controls rule --
+       correct there, a small compact bar) was never reset here even though this override repurposes
+       the SAME element into a full-play-area-spanning, otherwise-invisible wrapper (background/
+       border/box-shadow all cleared above) around the two small button clusters -- backdrop-filter
+       was the one property left un-reset, so the huge invisible wrapper kept blurring everything
+       visually behind it across the WHOLE board (reported live: the entire screenshot looked like
+       a heavy blur/glow). The individual .m-btn buttons below have their own blur(10px), unaffected. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 #app[data-gravity-sides="1"][data-mode="gravity"] .gravity-pad-cluster {
     display: flex;
