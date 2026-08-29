@@ -2477,6 +2477,38 @@ test.describe('Mobile Viewport and Layout Tests', () => {
     expect(new Set(result.map(n => n.time)).size).toBe(1);
   });
 
+  // Reported live via screenshots/index.html: at a short viewport, Compose's staff visually
+  // covered almost the entire Tonnetz ("almost no Tonnetz beyond what's overlapped by staves").
+  // Root cause: .notation-scroll (shared by Melody/Compose) sets overflow-x but never overflow-y
+  // -- #notation-bar's own max-height:45vh caps ITS box, but a staff taller than that budget just
+  // overflows straight past the cap (no clip, no internal scroll) and visually spills onto
+  // #game-container underneath instead of being contained. Same root cause the flood-fill metric
+  // (tests/exploratory.spec.js) was ALSO misreporting as "63% black" for this exact scenario --
+  // once real, the overlap disappears and so does the false reading.
+  test('Compose: a tall staff never visually overlaps the Tonnetz board, even on a short viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 403, height: 583 });
+    await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click());
+    await page.evaluate(() => {
+      ComposeMode.startRecording();
+      [[0, 0], [1, 0], [-1, 1], [2, -1], [0, 2]].forEach(({ 0: p, 1: q }) => ComposeMode.tapCell(p, q));
+      ComposeMode.stopRecording();
+    });
+    await page.waitForTimeout(200);
+
+    // A clipped ancestor doesn't change #compose-staff's OWN (still-natural-height)
+    // getBoundingClientRect() -- checking that directly would pass or fail the same regardless of
+    // whether the clip is actually active. Check what's REALLY visible/hit-testable at a point
+    // inside #game-container's own box instead, matching both the real visual bug (the staff
+    // painting over the board) and how the flood-fill metric itself samples the scene.
+    const overlap = await page.evaluate(() => {
+      const gc = document.getElementById('game-container').getBoundingClientRect();
+      const x = gc.left + gc.width / 2, y = gc.top + 5; // just inside the board's own top edge
+      const el = document.elementFromPoint(x, y);
+      return { tag: el ? el.tagName : null, id: el ? el.id : null, onStaff: !!(el && el.closest('#compose-staff')) };
+    });
+    expect(overlap.onStaff, `the point just inside #game-container's own top edge resolved to ${JSON.stringify(overlap)} -- the staff is painting over the board`).toBe(false);
+  });
+
   // Reported live: could zoom in (browser page zoom) but not out far enough to see the whole
   // audible range -- most browsers floor page zoom around 25-33%. Touch pinch is the natural
   // trigger on a touchscreen, so it must drive the app's own in-app zoom directly (not rely on

@@ -189,6 +189,16 @@ body {
     gap: 16px;
     width: 100%;
     max-height: 45vh;
+    /* Was missing entirely -- max-height alone only limits this flex CONTAINER's own box; by
+       default (overflow:visible) a child that renders taller still paints straight past it
+       regardless. At the mobile breakpoint below, #notation-bar-controls and .notation-scroll
+       each get their own ~160px budget, and 160+160 can exceed this container's own 45vh on a
+       short viewport -- with nowhere clipping the OUTER box, the excess spilled onto
+       #game-container underneath ("almost no Tonnetz beyond what's overlapped by staves," found
+       live). Each child already scrolls its own overflow internally (min-height:160px;
+       overflow-y:auto); this just stops the combined total from ever escaping #notation-bar's own
+       capped box in the first place. */
+    overflow: hidden;
     box-sizing: border-box;
     padding: 10px 20px;
     background: var(--panel);
@@ -214,9 +224,19 @@ body {
     box-sizing: border-box;
 }
 
+/* max-height/overflow-y matches #notation-bar's own 45vh cap (and #notation-bar-controls' own
+   identical pair, just above) -- .notation-scroll itself only ever set overflow-X (for its
+   horizontal staff/timeline scrolling), so a staff taller than #notation-bar's budget had nothing
+   clipping or scrolling it vertically and simply rendered PAST the container's own box, straight
+   onto #game-container underneath -- "almost no Tonnetz beyond what's overlapped by staves"
+   (found live, a short-viewport screenshot). #notation-bar's own max-height was never actually
+   enforced on this child; it only ever LOOKED enforced when the staff happened to be short
+   enough to fit under it by chance. */
 #notation-bar > .notation-scroll {
     flex: 1 1 auto;
     min-width: 0; /* let it shrink below its content's natural width instead of overflowing */
+    max-height: 45vh;
+    overflow-y: auto;
 }
 
 #sidebar {
