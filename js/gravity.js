@@ -37,7 +37,11 @@ const GravityMode = {
         rotation: 0,
         dropInterval: 1000, // ms
         timer: null,
-        difficulty: DifficultyBarbell.migrateLevel('tonncade_gravity_difficulty', 3),
+        // Math.min(3, ...): level 4 ("Chaos" -- welding turned off) was removed live
+        // ("level 4 physics should just cease to exist... not enjoying the gameplay"); clamps
+        // anyone whose localStorage still has a persisted "4" from before back down to the new
+        // top level rather than leaving them stuck referencing a level that no longer exists.
+        difficulty: Math.min(3, DifficultyBarbell.migrateLevel('tonncade_gravity_difficulty', 3)),
         nextGroupId: 1, // Every locked piece / pasted cell gets a persistent rigid-group id --
                          // see _assignGroupId and _boardComponents.
     },
@@ -160,21 +164,18 @@ const GravityMode = {
         btn.setAttribute('aria-label', label);
     },
 
-    // Level 4 has no entry in the shared Pieces.DIFFICULTY_KEYS (that array is also Blast's, which
-    // has no weld concept and stays capped at 3) -- the lookup falls through to TETRAHEX_KEYS,
-    // the SAME pool level 3 already uses, since level 4 is only about welding (see setDifficulty),
-    // not piece size.
     randomPiece: function() {
         const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty - 1] || Pieces.TETRAHEX_KEYS;
         return keys[Math.floor(Math.random() * keys.length)];
     },
 
-    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Level 4 (#93
-    // follow-up) keeps level 3's piece pool but turns off settleFloatingCellsStep's rest-time weld
-    // -- Gravity-only, so bounded at 4 here rather than sharing Blast's own DIFFICULTY_KEYS.length
-    // bound. Persisted, and reflected in the shared DifficultyBarbell control.
+    // Piece-size difficulty level (task #39): 1=small pieces .. 3=tetrahexes only. Persisted, and
+    // reflected in the shared DifficultyBarbell control. (A #93 follow-up briefly added a 4th
+    // level, "Chaos," that kept level 3's piece pool but turned off rest-time welding -- removed
+    // live: "level 4 physics should just cease to exist... not enjoying the gameplay." Welding
+    // now always applies; see settleFloatingCellsStep's own _weldIfTouching call.)
     setDifficulty: function(level) {
-        if (level < 1 || level > 4) return;
+        if (level < 1 || level > 3) return;
         this.state.difficulty = level;
         try { localStorage.setItem('tonncade_gravity_difficulty', String(level)); } catch (e) {}
         this._difficultyBarbell.setLevel(level);
@@ -553,11 +554,12 @@ const GravityMode = {
     // exactly that: pieces keep the shape they fell with, forever, and a line clear changes
     // nothing about how already-settled pieces relate to each other -- it only deletes cells.
     //
-    // The one deliberate exception: difficulty 1-3 welds a group to whatever it comes to rest
-    // touching (_weldIfTouching, called from settleFloatingCellsStep) -- a real merge, not the old
+    // The one deliberate exception: welding a group to whatever it comes to rest touching
+    // (_weldIfTouching, called from settleFloatingCellsStep) -- a real merge, not the old
     // fresh-adjacency-every-tick bug, since it only fires once, at the moment a group is BLOCKED
     // from moving further, and the result still splits correctly on a later clear via
-    // _resplitGroups the same as any other group. Difficulty 4 skips welding entirely.
+    // _resplitGroups the same as any other group. (A #93 follow-up briefly gated this off at a
+    // 4th "Chaos" difficulty level; that level was removed live, so welding always applies now.)
     _boardComponents: function() {
         const byGroup = new Map();
         GravityBoard.cells.forEach((val, key) => {
@@ -677,13 +679,12 @@ const GravityMode = {
                 const slide = (ref.q % 2 !== 0) ? { p: ref.p + 1, q: ref.q - 1 } : { p: ref.p, q: ref.q - 1 };
                 dp = slide.p - ref.p; dq = slide.q - ref.q;
                 if (!canOffset(dp, dq)) {
-                    // Genuinely at rest -- difficulty 1-3 welds it to whatever it's now resting
-                    // against (see _weldIfTouching); difficulty 4 leaves it independent, so pieces
-                    // that merely happen to end up touching can keep splitting apart on later
-                    // clears instead of fusing into one mass (#93 follow-up, requested live:
-                    // "static electricity... you could even imagine this being difficulty-
-                    // controlled" -- easy stays tidy, hard embraces the confusing fissures).
-                    if (this.state.difficulty <= 3) this._weldIfTouching(comp, processedGroupIds);
+                    // Genuinely at rest -- welds it to whatever it's now resting against (see
+                    // _weldIfTouching). Used to be gated off at difficulty 4 ("Chaos," #93
+                    // follow-up: "static electricity... you could even imagine this being
+                    // difficulty-controlled") -- that level was removed live ("not enjoying the
+                    // gameplay"), so welding now always applies regardless of difficulty.
+                    this._weldIfTouching(comp, processedGroupIds);
                     continue;
                 }
             }
@@ -962,12 +963,11 @@ const GravityMode = {
         // set the piece-size level.
         this._difficultyBarbell = DifficultyBarbell.create({
             containerId: 'gravity-difficulty',
-            levelCount: 4,
+            levelCount: 3,
             labels: [
                 { title: 'Easy — small pieces', ariaLabel: 'Easy' },
                 { title: 'Medium', ariaLabel: 'Medium' },
                 { title: 'Hard — full four-cell pieces', ariaLabel: 'Hard' },
-                { title: 'Chaos — hard pieces, no welding at rest', ariaLabel: 'Chaos' },
             ],
             onSelect: (level) => this.setDifficulty(level),
         });

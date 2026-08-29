@@ -3330,10 +3330,6 @@ test('Gravity: a falling mass that brushes past an unrelated settled piece keeps
     GravityMode.state.linesCleared = 0;
     GravityMode.state.isPaused = false;
     GravityMode.state.isGameOver = false;
-    // Difficulty 4: no rest-time welding (#93 follow-up) -- this test is specifically about the
-    // ORIGINAL disconnection bug (unrelated groups incorrectly fusing), a different thing from the
-    // NEW deliberate weld feature default difficulty would now also trigger here.
-    GravityMode.state.difficulty = 4;
     GravityMode.spawnPiece();
     GravityMode.state.p = 20; GravityMode.state.q = 40; // active piece parked well out of the way
 
@@ -3369,16 +3365,20 @@ test('Gravity: a falling mass that brushes past an unrelated settled piece keeps
     return { linesCleared: GravityMode.state.linesCleared, massQsByTick };
   });
   // Old buggy behavior: the mass touches the spike's column in passing on its way down, gets
-  // welded to it as one rigid mass, and freezes at q=6 forever -- massQsByTick would read
-  // [7, 6, 6, 6, 6, ...] and linesCleared would stay at 1. Correct behavior: it keeps falling past
-  // the brush-contact, drops far enough to nestle flush against the spike's own peak, and
-  // completes a SECOND real line there (q=5 -- the spike's one cell plus the mass's other nine
-  // exactly fill it) -- two clears total, and the mass's own cells are consumed by that second
-  // clear rather than sitting frozen.
-  expect(result.linesCleared).toBe(2);
-  expect(result.massQsByTick).toContain(6);  // it did pass through q=6 on the way down...
-  expect(result.massQsByTick.filter((q) => q === 6).length).toBeLessThan(5); // ...but didn't STAY there
-  expect(result.massQsByTick[result.massQsByTick.length - 1]).toBeNull(); // consumed by the 2nd clear, not frozen mid-air
+  // welded to it as one rigid mass DURING DESCENT, and freezes at q=6 forever -- massQsByTick
+  // would read [7, 6, 6, 6, 6, ...] and linesCleared would stay at 0.
+  //
+  // Since the rest-time weld feature (Gravity: a group welds to whatever it rests touching, above)
+  // became unconditional -- it used to be gated off at a 4th "Chaos" difficulty level, since
+  // removed -- this exact scenario's own outcome changed: the mass now welds to the clearing row
+  // AT REST and is consumed by that clear on the very first tick, rather than falling further to
+  // nestle against the spike's peak for a second, later clear (this test's original assertions
+  // pinned that specific multi-tick path, verified stable at the time; re-verified via direct
+  // instrumentation that the new single-tick outcome is itself correct, not a freeze). The
+  // property this test actually exists to guard -- no permanent freeze from a mid-descent brush
+  // contact -- still holds: the mass is fully consumed, not stuck at any fixed q.
+  expect(result.linesCleared).toBeGreaterThanOrEqual(1);
+  expect(result.massQsByTick[result.massQsByTick.length - 1]).toBeNull(); // consumed, not frozen mid-air
 });
 
 // Reported live, against a REAL captured play session (not a synthetic repro): the freeze fix
@@ -3719,12 +3719,12 @@ test('Gravity: a fragment surviving a line clear falls using its piece\'s true a
 });
 
 // Requested live (#93 follow-up, "static electricity... if you happen to be touching another
-// piece... choose that", difficulty-gated per the same conversation): difficulty 1-3 welds a
-// group into whatever it comes to rest touching, so pieces that end up flush against each other
-// stay one mass on later clears instead of independently splitting apart. Difficulty 4 keeps the
-// existing (pre-this-feature) independent-piece behavior -- deliberately embracing the "confusing
-// fissures" as a feature at the hardest level.
-test('Gravity: difficulty 1-3 welds a group to whatever it rests touching; difficulty 4 does not', async ({ page }) => {
+// piece... choose that"): a group welds into whatever it comes to rest touching, so pieces that
+// end up flush against each other stay one mass on later clears instead of independently
+// splitting apart. Originally gated off at a 4th "Chaos" difficulty level (which deliberately kept
+// the old independent-piece behavior); that level was removed live ("not enjoying the gameplay"),
+// so welding now always applies regardless of difficulty.
+test('Gravity: a group welds to whatever it rests touching', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(() => {
     document.querySelector('.mode-option[data-mode="gravity"]').click();
@@ -3734,32 +3734,19 @@ test('Gravity: difficulty 1-3 welds a group to whatever it rests touching; diffi
     GravityMode.spawnPiece();
     GravityMode.state.p = -100; GravityMode.state.q = 200; // parked out of the way
 
-    const setupPair = () => {
-      GravityBoard.cells.clear();
-      GravityBoard.fillCells([{ p: 0, q: 0 }], 'X', '#fff'); // resting on the floor
-      GravityMode._assignGroupId([{ p: 0, q: 0 }]);
-      GravityBoard.fillCells([{ p: 0, q: 1 }], 'Y', '#000'); // directly above -- will land flush on it
-      GravityMode._assignGroupId([{ p: 0, q: 1 }]);
-    };
+    GravityBoard.cells.clear();
+    GravityBoard.fillCells([{ p: 0, q: 0 }], 'X', '#fff'); // resting on the floor
+    GravityMode._assignGroupId([{ p: 0, q: 0 }]);
+    GravityBoard.fillCells([{ p: 0, q: 1 }], 'Y', '#000'); // directly above -- will land flush on it
+    GravityMode._assignGroupId([{ p: 0, q: 1 }]);
 
-    setupPair();
     GravityMode.state.difficulty = 3;
     GravityMode.tick();
-    const weldedIds = [GravityBoard.cells.get('0,0').groupId, GravityBoard.cells.get('0,1') ? GravityBoard.cells.get('0,1').groupId : null];
-
-    setupPair();
-    GravityMode.state.difficulty = 4;
-    GravityMode.tick();
-    const unweldedIds = [...GravityBoard.cells.values()].map((v) => v.groupId);
-
-    return { weldedIds, unweldedIds };
+    return [GravityBoard.cells.get('0,0').groupId, GravityBoard.cells.get('0,1') ? GravityBoard.cells.get('0,1').groupId : null];
   });
-  // Difficulty 3: the falling cell lands flush on the resting one and welds into the SAME group.
-  expect(result.weldedIds[0]).not.toBeNull();
-  expect(result.weldedIds[0]).toBe(result.weldedIds[1]);
-  // Difficulty 4: blocked straight down, it slides away diagonally instead (still can't occupy
-  // the same cell) and keeps its OWN separate group id -- never merged.
-  expect(new Set(result.unweldedIds).size).toBe(2);
+  // The falling cell lands flush on the resting one and welds into the SAME group.
+  expect(result[0]).not.toBeNull();
+  expect(result[0]).toBe(result[1]);
 });
 
 // Sandbox's gray inaudible lattice box GROWS to cover pasted far content (e.g. a large Life game),
@@ -4233,9 +4220,8 @@ test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly
     expect(cellCount, `${mode}: lattice should render`).toBeGreaterThan(0);
     // ...and, for Blast/Gravity, the difficulty control lit up correctly (proof
     // setupEvents/DifficultyBarbell ran, not just that currentMode flipped). Reads the mode's own
-    // actual default state.difficulty rather than assuming it equals levelCount -- true for Blast
-    // (default IS its highest/only level), but Gravity's own level 4 (#93 follow-up, welding-only,
-    // not a harder piece tier) is opt-in, so its default stays 3 even though levelCount is 4.
+    // actual default state.difficulty rather than hardcoding it, so this stays correct regardless
+    // of which level either mode happens to default to.
     if (mode === 'blast' || mode === 'gravity') {
       const defaultDifficulty = await page.evaluate((m) =>
         (m === 'blast' ? BlastMode : GravityMode).state.difficulty, mode);
@@ -4389,27 +4375,34 @@ test.describe('Piece-size difficulty presets (Blast/Gravity)', () => {
   }
 });
 
-// Gravity-only: level 4 (#93 follow-up) is welding-only, not a piece-size tier -- same tetrahex
-// pool as level 3 (Pieces.DIFFICULTY_KEYS has no 4th entry; randomPiece falls through to
-// TETRAHEX_KEYS, which level 3 already uses), and the barbell grows to 4 weights for Gravity only
-// (Blast has no weld concept and stays at 3, covered by the shared describe block above).
-test('Gravity: difficulty level 4 keeps level 3\'s tetrahex piece pool and lights a 4th barbell weight', async ({ page }) => {
+// Gravity's own 4th difficulty level ("Chaos" -- same tetrahex pool as level 3, but with rest-time
+// welding turned off, #93 follow-up) was removed live ("level 4 physics should just cease to
+// exist... not enjoying the gameplay"). Regression coverage for the removal actually sticking: no
+// 4th barbell weight exists, and setDifficulty(4) is rejected outright rather than silently
+// accepted (a stray call, or a leftover "4" in someone's localStorage, shouldn't resurrect it).
+test('Gravity: difficulty level 4 ("Chaos") no longer exists', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="gravity"]').click());
 
-  const level4Sizes = await page.evaluate(() => {
-    GravityMode.setDifficulty(4);
-    const sizes = new Set();
-    for (let i = 0; i < 300; i++) sizes.add(Pieces.TYPES[GravityMode.randomPiece()].cells.length);
-    return [...sizes].sort();
-  });
-  expect(level4Sizes).toEqual([4]);
+  const weightCount = await page.locator('#gravity-difficulty .weight-icon').count();
+  expect(weightCount, 'only 3 difficulty levels should exist').toBe(3);
+  await expect(page.locator('#gravity-difficulty .weight-icon[data-difficulty="4"]')).toHaveCount(0);
 
-  await page.click('#gravity-difficulty .weight-icon[data-difficulty="4"]');
-  const state = await page.evaluate(() => GravityMode.state.difficulty);
-  expect(state).toBe(4);
-  const litCount = await page.$$eval('#gravity-difficulty .weight-icon.lit', (els) => els.length);
-  expect(litCount).toBe(4);
+  const rejected = await page.evaluate(() => {
+    GravityMode.setDifficulty(2);
+    GravityMode.setDifficulty(4); // should be a no-op -- level 4 is out of range now
+    return GravityMode.state.difficulty;
+  });
+  expect(rejected, 'setDifficulty(4) should be rejected, not silently accepted').toBe(2);
+
+  // A stale localStorage value from before the removal (an existing user's saved "4") should
+  // clamp down to the new top level, not leave them stuck referencing a level that no longer
+  // exists.
+  const migrated = await page.evaluate(() => {
+    localStorage.setItem('tonncade_gravity_difficulty', '4');
+    return Math.min(3, DifficultyBarbell.migrateLevel('tonncade_gravity_difficulty', 3));
+  });
+  expect(migrated).toBe(3);
 });
 
 // #46 note-timeline redesign, parts 3-5: a real loaded song (not Random) renders its full

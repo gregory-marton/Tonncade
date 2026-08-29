@@ -2127,14 +2127,15 @@ button:hover {
 #app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .stat-label {
     display: none;
 }
-/* The 4-level difficulty picker (.difficulty-weights, shared with Blast) is a single un-wrapping
-   row of 4 dumbbell icons -- roughly 70px wide, genuinely wider than this whole 62px gutter, not
-   just close to it. Unlike Pause/Restart/Speed above, this one isn't about a label that can be
-   dropped; the icons themselves need the room. #gravity-controls' own `align-items: center`
-   (base rule) was centering every child around this widest one's true (overflowing) extent,
-   which is what actually pushed the OTHER children (the buttons, the stats) out past the panel's
-   own right edge too -- not their own content, despite how it first looked. 2-per-row wrapping
-   keeps every icon a real, tappable size while fitting the gutter, and stops that knock-on shift. */
+/* Originally written when the difficulty picker (.difficulty-weights, shared with Blast) had 4
+   levels -- a single un-wrapping row of 4 dumbbell icons ran ~70px wide, genuinely wider than
+   this whole 62px gutter. #gravity-controls' own `align-items: center` (base rule) was centering
+   every child around this widest one's true (overflowing) extent, which is what actually pushed
+   the OTHER children (the buttons, the stats) out past the panel's own right edge too -- not
+   their own content, despite how it first looked. The 4th level ("Chaos") was later removed
+   entirely (live: "not enjoying the gameplay"), so 3 icons now fit this gutter in a single row on
+   their own without wrapping -- this rule is a no-op today, kept as a harmless safety margin in
+   case a future level gets added back. */
 #app[data-gravity-sides="1"][data-mode="gravity"] #gravity-difficulty {
     flex-wrap: wrap;
     max-width: 100%;
