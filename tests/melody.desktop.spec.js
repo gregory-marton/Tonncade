@@ -93,6 +93,22 @@ test('Melody MIDI import preserves simultaneous notes instead of reducing them t
   expect(result[0].time).toBe(result[1].time);
 });
 
+test('Compose MIDI import preserves simultaneous notes for continued editing', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const buffer = MelodyMode.writeMIDI([
+      { midi: 48, time: 0, duration: 0.4 },
+      { midi: 55, time: 0, duration: 0.4 },
+      { midi: 60, time: 0.5, duration: 0.4 },
+    ]);
+    ComposeMode.loadMelodyFromArrayBuffer(buffer, 'polyphonic.mid');
+    return ComposeMode.state.notes.map((note) => ({ midi: note.midi, time: note.time }));
+  });
+
+  expect(result).toHaveLength(3);
+  expect(result.slice(0, 2).map((note) => note.midi).sort((a, b) => a - b)).toEqual([48, 55]);
+  expect(result[0].time).toBe(result[1].time);
+});
+
 test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.cleanupPlayback();

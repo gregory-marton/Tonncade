@@ -776,7 +776,9 @@ const ComposeMode = {
                 alert('No notes found in the MIDI file.');
                 return;
             }
-            const melody = MelodyMode.extractMonophonicMelody(parsed);
+            // Keep every parsed note. A same-onset group is a chord, and Compose must preserve
+            // it when a player opens a MIDI take to continue editing (MIDI is polyphonic).
+            const melody = parsed.notes;
 
             let prev = { p: 0, q: 0 };
             this.state.notes = melody.map(note => {
