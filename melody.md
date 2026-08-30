@@ -16,9 +16,10 @@ be able to hear a passage, see it on a grand staff, find its pitches on the Tonn
 the passage without being forced to restart useful work after every mistake.
 
 The work is intentionally staged. First make the current difficulty levels reliable and preserve
-polyphonic musical data. Then add partial-credit chord practice and richer feedback. Timing scores,
-play-along detection, hand separation, and advanced notation interpretation come later, after the
-core event model is proven.
+polyphonic musical data. Then add partial-credit chord practice and richer feedback. The practice
+loop already commits to non-interruptive performance, continued guide playback, obvious but
+voluntary targets, and adaptive tolerance; timing scores, play-along detection, hand separation,
+and advanced notation interpretation come later, after the core event model is proven.
 
 ## Immediate reliability work: GitHub issue #31
 
@@ -176,6 +177,17 @@ hand separation. These should be addressed with explicit practice choices and pr
 not by making every beginner pass an exact performance test. Chord partial credit and per-member
 feedback are foundations for this progression, not its endpoint.
 
+### Current practice-loop commitments
+
+These are part of the current design, not deferred aspirations:
+
+- Never interrupt an ongoing child performance for an ordinary wrong note.
+- Continue the backing or guide while tracking missed and extra notes.
+- Make the next target visually obvious, while allowing the child to replay or isolate it
+  voluntarily.
+- Use adaptive tolerance: accept approximate timing and partial chords early, and tighten
+  expectations only at higher levels.
+
 ## Longer songs and drill progression
 
 Update preview playback, timeline markers, scrolling, celebration, `startIndex`, `endIndex`,
@@ -263,3 +275,15 @@ Add and retain tests for:
 
 Prefer structural assertions—event/member counts, pitch sets, x-position ordering, barline counts,
 and known key spellings—over pixel-level rendering assertions.
+
+## Next steps: pedagogical depth
+
+After the current event model and practice-loop commitments are stable, add:
+
+- Explicit **Practice this spot** and **Repeat slowly** controls.
+- Learner-selected textures: melody-only, right hand, left hand, simplified chords, or full
+  texture.
+- Separate feedback dimensions for pitch, rhythm, completeness, and continuity.
+- Short musical phrases with cadence and accompaniment, rather than only arbitrary note sequences.
+- Encouragement after mistakes—for example, “You found 3 of 4 notes; let’s try the missing one”—
+  instead of effectively restarting the game.
