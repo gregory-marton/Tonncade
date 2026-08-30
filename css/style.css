@@ -530,6 +530,19 @@ svg {
     pointer-events: none;
 }
 
+/* Melody's current-event reading cue (js/melody.js): one soft band per event, fading through the
+   next few events. It is click-through so the staff and Timeline handles retain their existing
+   interaction contracts. */
+.melody-current-event-region {
+    position: absolute;
+    top: 0;
+    bottom: 12px;
+    background: var(--accent);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 0;
+}
+
 /* .pitch-row: the Timeline's own aligned note-name/octave row (INV-55) -- real flex+gap gives
    every pair of adjacent tokens the same visual spacing. Overflows its OWN box when wider than
    the viewport rather than scrolling independently -- the shared .notation-scroll ancestor is

@@ -147,6 +147,28 @@ test('Melody marks every member of the current chord as the current event', asyn
   expect(currentCount).toBe(2);
 });
 
+test('Melody shows a fading, click-through region for the current event and upcoming events', async ({ page }) => {
+  const regions = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 64, time: 0, duration: 0.4 },
+      { midi: 67, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 2;
+    MelodyMode.updateDifficultyUI();
+    return Array.from(document.querySelectorAll('#melody-notation-scroll .melody-current-event-region'))
+      .map((el) => ({ rank: el.dataset.eventRank, width: parseFloat(el.style.width), opacity: parseFloat(el.style.opacity) }));
+  });
+
+  expect(regions.length).toBe(2);
+  expect(regions[0].rank).toBe('0');
+  expect(regions[0].width).toBeGreaterThan(0);
+  expect(regions[0].opacity).toBeGreaterThan(regions[1].opacity);
+});
+
 test('Melody exposes per-note success and mistake states in the pitch row', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.state.isRandom = false;

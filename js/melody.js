@@ -630,6 +630,38 @@ const MelodyMode = {
         }, 460);
     },
 
+    // Draw a soft, non-interactive column over the current event and a few following events. The
+    // boundaries come from Timeline's own VexFlow x readback, so this cue stays aligned with the
+    // staff, pitch row, and marker stack instead of maintaining a second layout calculation.
+    updateCurrentEventRegions: function(index) {
+        const scroll = document.getElementById('melody-notation-scroll');
+        if (!scroll) return;
+        scroll.querySelectorAll('.melody-current-event-region').forEach((el) => el.remove());
+        if (index == null || !this.timeline || !this.timeline._lastRender) return;
+        const positions = this.timeline._lastRender.noteXPositions || [];
+        const byId = new Map(positions.map((entry) => [entry.id, entry]));
+        let eventStart = index;
+        for (let rank = 0; rank < 4 && eventStart < this.state.melody.length; rank++) {
+            const event = this.getEventBounds(eventStart);
+            const first = byId.get(event.start);
+            const next = byId.get(event.end);
+            const last = byId.get(event.end - 1) || first;
+            if (!first) break;
+            const left = Math.max(0, first.x - 16);
+            const right = next ? next.x - 16 : last.x + 32;
+            if (right > left) {
+                const region = document.createElement('div');
+                region.className = 'melody-current-event-region';
+                region.dataset.eventRank = String(rank);
+                region.style.left = left + 'px';
+                region.style.width = (right - left) + 'px';
+                region.style.opacity = String(rank === 0 ? 0.18 : 0.1 / rank);
+                scroll.appendChild(region);
+            }
+            eventStart = event.end;
+        }
+    },
+
     // 4/4 assumed throughout (no time-signature parsing exists in this codebase -- out of
     // scope, see next_steps.md). Only meaningful for a real song (see state.melodyBPM).
     measureOf: function(timeSec) {
@@ -804,6 +836,7 @@ const MelodyMode = {
             decorateNote,
             showBarlines: !this.state.isRandom,
         });
+        this.updateCurrentEventRegions(current);
         // Random's own small sliding window (built above) always already contains `current` --
         // nothing to scroll to. A real song renders in full up front, so playback needs to pull
         // the view along with it.
