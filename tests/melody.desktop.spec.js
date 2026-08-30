@@ -76,3 +76,19 @@ test('Melody level 1 Random does not celebrate finite fallback data as a song wi
   expect(result.userIndex).toBe(0);
   expect(result.confettiCount).toBe(0);
 });
+
+test('Melody MIDI import preserves simultaneous notes instead of reducing them to one pitch', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    const buffer = MelodyMode.writeMIDI([
+      { midi: 48, time: 0, duration: 0.4 },
+      { midi: 55, time: 0, duration: 0.4 },
+      { midi: 60, time: 0.5, duration: 0.4 },
+    ]);
+    MelodyMode.loadMelodyFromArrayBuffer(buffer, 'polyphonic.mid');
+    return MelodyMode.state.melody.map((note) => ({ midi: note.midi, time: note.time }));
+  });
+
+  expect(result).toHaveLength(3);
+  expect(result.slice(0, 2).map((note) => note.midi).sort((a, b) => a - b)).toEqual([48, 55]);
+  expect(result[0].time).toBe(result[1].time);
+});

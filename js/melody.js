@@ -338,11 +338,11 @@ const MelodyMode = {
                 return;
             }
 
-            // Filter to a monophonic sequence
-            let melodySeq = this.extractMonophonicMelody(parsed);
-
             // Center notes in the viewport octave range
-            melodySeq = this.centerMelody(melodySeq);
+            // Keep every parsed note. A monophonic passage is simply a sequence with one note at
+            // each onset; simultaneous notes are chord members and must remain available to
+            // Melody's event-aware matcher (MIDI is polyphonic, issue #46).
+            const melodySeq = this.centerMelody(parsed.notes);
 
             this.state.melody = melodySeq;
             this.state.isRandom = false;
