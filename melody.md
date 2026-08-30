@@ -116,6 +116,10 @@ Notation requirements:
 - Render every event, including every member of a chord.
 - Keep each staff notehead, pitch label, Tonnetz highlight, and timeline position synchronized.
 - Show note names with octave, using authored or detected key spelling.
+- Render only the clef(s) that contain music in the complete loaded song; if one clef is silent for
+  the whole song, omit that clef and its all-rest voice. Decide this at whole-song scope, never
+  from the selected drill range, so moving the practice markers cannot change the learner's
+  orientation or make the notation jump.
 - Keep the current target visible at every difficulty level.
 - Highlight the full staff-column region of the current event, not only a small triangle.
 - Keep barlines aligned through the staff, pitch row, and marker stack.
