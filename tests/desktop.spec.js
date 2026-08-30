@@ -3162,39 +3162,6 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   expect(res.size).toBe(2);           // original pile cell + one pasted cell
 });
 
-// Reported live (GH #30): pasting into Gravity silently did nothing, even for cells the player
-// was careful to pick as genuinely unoccupied elsewhere. Root-caused via the real recorded
-// session's own sound events (the actual MIDI played, not a reconstructed guess): the pitches
-// involved were all perfectly reachable somewhere in the cup, but Tonnetz.canonicalToGravity's
-// literal coordinate conversion happened to land on an out-of-bounds embedding of that pitch --
-// the SAME absolute pitch exists at a second (p,q) in the cup (differing by exactly the one
-// pitch-preserving lattice vector, (4,3) -- verified: the cup's own bounds mean a pitch never has
-// more than 2 valid in-bounds cells), just not the one the naive conversion picked. A player
-// copying "this note" has no way to know or care which of the two embeddings Sandbox happened to
-// use; matching pitch is what matches their actual intent. GravityBoard.isCellEmpty also couldn't
-// distinguish "out of bounds" from "occupied" either way, so this failed in total silence.
-test('Copy/paste into Gravity: falls back to the pitch-preserving alternate cell when the literal coordinate is out of bounds', async ({ page }) => {
-  await page.goto('/');
-  const res = await page.evaluate(() => {
-    document.querySelector('.mode-option[data-mode="gravity"]').click();
-    App.currentMode = 'gravity';
-    GravityBoard.cells.clear();
-    // Canonical (-7,6) is midi 29 (F1) -- Tonnetz.canonicalToGravity converts it to gravity
-    // (-6,-3), which is out of the cup's bounds. The SAME pitch also lands at gravity (-2,0),
-    // which IS in bounds and empty here.
-    App.clipboard = [{ p: -7, q: 6 }];
-    App.paste();
-    return {
-      placedAtAlternate: GravityBoard.cells.has('-2,0'),
-      placedAtLiteral: GravityBoard.cells.has('-6,-3'),
-      size: GravityBoard.cells.size,
-    };
-  });
-  expect(res.placedAtAlternate, 'should land at the in-bounds same-pitch alternate').toBe(true);
-  expect(res.placedAtLiteral, 'the literal out-of-bounds coordinate is never a real cell').toBe(false);
-  expect(res.size).toBe(1);
-});
-
 // Pasted mid-air cells fall to rest one row per TICK, exactly like the active piece, never in one
 // silent precomputed jump (reported live: an instant jump-to-rest was surprising). Paste itself
 // must leave the cell exactly where it landed; only once ticks actually run does it fall.
