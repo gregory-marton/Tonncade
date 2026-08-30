@@ -96,6 +96,7 @@ const MelodyMode = {
         endIndex: 0,
         userIndex: 0,          // Current progress of user in repeating the sequence
         matchedChordNotes: [], // Absolute note indices already supplied for the current onset event
+        pendingUserNotes: [],   // MIDI/UI notes played while Melody is demonstrating a target
         notePerformance: {},   // note index -> { correct, misses }; retained for the active song
         mistakeFlashNotes: {}, // note index -> expiry timestamp for brief red staff feedback
         startIndex: 0,         // Where the drilled segment begins -- always <= endIndex, letting
@@ -875,6 +876,7 @@ const MelodyMode = {
         this.state.startIndex = 0;
         this.state.measureCleanStreak = {};
         this.state.matchedChordNotes = [];
+        this.state.pendingUserNotes = [];
         this.state.notePerformance = {};
         this.state.mistakeFlashNotes = {};
         this.state.mistakeRetryCount = 0;
@@ -926,6 +928,7 @@ const MelodyMode = {
             this.state.isPlayingSequence = false;
             this.state.userIndex = start;
             this.updateDifficultyUI();
+            this.flushPendingUserNotes();
         }, totalDuration);
 
         this.state.playbackTimeoutIds.push(tId2);
@@ -1030,8 +1033,26 @@ const MelodyMode = {
         return { start, end };
     },
 
+    // Do not throw away a learner's playing just because the guide is still sounding. Process in
+    // order once the guide ends; if one queued note triggers recovery, leave the remainder queued
+    // for the next quiet moment rather than silently losing it.
+    flushPendingUserNotes: function() {
+        const queued = this.state.pendingUserNotes.splice(0);
+        for (let i = 0; i < queued.length; i++) {
+            if (this.state.isPlayingSequence || this.state.isPlayingPreview) {
+                this.state.pendingUserNotes.unshift(...queued.slice(i));
+                return;
+            }
+            this.handleUserInputNote(queued[i]);
+        }
+    },
+
     handleUserInputNote: function(midi) {
-        if (this.state.isPlayingSequence || this.state.isPlayingPreview) return;
+        if (this.state.isPlayingSequence) {
+            if (this.state.pendingUserNotes.length < 64) this.state.pendingUserNotes.push(midi);
+            return;
+        }
+        if (this.state.isPlayingPreview) return;
 
         const event = this.getEventBounds(this.state.userIndex);
         if (event.start >= event.end) return;
@@ -1314,6 +1335,7 @@ const MelodyMode = {
         }
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
+        this.state.pendingUserNotes = [];
 
         this.setPlayIcon(false);
 

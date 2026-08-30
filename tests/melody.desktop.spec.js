@@ -291,3 +291,24 @@ test('Melody backs off repeated mistake replays so learners get more thinking ti
 
   expect(delays).toEqual({ first: 1200, second: 2400 });
 });
+
+test('Melody preserves notes played while its demonstration is sounding for later credit', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.state.melody = [{ midi: 60, time: 0, duration: 0.4 }];
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 0;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.matchedChordNotes = [];
+    MelodyMode.state.isPlayingSequence = true;
+    MelodyMode.state.pendingUserNotes = [];
+    MelodyMode.handleUserInputNote(60);
+    const queued = MelodyMode.state.pendingUserNotes.slice();
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.flushPendingUserNotes();
+    return { queued, userIndex: MelodyMode.state.userIndex };
+  });
+
+  expect(result.queued).toEqual([60]);
+  expect(result.userIndex).toBe(1);
+});
