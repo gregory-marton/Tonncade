@@ -109,6 +109,16 @@ test('Compose MIDI import preserves simultaneous notes for continued editing', a
   expect(result[0].time).toBe(result[1].time);
 });
 
+test('Notation places same-onset notes at one staff position as a chord', async ({ page }) => {
+  const positions = await page.evaluate(() => Notation.render('melody-staff', [
+    { midi: 60, time: 0, duration: 0.4 },
+    { midi: 64, time: 0, duration: 0.4 },
+  ], { bpm: 120 }).noteXPositions);
+
+  expect(positions).toHaveLength(2);
+  expect(positions[0].x).toBe(positions[1].x);
+});
+
 test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.cleanupPlayback();

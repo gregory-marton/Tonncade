@@ -299,7 +299,29 @@ const Notation = {
 
             const trebleItems = [];
             const bassItems = [];
-            items.forEach((item, ii) => {
+            // VexFlow needs one StaveNote with multiple keys for a same-clef chord. Keep the
+            // public flat noteXPositions contract, but combine adjacent same-onset notes here so
+            // each member shares one formatted position while the two clefs retain independent
+            // voices when a chord crosses the register split.
+            const renderItems = [];
+            items.forEach((item) => {
+                if (item.rest) {
+                    renderItems.push(item);
+                    return;
+                }
+                const previous = renderItems[renderItems.length - 1];
+                if (previous && previous.chord && previous.beatStart === item.beatStart) {
+                    previous.chord.push(item);
+                    previous.beatDuration = Math.max(previous.beatDuration, item.beatDuration);
+                } else {
+                    renderItems.push({
+                        chord: [item],
+                        beatStart: item.beatStart,
+                        beatDuration: item.beatDuration,
+                    });
+                }
+            });
+            renderItems.forEach((item, ii) => {
                 if (item.rest) {
                     const trebleRest = this._ghostRest('treble', item.beatDuration);
                     trebleItems.push(trebleRest);
@@ -318,40 +340,39 @@ const Notation = {
                     }
                     return;
                 }
-                const isTreble = item.midi >= clefSplit;
-                const clef = isTreble ? 'treble' : 'bass';
-                const { key, accidental } = this.midiToVexKey(item.midi, keySignature);
-                const vexNote = new VexFlow.StaveNote({ keys: [key], duration: this.durationCode(item.beatDuration), clef });
-                if (accidental) vexNote.addModifier(new VexFlow.Accidental(accidental), 0);
-                // ctx.setFillStyle/setStrokeStyle (above) only covers elements that inherit the
-                // RenderContext's ambient color -- a StaveNote's stem and ledger lines each set
-                // their OWN hardcoded default color internally ("black" and "#444" respectively)
-                // regardless of the context's current style, so both stayed near-invisible even
-                // after that fix. Reported live: "the little staff line through the C is barely
-                // visible... would do well to be fully white like the note." setStyle/
-                // setLedgerLineStyle override a note's own per-instance color explicitly.
-                vexNote.setStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
-                if (typeof vexNote.setLedgerLineStyle === 'function') {
-                    vexNote.setLedgerLineStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
-                }
-                // Mode-specific per-note feedback (Melody performance colors) is applied at the
-                // same point as the shared readable default, so staff noteheads, stems, and
-                // ledger lines stay synchronized with the Timeline's label decoration.
-                const noteDecoration = opts.decorateNote ? (opts.decorateNote(item) || {}) : {};
-                if (noteDecoration.style) {
-                    vexNote.setStyle(noteDecoration.style);
-                    if (typeof vexNote.setLedgerLineStyle === 'function') {
-                        vexNote.setLedgerLineStyle(noteDecoration.style);
+                ['treble', 'bass'].forEach((clef) => {
+                    const members = item.chord.filter((member) => (member.midi >= clefSplit) === (clef === 'treble'));
+                    if (members.length === 0) {
+                        (clef === 'treble' ? trebleItems : bassItems).push(this._ghostRest(clef, item.beatDuration));
+                        return;
                     }
-                }
-                noteXPositions.push({ id: item.id, midi: item.midi, beatStart: item.beatStart, clef, vexNote });
-                if (isTreble) {
-                    trebleItems.push(vexNote);
-                    bassItems.push(this._ghostRest('bass', item.beatDuration));
-                } else {
-                    bassItems.push(vexNote);
-                    trebleItems.push(this._ghostRest('treble', item.beatDuration));
-                }
+                    const keys = members.map((member) => this.midiToVexKey(member.midi, keySignature));
+                    const vexNote = new VexFlow.StaveNote({
+                        keys: keys.map((entry) => entry.key),
+                        duration: this.durationCode(item.beatDuration),
+                        clef,
+                    });
+                    keys.forEach((entry, keyIndex) => {
+                        if (entry.accidental) vexNote.addModifier(new VexFlow.Accidental(entry.accidental), keyIndex);
+                    });
+                    // ctx.setFillStyle/setStrokeStyle (above) only covers elements that inherit the
+                    // RenderContext's ambient color -- a StaveNote's stem and ledger lines each set
+                    // their OWN hardcoded default color internally. Set the readable default and
+                    // then apply the first member's mode-specific decoration to the grouped note.
+                    vexNote.setStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
+                    if (typeof vexNote.setLedgerLineStyle === 'function') {
+                        vexNote.setLedgerLineStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
+                    }
+                    const noteDecoration = opts.decorateNote ? (opts.decorateNote(members[0]) || {}) : {};
+                    if (noteDecoration.style) {
+                        vexNote.setStyle(noteDecoration.style);
+                        if (typeof vexNote.setLedgerLineStyle === 'function') vexNote.setLedgerLineStyle(noteDecoration.style);
+                    }
+                    members.forEach((member) => {
+                        noteXPositions.push({ id: member.id, midi: member.midi, beatStart: member.beatStart, clef, vexNote });
+                    });
+                    (clef === 'treble' ? trebleItems : bassItems).push(vexNote);
+                });
             });
 
             const trebleVoice = new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT);
