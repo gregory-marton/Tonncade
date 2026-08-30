@@ -92,3 +92,39 @@ test('Melody MIDI import preserves simultaneous notes instead of reducing them t
   expect(result.slice(0, 2).map((note) => note.midi).sort((a, b) => a - b)).toEqual([48, 55]);
   expect(result[0].time).toBe(result[1].time);
 });
+
+test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.cleanupPlayback();
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 64, time: 0, duration: 0.4 },
+      { midi: 67, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.isPlayingPreview = false;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 2;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.matchedChordNotes = [];
+    MelodyMode.handleUserInputNote(60);
+    const partial = {
+      userIndex: MelodyMode.state.userIndex,
+      matched: MelodyMode.state.matchedChordNotes.slice(),
+    };
+    MelodyMode.handleUserInputNote(64);
+    return {
+      partial,
+      completed: {
+        userIndex: MelodyMode.state.userIndex,
+        matched: MelodyMode.state.matchedChordNotes.slice(),
+      },
+    };
+  });
+
+  expect(result.partial.userIndex).toBe(0);
+  expect(result.partial.matched).toEqual([0]);
+  expect(result.completed.userIndex).toBe(2);
+  expect(result.completed.matched).toEqual([]);
+});

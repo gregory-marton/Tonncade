@@ -89,6 +89,7 @@ const MelodyMode = {
         // marker visually sits on a specific note, same as the start marker.
         endIndex: 0,
         userIndex: 0,          // Current progress of user in repeating the sequence
+        matchedChordNotes: [], // Absolute note indices already supplied for the current onset event
         startIndex: 0,         // Where the drilled segment begins -- always <= endIndex, letting
                                 // a player replay from any note already reached instead of
                                 // always from note 0.
@@ -918,16 +919,47 @@ const MelodyMode = {
         this.updateDifficultyUI();
     },
 
+    // A chord is represented by the existing flat note list: adjacent notes whose starts are
+    // within the same onset tolerance are one logical event, while a single note is simply an
+    // event with one member. Returning absolute indices keeps Timeline/Notation's established
+    // note-index contract intact while allowing the matcher to award each chord member once.
+    getEventBounds: function(index) {
+        const melody = this.state.melody;
+        if (!melody[index]) return { start: index, end: index };
+        const start = index;
+        const onset = melody[index].time;
+        let end = start + 1;
+        while (end < melody.length && Math.abs(melody[end].time - onset) < 0.08) end++;
+        return { start, end };
+    },
+
     handleUserInputNote: function(midi) {
         if (this.state.isPlayingSequence || this.state.isPlayingPreview) return;
 
-        const targetNote = this.state.melody[this.state.userIndex];
-        if (!targetNote) return;
+        const event = this.getEventBounds(this.state.userIndex);
+        if (event.start >= event.end) return;
+        const matched = this.state.matchedChordNotes || [];
+        const targetIndex = this.state.melody
+            .slice(event.start, event.end)
+            .findIndex((note, offset) => note.midi === midi && !matched.includes(event.start + offset));
 
         // Compare exact pitch
-        if (midi === targetNote.midi) {
+        if (targetIndex >= 0) {
             // Correct note!
-            this.state.userIndex++;
+            matched.push(event.start + targetIndex);
+            this.state.matchedChordNotes = matched;
+
+            // Partial chord credit stays on the same event until every member is supplied. No
+            // progression, streak, measure banking, or idle replay is triggered for a partial
+            // event; the accepted members remain available as feedback while the missing members
+            // stay actionable.
+            if (matched.length < event.end - event.start) {
+                this.updateDifficultyUI();
+                return;
+            }
+
+            this.state.userIndex = event.end;
+            this.state.matchedChordNotes = [];
             this.updateStreak(this.state.userIndex);
 
             // INV-26: the end advances immediately with every correct play that reaches the
@@ -1063,7 +1095,10 @@ const MelodyMode = {
             if (this.state.userIndex > this.state.endIndex) {
                 this.state.endIndex = this.state.userIndex;
             }
-            this.state.userIndex = this.state.startIndex;
+            // A partially completed chord remains the active event: its accepted members are
+            // retained for the retry, while an ordinary single-note mistake keeps the established
+            // behavior of rewinding to the drill's start marker.
+            if (matched.length === 0) this.state.userIndex = this.state.startIndex;
             this.updateDifficultyUI();
             
             if (this.state.userRepeatTimeoutId) {
