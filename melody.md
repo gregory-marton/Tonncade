@@ -198,6 +198,10 @@ guide. After the guide finishes, Melody compares the collected notes with the re
 retaining correct members and recording missed and extra pitches. If recovery is needed, the next
 prompt waits for both the adaptive pause and a silence window after the child's latest input.
 
+For a searching learner, target playback may slow to 2×, 3×, or 4× slower than the normal prompt
+speed, stopping at 4×. This is a playback-speed choice, not an exponentially lengthening silent
+interval; active playing always takes priority over another prompt.
+
 ## Longer songs and drill progression
 
 Update preview playback, timeline markers, scrolling, celebration, `startIndex`, `endIndex`,
@@ -208,6 +212,19 @@ Update preview playback, timeline markers, scrolling, celebration, `startIndex`,
 - End growth remains deterministic and is never caused by an incorrect input.
 - A mistake in a later measure does not erase already-banked credit from an earlier measure.
 - Preview plays the same event/member data that the learner is asked to reproduce.
+
+### Random practice
+
+Random is a pure Simon exercise and follows a separate progression contract from authored songs:
+
+- Begin with a one-event generated prefix.
+- Play the complete prefix, then accept the learner's complete repeat from position zero.
+- Append exactly one generated event after each successful prefix repeat, without a fixed maximum.
+- Retain and render the complete generated prefix in the ordinary scrollable Timeline; long Random
+  play may scroll just like a long authored song, but its content does not slide or disappear.
+- Keep the logical start at zero. Do not apply authored-song measure mastery or automatically move
+  the start marker.
+- Use seeded randomness so a replay can regenerate the same growing sequence.
 
 ## Invariants
 
