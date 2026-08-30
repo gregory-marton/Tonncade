@@ -1853,12 +1853,16 @@ test('Gravity queue shows the currently-falling piece, not just the upcoming one
   await expect(activeItem.locator('.piece-preview')).toBeVisible();
 
   // It should reflect the REAL active piece, not just any piece -- change it and confirm the
-  // displayed name tracks it.
+  // displayed name tracks it. Flaked ~10% of the time (caught in a full-suite run): swapping in
+  // the real nextQueue[0] doesn't guarantee a different piece, since Gravity's queue draws
+  // uniformly from a 10-piece pool at the default difficulty and can repeat back-to-back. Force a
+  // piece guaranteed different from the current one instead of trusting the RNG to differ.
   const nameBefore = await activeItem.locator('.piece-name').textContent();
-  await page.evaluate(() => {
-    GravityMode.state.activePiece = GravityMode.state.nextQueue[0];
+  await page.evaluate((before) => {
+    const distinct = Pieces.TETRAHEX_KEYS.find((k) => k !== before);
+    GravityMode.state.activePiece = distinct;
     GravityMode.renderNextQueue();
-  });
+  }, nameBefore);
   const nameAfter = await activeItem.locator('.piece-name').textContent();
   expect(nameAfter).not.toBe(nameBefore);
 });
