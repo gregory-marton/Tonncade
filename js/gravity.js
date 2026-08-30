@@ -420,14 +420,25 @@ const GravityMode = {
             return Tonnetz.gravityToCanonical(+parts[0], +parts[1]);
         });
     },
+    // Reported live (GH #30): pasting silently did nothing even for cells the player was careful
+    // to pick as unoccupied elsewhere. Root cause: canonicalToGravity's coordinate conversion is a
+    // literal, single embedding of a pitch onto the gravity lattice, but the SAME pitch can also
+    // land on a different (p,q) -- differing by exactly (4,3), the one lattice vector that
+    // preserves pitch (-3*4+4*3=0) -- and the cup's own narrow bounds mean at most ONE such
+    // alternate is ever in-cup (verified: no pitch has more than 2 in-bounds cells total). A
+    // player copying "this note" cares about the PITCH, not which of its two possible embeddings
+    // the source mode's own pan position happened to produce -- pasting the note wherever it DOES
+    // fit in the cup matches that intent, where silently dropping it (the old behavior) didn't.
     pasteClipboard: function(cells) {
         const placed = [];
         const midis = [];
         cells.forEach((c) => {
             const g = Tonnetz.canonicalToGravity(c.p, c.q);
-            if (GravityBoard.isCellEmpty(g.p, g.q)) {
-                placed.push({ p: g.p, q: g.q });
-                midis.push(Tonnetz.getMidi(g.p, g.q));
+            const candidates = [g, { p: g.p + 4, q: g.q + 3 }, { p: g.p - 4, q: g.q - 3 }];
+            const target = candidates.find((cand) => GravityBoard.isCellEmpty(cand.p, cand.q));
+            if (target) {
+                placed.push({ p: target.p, q: target.q });
+                midis.push(Tonnetz.getMidi(target.p, target.q));
             }
         });
         if (!placed.length) return;
