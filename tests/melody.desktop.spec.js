@@ -476,3 +476,24 @@ test('Melody MIDI tracks active notes through note-off and sustain release', asy
   expect(result.sustained).toEqual([64]);
   expect(result.sustainDown).toBe(false);
 });
+
+test('Melody shows active learner pitches as a separate staff overlay', async ({ page }) => {
+  const live = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 64, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.liveInputNotes = new Set([61]);
+    MelodyMode.updateDifficultyUI();
+    const note = document.querySelector('.melody-live-note[data-midi="61"]');
+    return note ? { text: note.textContent, color: getComputedStyle(note).color } : null;
+  });
+
+  expect(live).not.toBeNull();
+  expect(live.text).toContain('C');
+  expect(live.color).not.toBe('');
+});

@@ -543,6 +543,27 @@ svg {
     z-index: 0;
 }
 
+/* The pitch currently held on a MIDI keyboard (js/melody.js). Keep it distinct from the target
+   notation so a learner can see what they are actually playing while the guide continues. */
+.melody-live-note {
+    position: absolute;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    min-height: 22px;
+    padding: 1px 4px;
+    border: 2px solid #52a7d9;
+    border-radius: 50%;
+    background: rgba(117, 199, 255, 0.24);
+    color: #14658f;
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
 /* .pitch-row: the Timeline's own aligned note-name/octave row (INV-55) -- real flex+gap gives
    every pair of adjacent tokens the same visual spacing. Overflows its OWN box when wider than
    the viewport rather than scrolling independently -- the shared .notation-scroll ancestor is

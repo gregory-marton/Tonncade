@@ -100,6 +100,7 @@ const MelodyMode = {
         matchedChordNotes: [], // Absolute note indices already supplied for the current onset event
         pendingUserNotes: [],   // MIDI/UI notes played while Melody is demonstrating a target
         extraNotes: [],         // Extra pitches heard during the active practice attempt
+        liveInputNotes: new Set(), // MIDI pitches currently held by the learner
         notePerformance: {},   // note index -> { correct, misses }; retained for the active song
         mistakeFlashNotes: {}, // note index -> expiry timestamp for brief red staff feedback
         timingPerformance: {}, // note index -> early/on-time/late, enabled above Easy
@@ -544,8 +545,10 @@ const MelodyMode = {
     // specific cell was touched (live MIDI hardware input -- see js/midi-input.js). Highlights
     // every cell sharing that pitch instead of one specific (p, q).
     playUserNoteByMidi: function(midi) {
+        this.state.liveInputNotes.add(midi);
         Render.highlightByMidi(midi, 250);
         Synth.playNote(midi);
+        this.renderLiveInputNotes();
         this.handleUserInputNote(midi);
     },
 
@@ -682,6 +685,37 @@ const MelodyMode = {
             }
             eventStart = event.end;
         }
+    },
+
+    // Show held learner pitches on the staff without replacing the target notation. The x anchor
+    // is the current event; the y position is computed from the active clef's actual staff bounds.
+    renderLiveInputNotes: function() {
+        const staff = document.getElementById('melody-staff');
+        if (!staff || !this.timeline || !this.timeline._lastRender) return;
+        staff.querySelectorAll('.melody-live-note').forEach((el) => el.remove());
+        staff.style.position = 'relative';
+        const current = this.getEventBounds(this.state.userIndex).start;
+        const anchor = this.timeline._lastRender.noteXPositions.find((entry) => entry.id === current)
+            || this.timeline._lastRender.noteXPositions[0];
+        if (!anchor) return;
+        const bounds = this.timeline._lastRender.staveBounds;
+        this.state.liveInputNotes.forEach((midi) => {
+            const clef = midi >= (Notation.CLEF_SPLIT_MIDI || 60) ? 'treble' : 'bass';
+            const y = Notation.staffYForMidi(midi, clef, bounds, this.state.keySignature);
+            if (y == null) return;
+            const note = document.createElement('span');
+            note.className = 'melody-live-note';
+            note.dataset.midi = String(midi);
+            note.textContent = Tonnetz.getNoteName(midi, this.state.keySignature) + Tonnetz.getOctave(midi);
+            note.style.left = (anchor.x + 3) + 'px';
+            note.style.top = (y - 13) + 'px';
+            staff.appendChild(note);
+        });
+    },
+
+    releaseUserNoteByMidi: function(midi) {
+        this.state.liveInputNotes.delete(midi);
+        this.renderLiveInputNotes();
     },
 
     // 4/4 assumed throughout (no time-signature parsing exists in this codebase -- out of
@@ -836,10 +870,10 @@ const MelodyMode = {
             showBarlines: !this.state.isRandom,
         });
         this.updateCurrentEventRegions(current);
-        // Random's own small sliding window (built above) always already contains `current` --
-        // nothing to scroll to. A real song renders in full up front, so playback needs to pull
-        // the view along with it.
-        if (!this.state.isRandom) this.timeline.scrollToCurrent(current);
+        this.renderLiveInputNotes();
+        // Both authored songs and Random render their complete current sequence/prefix, so
+        // playback may pull the shared viewport along with the current event.
+        this.timeline.scrollToCurrent(current);
     },
 
     // Marks the drill as genuinely started -- checked by init() so a mere mode SWITCH (away and
@@ -862,6 +896,7 @@ const MelodyMode = {
         this.state.matchedChordNotes = [];
         this.state.pendingUserNotes = [];
         this.state.extraNotes = [];
+        this.state.liveInputNotes = new Set();
         this.state.notePerformance = {};
         this.state.mistakeFlashNotes = {};
         this.state.timingPerformance = {};
@@ -1372,6 +1407,7 @@ const MelodyMode = {
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
         this.state.pendingUserNotes = [];
+        this.state.liveInputNotes = new Set();
         this.state.lastPracticeInputAt = null;
         this.state.lastPracticeEventStart = null;
         this.state.lastUserInputAt = null;
