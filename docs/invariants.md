@@ -1576,3 +1576,16 @@ optional safeguard, never a prerequisite for connection or note handling.
 
 **Test:** `tests/invariants.spec.js` — "INV-57: connecting MIDI requests a screen wake lock when
 the browser provides one" (with a mocked Web MIDI device and wake-lock provider).
+
+---
+
+### INV-58: Melody never discards learner notes during its own demonstration
+
+When Melody is sounding a target sequence, learner note-ons are buffered in arrival order rather
+than ignored. Once the demonstration finishes, the buffered notes are evaluated against the current
+target; if one causes recovery, remaining notes stay queued for the next quiet moment. The buffer is
+bounded and is cleared when the Melody session is reset or abandoned, so stale input cannot leak
+between sessions or modes.
+
+**Test:** `tests/melody.desktop.spec.js` — "Melody preserves notes played while its demonstration
+is sounding for later credit".

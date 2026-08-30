@@ -204,6 +204,10 @@ Add explicit invariants stating that:
 - All difficulty levels retain readable staff notation.
 - An active MIDI practice session requests and, after visibility changes, safely reacquires a screen
   wake lock when the browser supports it; wake-lock denial never disables MIDI input.
+- Notes played by the learner while Melody demonstrates a target are retained and evaluated after
+  the demonstration, rather than silently discarded.
+- Melody matching and notation use the same onset-event tolerance, including for off-grid MIDI
+  note-ons.
 
 ## Delivery milestones
 
