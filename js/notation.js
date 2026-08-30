@@ -188,9 +188,11 @@ const Notation = {
     // isn't needed for a first cut (docs/melody-notation-design.md).
     pitchFromY: function(y, staveBounds, keySignature) {
         if (!staveBounds) return this.CLEF_SPLIT_MIDI;
-        const trebleMid = (staveBounds.trebleTop + staveBounds.trebleBottom) / 2;
-        const bassMid = (staveBounds.bassTop + staveBounds.bassBottom) / 2;
-        const useTreble = Math.abs(y - trebleMid) <= Math.abs(y - bassMid);
+        const hasTreble = staveBounds.trebleTop != null;
+        const hasBass = staveBounds.bassTop != null;
+        const trebleMid = hasTreble ? (staveBounds.trebleTop + staveBounds.trebleBottom) / 2 : null;
+        const bassMid = hasBass ? (staveBounds.bassTop + staveBounds.bassBottom) / 2 : null;
+        const useTreble = hasTreble && (!hasBass || Math.abs(y - trebleMid) <= Math.abs(y - bassMid));
         const bottom = useTreble ? this.CLEF_BOTTOM_LINE.treble : this.CLEF_BOTTOM_LINE.bass;
         const bottomY = useTreble ? staveBounds.trebleBottom : staveBounds.bassBottom;
         const halfSpacing = staveBounds.spacing / 2;
@@ -242,6 +244,10 @@ const Notation = {
         const keySignature = opts.keySignature || null;
         const beatsPerMeasure = opts.beatsPerMeasure || 4;
         const clefSplit = opts.clefSplit != null ? opts.clefSplit : this.CLEF_SPLIT_MIDI;
+        const sourceNotes = notes || [];
+        const hasTreble = sourceNotes.length === 0 || sourceNotes.some((note) => note.midi >= clefSplit);
+        const hasBass = sourceNotes.length === 0 || sourceNotes.some((note) => note.midi < clefSplit);
+        const activeClefs = [hasTreble ? 'treble' : null, hasBass ? 'bass' : null].filter(Boolean);
 
         const beatNotes = this.notesToBeatSpace(notes || [], bpm);
         const measures = this.toMeasures(beatNotes, beatsPerMeasure);
@@ -260,7 +266,7 @@ const Notation = {
         }
 
         const width = Math.max(300, measures.length * measureWidth + 40);
-        const height = this.STAVE_HEIGHT * 2 + 40;
+        const height = this.STAVE_HEIGHT * activeClefs.length + 40;
 
         const renderer = new VexFlow.Renderer(container, VexFlow.Renderer.Backends.SVG);
         renderer.resize(width, height);
@@ -281,31 +287,31 @@ const Notation = {
         let x = 10;
         measures.forEach((items, mi) => {
             barlineXPositions.push(x);
-            const treble = new VexFlow.Stave(x, 10, measureWidth);
-            const bass = new VexFlow.Stave(x, 10 + this.STAVE_HEIGHT, measureWidth);
+            const treble = hasTreble ? new VexFlow.Stave(x, 10, measureWidth) : null;
+            const bass = hasBass ? new VexFlow.Stave(x, 10 + (hasTreble ? this.STAVE_HEIGHT : 0), measureWidth) : null;
             if (mi === 0) {
-                treble.addClef('treble');
-                bass.addClef('bass');
+                if (treble) treble.addClef('treble');
+                if (bass) bass.addClef('bass');
                 if (keySignature != null && this.FIFTHS_TO_VEX_KEY[keySignature + 7]) {
                     const vexKeySpec = this.FIFTHS_TO_VEX_KEY[keySignature + 7];
-                    treble.addKeySignature(vexKeySpec);
-                    bass.addKeySignature(vexKeySpec);
+                    if (treble) treble.addKeySignature(vexKeySpec);
+                    if (bass) bass.addKeySignature(vexKeySpec);
                 }
-                treble.addTimeSignature(beatsPerMeasure + '/4');
-                bass.addTimeSignature(beatsPerMeasure + '/4');
+                if (treble) treble.addTimeSignature(beatsPerMeasure + '/4');
+                if (bass) bass.addTimeSignature(beatsPerMeasure + '/4');
             }
-            treble.setContext(ctx).draw();
-            bass.setContext(ctx).draw();
+            if (treble) treble.setContext(ctx).draw();
+            if (bass) bass.setContext(ctx).draw();
             if (mi === 0) {
                 staveBounds = {
-                    trebleTop: treble.getYForLine(0),
-                    trebleBottom: treble.getYForLine(4),
-                    bassTop: bass.getYForLine(0),
-                    bassBottom: bass.getYForLine(4),
-                    spacing: treble.getSpacingBetweenLines(),
+                    trebleTop: treble ? treble.getYForLine(0) : null,
+                    trebleBottom: treble ? treble.getYForLine(4) : null,
+                    bassTop: bass ? bass.getYForLine(0) : null,
+                    bassBottom: bass ? bass.getYForLine(4) : null,
+                    spacing: (treble || bass).getSpacingBetweenLines(),
                 };
             }
-            if (mi === 0) {
+            if (mi === 0 && treble && bass) {
                 new VexFlow.StaveConnector(treble, bass).setType('brace').setContext(ctx).draw();
                 new VexFlow.StaveConnector(treble, bass).setType('singleLeft').setContext(ctx).draw();
             }
@@ -337,9 +343,9 @@ const Notation = {
             });
             renderItems.forEach((item, ii) => {
                 if (item.rest) {
-                    const trebleRest = this._ghostRest('treble', item.beatDuration);
-                    trebleItems.push(trebleRest);
-                    bassItems.push(this._ghostRest('bass', item.beatDuration));
+                    const trebleRest = hasTreble ? this._ghostRest('treble', item.beatDuration) : null;
+                    if (trebleRest) trebleItems.push(trebleRest);
+                    if (hasBass) bassItems.push(this._ghostRest('bass', item.beatDuration));
                     // The padding rest at the very end of the whole piece -- captured separately
                     // (endPadding below), NOT pushed into noteXPositions itself, since that array
                     // feeds renderLabels/hit-testing, which only know how to handle real notes.
@@ -350,11 +356,11 @@ const Notation = {
                     // the drilled segment reached the last note and visually sat BEFORE it instead
                     // of after, reading as excluding its own last note (reported live).
                     if (mi === measures.length - 1 && ii === items.length - 1 && beatNotes.length > 0) {
-                        endPaddingVexNote = trebleRest;
+                        endPaddingVexNote = trebleRest || (hasBass ? bassItems[bassItems.length - 1] : null);
                     }
                     return;
                 }
-                ['treble', 'bass'].forEach((clef) => {
+                activeClefs.forEach((clef) => {
                     const members = item.chord.filter((member) => (member.midi >= clefSplit) === (clef === 'treble'));
                     if (members.length === 0) {
                         (clef === 'treble' ? trebleItems : bassItems).push(this._ghostRest(clef, item.beatDuration));
@@ -398,10 +404,11 @@ const Notation = {
                 });
             });
 
-            const trebleVoice = new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT);
-            trebleVoice.addTickables(trebleItems);
-            const bassVoice = new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT);
-            bassVoice.addTickables(bassItems);
+            const trebleVoice = hasTreble ? new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT) : null;
+            if (trebleVoice) trebleVoice.addTickables(trebleItems);
+            const bassVoice = hasBass ? new VexFlow.Voice({ numBeats: beatsPerMeasure, beatValue: 4 }).setMode(VexFlow.Voice.Mode.SOFT) : null;
+            if (bassVoice) bassVoice.addTickables(bassItems);
+            const voices = [trebleVoice, bassVoice].filter(Boolean);
 
             // The ACTUAL usable width for notes, not a flat MEASURE_WIDTH-40 guess: the first
             // measure's clef+key+time-signature glyphs (added above) eat into the same fixed
@@ -412,10 +419,11 @@ const Notation = {
             // from a real screenshot: "odd doubling... at the beginning of the second measure").
             // getNoteStartX()/getNoteEndX() read back the stave's own real front-matter width,
             // whatever it happens to be for THIS measure, rather than assuming one fixed number.
-            const noteAreaWidth = treble.getNoteEndX() - treble.getNoteStartX();
-            new VexFlow.Formatter().joinVoices([trebleVoice, bassVoice]).format([trebleVoice, bassVoice], noteAreaWidth);
-            trebleVoice.draw(ctx, treble);
-            bassVoice.draw(ctx, bass);
+            const stave = treble || bass;
+            const noteAreaWidth = stave.getNoteEndX() - stave.getNoteStartX();
+            new VexFlow.Formatter().joinVoices(voices).format(voices, noteAreaWidth);
+            if (trebleVoice) trebleVoice.draw(ctx, treble);
+            if (bassVoice) bassVoice.draw(ctx, bass);
 
             x += measureWidth;
         });

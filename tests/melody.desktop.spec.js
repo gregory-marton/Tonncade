@@ -39,7 +39,7 @@ test('Melody level 3 keeps the staff and current target visible', async ({ page 
     };
   });
 
-  expect(result.tokenCount).toBe(1);
+  expect(result.tokenCount).toBe(3);
   expect(result.currentCount).toBe(1);
 });
 
@@ -58,7 +58,7 @@ test('Melody level 2 keeps the current Random event visible and advances on corr
   expect(result.after).toBe(1);
 });
 
-test('Melody level 1 Random does not celebrate finite fallback data as a song win', async ({ page }) => {
+test('Melody level 1 Random grows after a prefix instead of celebrating a finite fallback', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.melody = [{ midi: 60, time: 0, duration: 0.4 }];
@@ -73,7 +73,7 @@ test('Melody level 1 Random does not celebrate finite fallback data as a song wi
     };
   });
 
-  expect(result.userIndex).toBe(0);
+  expect(result.userIndex).toBe(1);
   expect(result.confettiCount).toBe(0);
 });
 
@@ -146,6 +146,23 @@ test('Notation groups near-simultaneous off-grid notes using the same event tole
 
   expect(positions).toHaveLength(2);
   expect(positions[0].x).toBe(positions[1].x);
+});
+
+test('Notation omits a wholly silent clef without changing the decision for a mixed song', async ({ page }) => {
+  const result = await page.evaluate(() => ({
+    trebleOnly: Notation.render('melody-staff', [
+      { midi: 72, time: 0, duration: 0.4 },
+      { midi: 76, time: 0.5, duration: 0.4 },
+    ], { bpm: 120 }),
+    mixed: Notation.render('melody-staff', [
+      { midi: 48, time: 0, duration: 0.4 },
+      { midi: 72, time: 0.5, duration: 0.4 },
+    ], { bpm: 120 }),
+  }));
+
+  expect(result.trebleOnly.staveBounds.bassTop).toBeNull();
+  expect(result.trebleOnly.height).toBeLessThan(result.mixed.height);
+  expect(result.mixed.staveBounds.bassTop).toBeGreaterThan(0);
 });
 
 test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
@@ -256,6 +273,7 @@ test('Melody exposes per-note success and mistake states in the pitch row', asyn
     MelodyMode.state.isRandom = false;
     MelodyMode.state.melody = [
       { midi: 60, time: 0, duration: 0.4 },
+      { midi: 62, time: 0.5, duration: 0.4 },
     ];
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 1;
