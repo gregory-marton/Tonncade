@@ -850,17 +850,9 @@ const MelodyMode = {
     resetGame: function() {
         this.state.gameStarted = true;
         this.cleanup();
-        // Starts at [0, 1], not the degenerate [0, 0] -- a single-note segment made the two
-        // markers visually coincide from the very first moment (reported live: "the start bar
-        // should be at position 0, the end bar at position 1... right now both seem to be at
-        // zero"). Clamped for a genuinely 1-note melody, where there IS no second note.
-        //
-        // Both bounds are INCLUSIVE note indices, matching startIndex/endIndex's shared meaning
-        // everywhere else. Visually the marker reads as a caret in the gap BEFORE its note (like
-        // a text-cursor position, not a highlight ON the note), but it's still keyed by that
-        // note's own index -- same index means the same computed x, so [startIndex, endIndex]
-        // both pointing at note 0 would still draw both markers at the same spot. [0, 1]
-        // deliberately drills TWO notes (0 and 1), not one -- intentional, not an off-by-one.
+        // Authored songs start at [0, 1] when possible so the two moveable markers do not
+        // coincide. Random starts at [0, 0] because its prefix begins with one event and grows
+        // from the fixed logical start at zero.
         this.state.endIndex = this.state.isRandom
             ? 0
             : Math.min(1, Math.max(0, this.state.melody.length - 1));
@@ -1146,7 +1138,7 @@ const MelodyMode = {
             // INV-26: the end advances immediately with every correct play that reaches the
             // current frontier -- no streak gate. (The old coupled version, where the end waited
             // on the same streak the start needed, was a real regression: nothing visibly
-            // advanced between reps.) Random keeps its own separate, timeout-driven growth below.
+            // advanced between reps.) Random grows its prefix immediately below.
             // Note the >= (via userIndex > endIndex, not userIndex-1 > endIndex): playing the
             // LAST note of the current segment (userIndex-1 === endIndex) is exactly the moment
             // that segment is fully mastered and must grow -- a strict > here was the actual bug
@@ -1168,9 +1160,9 @@ const MelodyMode = {
 
             if (this.state.userIndex >= this.state.melody.length) {
                 if (this.state.isRandom) {
-                    // Random is an ongoing memory drill, not a finite song with a victory
-                    // flourish. Roll a fresh challenge instead of letting the fallback sequence
-                    // look "won" at any difficulty (issue #31).
+                // This is unreachable for normal Random play because completion appends an event
+                // first; retain the guard for malformed/legacy state rather than celebrating a
+                // finite fallback sequence (issue #31).
                     this.loadDefault();
                     return;
                 }
@@ -1254,12 +1246,8 @@ const MelodyMode = {
             // the player again after their first correct note, exactly the regression reported
             // live ("not timing out ... consequently not showing me what to do next").
             this.state.userRepeatTimeoutId = setTimeout(() => {
-                // Timeout fired: player paused. Random has no measure concept -- grow by however
-                // far they got, same as always. A real song's end already advances live above;
-                // this just re-drills the current segment as a reminder of what comes next.
-                if (this.state.isRandom && this.state.userIndex > this.state.endIndex) {
-                    this.state.endIndex = this.state.userIndex;
-                }
+                // Timeout fired: player paused. This re-drills the current segment as a reminder
+                // of what comes next; Random's prefix was already extended on completion above.
                 this.playTargetSequence();
             }, 2000);
         } else {
