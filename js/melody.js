@@ -185,12 +185,17 @@ const MelodyMode = {
     // real songs. This is only the OFFLINE degrade: a random 10-note sequence within one octave
     // (C4..B4), so the drill is always playable with no web connection or under file:// (#86).
     randomMelody: function() {
-        const base = 60; // C4
-        const notes = [];
-        for (let i = 0; i < 10; i++) {
-            notes.push({ midi: base + Math.floor(Math.random() * 12), time: i * 0.5, duration: 0.4 });
-        }
-        return notes;
+        return [{ midi: 60 + Math.floor(Math.random() * 12), time: 0, duration: 0.4 }];
+    },
+
+    appendRandomEvent: function() {
+        const previous = this.state.melody[this.state.melody.length - 1];
+        this.state.melody.push({
+            midi: 60 + Math.floor(Math.random() * 12),
+            time: previous ? previous.time + 0.5 : 0,
+            duration: 0.4,
+        });
+        this.state.endIndex = this.state.melody.length - 1;
     },
 
     // The "Random" entry in #melody-source (js/file-folder.js's FileFolder contract: `hasRandom`
@@ -750,69 +755,42 @@ const MelodyMode = {
         let endIndex = this.state.endIndex;
 
         if (this.state.isRandom) {
-            // Random is a memory-quiz sliding window forever -- no measures, no full timeline,
-            // this isn't a piece to progress through (#46). Byte-for-byte the original windowing
-            // (pastWindow=3, futureWindow=4 at Easy) -- just fed through the shared Timeline
-            // instead of a separate list. Each entry's own `id` stays its ABSOLUTE melody index
-            // (not its position within this window slice), so decorations/glow lookups and any
-            // marker positioning line up correctly regardless of the slice.
-            const pastWindow = 3;
-            const futureWindow = diff === 1 ? 4 : 0;
-            const windowStart = Math.max(0, current - pastWindow);
-            // Every difficulty must retain the current event in the practice strip. Hard and
-            // Medium suppress advance hints, but an exclusive end at `current` made their window
-            // empty at the start (and omitted the current event after every correct play), which
-            // was the root of issue #31's "level 2 doesn't advance" report.
-            const windowEnd = diff === 1
-                ? Math.min(melody.length, current + futureWindow)
-                : Math.min(melody.length, current + 1);
-            notesForTimeline = [];
-            for (let i = windowStart; i < windowEnd; i++) {
-                notesForTimeline.push(Object.assign({}, melody[i], { id: i }));
-            }
+            // Random is Simon over a growing prefix, not a moving content window. Keep every
+            // generated event in the shared scrollable Timeline and keep the logical start at 0.
+            const windowStart = 0;
+            const windowEnd = melody.length;
+            notesForTimeline = melody.map((note, i) => Object.assign({}, note, { id: i }));
 
-            for (let i = windowStart; i < current; i++) {
+            for (let i = 0; i < current; i++) {
                 const midi = melody[i].midi;
                 const distance = current - i;
                 const opacity = pastOpacityByDistance[distance] || 0.3;
                 decorations[i] = { style: { opacity: String(opacity) }, data: { 'note-role': 'past', distance: String(distance) } };
                 document.querySelectorAll(`polygon[data-midi="${midi}"]`).forEach(p => p.classList.add('glow-past'));
             }
-            if (diff === 1) {
-                for (let i = current; i < Math.min(melody.length, current + futureWindow); i++) {
-                    const midi = melody[i].midi;
-                    const rank = i - current; // 0 = next, 1 = 2nd, 2 = 3rd, 3+ = further out
-                    const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
-                    if (rank <= 2) {
-                        const role = rank === 0 ? 'current' : 'future';
-                        decorations[i] = {
-                            style: { color: UPCOMING_COLORS[rank], fontSize: rank === 0 ? '1.1em' : '1em', fontWeight: rank === 0 ? '900' : '700' },
-                            data: { 'note-role': role, upcoming: String(rank) },
-                        };
-                        polygons.forEach(p => p.classList.add('glow-next-' + rank));
-                        if (rank === 0) Render.markCurrentNote(polygons);
-                    } else {
-                        decorations[i] = { style: { opacity: '0.8' }, data: { 'note-role': 'future' } };
-                        polygons.forEach(p => p.classList.add('glow-future'));
-                    }
+            for (let i = current; i < melody.length; i++) {
+                const midi = melody[i].midi;
+                const rank = i - current;
+                const polygons = document.querySelectorAll(`polygon[data-midi="${midi}"]`);
+                if (i === current) {
+                    decorations[i] = {
+                        style: { color: UPCOMING_COLORS[0], fontSize: '1.1em', fontWeight: '900' },
+                        data: { 'note-role': 'current', upcoming: '0' },
+                    };
+                    polygons.forEach(p => p.classList.add('glow-next-0'));
+                    Render.markCurrentNote(polygons);
+                } else if (diff === 1 && rank <= 3) {
+                    decorations[i] = {
+                        style: { color: UPCOMING_COLORS[Math.min(rank, 2)], fontSize: '1em', fontWeight: '700' },
+                        data: { 'note-role': 'future', upcoming: String(rank) },
+                    };
+                    polygons.forEach(p => p.classList.add('glow-next-' + Math.min(rank, 2)));
+                } else {
+                    decorations[i] = { style: { opacity: '0.5' }, data: { 'note-role': 'future' } };
                 }
-            } else if (current >= 0 && current < melody.length) {
-                // The staff remains readable at every level. Medium/Hard do not add Tonnetz
-                // advance guidance, but the current event still gets a stable practice-strip
-                // identity so the learner can follow the music while hints are reduced.
-                decorations[current] = {
-                    style: { color: UPCOMING_COLORS[0], fontSize: '1.1em', fontWeight: '900' },
-                    data: { 'note-role': 'current', upcoming: '0' },
-                };
             }
-            // Reported live: "why wouldn't random have positions? They exist, they just grow the
-            // same way Compose does." Right -- the window itself has real edges that slide
-            // forward as `current` advances, same as Compose's own range growing. windowEnd is
-            // EXCLUSIVE (see the build loop above), so the last rendered id is windowEnd - 1; a
-            // genuinely empty window (e.g. current===0 outside Easy, windowStart===windowEnd)
-            // has nothing to bracket, so both stay null there instead of pointing at a stale id.
-            startIndex = windowEnd > windowStart ? windowStart : null;
-            endIndex = windowEnd > windowStart ? windowEnd - 1 : null;
+            startIndex = 0;
+            endIndex = windowEnd - 1;
         } else {
             // #46: a real song renders EVERY note up front, not a small window -- the whole
             // piece, scrollable (css/style.css). Measure boundaries are the barline overlay's
@@ -883,7 +861,9 @@ const MelodyMode = {
         // note's own index -- same index means the same computed x, so [startIndex, endIndex]
         // both pointing at note 0 would still draw both markers at the same spot. [0, 1]
         // deliberately drills TWO notes (0 and 1), not one -- intentional, not an off-by-one.
-        this.state.endIndex = Math.min(1, Math.max(0, this.state.melody.length - 1));
+        this.state.endIndex = this.state.isRandom
+            ? 0
+            : Math.min(1, Math.max(0, this.state.melody.length - 1));
         this.state.userIndex = 0;
         this.state.startIndex = 0;
         this.state.measureCleanStreak = {};
@@ -1172,7 +1152,11 @@ const MelodyMode = {
             // that segment is fully mastered and must grow -- a strict > here was the actual bug
             // behind the regression: it left endIndex frozen at 0 forever after playing note 0,
             // since userIndex-1 (0) is never strictly greater than endIndex (0).
-            if (!this.state.isRandom && this.state.userIndex > this.state.endIndex) {
+            if (this.state.isRandom && this.state.userIndex > this.state.endIndex) {
+                // Simon grows by one event after the complete current prefix is repeated. The
+                // logical start remains zero and the generated sequence has no fixed endpoint.
+                this.appendRandomEvent();
+            } else if (!this.state.isRandom && this.state.userIndex > this.state.endIndex) {
                 this.state.endIndex = this.state.userIndex;
             }
 

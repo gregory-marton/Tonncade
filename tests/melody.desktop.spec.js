@@ -256,7 +256,6 @@ test('Melody exposes per-note success and mistake states in the pitch row', asyn
     MelodyMode.state.isRandom = false;
     MelodyMode.state.melody = [
       { midi: 60, time: 0, duration: 0.4 },
-      { midi: 62, time: 0.5, duration: 0.4 },
     ];
     MelodyMode.state.startIndex = 0;
     MelodyMode.state.endIndex = 1;
@@ -401,4 +400,39 @@ test('Melody waits for silence after a mistake and retains extra notes without i
   expect(result.afterMistake.extras).toEqual([99]);
   expect(result.afterContinuedPlaying.isPlayingSequence).toBe(false);
   expect(result.afterContinuedPlaying.extras).toEqual([99, 98]);
+});
+
+test('Melody Random grows its complete Simon prefix without a fixed ten-note limit', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.cleanupPlayback();
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+    ];
+    MelodyMode.state.isRandom = true;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 0;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.isPlayingPreview = false;
+    MelodyMode.state.matchedChordNotes = [];
+    MelodyMode.state.userRepeatTimeoutId = null;
+    MelodyMode.updateDifficultyUI();
+    const before = document.querySelectorAll('#melody-staff-labels .note-token').length;
+    MelodyMode.handleUserInputNote(60);
+    return {
+      before,
+      length: MelodyMode.state.melody.length,
+      endIndex: MelodyMode.state.endIndex,
+      startIndex: MelodyMode.state.startIndex,
+      userIndex: MelodyMode.state.userIndex,
+      after: document.querySelectorAll('#melody-staff-labels .note-token').length,
+    };
+  });
+
+  expect(result.before).toBe(1);
+  expect(result.length).toBe(2);
+  expect(result.endIndex).toBe(1);
+  expect(result.startIndex).toBe(0);
+  expect(result.userIndex).toBe(1);
+  expect(result.after).toBe(2);
 });
