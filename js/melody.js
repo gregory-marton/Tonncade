@@ -63,6 +63,7 @@ const MelodyMode = {
     // can replace them without changing matching behavior.
     RECOVERY_BASE_DELAY_MS: 1200,
     RECOVERY_MAX_DELAY_MS: 4800,
+    TIMING_TOLERANCE_MS: { 2: 350, 3: 150 },
     state: {
         melody: [],            // List of { midi, time, duration }
         // Set explicitly at both load sites (loadDefault/loadMelodyFromArrayBuffer) -- never
@@ -99,6 +100,9 @@ const MelodyMode = {
         pendingUserNotes: [],   // MIDI/UI notes played while Melody is demonstrating a target
         notePerformance: {},   // note index -> { correct, misses }; retained for the active song
         mistakeFlashNotes: {}, // note index -> expiry timestamp for brief red staff feedback
+        timingPerformance: {}, // note index -> early/on-time/late, enabled above Easy
+        lastPracticeInputAt: null,
+        lastPracticeEventStart: null,
         startIndex: 0,         // Where the drilled segment begins -- always <= endIndex, letting
                                 // a player replay from any note already reached instead of
                                 // always from note 0.
@@ -716,6 +720,7 @@ const MelodyMode = {
         const decorate = (entry) => {
             const base = decorations[entry.id] || {};
             const stats = this.state.notePerformance[entry.id];
+            const timing = this.state.timingPerformance[entry.id];
             const flashing = this.state.mistakeFlashNotes[entry.id] > Date.now();
             const color = flashing ? '#ff5b5b' : this.performanceColor(entry.id);
             if (color) base.style = Object.assign({}, base.style, { color });
@@ -723,6 +728,9 @@ const MelodyMode = {
                 base.data = Object.assign({}, base.data, {
                     'note-status': flashing ? 'miss' : (stats.misses > 0 ? 'mixed' : 'correct'),
                 });
+            }
+            if (timing) {
+                base.data = Object.assign({}, base.data, { 'note-timing': timing });
             }
             return base;
         };
@@ -879,6 +887,9 @@ const MelodyMode = {
         this.state.pendingUserNotes = [];
         this.state.notePerformance = {};
         this.state.mistakeFlashNotes = {};
+        this.state.timingPerformance = {};
+        this.state.lastPracticeInputAt = null;
+        this.state.lastPracticeEventStart = null;
         this.state.mistakeRetryCount = 0;
         this.state.lastMistakeDelayMs = 0;
         this.updateStreak(0);
@@ -1050,6 +1061,24 @@ const MelodyMode = {
         }
     },
 
+    // Judge relative spacing only after Easy. The first accepted event establishes a baseline;
+    // each later event gets the same result copied to all of its members, so a chord is one timing
+    // decision while pitch feedback remains per member. This intentionally does not affect credit.
+    recordEventTiming: function(event) {
+        const now = this.now ? this.now() : Date.now();
+        if (this.state.lastPracticeEventStart != null && this.state.lastPracticeEventStart !== event.start && this.state.difficulty > 1) {
+            const previous = this.state.melody[this.state.lastPracticeEventStart];
+            const expectedMs = (this.state.melody[event.start].time - previous.time) * 1000;
+            const actualMs = now - this.state.lastPracticeInputAt;
+            const tolerance = this.TIMING_TOLERANCE_MS[this.state.difficulty] || this.TIMING_TOLERANCE_MS[3];
+            const status = actualMs < expectedMs - tolerance ? 'early'
+                : actualMs > expectedMs + tolerance ? 'late' : 'on-time';
+            for (let index = event.start; index < event.end; index++) this.state.timingPerformance[index] = status;
+        }
+        this.state.lastPracticeInputAt = now;
+        this.state.lastPracticeEventStart = event.start;
+    },
+
     handleUserInputNote: function(midi) {
         if (this.state.isPlayingSequence) {
             if (this.state.pendingUserNotes.length < 64) this.state.pendingUserNotes.push(midi);
@@ -1068,6 +1097,7 @@ const MelodyMode = {
         if (targetIndex >= 0) {
             // Correct note!
             const matchedIndex = event.start + targetIndex;
+            if (!matched.includes(matchedIndex)) this.recordEventTiming(event);
             matched.push(matchedIndex);
             this.recordNotePerformance(matchedIndex, 'correct');
             this.state.matchedChordNotes = matched;
@@ -1339,6 +1369,8 @@ const MelodyMode = {
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
         this.state.pendingUserNotes = [];
+        this.state.lastPracticeInputAt = null;
+        this.state.lastPracticeEventStart = null;
 
         this.setPlayIcon(false);
 

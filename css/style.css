@@ -588,6 +588,12 @@ svg {
     border-top: 6px solid currentColor;
 }
 
+/* Timing feedback is deliberately a second visual channel, separate from pitch correctness:
+   early/on-time/late remains readable even when a learner's note-performance color is also active. */
+.note-token[data-note-timing="early"] { border-bottom: 2px dotted #9ab4ff; }
+.note-token[data-note-timing="on-time"] { border-bottom: 2px dotted #89d68a; }
+.note-token[data-note-timing="late"] { border-bottom: 2px dotted #f0a35e; }
+
 /* The Timeline's two boundary markers (INV-55, js/timeline.js): a vertical line with a trapezoid
    handle at each end, absolutely positioned at the target note's own x -- so it's visually clear
    which note a drag would land on, unlike the plain range-slider version this replaced long ago,

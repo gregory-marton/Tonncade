@@ -322,3 +322,45 @@ test('Melody preserves notes played while its demonstration is sounding for late
   expect(result.queued).toEqual([60]);
   expect(result.userIndex).toBe(1);
 });
+
+test('Melody gives higher difficulties relative timing feedback without changing the forgiving default', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.3 },
+      { midi: 62, time: 0.5, duration: 0.3 },
+      { midi: 64, time: 1, duration: 0.3 },
+      { midi: 65, time: 1.5, duration: 0.3 },
+    ];
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.difficulty = 2;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 3;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.timingPerformance = {};
+    MelodyMode.state.lastPracticeInputAt = null;
+    MelodyMode.state.lastPracticeEventStart = null;
+    let now = 1000;
+    MelodyMode.now = () => now;
+    MelodyMode.handleUserInputNote(60);
+    now = 1600;
+    MelodyMode.handleUserInputNote(62);
+    const onTime = MelodyMode.state.timingPerformance[1];
+    now = 2600;
+    MelodyMode.handleUserInputNote(64);
+    return {
+      onTime,
+      late: MelodyMode.state.timingPerformance[2],
+      visualState: document.querySelector('#melody-staff-labels [data-note-idx="2"]')?.getAttribute('data-note-timing') || null,
+      visualBorder: (() => {
+        const label = document.querySelector('#melody-staff-labels [data-note-idx="2"]');
+        return label ? getComputedStyle(label).borderBottomStyle : null;
+      })(),
+    };
+  });
+
+  expect(result.onTime).toBe('on-time');
+  expect(result.late).toBe('late');
+  expect(result.visualState).toBe('late');
+  expect(result.visualBorder).toBe('dotted');
+});
