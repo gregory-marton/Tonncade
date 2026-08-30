@@ -313,10 +313,28 @@ test('Melody backs off repeated mistake replays so learners get more thinking ti
     MelodyMode.state.mistakeTimeoutId = null;
     MelodyMode.state.isPlayingSequence = false;
     MelodyMode.handleUserInputNote(61);
-    return { first, second: MelodyMode.state.lastMistakeDelayMs };
+    return {
+      first,
+      second: MelodyMode.state.lastMistakeDelayMs,
+      factor: MelodyMode.state.promptSlowFactor,
+    };
   });
 
-  expect(delays).toEqual({ first: 1200, second: 2400 });
+  expect(delays).toEqual({ first: 1200, second: 2400, factor: 3 });
+});
+
+test('Melody prompt playback supports only normal through 4x slower timing', async ({ page }) => {
+  const plans = await page.evaluate(() => {
+    MelodyMode.state.melody = [
+      { midi: 60, time: 2, duration: 0.4 },
+      { midi: 64, time: 2.5, duration: 0.4 },
+    ];
+    return [1, 2, 3, 4, 8].map((factor) => MelodyMode.getPromptPlaybackPlan(0, 1, factor));
+  });
+
+  expect(plans.map((plan) => plan.factor)).toEqual([1, 2, 3, 4, 4]);
+  expect(plans.map((plan) => plan.scheduledTimes)).toEqual([[500, 1000], [500, 1500], [500, 2000], [500, 2500], [500, 2500]]);
+  expect(plans.map((plan) => plan.totalDuration)).toEqual([1400, 2300, 3200, 4100, 4100]);
 });
 
 test('Melody preserves notes played while its demonstration is sounding for later credit', async ({ page }) => {

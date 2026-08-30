@@ -64,6 +64,7 @@ const MelodyMode = {
     RECOVERY_BASE_DELAY_MS: 1200,
     RECOVERY_MAX_DELAY_MS: 4800,
     SILENCE_BEFORE_REPROMPT_MS: 700,
+    PROMPT_SLOW_FACTORS: [1, 2, 3, 4],
     TIMING_TOLERANCE_MS: { 2: 350, 3: 150 },
     state: {
         melody: [],            // List of { midi, time, duration }
@@ -131,6 +132,7 @@ const MelodyMode = {
         lastUserInputAt: null,
         mistakeRetryCount: 0,
         lastMistakeDelayMs: 0,
+        promptSlowFactor: 1,
         currentStreak: 0,      // Current streak (drives the stat bar-graph vs bestStreak)
         bestStreak: 0,         // Longest streak achieved
         difficulty: 1,    // 1=full hints .. 3=no hints (see DifficultyBarbell, js/difficulty-barbell.js)
@@ -928,20 +930,17 @@ const MelodyMode = {
         const start = this.state.startIndex;
         this.state.userIndex = start;
 
-        let delayOffset = 0.5; // Initial delay before sequence starts playing
+        const plan = this.getPromptPlaybackPlan(start, this.state.endIndex, this.state.promptSlowFactor);
 
         for (let i = start; i <= this.state.endIndex; i++) {
             const note = this.state.melody[i];
             if (!note) break;
-
-            // Calculate timing relative to the first note IN THIS SEGMENT
-            const relativeTime = note.time - this.state.melody[start].time;
-            const scheduledTime = (relativeTime * 1000) + (delayOffset * 1000);
+            const scheduledTime = plan.scheduledTimes[i - start];
 
             // Schedule note sound and visual highlight
             const tId1 = setTimeout(() => {
                 Synth.playNote(note.midi);
-                Render.highlightByMidi(note.midi, note.duration * 1000);
+                Render.highlightByMidi(note.midi, note.duration * 1000 * plan.factor);
                 this.updateDifficultyUI(i);
             }, scheduledTime);
 
@@ -949,9 +948,7 @@ const MelodyMode = {
         }
 
         // Calculate when the sequence finishes playing
-        const lastNote = this.state.melody[this.state.endIndex];
-        const lastRelativeTime = lastNote ? (lastNote.time - this.state.melody[start].time + lastNote.duration) : 1;
-        const totalDuration = (lastRelativeTime * 1000) + (delayOffset * 1000);
+        const totalDuration = plan.totalDuration;
 
         const tId2 = setTimeout(() => {
             this.state.isPlayingSequence = false;
@@ -961,6 +958,33 @@ const MelodyMode = {
         }, totalDuration);
 
         this.state.playbackTimeoutIds.push(tId2);
+    },
+
+    // Return the timing plan used by prompt playback. Slowing is deliberately capped at 4x:
+    // longer waits can make the prompt less useful than a voluntary replay or isolated practice.
+    getPromptPlaybackPlan: function(start, end, requestedFactor) {
+        const melody = this.state.melody;
+        const first = melody[start];
+        const factor = this.PROMPT_SLOW_FACTORS.reduce((chosen, allowed) =>
+            Math.abs(allowed - requestedFactor) < Math.abs(chosen - requestedFactor) ? allowed : chosen,
+        1);
+        const delayOffsetMs = 500;
+        const scheduledTimes = [];
+        for (let i = start; i <= end; i++) {
+            const note = melody[i];
+            if (!note || !first) break;
+            scheduledTimes.push(delayOffsetMs + (note.time - first.time) * 1000 * factor);
+        }
+        const lastNote = melody[end];
+        const relativeEnd = lastNote && first
+            ? (lastNote.time - first.time + lastNote.duration) * 1000 * factor
+            : 1000;
+        return { factor, scheduledTimes, totalDuration: delayOffsetMs + relativeEnd };
+    },
+
+    setPromptSlowFactor: function(factor) {
+        this.state.promptSlowFactor = this.getPromptPlaybackPlan(0, 0, factor).factor;
+        return this.state.promptSlowFactor;
     },
 
     // #46 scrub control: replay the drilled segment starting from any note in the song --
@@ -1090,6 +1114,7 @@ const MelodyMode = {
             this.RECOVERY_MAX_DELAY_MS,
             this.RECOVERY_BASE_DELAY_MS * Math.pow(2, this.state.mistakeRetryCount)
         );
+        this.state.promptSlowFactor = this.PROMPT_SLOW_FACTORS[Math.min(this.state.mistakeRetryCount + 1, 3)];
         this.state.mistakeRetryCount++;
         this.state.lastMistakeDelayMs = retryDelay;
         const earliestReplayAt = Date.now() + retryDelay;
@@ -1171,6 +1196,7 @@ const MelodyMode = {
             this.state.userIndex = event.end;
             this.state.matchedChordNotes = [];
             this.state.mistakeRetryCount = 0;
+            this.state.promptSlowFactor = 1;
             this.updateStreak(this.state.userIndex);
 
             // INV-26: the end advances immediately with every correct play that reaches the
