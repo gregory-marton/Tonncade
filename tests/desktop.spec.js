@@ -292,6 +292,10 @@ test('updateDifficultyUI(overrideIndex) pivots the window on the override, not s
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   const currentName = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 5;
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0; // would normally show melody[0] as current
     MelodyMode.updateDifficultyUI(5); // override to pivot on index 5 instead
