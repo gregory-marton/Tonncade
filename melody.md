@@ -200,7 +200,12 @@ prompt waits for both the adaptive pause and a silence window after the child's 
 
 For a searching learner, target playback may slow to 2×, 3×, or 4× slower than the normal prompt
 speed, stopping at 4×. This is a playback-speed choice, not an exponentially lengthening silent
-interval; active playing always takes priority over another prompt.
+interval; active playing always takes priority over another prompt. Repeated recovery prompts use
+2×, then 3×, then 4×, and successful input returns to normal speed.
+
+While a MIDI key is held, Melody also shows the learner's actual pitch as a separate staff overlay.
+It does not replace or recolor the target note, and disappears on note-off (including release from
+the sustain pedal), so exploratory playing remains legible without confusing it with target credit.
 
 ## Longer songs and drill progression
 
@@ -250,6 +255,9 @@ Add explicit invariants stating that:
   wake lock when the browser supports it; wake-lock denial never disables MIDI input.
 - Notes played by the learner while Melody demonstrates a target are retained and evaluated after
   the demonstration, rather than silently discarded.
+- A held MIDI pitch is visibly distinct from target notation and is removed when that pitch is
+  released.
+- Prompt slow-down is capped at 4× and successful input restores normal prompt speed.
 - Melody matching and notation use the same onset-event tolerance, including for off-grid MIDI
   note-ons.
 

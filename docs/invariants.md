@@ -1589,3 +1589,22 @@ between sessions or modes.
 
 **Test:** `tests/melody.desktop.spec.js` — "Melody preserves notes played while its demonstration
 is sounding for later credit".
+
+### INV-59: Melody distinguishes a held learner pitch from target notation
+
+While a MIDI pitch is held during Melody practice, the staff may show that pitch as a separate
+overlay anchored at the current target event. The overlay must not replace, recolor, or award
+credit to the requested notation, and it must disappear when the pitch is released, including
+when release is caused by the sustain pedal.
+
+**Test:** `tests/melody.desktop.spec.js` — "Melody shows active learner pitches as a separate staff
+overlay" and "Melody MIDI tracks active notes through note-off and sustain release".
+
+### INV-60: Melody's recovery prompt speed is bounded and resets after success
+
+When a learner needs repeated recovery prompts, prompt playback may progress from normal speed to
+2×, 3×, and 4× slower, but never beyond 4×. A successfully completed target resets the prompt to
+normal speed; the speed policy never changes pitch matching or interrupts an active performance.
+
+**Test:** `tests/melody.desktop.spec.js` — "Melody prompt playback supports only normal through 4x
+slower timing" and "Melody backs off repeated mistake replays so learners get more thinking time".
