@@ -128,3 +128,48 @@ test('Melody gives partial credit for a chord and advances only after every memb
   expect(result.completed.userIndex).toBe(2);
   expect(result.completed.matched).toEqual([]);
 });
+
+test('Melody marks every member of the current chord as the current event', async ({ page }) => {
+  const currentCount = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 64, time: 0, duration: 0.4 },
+      { midi: 67, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 2;
+    MelodyMode.updateDifficultyUI();
+    return document.querySelectorAll('#melody-staff-labels [data-note-role="current"]').length;
+  });
+
+  expect(currentCount).toBe(2);
+});
+
+test('Melody exposes per-note success and mistake states in the pitch row', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 62, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.notePerformance = {};
+    MelodyMode.state.mistakeFlashNotes = {};
+    MelodyMode.updateDifficultyUI();
+    MelodyMode.handleUserInputNote(60);
+    const success = document.querySelector('#melody-staff-labels .note-token').getAttribute('data-note-status');
+
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.handleUserInputNote(61);
+    const mistake = document.querySelector('#melody-staff-labels .note-token').getAttribute('data-note-status');
+    return { success, mistake };
+  });
+
+  expect(result.success).toBe('correct');
+  expect(result.mistake).toBe('miss');
+});

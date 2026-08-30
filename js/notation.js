@@ -334,6 +334,16 @@ const Notation = {
                 if (typeof vexNote.setLedgerLineStyle === 'function') {
                     vexNote.setLedgerLineStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
                 }
+                // Mode-specific per-note feedback (Melody performance colors) is applied at the
+                // same point as the shared readable default, so staff noteheads, stems, and
+                // ledger lines stay synchronized with the Timeline's label decoration.
+                const noteDecoration = opts.decorateNote ? (opts.decorateNote(item) || {}) : {};
+                if (noteDecoration.style) {
+                    vexNote.setStyle(noteDecoration.style);
+                    if (typeof vexNote.setLedgerLineStyle === 'function') {
+                        vexNote.setLedgerLineStyle(noteDecoration.style);
+                    }
+                }
                 noteXPositions.push({ id: item.id, midi: item.midi, beatStart: item.beatStart, clef, vexNote });
                 if (isTreble) {
                     trebleItems.push(vexNote);

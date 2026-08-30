@@ -90,6 +90,8 @@ const MelodyMode = {
         endIndex: 0,
         userIndex: 0,          // Current progress of user in repeating the sequence
         matchedChordNotes: [], // Absolute note indices already supplied for the current onset event
+        notePerformance: {},   // note index -> { correct, misses }; retained for the active song
+        mistakeFlashNotes: {}, // note index -> expiry timestamp for brief red staff feedback
         startIndex: 0,         // Where the drilled segment begins -- always <= endIndex, letting
                                 // a player replay from any note already reached instead of
                                 // always from note 0.
@@ -600,6 +602,34 @@ const MelodyMode = {
         this.updateDifficultyUI();
     },
 
+    performanceColor: function(index) {
+        const stats = this.state.notePerformance[index];
+        if (!stats || (!stats.correct && !stats.misses)) return null;
+        if (stats.misses > 0 && stats.correct === 0) return '#e05a4f';
+        if (stats.misses > 0) return '#f0a35e';
+        if (stats.correct >= 4) return '#36d46b';
+        if (stats.correct >= 2) return '#89d68a';
+        return '#e6d36a';
+    },
+
+    recordNotePerformance: function(index, kind) {
+        const stats = this.state.notePerformance[index] || { correct: 0, misses: 0 };
+        stats[kind]++;
+        this.state.notePerformance[index] = stats;
+    },
+
+    flashMistakeNotes: function(indices) {
+        const expiresAt = Date.now() + 450;
+        indices.forEach((index) => { this.state.mistakeFlashNotes[index] = expiresAt; });
+        this.updateDifficultyUI();
+        setTimeout(() => {
+            indices.forEach((index) => {
+                if (this.state.mistakeFlashNotes[index] <= Date.now()) delete this.state.mistakeFlashNotes[index];
+            });
+            this.updateDifficultyUI();
+        }, 460);
+    },
+
     // 4/4 assumed throughout (no time-signature parsing exists in this codebase -- out of
     // scope, see next_steps.md). Only meaningful for a real song (see state.melodyBPM).
     measureOf: function(timeSec) {
@@ -630,6 +660,7 @@ const MelodyMode = {
 
         const melody = this.state.melody;
         const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
+        const currentEvent = this.getEventBounds(current);
         const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
         // The next THREE to play each get their own colour, mirrored on the Tonnetz by
         // glow-next-0/1/2 (see css/style.css), so the upcoming notes read as linked between
@@ -641,7 +672,26 @@ const MelodyMode = {
         // loop this function always used, just feeding the shared Timeline instead of building a
         // second HTML list.
         const decorations = {};
-        const decorate = (entry) => decorations[entry.id];
+        const decorate = (entry) => {
+            const base = decorations[entry.id] || {};
+            const stats = this.state.notePerformance[entry.id];
+            const flashing = this.state.mistakeFlashNotes[entry.id] > Date.now();
+            const color = flashing ? '#ff5b5b' : this.performanceColor(entry.id);
+            if (color) base.style = Object.assign({}, base.style, { color });
+            if (stats || flashing) {
+                base.data = Object.assign({}, base.data, {
+                    'note-status': flashing ? 'miss' : (stats.misses > 0 ? 'mixed' : 'correct'),
+                });
+            }
+            return base;
+        };
+        // The same per-note performance color reaches VexFlow's notehead/stem and the aligned
+        // pitch-row label. A flashing miss temporarily overrides the accumulated color.
+        const decorateNote = (entry) => {
+            const flashing = this.state.mistakeFlashNotes[entry.id] > Date.now();
+            const color = flashing ? '#ff5b5b' : this.performanceColor(entry.id);
+            return color ? { style: { fillStyle: color, strokeStyle: color } } : null;
+        };
         let notesForTimeline;
         let startIndex = this.state.startIndex;
         let endIndex = this.state.endIndex;
@@ -725,15 +775,15 @@ const MelodyMode = {
                     const opacity = pastOpacityByDistance[distance] || 0.3;
                     decorations[i] = { style: { opacity: String(opacity) }, data: { 'note-role': 'past', distance: String(distance) } };
                     polygons.forEach(p => p.classList.add('glow-past'));
-                } else if (i === current) {
+                } else if (i >= currentEvent.start && i < currentEvent.end) {
                     decorations[i] = {
                         style: { color: UPCOMING_COLORS[0], fontSize: '1.1em', fontWeight: '900' },
                         data: { 'note-role': 'current', upcoming: '0' },
                     };
                     polygons.forEach(p => p.classList.add('glow-next-0'));
-                    Render.markCurrentNote(polygons);
-                } else if (diff === 1 && i - current <= 2) {
-                    const rank = i - current;
+                    if (i === currentEvent.start) Render.markCurrentNote(polygons);
+                } else if (diff === 1 && i - currentEvent.end <= 2) {
+                    const rank = i - currentEvent.end;
                     decorations[i] = {
                         style: { color: UPCOMING_COLORS[rank], fontSize: '1em', fontWeight: '700' },
                         data: { 'note-role': 'future', upcoming: String(rank) },
@@ -751,6 +801,7 @@ const MelodyMode = {
             startIndex,
             endIndex,
             decorate,
+            decorateNote,
             showBarlines: !this.state.isRandom,
         });
         // Random's own small sliding window (built above) always already contains `current` --
@@ -782,6 +833,9 @@ const MelodyMode = {
         this.state.userIndex = 0;
         this.state.startIndex = 0;
         this.state.measureCleanStreak = {};
+        this.state.matchedChordNotes = [];
+        this.state.notePerformance = {};
+        this.state.mistakeFlashNotes = {};
         this.updateStreak(0);
         this.updateGhost();
         this.updateDifficultyUI();
@@ -946,7 +1000,9 @@ const MelodyMode = {
         // Compare exact pitch
         if (targetIndex >= 0) {
             // Correct note!
-            matched.push(event.start + targetIndex);
+            const matchedIndex = event.start + targetIndex;
+            matched.push(matchedIndex);
+            this.recordNotePerformance(matchedIndex, 'correct');
             this.state.matchedChordNotes = matched;
 
             // Partial chord credit stays on the same event until every member is supplied. No
@@ -1084,6 +1140,10 @@ const MelodyMode = {
             // own banked credit (including ones already fully mastered and skipped past) is
             // untouched (reported live: "if I make an error later, that shouldn't count against
             // the three consecutive good plays of an earlier measure").
+            const eventIndices = Array.from({ length: event.end - event.start }, (_, offset) => event.start + offset);
+            eventIndices.filter((index) => !matched.includes(index)).forEach((index) => this.recordNotePerformance(index, 'misses'));
+            this.flashMistakeNotes(eventIndices);
+
             if (!this.state.isRandom) {
                 const mistakeMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);
                 this.state.measureCleanStreak[mistakeMeasure] = 0;
