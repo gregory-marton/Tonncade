@@ -800,7 +800,8 @@ const MelodyMode = {
             const windowEnd = melody.length;
             notesForTimeline = melody.map((note, i) => Object.assign({}, note, { id: i }));
 
-            for (let i = 0; i < current; i++) {
+            const pastEnd = Math.min(current, melody.length);
+            for (let i = 0; i < pastEnd; i++) {
                 const midi = melody[i].midi;
                 const distance = current - i;
                 const opacity = pastOpacityByDistance[distance] || 0.3;

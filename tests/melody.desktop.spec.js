@@ -473,6 +473,24 @@ test('Melody Random grows its complete Simon prefix without a fixed ten-note lim
   expect(result.after).toBe(2);
 });
 
+test('Melody tolerates a stale Random cursor while rendering a short prefix', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.state.isRandom = true;
+    MelodyMode.state.melody = [{ midi: 60, time: 0, duration: 0.4 }];
+    MelodyMode.state.userIndex = 9;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 0;
+    MelodyMode.updateDifficultyUI(9);
+    return {
+      current: document.querySelector('#melody-staff-labels [data-note-role="current"]')?.textContent,
+      tokens: document.querySelectorAll('#melody-staff-labels .note-token').length,
+    };
+  });
+
+  expect(result.current).toContain('C');
+  expect(result.tokens).toBe(1);
+});
+
 test('Melody MIDI tracks active notes through note-off and sustain release', async ({ page }) => {
   const result = await page.evaluate(() => {
     MidiInput.state.activeNotes = new Set();
