@@ -63,6 +63,7 @@ const MelodyMode = {
     // can replace them without changing matching behavior.
     RECOVERY_BASE_DELAY_MS: 1200,
     RECOVERY_MAX_DELAY_MS: 4800,
+    SILENCE_BEFORE_REPROMPT_MS: 700,
     TIMING_TOLERANCE_MS: { 2: 350, 3: 150 },
     state: {
         melody: [],            // List of { midi, time, duration }
@@ -98,6 +99,7 @@ const MelodyMode = {
         userIndex: 0,          // Current progress of user in repeating the sequence
         matchedChordNotes: [], // Absolute note indices already supplied for the current onset event
         pendingUserNotes: [],   // MIDI/UI notes played while Melody is demonstrating a target
+        extraNotes: [],         // Extra pitches heard during the active practice attempt
         notePerformance: {},   // note index -> { correct, misses }; retained for the active song
         mistakeFlashNotes: {}, // note index -> expiry timestamp for brief red staff feedback
         timingPerformance: {}, // note index -> early/on-time/late, enabled above Easy
@@ -124,6 +126,8 @@ const MelodyMode = {
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
+        waitingForSilence: false,  // Mistake recovery waits here without blocking child input
+        lastUserInputAt: null,
         mistakeRetryCount: 0,
         lastMistakeDelayMs: 0,
         currentStreak: 0,      // Current streak (drives the stat bar-graph vs bestStreak)
@@ -885,11 +889,14 @@ const MelodyMode = {
         this.state.measureCleanStreak = {};
         this.state.matchedChordNotes = [];
         this.state.pendingUserNotes = [];
+        this.state.extraNotes = [];
         this.state.notePerformance = {};
         this.state.mistakeFlashNotes = {};
         this.state.timingPerformance = {};
         this.state.lastPracticeInputAt = null;
         this.state.lastPracticeEventStart = null;
+        this.state.lastUserInputAt = null;
+        this.state.waitingForSilence = false;
         this.state.mistakeRetryCount = 0;
         this.state.lastMistakeDelayMs = 0;
         this.updateStreak(0);
@@ -903,6 +910,7 @@ const MelodyMode = {
 
     playTargetSequence: function() {
         this.cleanupPlayback();
+        this.state.waitingForSilence = false;
         this.state.isPlayingSequence = true;
 
         // Disable input -- repetition begins at startIndex, not always note 0 (see #46 scrub
@@ -962,6 +970,7 @@ const MelodyMode = {
             clearTimeout(this.state.mistakeTimeoutId);
             this.state.mistakeTimeoutId = null;
         }
+        this.state.waitingForSilence = false;
 
         // Doesn't touch measureCleanStreak (#46) -- each measure's own banked credit is a
         // historical record independent of where the drilled segment currently sits, so
@@ -1061,6 +1070,42 @@ const MelodyMode = {
         }
     },
 
+    // Recovery is allowed to replay only after the child has stopped playing. The adaptive delay
+    // remains a minimum pause, while a later note pushes the silence boundary out without
+    // converting the child’s continued performance into blocked/queued input.
+    scheduleMistakeReplay: function() {
+        if (this.state.mistakeTimeoutId) clearTimeout(this.state.mistakeTimeoutId);
+        this.state.waitingForSilence = true;
+        const retryDelay = Math.min(
+            this.RECOVERY_MAX_DELAY_MS,
+            this.RECOVERY_BASE_DELAY_MS * Math.pow(2, this.state.mistakeRetryCount)
+        );
+        this.state.mistakeRetryCount++;
+        this.state.lastMistakeDelayMs = retryDelay;
+        const earliestReplayAt = Date.now() + retryDelay;
+        const tryReplay = () => {
+            const now = Date.now();
+            const silenceRemaining = this.SILENCE_BEFORE_REPROMPT_MS - (now - (this.state.lastUserInputAt || now));
+            const delayRemaining = earliestReplayAt - now;
+            if (silenceRemaining > 0 || delayRemaining > 0) {
+                this.state.mistakeTimeoutId = setTimeout(tryReplay, Math.max(20, silenceRemaining, delayRemaining));
+                return;
+            }
+            this.state.mistakeTimeoutId = null;
+            this.state.waitingForSilence = false;
+            if (App.currentMode === 'melody' && !this.state.isPlayingPreview) this.playTargetSequence();
+        };
+        this.state.mistakeTimeoutId = setTimeout(tryReplay, retryDelay);
+    },
+
+    cancelMistakeReplay: function() {
+        if (this.state.mistakeTimeoutId) {
+            clearTimeout(this.state.mistakeTimeoutId);
+            this.state.mistakeTimeoutId = null;
+        }
+        this.state.waitingForSilence = false;
+    },
+
     // Judge relative spacing only after Easy. The first accepted event establishes a baseline;
     // each later event gets the same result copied to all of its members, so a chord is one timing
     // decision while pitch feedback remains per member. This intentionally does not affect credit.
@@ -1080,6 +1125,7 @@ const MelodyMode = {
     },
 
     handleUserInputNote: function(midi) {
+        this.state.lastUserInputAt = Date.now();
         if (this.state.isPlayingSequence) {
             if (this.state.pendingUserNotes.length < 64) this.state.pendingUserNotes.push(midi);
             return;
@@ -1097,6 +1143,7 @@ const MelodyMode = {
         if (targetIndex >= 0) {
             // Correct note!
             const matchedIndex = event.start + targetIndex;
+            this.cancelMistakeReplay();
             if (!matched.includes(matchedIndex)) this.recordEventTiming(event);
             matched.push(matchedIndex);
             this.recordNotePerformance(matchedIndex, 'correct');
@@ -1241,6 +1288,7 @@ const MelodyMode = {
             const eventIndices = Array.from({ length: event.end - event.start }, (_, offset) => event.start + offset);
             eventIndices.filter((index) => !matched.includes(index)).forEach((index) => this.recordNotePerformance(index, 'misses'));
             this.flashMistakeNotes(eventIndices.filter((index) => !matched.includes(index)));
+            this.state.extraNotes.push(midi);
 
             if (!this.state.isRandom) {
                 const mistakeMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);
@@ -1264,27 +1312,9 @@ const MelodyMode = {
                 this.state.userRepeatTimeoutId = null;
             }
 
-            if (this.state.mistakeTimeoutId) {
-                clearTimeout(this.state.mistakeTimeoutId);
-            }
-
-            // Temporarily block inputs by setting isPlayingSequence
-            this.state.isPlayingSequence = true;
-
-            // Replay the target sequence after an adaptive delay to let the wrong note decay and
-            // give the learner more time when mistakes repeat.
-            const retryDelay = Math.min(
-                this.RECOVERY_MAX_DELAY_MS,
-                this.RECOVERY_BASE_DELAY_MS * Math.pow(2, this.state.mistakeRetryCount)
-            );
-            this.state.mistakeRetryCount++;
-            this.state.lastMistakeDelayMs = retryDelay;
-            this.state.mistakeTimeoutId = setTimeout(() => {
-                this.state.mistakeTimeoutId = null;
-                if (App.currentMode === 'melody' && !this.state.isPlayingPreview) {
-                    this.playTargetSequence();
-                }
-            }, retryDelay);
+            // Do not block or interrupt an ongoing child performance. The replay remains pending
+            // until both the adaptive delay and a genuine silence period have elapsed.
+            this.scheduleMistakeReplay();
         }
     },
 
@@ -1366,11 +1396,13 @@ const MelodyMode = {
             clearTimeout(this.state.mistakeTimeoutId);
             this.state.mistakeTimeoutId = null;
         }
+        this.state.waitingForSilence = false;
         this.state.isPlayingSequence = false;
         this.state.isPlayingPreview = false;
         this.state.pendingUserNotes = [];
         this.state.lastPracticeInputAt = null;
         this.state.lastPracticeEventStart = null;
+        this.state.lastUserInputAt = null;
 
         this.setPlayIcon(false);
 

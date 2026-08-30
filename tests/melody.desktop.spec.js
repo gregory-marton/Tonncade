@@ -364,3 +364,41 @@ test('Melody gives higher difficulties relative timing feedback without changing
   expect(result.visualState).toBe('late');
   expect(result.visualBorder).toBe('dotted');
 });
+
+test('Melody waits for silence after a mistake and retains extra notes without interrupting play', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 62, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.isPlayingPreview = false;
+    MelodyMode.state.matchedChordNotes = [];
+    MelodyMode.state.extraNotes = [];
+    MelodyMode.state.waitingForSilence = false;
+    MelodyMode.handleUserInputNote(99);
+    const afterMistake = {
+      isPlayingSequence: MelodyMode.state.isPlayingSequence,
+      waitingForSilence: MelodyMode.state.waitingForSilence,
+      extras: MelodyMode.state.extraNotes.slice(),
+    };
+    MelodyMode.handleUserInputNote(98);
+    return {
+      afterMistake,
+      afterContinuedPlaying: {
+        isPlayingSequence: MelodyMode.state.isPlayingSequence,
+        extras: MelodyMode.state.extraNotes.slice(),
+      },
+    };
+  });
+
+  expect(result.afterMistake.isPlayingSequence).toBe(false);
+  expect(result.afterMistake.waitingForSilence).toBe(true);
+  expect(result.afterMistake.extras).toEqual([99]);
+  expect(result.afterContinuedPlaying.isPlayingSequence).toBe(false);
+  expect(result.afterContinuedPlaying.extras).toEqual([99, 98]);
+});

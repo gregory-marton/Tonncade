@@ -184,9 +184,15 @@ These are part of the current design, not deferred aspirations:
 - Never interrupt an ongoing child performance for an ordinary wrong note.
 - Continue the backing or guide while tracking missed and extra notes.
 - Make the next target visually obvious, while allowing the child to replay or isolate it
-  voluntarily.
-- Use adaptive tolerance: accept approximate timing and partial chords early, and tighten
-  expectations only at higher levels.
+  voluntarily with the moveable start/end markers.
+- Use adaptive tolerance: ignore timing for acceptance early and accept partial chords early;
+  higher levels may add stricter completeness and timing expectations as those policies become
+  explicit. The current higher-level timing signal is visual only and does not gate progress.
+
+During guide playback, child MIDI notes remain audible and are collected rather than stopping the
+guide. After the guide finishes, Melody compares the collected notes with the requested events,
+retaining correct members and recording missed and extra pitches. If recovery is needed, the next
+prompt waits for both the adaptive pause and a silence window after the child's latest input.
 
 ## Longer songs and drill progression
 
