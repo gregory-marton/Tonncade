@@ -43,6 +43,8 @@ const MidiInput = {
         boundInputIds: new Set(),
         pendingChordNotes: [],
         chordTimeoutId: null,
+        wakeLock: null,
+        wakeLockVisibilityBound: false,
     },
 
     // Issue #11: Blast wants a whole CHORD (the notes played close together), not one note at a
@@ -62,8 +64,37 @@ const MidiInput = {
             this.state.access = access;
             this.bindAllInputs();
             access.onstatechange = () => this.bindAllInputs();
+            this.requestWakeLock();
             return access;
         });
+    },
+
+    // A MIDI connection is commonly used for hands-on practice on a phone or tablet. Web MIDI
+    // activity alone does not keep the screen awake, so use Screen Wake Lock when available.
+    // Wake locks are released automatically when the page is hidden; reacquire on return while
+    // the MIDI session is still active. Unsupported browsers simply retain their old behavior.
+    requestWakeLock: async function() {
+        if (!this.state.access || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') return;
+        if (this.state.wakeLock || document.visibilityState !== 'visible') return;
+        if (!this.state.wakeLockVisibilityBound) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') this.requestWakeLock();
+            });
+            this.state.wakeLockVisibilityBound = true;
+        }
+        try {
+            const lock = await navigator.wakeLock.request('screen');
+            this.state.wakeLock = lock;
+            if (lock && typeof lock.addEventListener === 'function') {
+                lock.addEventListener('release', () => {
+                    this.state.wakeLock = null;
+                    if (document.visibilityState === 'visible') this.requestWakeLock();
+                });
+            }
+        } catch (err) {
+            // Wake Lock can be denied by policy or battery-saving settings; MIDI remains usable.
+            console.warn('Screen wake lock unavailable:', err);
+        }
     },
 
     bindAllInputs: function() {

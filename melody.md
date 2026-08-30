@@ -145,6 +145,11 @@ Do not introduce timing scores in this stage. Correct pitches, useful recovery, 
 feedback come first. Adaptive timing, play-along/overplay detection, hand separation, and scoring
 are follow-up work.
 
+MIDI practice also needs a device-lifecycle safeguard: when supported, an active Web MIDI session
+requests a Screen Wake Lock so a phone or tablet does not sleep during hands-on practice. The lock
+must be reacquired after the page becomes visible again, and failure or lack of browser support must
+not disable MIDI input. This follows the mobile report tracked in issue #29.
+
 ## Longer songs and drill progression
 
 Update preview playback, timeline markers, scrolling, celebration, `startIndex`, `endIndex`,
@@ -176,6 +181,8 @@ Add explicit invariants stating that:
 - A partial retry replays the complete original chord.
 - Each member's visual state reflects its own performance result.
 - All difficulty levels retain readable staff notation.
+- An active MIDI practice session requests and, after visibility changes, safely reacquires a screen
+  wake lock when the browser supports it; wake-lock denial never disables MIDI input.
 
 ## Delivery milestones
 
@@ -220,6 +227,7 @@ Add and retain tests for:
 - Per-member staff/pitch-row feedback and full-event Tonnetz highlighting.
 - Preview synchronization and timeline alignment.
 - MIDI/UI input equivalence.
+- MIDI connection lifecycle and wake-lock fallback behavior on mobile-capable browsers.
 - Existing desktop, mobile, and invariant suites without weakening their assertions.
 
 Prefer structural assertions—event/member counts, pitch sets, x-position ordering, barline counts,
