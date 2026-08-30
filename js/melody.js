@@ -57,6 +57,12 @@ const MelodyFolder = FileFolder.create({
 });
 
 const MelodyMode = {
+    // Recovery starts promptly, then gives a learner progressively more time to inspect and
+    // remember the target after repeated mistakes. The cap prevents an accidental long pause from
+    // becoming a dead end; these are deliberately named constants so a future learner preference
+    // can replace them without changing matching behavior.
+    RECOVERY_BASE_DELAY_MS: 1200,
+    RECOVERY_MAX_DELAY_MS: 4800,
     state: {
         melody: [],            // List of { midi, time, duration }
         // Set explicitly at both load sites (loadDefault/loadMelodyFromArrayBuffer) -- never
@@ -113,6 +119,8 @@ const MelodyMode = {
         playbackTimeoutIds: [],// Scheduled timeouts for preview/sequence playback
         userRepeatTimeoutId: null, // Timer for "going ahead" (2s timeout)
         mistakeTimeoutId: null,    // Timer for showing sequence again on mistake
+        mistakeRetryCount: 0,
+        lastMistakeDelayMs: 0,
         currentStreak: 0,      // Current streak (drives the stat bar-graph vs bestStreak)
         bestStreak: 0,         // Longest streak achieved
         difficulty: 1,    // 1=full hints .. 3=no hints (see DifficultyBarbell, js/difficulty-barbell.js)
@@ -869,6 +877,8 @@ const MelodyMode = {
         this.state.matchedChordNotes = [];
         this.state.notePerformance = {};
         this.state.mistakeFlashNotes = {};
+        this.state.mistakeRetryCount = 0;
+        this.state.lastMistakeDelayMs = 0;
         this.updateStreak(0);
         this.updateGhost();
         this.updateDifficultyUI();
@@ -1049,6 +1059,7 @@ const MelodyMode = {
 
             this.state.userIndex = event.end;
             this.state.matchedChordNotes = [];
+            this.state.mistakeRetryCount = 0;
             this.updateStreak(this.state.userIndex);
 
             // INV-26: the end advances immediately with every correct play that reaches the
@@ -1206,13 +1217,20 @@ const MelodyMode = {
             // Temporarily block inputs by setting isPlayingSequence
             this.state.isPlayingSequence = true;
 
-            // Replay the target sequence after a 1.2s delay to let the wrong note decay
+            // Replay the target sequence after an adaptive delay to let the wrong note decay and
+            // give the learner more time when mistakes repeat.
+            const retryDelay = Math.min(
+                this.RECOVERY_MAX_DELAY_MS,
+                this.RECOVERY_BASE_DELAY_MS * Math.pow(2, this.state.mistakeRetryCount)
+            );
+            this.state.mistakeRetryCount++;
+            this.state.lastMistakeDelayMs = retryDelay;
             this.state.mistakeTimeoutId = setTimeout(() => {
                 this.state.mistakeTimeoutId = null;
                 if (App.currentMode === 'melody' && !this.state.isPlayingPreview) {
                     this.playTargetSequence();
                 }
-            }, 1200);
+            }, retryDelay);
         }
     },
 

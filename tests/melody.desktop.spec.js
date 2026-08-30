@@ -195,3 +195,27 @@ test('Melody exposes per-note success and mistake states in the pitch row', asyn
   expect(result.success).toBe('correct');
   expect(result.mistake).toBe('miss');
 });
+
+test('Melody backs off repeated mistake replays so learners get more thinking time', async ({ page }) => {
+  const delays = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 62, time: 0.5, duration: 0.4 },
+    ];
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.mistakeRetryCount = 0;
+    MelodyMode.handleUserInputNote(61);
+    const first = MelodyMode.state.lastMistakeDelayMs;
+    clearTimeout(MelodyMode.state.mistakeTimeoutId);
+    MelodyMode.state.mistakeTimeoutId = null;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.handleUserInputNote(61);
+    return { first, second: MelodyMode.state.lastMistakeDelayMs };
+  });
+
+  expect(delays).toEqual({ first: 1200, second: 2400 });
+});
