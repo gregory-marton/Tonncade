@@ -4510,12 +4510,14 @@ test('Melody: Random keeps its full generated prefix on the shared timeline', as
   // Default entry (loadDefault/Random), no song loaded -- explicit re-verification per the
   // plan's own scope boundary: none of parts 3-5 should leak into Random.
   const result = await page.evaluate(() => {
+    MelodyMode.state.melody = Array.from({ length: 10 }, (_, i) => ({ midi: 60 + (i % 12), time: i * 0.5, duration: 0.4 }));
     MelodyMode.state.endIndex = 7;
     MelodyMode.state.userIndex = 5;
     MelodyMode.updateDifficultyUI();
     return {
       isRandom: MelodyMode.state.isRandom,
       tokenCount: document.querySelectorAll('#melody-staff-labels .note-token').length,
+      melodyLength: MelodyMode.state.melody.length,
       // Random passes showBarlines: false: it is a Simon sequence rather than an authored song,
       // even though its complete generated prefix remains on the ordinary scrollable Timeline.
       tickCount: document.querySelectorAll('#melody-notation-scroll .notation-barline').length,
@@ -5966,7 +5968,7 @@ test('Notation.render: barline count matches measure count for a phrase spanning
     document.body.appendChild(container);
     // 120bpm -> 2 seconds/measure (4/4). 9 seconds of notes spans 5 measures (ceil(9/2)... using
     // whole notes at 2s each to land exactly on measure boundaries, no ambiguity from clipping).
-    const notes = [0, 1, 2, 3, 4].map((i) => ({ midi: 60, time: i * 2, duration: 2 }));
+    const notes = [0, 1, 2, 3, 4].map((i) => ({ midi: i % 2 ? 59 : 60, time: i * 2, duration: 2 }));
     const result = Notation.render('notation-test-container-3', notes, { bpm: 120 });
     return { staves: container.querySelectorAll('.vf-stave').length, result };
   });
