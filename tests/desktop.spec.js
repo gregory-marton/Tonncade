@@ -4301,16 +4301,16 @@ test('Deep-linking straight to Blast/Gravity (no prior mode) initializes cleanly
 });
 
 // #86: Melody no longer bundles a built-in default song (the online midi/ folder supplies real
-// songs). With no web connection (and no local folder), it degrades to a random 10-note sequence
-// within a single octave so the drill is always playable.
-test('Melody: offline (no online folder) degrades to a random 10-note, one-octave sequence', async ({ page }) => {
+// songs). With no web connection (and no local folder), it starts a one-event Simon prefix that
+// grows after each successful full repetition.
+test('Melody: offline (no online folder) starts a one-event Simon prefix', async ({ page }) => {
   await page.route('**/midi/index.json', route => route.abort());
   await page.route('**/midi/*.mid', route => route.abort());
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForTimeout(600);
   const melody = await page.evaluate(() => MelodyMode.state.melody.map(n => n.midi));
-  expect(melody.length, 'random fallback is 10 notes').toBe(10);
+  expect(melody.length, 'random fallback starts with one event').toBe(1);
   expect(Math.max(...melody) - Math.min(...melody), 'all within one octave').toBeLessThan(12);
 });
 
@@ -4504,7 +4504,7 @@ test('Melody: a real song renders its entire timeline up front, not a sliding wi
   expect(result.tokenCount).toBe(result.melodyLength);
 });
 
-test('Melody: Random keeps its small sliding window even with the song-timeline code present', async ({ page }) => {
+test('Melody: Random keeps its full generated prefix on the shared timeline', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   // Default entry (loadDefault/Random), no song loaded -- explicit re-verification per the
@@ -4516,14 +4516,13 @@ test('Melody: Random keeps its small sliding window even with the song-timeline 
     return {
       isRandom: MelodyMode.state.isRandom,
       tokenCount: document.querySelectorAll('#melody-staff-labels .note-token').length,
-      // Random passes showBarlines: false to Timeline.refresh -- a forever-sliding memory-quiz
-      // window isn't a piece being progressed through measure by measure, even though the
-      // underlying melody data technically has measures.
+      // Random passes showBarlines: false: it is a Simon sequence rather than an authored song,
+      // even though its complete generated prefix remains on the ordinary scrollable Timeline.
       tickCount: document.querySelectorAll('#melody-notation-scroll .notation-barline').length,
     };
   });
   expect(result.isRandom).toBe(true);
-  expect(result.tokenCount).toBeLessThan(10); // pastWindow(3) + current + at most 3 hinted ahead
+  expect(result.tokenCount).toBe(result.melodyLength);
   expect(result.tickCount).toBe(0); // no measures in Random, ever
 });
 
@@ -6317,12 +6316,7 @@ test('Timeline.refresh: renders the staff, pitch row, and both markers at the ri
   expect(parseFloat(info.endLeft)).toBeGreaterThan(parseFloat(info.startLeft)); // end (note 1) is right of start (note 0)
 });
 
-// Reported live: Melody's Random mode ("no meaningful boundary markers for a forever-sliding
-// window" -- js/melody.js passes startIndex/endIndex both null there) showed an end marker with
-// no start marker. Root cause: _positionMarker's `idx + 1` lookup for 'end' doesn't guard against
-// idx being null -- JS coerces `null + 1` to `1`, so a null endIndex silently looked up whichever
-// note happens to have id 1 (present in Random's sliding window most of the time) instead of
-// finding nothing and removing the marker, the way the null start correctly did.
+// Timeline marker null handling remains covered for callers that intentionally omit boundaries.
 test('Timeline.refresh: a null endIndex removes the end marker entirely, not a phantom one at id 1', async ({ page }) => {
   await page.goto('/');
   const info = await page.evaluate((setupCode) => {
@@ -6343,19 +6337,14 @@ test('Timeline.refresh: a null endIndex removes the end marker entirely, not a p
   expect(info.endMarkerExists, 'a null endIndex must remove the end marker too, not phantom-render one at id 1').toBe(false);
 });
 
-// Reported live, disputing the fix just above: "why wouldn't random have positions? They exist,
-// they just grow the same way Compose does." Right -- Random's sliding window (windowStart/
-// windowEnd in updateDifficultyUI) has real, meaningful edges that slide forward as `current`
-// advances, the same way Compose's own note range grows. Suppressing both markers to null was
-// the actual bug; they should track the window's own bounds instead.
-test('Melody Random mode: the timeline shows real start/end markers tracking the sliding window, not none', async ({ page }) => {
+test('Melody Random mode: the timeline keeps real markers at the fixed start and current prefix end', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   const info = await page.evaluate(() => {
     MelodyMode.state.melody = Array.from({ length: 20 }, (_, i) => ({ midi: 60 + (i % 12), time: i * 0.5, duration: 0.4 }));
     MelodyMode.state.isRandom = true;
-    MelodyMode.state.difficulty = 2; // non-Easy: windowEnd = current (exclusive), no future window
+    MelodyMode.state.difficulty = 2;
     MelodyMode.state.userIndex = 10;
     MelodyMode.updateDifficultyUI();
     const startEl = document.querySelector('.timeline-marker-start');
@@ -6367,8 +6356,7 @@ test('Melody Random mode: the timeline shows real start/end markers tracking the
       endLeft: endEl ? endEl.getBoundingClientRect().left : null,
     };
   });
-  // pastWindow=3, current=10 -> windowStart=7, windowEnd=10 (exclusive) -> ids 7,8,9 rendered;
-  // real markers should bracket that window, not be absent.
+  // The complete prefix is rendered; markers stay at the logical start and current prefix end.
   expect(info.startExists).toBe(true);
   expect(info.endExists).toBe(true);
   expect(info.endLeft).toBeGreaterThan(info.startLeft);

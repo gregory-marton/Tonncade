@@ -58,9 +58,8 @@ const Timeline = {
         // showBarlines} -- decorate is an optional (entry) => {className, style} hook
         // Notation.renderLabels applies per pitch-row label (Melody's practice-strip color
         // hints; Compose omits it). showBarlines defaults to true; Melody's Random mode passes
-        // false -- a forever-sliding memory-quiz window isn't a piece being progressed through
-        // measure by measure, so measure boundaries aren't meaningful there even though the
-        // underlying melody data technically has them.
+        // false -- a generated Simon prefix is not authored measure-by-measure notation, even
+        // though the complete prefix remains on this ordinary scrollable Timeline.
         refresh: function(notes, opts) {
             opts = opts || {};
             const notesWithId = (notes || []).map((n, i) => Object.assign({}, n, { id: n.id != null ? n.id : i }));
@@ -96,15 +95,10 @@ const Timeline = {
             // idx is the very last real note (reported live: the end marker visually excluded its
             // own last note).
             // idx != null, not just `which === 'end'` -- JS coerces `null + 1` to `1`, so an
-            // absent endIndex (Random mode's "no meaningful boundary markers" -- js/melody.js)
-            // silently looked up whichever note happens to have id 1 instead of correctly
-            // finding nothing (reported live: Random showed an end marker with no start marker).
+            // An absent endIndex must not be coerced into an id lookup (for example, null + 1).
             const lookupId = (which === 'end' && idx != null) ? idx + 1 : idx;
-            // Random mode's window renders a small SLICE of the melody with non-contiguous-from-
-            // zero ids (e.g. 7,8,9) -- neither a real id+1 note nor endPadding (whose own id
-            // assumes a contiguous-from-zero range) exists there. Falling back to idx itself
-            // (same spot the start marker would use) still brackets the window correctly, just
-            // without the "after the note" nudge a full song's end marker gets.
+            // A sparse rendered range may lack a real id+1 note or endPadding. Falling back to
+            // idx itself (same spot the start marker would use) keeps the marker usable.
             const entry = this._lastRender.noteXPositions.find((n) => n.id === lookupId) ||
                 (which === 'end' && this._lastRender.endPadding && this._lastRender.endPadding.id === lookupId
                     ? this._lastRender.endPadding : null) ||
