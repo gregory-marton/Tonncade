@@ -622,7 +622,7 @@ const MelodyMode = {
         }
         Render.clearCurrentNoteMarkers();
 
-        if (diff === 3 || this.state.melody.length === 0) {
+        if (this.state.melody.length === 0) {
             this.timeline.refresh([], { bpm: this.state.melodyBPM, keySignature: this.state.keySignature });
             return;
         }
@@ -655,7 +655,13 @@ const MelodyMode = {
             const pastWindow = 3;
             const futureWindow = diff === 1 ? 4 : 0;
             const windowStart = Math.max(0, current - pastWindow);
-            const windowEnd = diff === 1 ? Math.min(melody.length, current + futureWindow) : current;
+            // Every difficulty must retain the current event in the practice strip. Hard and
+            // Medium suppress advance hints, but an exclusive end at `current` made their window
+            // empty at the start (and omitted the current event after every correct play), which
+            // was the root of issue #31's "level 2 doesn't advance" report.
+            const windowEnd = diff === 1
+                ? Math.min(melody.length, current + futureWindow)
+                : Math.min(melody.length, current + 1);
             notesForTimeline = [];
             for (let i = windowStart; i < windowEnd; i++) {
                 notesForTimeline.push(Object.assign({}, melody[i], { id: i }));
@@ -686,6 +692,14 @@ const MelodyMode = {
                         polygons.forEach(p => p.classList.add('glow-future'));
                     }
                 }
+            } else if (current >= 0 && current < melody.length) {
+                // The staff remains readable at every level. Medium/Hard do not add Tonnetz
+                // advance guidance, but the current event still gets a stable practice-strip
+                // identity so the learner can follow the music while hints are reduced.
+                decorations[current] = {
+                    style: { color: UPCOMING_COLORS[0], fontSize: '1.1em', fontWeight: '900' },
+                    data: { 'note-role': 'current', upcoming: '0' },
+                };
             }
             // Reported live: "why wouldn't random have positions? They exist, they just grow the
             // same way Compose does." Right -- the window itself has real edges that slide
@@ -936,6 +950,13 @@ const MelodyMode = {
             }
 
             if (this.state.userIndex >= this.state.melody.length) {
+                if (this.state.isRandom) {
+                    // Random is an ongoing memory drill, not a finite song with a victory
+                    // flourish. Roll a fresh challenge instead of letting the fallback sequence
+                    // look "won" at any difficulty (issue #31).
+                    this.loadDefault();
+                    return;
+                }
                 // Reported live: the flourish is for a COMPLETE playthrough. Reaching the last
                 // note when the drilled segment didn't start at the very beginning isn't that --
                 // send the start back to 0 instead, so the next pass is a genuine start-to-finish
