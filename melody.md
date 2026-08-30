@@ -150,6 +150,27 @@ requests a Screen Wake Lock so a phone or tablet does not sleep during hands-on 
 must be reacquired after the page becomes visible again, and failure or lack of browser support must
 not disable MIDI input. This follows the mobile report tracked in issue #29.
 
+### Early-learner guardrails
+
+The Simon-like loop is useful for short pitch-memory and instrument-mapping drills, but it must not
+pretend that exact MIDI pitch order is the whole of musicianship. For early learners, the default
+experience should eventually separate these modes of practice:
+
+- **Listen and find:** generous pitch tolerance, no timing judgment, and clear current-note hints.
+- **Play along:** Melody continues while the learner plays; wrong or extra notes are recorded as
+  feedback without interrupting the learner's phrase.
+- **Read:** the staff and rhythm become primary, with hints gradually reduced.
+- **Perform:** timing, pitch, completeness, continuity, and eventually dynamics can contribute to
+  an optional score.
+- **Explore:** experimentation is welcome and is not represented as failure.
+
+The current implementation is strongest as a pitch-memory/readiness drill. Its next pedagogical
+risks to address are interruptive replay, lack of timing/rhythm feedback, ignored MIDI velocity and
+note-off duration, limited learner choice, and treating register-split notation as if it were true
+hand separation. These should be addressed with explicit practice choices and progressive tolerance,
+not by making every beginner pass an exact performance test. Chord partial credit and per-member
+feedback are foundations for this progression, not its endpoint.
+
 ## Longer songs and drill progression
 
 Update preview playback, timeline markers, scrolling, celebration, `startIndex`, `endIndex`,
