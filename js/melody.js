@@ -1029,7 +1029,10 @@ const MelodyMode = {
         const start = index;
         const onset = melody[index].time;
         let end = start + 1;
-        while (end < melody.length && Math.abs(melody[end].time - onset) < 0.08) end++;
+        const tolerance = (typeof Notation !== 'undefined' && Notation.EVENT_ONSET_TOLERANCE_SECONDS != null)
+            ? Notation.EVENT_ONSET_TOLERANCE_SECONDS
+            : 0.08;
+        while (end < melody.length && Math.abs(melody[end].time - onset) < tolerance) end++;
         return { start, end };
     },
 

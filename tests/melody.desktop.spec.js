@@ -138,6 +138,16 @@ test('Notation keeps per-member staff feedback when chord members share a clef',
   expect(colors.green).toBeGreaterThan(0);
 });
 
+test('Notation groups near-simultaneous off-grid notes using the same event tolerance as Melody', async ({ page }) => {
+  const positions = await page.evaluate(() => Notation.render('melody-staff', [
+    { midi: 60, time: 0.05, duration: 0.4 },
+    { midi: 64, time: 0.11, duration: 0.4 },
+  ], { bpm: 120 }).noteXPositions);
+
+  expect(positions).toHaveLength(2);
+  expect(positions[0].x).toBe(positions[1].x);
+});
+
 test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.cleanupPlayback();

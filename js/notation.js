@@ -54,6 +54,10 @@ const Notation = {
     // space its handful of notes absurdly far apart instead of just leaving room to spare.
     MEASURE_WIDTH_MAX: 420,
     STAVE_HEIGHT: 80,
+    // Melody's event matcher uses this same tolerance for a human-played chord whose MIDI
+    // note-ons arrive on adjacent event-loop turns. Keep the grouping decision in the shared
+    // notation conversion rather than letting rendered quantized beats redefine it.
+    EVENT_ONSET_TOLERANCE_SECONDS: 0.08,
 
     // Matches css/style.css's --text custom property -- see render()'s own comment on why this
     // needs setting explicitly at all (VexFlow's own default is solid black).
@@ -82,12 +86,21 @@ const Notation = {
     // that don't care about it are unaffected.
     notesToBeatSpace: function(notes, bpm) {
         const secondsPerBeat = 60 / (bpm || 120);
-        return notes.map((n, i) => ({
+        const beatNotes = notes.map((n, i) => ({
             id: n.id != null ? n.id : i,
             midi: n.midi,
+            time: n.time,
             beatStart: this.quantizeToGrid(n.time / secondsPerBeat),
             beatDuration: Math.max(0.25, this.quantizeToGrid(n.duration / secondsPerBeat)),
         })).sort((a, b) => a.beatStart - b.beatStart);
+        let eventId = -1;
+        let previousTime = null;
+        beatNotes.forEach((note) => {
+            if (previousTime == null || Math.abs(note.time - previousTime) >= this.EVENT_ONSET_TOLERANCE_SECONDS) eventId++;
+            note.eventId = eventId;
+            previousTime = note.time;
+        });
+        return beatNotes;
     },
 
     // The largest single VexFlow duration code ("w"/"h"/"q"/"8"/"16") whose beat length is <= the
@@ -136,7 +149,7 @@ const Notation = {
             inMeasure.forEach((n) => {
                 if (n.beatStart > cursor) items.push({ rest: true, beatDuration: n.beatStart - cursor });
                 const clippedDuration = Math.min(n.beatDuration, mEnd - n.beatStart);
-                items.push({ id: n.id, midi: n.midi, beatStart: n.beatStart, beatDuration: clippedDuration });
+                items.push({ id: n.id, midi: n.midi, beatStart: n.beatStart, beatDuration: clippedDuration, eventId: n.eventId });
                 cursor = n.beatStart + clippedDuration;
             });
             if (cursor < mEnd) items.push({ rest: true, beatDuration: mEnd - cursor });
@@ -310,7 +323,7 @@ const Notation = {
                     return;
                 }
                 const previous = renderItems[renderItems.length - 1];
-                if (previous && previous.chord && previous.beatStart === item.beatStart) {
+                if (previous && previous.chord && previous.eventId === item.eventId) {
                     previous.chord.push(item);
                     previous.beatDuration = Math.max(previous.beatDuration, item.beatDuration);
                 } else {
@@ -318,6 +331,7 @@ const Notation = {
                         chord: [item],
                         beatStart: item.beatStart,
                         beatDuration: item.beatDuration,
+                        eventId: item.eventId,
                     });
                 }
             });
