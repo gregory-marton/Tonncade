@@ -205,6 +205,20 @@ const Notation = {
         return (octave + 1) * 12 + semitone;
     },
 
+    staffYForMidi: function(midi, clef, staveBounds, keySignature) {
+        if (!staveBounds) return null;
+        const top = staveBounds[clef + 'Top'];
+        const bottomY = staveBounds[clef + 'Bottom'];
+        if (top == null || bottomY == null) return null;
+        const bottom = this.CLEF_BOTTOM_LINE[clef];
+        const name = Tonnetz.getNoteName(midi, keySignature);
+        const letter = name.charAt(0);
+        const noteOctave = Tonnetz.getOctave(midi);
+        const steps = (noteOctave - bottom.octave) * 7
+            + this.LETTERS.indexOf(letter) - this.LETTERS.indexOf(bottom.letter);
+        return bottomY - steps * (staveBounds.spacing / 2);
+    },
+
     // Inverse of beat->x layout: given an x pixel and the barlineXPositions Notation.render
     // returns, finds which measure x falls in and interpolates linearly across that measure's
     // width to a beat position. Used by click-to-add/drag-to-retime to turn a staff click back
