@@ -353,7 +353,7 @@ test.describe('Invariant tests', () => {
     await page.waitForFunction(() => document.getElementById('midi-connect-btn').classList.contains('connected'));
   };
 
-  test('INV-23: connecting MIDI requests a screen wake lock when the browser provides one', async ({ page }) => {
+  test('INV-57: connecting MIDI requests a screen wake lock when the browser provides one', async ({ page }) => {
     await page.evaluate(() => {
       window.__wakeLockRequests = [];
       const fakeWakeLock = {

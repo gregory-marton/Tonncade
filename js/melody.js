@@ -1186,7 +1186,7 @@ const MelodyMode = {
             // the three consecutive good plays of an earlier measure").
             const eventIndices = Array.from({ length: event.end - event.start }, (_, offset) => event.start + offset);
             eventIndices.filter((index) => !matched.includes(index)).forEach((index) => this.recordNotePerformance(index, 'misses'));
-            this.flashMistakeNotes(eventIndices);
+            this.flashMistakeNotes(eventIndices.filter((index) => !matched.includes(index)));
 
             if (!this.state.isRandom) {
                 const mistakeMeasure = this.measureOf(this.state.melody[this.state.userIndex].time);

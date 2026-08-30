@@ -1563,3 +1563,16 @@ This inventory is the reference list INV-13 (below) checks against, and the voca
 rest of this doc and its tests should stay consistent with. Undo (#17) isn't in any per-mode
 row: it consolidated into a single header control (`#undo-btn`, next to Copy/Paste) that lives
 outside every mode's own panel and is simply disabled where inapplicable — see INV-54.
+
+---
+
+### INV-57: Active MIDI practice requests a screen wake lock without making MIDI mandatory
+
+After a MIDI connection succeeds, `js/midi-input.js` requests a Screen Wake Lock when the browser
+supports the API, so hands-on Melody practice is not interrupted by the phone or tablet sleeping.
+The lock is reacquired when the page becomes visible again after the browser releases it. Unsupported
+browsers, denied requests, and wake-lock failures leave MIDI input operational; the wake lock is an
+optional safeguard, never a prerequisite for connection or note handling.
+
+**Test:** `tests/invariants.spec.js` — "INV-57: connecting MIDI requests a screen wake lock when
+the browser provides one" (with a mocked Web MIDI device and wake-lock provider).

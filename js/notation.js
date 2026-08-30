@@ -363,12 +363,21 @@ const Notation = {
                     if (typeof vexNote.setLedgerLineStyle === 'function') {
                         vexNote.setLedgerLineStyle({ fillStyle: this.NOTE_COLOR, strokeStyle: this.NOTE_COLOR });
                     }
-                    const noteDecoration = opts.decorateNote ? (opts.decorateNote(members[0]) || {}) : {};
+                    const noteDecorations = members.map((member) => opts.decorateNote ? (opts.decorateNote(member) || {}) : {});
+                    const noteDecoration = noteDecorations[0];
                     if (noteDecoration.style) {
                         vexNote.setStyle(noteDecoration.style);
                         if (typeof vexNote.setLedgerLineStyle === 'function') vexNote.setLedgerLineStyle(noteDecoration.style);
                     }
-                    members.forEach((member) => {
+                    members.forEach((member, memberIndex) => {
+                        // Grouped StaveNotes expose per-key styling in VexFlow. Use it when
+                        // available so a correct and missed member in the same clef remain
+                        // visually distinct; the whole-note fallback above preserves readable
+                        // styling on older VexFlow builds.
+                        const memberDecoration = noteDecorations[memberIndex];
+                        if (memberDecoration.style && typeof vexNote.setKeyStyle === 'function') {
+                            vexNote.setKeyStyle(memberIndex, memberDecoration.style);
+                        }
                         noteXPositions.push({ id: member.id, midi: member.midi, beatStart: member.beatStart, clef, vexNote });
                     });
                     (clef === 'treble' ? trebleItems : bassItems).push(vexNote);

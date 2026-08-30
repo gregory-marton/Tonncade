@@ -119,6 +119,25 @@ test('Notation places same-onset notes at one staff position as a chord', async 
   expect(positions[0].x).toBe(positions[1].x);
 });
 
+test('Notation keeps per-member staff feedback when chord members share a clef', async ({ page }) => {
+  const colors = await page.evaluate(() => {
+    Notation.render('melody-staff', [
+      { id: 0, midi: 60, time: 0, duration: 0.4 },
+      { id: 1, midi: 64, time: 0, duration: 0.4 },
+    ], {
+      bpm: 120,
+      decorateNote: (entry) => ({ style: { fillStyle: entry.id === 0 ? '#ff0000' : '#00ff00', strokeStyle: entry.id === 0 ? '#ff0000' : '#00ff00' } }),
+    });
+    return {
+      red: document.querySelectorAll('#melody-staff [fill="#ff0000"]').length,
+      green: document.querySelectorAll('#melody-staff [fill="#00ff00"]').length,
+    };
+  });
+
+  expect(colors.red).toBeGreaterThan(0);
+  expect(colors.green).toBeGreaterThan(0);
+});
+
 test('Melody gives partial credit for a chord and advances only after every member is played', async ({ page }) => {
   const result = await page.evaluate(() => {
     MelodyMode.cleanupPlayback();
@@ -153,6 +172,33 @@ test('Melody gives partial credit for a chord and advances only after every memb
   expect(result.partial.matched).toEqual([0]);
   expect(result.completed.userIndex).toBe(2);
   expect(result.completed.matched).toEqual([]);
+});
+
+test('Melody does not flash an already-correct chord member when a later member is missed', async ({ page }) => {
+  const flashing = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = [
+      { midi: 60, time: 0, duration: 0.4 },
+      { midi: 64, time: 0, duration: 0.4 },
+    ];
+    MelodyMode.state.startIndex = 0;
+    MelodyMode.state.endIndex = 1;
+    MelodyMode.state.userIndex = 0;
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.state.matchedChordNotes = [];
+    MelodyMode.state.notePerformance = {};
+    MelodyMode.state.mistakeFlashNotes = {};
+    MelodyMode.handleUserInputNote(60);
+    MelodyMode.state.isPlayingSequence = false;
+    MelodyMode.handleUserInputNote(99);
+    return {
+      accepted: MelodyMode.state.mistakeFlashNotes[0] || null,
+      missed: MelodyMode.state.mistakeFlashNotes[1] || null,
+    };
+  });
+
+  expect(flashing.accepted).toBeFalsy();
+  expect(flashing.missed).toBeGreaterThan(0);
 });
 
 test('Melody marks every member of the current chord as the current event', async ({ page }) => {
