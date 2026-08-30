@@ -3162,6 +3162,69 @@ test('Copy/paste into Gravity ignores out-of-cup and overlapping cells; places t
   expect(res.size).toBe(2);           // original pile cell + one pasted cell
 });
 
+// Reported live (GH #30): pasting into Gravity silently did nothing for cells the player was
+// careful to pick as genuinely unoccupied elsewhere. Root cause, confirmed via a real captured
+// session's own recorded sound events (the actual MIDI played): the pitches involved were all
+// perfectly reachable somewhere in the cup, but Tonnetz.canonicalToGravity's literal coordinate
+// conversion is only ONE of up to two possible embeddings of a given pitch onto the gravity
+// lattice (the two differ by exactly (4,3), the one lattice vector that preserves pitch --
+// -3*4+4*3=0), and it happened to land on the out-of-bounds one. A player copying "this note"
+// cares about the pitch, not which embedding the source mode's own pan position produced.
+//
+// This must be decided per PASTE OPERATION, not per cell: a first attempt tried each cell's own
+// literal position then its two immediate (4,3) neighbors independently, which is wrong for two
+// reasons caught in review -- (1) the in-bounds embedding can be arbitrarily many (4,3)-steps away
+// from the literal one, not just one step, since the literal conversion can land anywhere along
+// that pitch's infinite line depending on how far the ORIGINAL canonical cell was from the
+// origin; and (2) picking each cell's own nearest fit independently can scatter a connected
+// multi-cell shape across two different copies of the same pattern in the cup instead of keeping
+// it together. The fix scores each whole-clipboard shift by how many of ITS cells that shift
+// would actually place (empty + in-bounds), and uses whichever shift places the most -- keeping a
+// multi-cell shape together whenever any single shift can seat more of it than treating cells
+// independently would.
+test('Copy/paste into Gravity: a single cell falls back to the pitch-preserving cell when the literal one is out of bounds', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // Canonical (-7,6) is midi 29 (F1). Tonnetz.canonicalToGravity converts it to gravity (-6,-3),
+    // out of the cup's bounds. The SAME pitch also lands at gravity (-2,0), in bounds and empty.
+    App.clipboard = [{ p: -7, q: 6 }];
+    App.paste();
+    return {
+      placedAtAlternate: GravityBoard.cells.has('-2,0'),
+      placedAtLiteral: GravityBoard.cells.has('-6,-3'),
+      size: GravityBoard.cells.size,
+    };
+  });
+  expect(res.placedAtAlternate, 'should land at the in-bounds same-pitch cell').toBe(true);
+  expect(res.placedAtLiteral, 'the literal out-of-bounds coordinate is never a real cell').toBe(false);
+  expect(res.size).toBe(1);
+});
+
+test('Copy/paste into Gravity: a connected two-cell shape stays connected when it needs a shift, even though the literal conversion of BOTH cells is out of bounds', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(() => {
+    document.querySelector('.mode-option[data-mode="gravity"]').click();
+    App.currentMode = 'gravity';
+    GravityBoard.cells.clear();
+    // Two ADJACENT canonical cells. Both convert to out-of-bounds gravity positions on their own
+    // ((-4,-6) and (-5,-5)) -- neither is individually pasteable at the literal position -- but
+    // shifting BOTH by the same 2 steps of (4,3) lands them at (4,0) and (3,1), which ARE both
+    // in bounds, empty, AND still adjacent to each other (a shared shift preserves relative
+    // position, since it's the same affine offset applied to both).
+    App.clipboard = [{ p: -10, q: 7 }, { p: -9, q: 7 }];
+    App.paste();
+    return {
+      placedBoth: GravityBoard.cells.has('4,0') && GravityBoard.cells.has('3,1'),
+      size: GravityBoard.cells.size,
+    };
+  });
+  expect(res.placedBoth, 'both cells of the connected shape should land together at the shared shift').toBe(true);
+  expect(res.size).toBe(2);
+});
+
 // Pasted mid-air cells fall to rest one row per TICK, exactly like the active piece, never in one
 // silent precomputed jump (reported live: an instant jump-to-rest was surprising). Paste itself
 // must leave the cell exactly where it landed; only once ticks actually run does it fall.

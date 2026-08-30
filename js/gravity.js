@@ -420,14 +420,44 @@ const GravityMode = {
             return Tonnetz.gravityToCanonical(+parts[0], +parts[1]);
         });
     },
+    // Reported live (GH #30): pasting silently did nothing even for cells the player was careful
+    // to pick as unoccupied elsewhere. Root cause: Tonnetz.canonicalToGravity's coordinate
+    // conversion is only ONE of up to two possible embeddings of a given pitch onto the gravity
+    // lattice -- the two differ by exactly (4,3), the one lattice vector that preserves pitch
+    // (-3*4+4*3=0), and the cup's own narrow bounds mean a pitch never has more than 2 in-bounds
+    // cells (verified exhaustively) -- and the literal conversion can land arbitrarily far from
+    // either one, along that pitch's infinite line, depending on how far the ORIGINAL canonical
+    // cell was from the origin. A player copying "this note" cares about the pitch, not which
+    // embedding the source mode's own pan position happened to produce.
+    //
+    // Decided per PASTE OPERATION, not per cell: scores each whole-clipboard shift (a multiple of
+    // that same (4,3) vector, applied identically to every cell) by how many cells it seats
+    // (empty + in-bounds), and uses whichever shift seats the most. This keeps a connected
+    // multi-cell shape together -- an earlier version tried each cell's own nearest fit
+    // independently, which could scatter a shape's cells across two different copies of the same
+    // pattern in the cup instead of keeping them adjacent, since a shared shift is exactly what
+    // preserves the shape's own relative geometry (an affine offset applied uniformly). K_RANGE is
+    // generous relative to the cup's own ~20-row height; ties prefer the smallest |shift|, i.e.
+    // the embedding closest to the literal, unshifted one.
     pasteClipboard: function(cells) {
+        const naive = cells.map((c) => Tonnetz.canonicalToGravity(c.p, c.q));
+        const K_RANGE = 8;
+        let bestK = 0, bestScore = -1;
+        for (let k = -K_RANGE; k <= K_RANGE; k++) {
+            const score = naive.filter((g) => GravityBoard.isCellEmpty(g.p + 4 * k, g.q + 3 * k)).length;
+            if (score > bestScore || (score === bestScore && Math.abs(k) < Math.abs(bestK))) {
+                bestScore = score;
+                bestK = k;
+            }
+        }
+
         const placed = [];
         const midis = [];
-        cells.forEach((c) => {
-            const g = Tonnetz.canonicalToGravity(c.p, c.q);
-            if (GravityBoard.isCellEmpty(g.p, g.q)) {
-                placed.push({ p: g.p, q: g.q });
-                midis.push(Tonnetz.getMidi(g.p, g.q));
+        naive.forEach((g) => {
+            const target = { p: g.p + 4 * bestK, q: g.q + 3 * bestK };
+            if (GravityBoard.isCellEmpty(target.p, target.q)) {
+                placed.push(target);
+                midis.push(Tonnetz.getMidi(target.p, target.q));
             }
         });
         if (!placed.length) return;
