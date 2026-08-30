@@ -747,7 +747,10 @@ const MelodyMode = {
         }
 
         const melody = this.state.melody;
-        const current = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
+        // Keep a stale cursor harmless while a song is being replaced or a test/consumer is
+        // restoring state. The Timeline cannot render an event outside the loaded melody.
+        const requestedCurrent = (overrideIndex !== undefined) ? overrideIndex : this.state.userIndex;
+        const current = Math.max(0, Math.min(requestedCurrent, melody.length - 1));
         const currentEvent = this.getEventBounds(current);
         const pastOpacityByDistance = { 1: 0.85, 2: 0.55, 3: 0.3 };
         // The next THREE to play each get their own colour, mirrored on the Tonnetz by

@@ -268,6 +268,9 @@ test('midi note list fades past notes progressively by recency', async ({ page }
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
   await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.endIndex = 5;
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 3;
     MelodyMode.updateDifficultyUI();
@@ -320,6 +323,12 @@ test('playing the full melody preview live-updates the note list as it plays', a
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.evaluate(() => { MelodyMode.state.difficulty = 1; });
+  await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.endIndex = 5;
+    MelodyMode.updateDifficultyUI();
+  });
 
   // resetGame() schedules an untracked 1s auto-kickoff of the "listen to the notes" teaching
   // intro that cleanupPlayback() can't cancel — let it fully play out and finish first so it
@@ -1561,6 +1570,7 @@ test('Melody mode: the start marker sits right before the note it targets', asyn
 
   await page.evaluate(() => {
     MelodyMode.state.isRandom = false; // Random forces both markers null -- see INV-26
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
     MelodyMode.state.endIndex = 3;
     MelodyMode.state.startIndex = 2;
     MelodyMode.updateDifficultyUI();
@@ -1762,6 +1772,7 @@ test('Melody mode: a wrong note resets progress back to the scrub position, not 
     MelodyMode.state.endIndex = 3;
     MelodyMode.state.startIndex = 2; // player scrubbed to replay from note 2
     MelodyMode.state.userIndex = 3;  // got note 2 right, currently on note 3
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
     MelodyMode.handleUserInputNote(-1); // guaranteed wrong pitch
     return MelodyMode.state.userIndex;
   });
@@ -4180,10 +4191,13 @@ test('Melody: the next three notes are tri-coloured in the timeline and on the T
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
   await page.waitForFunction(() => !MelodyMode.state.isPlayingSequence, { timeout: 8000 });
   const out = await page.evaluate(() => {
+    MelodyMode.state.isRandom = false;
+    MelodyMode.state.melody = Array.from({ length: 6 }, (_, i) => ({ midi: 60 + i, time: i * 0.5, duration: 0.4 }));
+    MelodyMode.state.endIndex = 5;
     MelodyMode.state.difficulty = 1;
     MelodyMode.state.userIndex = 0;
     MelodyMode.updateDifficultyUI();
-    const tokens = [...document.querySelectorAll('#melody-staff-labels .note-token[data-upcoming]')];
+    const tokens = [...document.querySelectorAll('#melody-staff-labels .note-token[data-note-role="future"][data-upcoming]')];
     return {
       upcomingRanks: tokens.map((t) => t.getAttribute('data-upcoming')),
       tokenColors: tokens.map((t) => t.style.color),
