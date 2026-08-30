@@ -6374,10 +6374,9 @@ test('Melody Random mode: the timeline shows real start/end markers tracking the
   expect(info.endLeft).toBeGreaterThan(info.startLeft);
 });
 
-// Companion edge case: at the very start (current=0, non-Easy so windowEnd=current), the window
-// is genuinely empty -- windowStart===windowEnd===0, no notes rendered at all. Markers must stay
-// absent here (nothing to bracket), not point at a stale or out-of-range id.
-test('Melody Random mode: an empty sliding window (current=0) shows no markers, not stale ones', async ({ page }) => {
+// Companion edge case: at the very start, every difficulty still exposes the current event after
+// the issue #31 fix. The staff and markers must not begin in an empty state.
+test('Melody Random mode: the initial current event has real markers', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => document.querySelector('.mode-option[data-mode="melody"]').click());
 
@@ -6392,8 +6391,8 @@ test('Melody Random mode: an empty sliding window (current=0) shows no markers, 
       endExists: !!document.querySelector('.timeline-marker-end'),
     };
   });
-  expect(info.startExists).toBe(false);
-  expect(info.endExists).toBe(false);
+  expect(info.startExists).toBe(true);
+  expect(info.endExists).toBe(true);
 });
 
 // Reported live: the end marker rendered as a caret BEFORE its own note -- correct for the start
