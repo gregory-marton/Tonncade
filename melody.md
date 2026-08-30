@@ -145,6 +145,11 @@ Do not introduce timing scores in this stage. Correct pitches, useful recovery, 
 feedback come first. Adaptive timing, play-along/overplay detection, hand separation, and scoring
 are follow-up work.
 
+The first timing step is intentionally lighter than scoring: at Medium and Hard, compare each
+event's onset spacing with the target's relative spacing and mark the event early, on-time, or late.
+Easy remains indifferent to timing. This gives a learner a second feedback dimension without making
+timing a gate before tolerance and play-along behavior are designed.
+
 MIDI practice also needs a device-lifecycle safeguard: when supported, an active Web MIDI session
 requests a Screen Wake Lock so a phone or tablet does not sleep during hands-on practice. The lock
 must be reacquired after the page becomes visible again, and failure or lack of browser support must
@@ -253,6 +258,7 @@ Add and retain tests for:
 - Preview synchronization and timeline alignment.
 - MIDI/UI input equivalence.
 - MIDI connection lifecycle and wake-lock fallback behavior on mobile-capable browsers.
+- Relative timing feedback at higher difficulties, with no timing score or Easy-mode gate.
 - Existing desktop, mobile, and invariant suites without weakening their assertions.
 
 Prefer structural assertions—event/member counts, pitch sets, x-position ordering, barline counts,
