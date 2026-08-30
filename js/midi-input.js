@@ -43,6 +43,10 @@ const MidiInput = {
         boundInputIds: new Set(),
         pendingChordNotes: [],
         chordTimeoutId: null,
+        heldNotes: new Set(),
+        sustainedNotes: new Set(),
+        activeNotes: new Set(),
+        sustainDown: false,
         wakeLock: null,
         wakeLockVisibilityBound: false,
     },
@@ -120,8 +124,32 @@ const MidiInput = {
         const velocity = data[2];
         // A note-on with velocity 0 is the same as a note-off by MIDI convention.
         if (command === 0x90 && velocity > 0) {
+            this.noteOnState(note);
             this.handleNoteOn(note);
+        } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+            this.noteOffState(note);
+            this.handleNoteOff(note);
+        } else if (command === 0xb0 && note === 64) {
+            this.state.sustainDown = velocity >= 64;
+            if (!this.state.sustainDown) {
+                this.state.sustainedNotes.forEach((midi) => {
+                    if (!this.state.heldNotes.has(midi)) this.state.activeNotes.delete(midi);
+                });
+                this.state.sustainedNotes.clear();
+            }
         }
+    },
+
+    noteOnState: function(midi) {
+        this.state.heldNotes.add(midi);
+        this.state.sustainedNotes.delete(midi);
+        this.state.activeNotes.add(midi);
+    },
+
+    noteOffState: function(midi) {
+        this.state.heldNotes.delete(midi);
+        if (this.state.sustainDown) this.state.sustainedNotes.add(midi);
+        else this.state.activeNotes.delete(midi);
     },
 
     handleNoteOn: function(midi) {
@@ -140,6 +168,13 @@ const MidiInput = {
             this.bufferChordNote(midi);
         } else if (App.currentMode === 'life' && typeof LifeMode !== 'undefined') {
             LifeMode.handleMidiNote(midi);
+        }
+    },
+
+    handleNoteOff: function(midi) {
+        if (typeof App === 'undefined') return;
+        if (App.currentMode === 'melody' && typeof MelodyMode !== 'undefined' && MelodyMode.releaseUserNoteByMidi) {
+            MelodyMode.releaseUserNoteByMidi(midi);
         }
     },
 

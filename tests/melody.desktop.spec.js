@@ -454,3 +454,25 @@ test('Melody Random grows its complete Simon prefix without a fixed ten-note lim
   expect(result.userIndex).toBe(1);
   expect(result.after).toBe(2);
 });
+
+test('Melody MIDI tracks active notes through note-off and sustain release', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    MidiInput.state.activeNotes = new Set();
+    MidiInput.state.sustainDown = false;
+    MidiInput.handleMessage([0x90, 60, 100]);
+    const held = Array.from(MidiInput.state.activeNotes);
+    MidiInput.handleMessage([0x80, 60, 100]);
+    const released = Array.from(MidiInput.state.activeNotes);
+    MidiInput.handleMessage([0xb0, 64, 127]);
+    MidiInput.handleMessage([0x90, 64, 100]);
+    MidiInput.handleMessage([0x80, 64, 0]);
+    const sustained = Array.from(MidiInput.state.activeNotes);
+    MidiInput.handleMessage([0xb0, 64, 0]);
+    return { held, released, sustained, sustainDown: MidiInput.state.sustainDown };
+  });
+
+  expect(result.held).toEqual([60]);
+  expect(result.released).toEqual([]);
+  expect(result.sustained).toEqual([64]);
+  expect(result.sustainDown).toBe(false);
+});
