@@ -5922,3 +5922,97 @@ Now wire the keyboard shortcut and button click in `[REDACTED_PERSON]` (renaming
 ### 2026-08-16T23:09:43.964Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 Now update `[REDACTED_PRIVATE_INFO]` to add `canUndo()` and auto-refresh hooks.
+
+
+### 2026-08-16T23:09:55.944Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove the now-obsolete per-mode button wiring in [REDACTED_SECRET] (keep the `undo()` methods themselves).
+
+
+### 2026-08-16T23:11:09.202Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — this is exactly my own set of edits, nothing foreign mixed in. The other unrelated files (`[REDACTED_SECRET]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`) belong to the concurrent Life-automaton session and I'll leave them untouched and unstaged.
+
+Now let's check some of these tests that click `#compose-undo`/`#life-undo` etc. — since they don't explicitly switch mode first for Sandbox tests (sandbox is default), but the Compose/Life ones do switch mode. Let me check the earlier Compose test at line 756 switches mode first.
+
+
+### 2026-08-16T23:11:13.151Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, mode switching is in place. Now let's run the test suite to verify.
+
+
+### 2026-08-16T23:11:20.835Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] ([REDACTED_STUDENT]) all pass. Now run the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T23:13:24.436Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While that runs, let's update `PRIMARY_ELEMENTS` in `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-16T23:13:48.128Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The disabled-button design correctly prevents clicking when there's nothing to undo — but 4 "no-op on empty history" tests now hang trying to click a disabled button. Let me fix them to call `App.undo()` directly instead of clicking the DOM button, since the button's disabled-state is now itself proof of the no-op.
+
+
+### 2026-08-16T23:14:19.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now re-run the full Undo test group to confirm all pass.
+
+
+### 2026-08-16T23:14:34.177Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 23 pass. Now run [REDACTED_SECRET] relevant invariants tests to confirm the `PRIMARY_ELEMENTS` edit and mode-switch persistence still hold.
+
+
+### 2026-08-16T23:15:33.650Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All pass. Now let's update `[REDACTED_PRIVATE_INFO]`'s [REDACTED_SECRET] section and Primary Elements table for the new architecture.
+
+
+### 2026-08-16T23:15:58.624Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update the [REDACTED_PERSON] table rows to drop the per-mode "Undo" mentions (since it's now a shared header control, not mode-specific).
+
+
+### 2026-08-16T23:16:24.151Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both remaining hits are purely historical/explanatory comments — fine to leave as-is. Now run the full test suites (node unit tests already passed; run the full Playwright desktop + invariants spec) to catch any collateral regressions.
+
+
+### 2026-08-16T23:17:34.705Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 150 pass. Let's run the full invariants suite too as a final check.
+
+
+### 2026-08-16T23:19:37.998Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While the invariants suite runs, let's look at `[REDACTED_SECRET]` per the user's request.
+
+
+### 2026-08-16T23:19:50.774Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly staged: only my files, `[REDACTED_PRIVATE_INFO]` and the `life_helpers`/`life/*` untracked files stay out of this commit.
+
+
+### 2026-08-16T23:19:56.737Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed cleanly (12 files, only my own work — the concurrent session's `[REDACTED_PRIVATE_INFO]` and `life_helpers/*` stayed untouched). Let's check the invariants run that finished in the background.
+
+
+### 2026-08-16T23:20:06.603Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Undo is now consolidated into a single header button (`#undo-btn`, next to Copy/Paste): triggered by Ctrl/Cmd+Z or a click, always visible but disabled whenever undo isn't applicable — no support in the current mode (Melody/Snake/Gravity) or an empty history in modes that do support it (Sandbox/Blast/Life/Compose). The four old per-mode buttons and their wiring are gone. Full test suite (150 desktop + node unit tests) passes; committed as `[REDACTED_SECRET]`. `dev.log` is committed too, alongside my own files only — the concurrent Life-automaton session's `life/index.json` and `life_helpers/*` stayed untouched. Waiting on the full invariants suite (Mobile/Tablet Chrome) to finish as a final check.
+
+
+### 2026-08-16T23:20:17.034Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The [REDACTED_PRIVATE_INFO] will notify me automatically when finished — no need to poll. I'll report the invariants results as soon as they land.
+
+
+### 2026-08-16T23:22:09.346Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That confirms it — same commit (my changes are already committed, stash had nothing to move), passed cleanly on rerun. This is the known pre-existing INV-23 flake, not a regression from the Undo work.
+
+Everything's done and verified: single header `#undo-btn` (Ctrl/Cmd+Z, disabled when inapplicable) replacing the four per-mode buttons, full desktop suite (150/150) and invariants suite (119/120, one pre-existing unrelated flake that passes on rerun) green, `docs/invariants.md` and `PRIMARY_ELEMENTS` updated, committed as `[REDACTED_SECRET]` along with `dev.log` as requested.
