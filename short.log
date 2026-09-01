@@ -4094,3 +4094,171 @@ Now let's do a final full run of both [REDACTED_PRIVATE_INFO] and [REDACTED_PRIV
 ### 2026-08-16T00:48:50.351Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 [REDACTED_PERSON] Now let's stage and commit the difficulty-barbell refactor.
+
+
+### 2026-08-16T00:48:54.946Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly scoped, dev.log and life_helpers left alone.
+
+
+### 2026-08-16T00:49:05.692Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pieces of work are done and committed:
+
+1. **`MODE_MUTATIONS` rename + coverage test + INV-24/44/45 mode-list fixes** — surfaced a real, live bug in the process: `[REDACTED_PRIVATE_INFO]`'s pan-resize `ResizeObserver` and `modeRefreshFns` both hardcoded the pre-Life pannable mode list, so Life's board never refit its viewBox after a resize. Fixed and derived from `Render.RESTRICTED_MODES` instead. Committed as `[REDACTED_SECRET]`.
+
+2. **Difficulty as a shared integer-level barbell component** — new `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]` re-keyed to a 1-indexed array, Blast/Gravity/Melody wired to the shared component with a localStorage migration shim, `index.html` markup collapsed from 9 hand-authored buttons to 3 empty containers, `sw.js` bumped, tests rewritten to integers, and a new INV-49 section documenting it. Committed as `[REDACTED_SECRET]`.
+
+All 111 desktop tests and all 58 invariant tests (Mobile + Tablet Chrome) pass.
+
+
+### 2026-08-16T00:51:52.985Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Okay, time to do the Melody scrubber fixes.
+
+
+### 2026-08-16T00:55:18.197Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T01:17:30.612Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both recommended options chosen. Now let me write the final plan file.
+
+
+### 2026-08-16T01:25:46.099Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Starting implementation. Let me read the exact current state of the relevant melody.js sections first.
+
+
+### 2026-08-16T01:25:48.343Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T01:25:56.780Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T01:26:01.285Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll add both `isRandom = false` (part 0) and `melodyBPM` (part 4) here now, since it's the same call site.
+
+
+### 2026-08-16T01:26:04.753Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `[REDACTED_PRIVATE_INFO]` to state block.
+
+
+### 2026-08-16T01:26:09.385Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the `cleanStreak`/`segmentHadMistake` state fields for part 5.
+
+
+### 2026-08-16T01:26:17.260Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_STUDENT]`, and the "[REDACTED_PRIVATE_INFO]" branch.
+
+
+### 2026-08-16T01:26:31.654Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement Parts 1+2 together. First look at the current CSS.
+
+
+### 2026-08-16T01:26:42.143Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll implement the marker CSS directly in its final absolute-positioned form (parts 1+2+3b together, since we're doing all parts in one session — no benefit to building the in-flow version first just to redo it).
+
+
+### 2026-08-16T01:26:55.565Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `[REDACTED_PRIVATE_INFO]`'s `#melody-note-list`.
+
+
+### 2026-08-16T01:27:00.069Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rewrite `[REDACTED_PRIVATE_INFO]` in melody.js for absolute positioning.
+
+
+### 2026-08-16T01:27:17.912Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's view the full `[REDACTED_PERSON]` to rewrite it with the isRandom branch (parts 3a and 4b).
+
+
+### 2026-08-16T01:28:29.452Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement the edge-scroll in `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-16T01:28:41.352Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Part 4a: hoisting the tempo constant and updating `parseMIDI`'s return shape.
+
+
+### 2026-08-16T01:29:04.400Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now rename the constant and its usage in `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T01:29:10.871Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's verify [REDACTED_PERSON]'s usage of `[REDACTED_SECRET]` is safe with the additive `.bpm` field.
+
+
+### 2026-08-16T01:29:14.947Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T01:29:23.347Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's edit `handleUserInputNote`'s "[REDACTED_PRIVATE_INFO]" and [REDACTED_STUDENT] branches.
+
+
+### 2026-08-16T01:29:40.348Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_PRIVATE_INFO]:
+
+
+### 2026-08-16T01:29:45.995Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]` and `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T01:29:51.608Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `seekTo`:
+
+
+### 2026-08-16T01:30:00.724Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the existing Melody tests to see what breaks.
+
+
+### 2026-08-16T01:31:13.846Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — `offsetLeft - 5` goes negative for the first token, pushing the marker outside the scrollable container's visible/clipped area. Clamping to 0.
+
+
+### 2026-08-16T01:31:20.596Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's clean up debug tests and rerun.
+
+
+### 2026-08-16T01:31:37.241Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix the marker-adjacency test ([REDACTED_PRIVATE_INFO]) to check `style.left` instead of `nextElementSibling`.
+
+
+### 2026-08-16T01:31:43.790Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rerun the full [REDACTED_PERSON].
+
+
+### 2026-08-16T01:32:00.417Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
