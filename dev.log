@@ -17637,3 +17637,800 @@ Found several more hardcoded mode-list arrays. Let me examine each in context.
 ### 2026-08-15T23:57:54.889Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 → Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T23:57:54.937Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 366 ### [REDACTED_SECRET] 367 368 The player can rotate the whole rendered lattice (`#rotate-view-btn`, `[REDACTED_PRIVATE_INFO]`'s 369 `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]`) in 30°-steps — motivated live by a real AXiS-49 MIDI 370 keyboard being physically oriented differently than the on-screen Tonnetz expected, and by 371 [REDACTED_PRIVATE_INFO]'s narrower aspect ratios sometimes fitting better with the lattice's flats aligned 372 to the screen edges instead of its points. 30° (not 60°) is deliberate: a hexagon's own 60° 373 self-symmetry means EVERY rotation angle renders a perfectly normal, uniformly-rotated field of 374 hexagons — there's no "wrong" angle the way there would be for a shape without 6-fold symmetry 375 — so 30° steps cleanly reach both the pointy-top family (0/60/120°...) and the flat-top family 376 (30/90/150°...), including exact quarter turns to match portrait/landscape or a physical 377 device's own orientation. 378 379 This  …[947 chars elided]… ion, so fitting and 389 pan-clamping stay correct (nothing clipped) at any rotation. 390 391 Gravity is the one exception: its falling mechanic is defined entirely in axial space ("down" 392 is a fixed direction there, independent of rendering), so rotating gravity's on-screen render 393 without also rotating its game logic would make pieces visibly fall sideways while the code 394 still calls that direction "down." `Render.getEffectiveRotation()` always returns 0 in Gravity 395 regardless of the player's stored preference, and the rotate button hides itself there rather 396 than silently doing nothing. 397 398 **Test:** `tests/invariants.spec.js` — the six "INV-24: ..." tests (transform value per click, 399 30° wraparound + localStorage persistence across reload, no cell becomes clipped/unobscured 400 after rotating, a placed piece visibly moves with the lattice rather than staying fixed, a 401 label's on-screen aspect ratio stays constant across rotation, and Gravity's immunity). 402
+
+
+### 2026-08-15T23:58:01.177Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two real gaps found in INV-24 and INV-44/INV-45. Let me continue the systematic sweep for more.
+
+
+### 2026-08-15T23:58:02.409Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "\['sandbox'\|for (const mode of \[\|for (const .* of \['" [REDACTED_PERSON]
+
+
+### 2026-08-15T23:58:02.554Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 137: for (const [mode, panelId] of [['[REDACTED_PERSON]', '[REDACTED_PERSON]'], ['[REDACTED_PERSON]', '[REDACTED_PERSON]']]) { 791: for (const mode of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) { 1565: for (const activeMode of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) { 1633: const modes = ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']; 1668: for (const restricted of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) { 1669: for (const pannable of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) { 1689: for (const restricted of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) { 1750: for (const mode of ['[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]', '[REDACTED_PERSON]']) {
+
+
+### 2026-08-15T23:58:21.933Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T23:58:21.976Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 785 }); 786 } 787 788 test('[REDACTED_SECRET]', async ({ page }) => { 789 for (const viewport of [{ width: 390, height: 844 }, { width: 852, height: 393 }]) { 790 await page.setViewportSize(viewport); 791 for (const mode of ['snake', 'blast', 'gravity']) { 792 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 793 // Same settling wait INV-21 already uses, for the same reason (see docs/invariants.md): 794 // fitContentBox's fit can need a ResizeObserver-driven correction pass to catch layout 795 // that wasn't settled yet at mode-entry's own synchronous call (panel text populated a 796 // moment earlier, a CSS transition still animating) -- found live via this exact test 797 // flaking without it once INV-40's JS-computed sizing replaced the old CSS-percentage 798 // approach, which had no such settling dependency (a browser's own layout is synchronous; 799 // recomputing a value in JS in response to it is not).
+
+
+### 2026-08-15T23:58:27.718Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T23:58:27.758Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1558 } 1559 }); 1560 1561 test('[REDACTED_SECRET]: exactly one of #blast-stats/#gravity-controls/#snake-controls is visible at a time on mobile', async ({ page }) => { 1562 await page.setViewportSize({ width: 320, height: 480 }); 1563 await page.goto('/'); 1564 const ids = ['blast-stats', 'gravity-controls', 'snake-controls']; 1565 for (const activeMode of ['blast', 'gravity', 'snake']) { 1566 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), activeMode); 1567 await page.waitForTimeout(300); 1568 const displays = await page.evaluate((ids) => 1569 ids.map(id => getComputedStyle(document.getElementById(id)).display), ids);
+
+
+### 2026-08-15T23:58:40.192Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T23:58:40.231Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1685 // Same leftover-inline hazard for a restricted mode itself, resized mobile -> desktop: its 1686 // fitContentBox no-ops at desktop widths, and must clear the inline mobile fit rather than 1687 // leave the board stranded at the old mobile box (found live: Snake/Blast/Gravity desktop 1688 // fixture frames were tiny or blank). The SVG must fall back to filling its container. 1689 for (const restricted of ['gravity', 'blast', 'snake']) { 1690 await page.setViewportSize({ width: 390, height: 844 }); 1691 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), restricted); 1692 await page.waitForTimeout(300); 1693 expect(await page.evaluate(() => Render.svg.style.width), 1694 `${restricted} should set an inline SVG width on mobile`).not.toBe(''); 1695 await page.setViewportSize({ width: 1757, height: 1000 }); 1696 await page.waitForTimeout(400); // let the mode's ResizeObserver refit at the new size 1697 const fill = await page.evaluate(() => { 1698 const gc = document.getElementById('game-container').getBoundingClientRect(); 1699 const svg = Render.svg.getBoundingClientRect(); 1700 return { inlineW: Render.svg.style.width, fillW: svg.width / gc.width, fillH: svg.height / gc.height }; 1701 }); 1702 expect(fill.inlineW, `${restricted} mobile->desktop should clear the inline SVG width`).toBe(''); 1703 expect(fill.fillW, `${restricted} mobile->desktop SVG should fill container width`).toBeGreaterThan(0.98); 1704 expect(fill.fillH, `${restricted} mobile->desktop SVG should fill container height`).toBeGreaterThan(0.98);
+
+
+### 2026-08-15T23:58:55.693Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me also check for any other per-mode hardcoded structures (not just arrays) I might have missed via a different grep pattern.
+
+
+### 2026-08-15T23:58:56.713Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "RESTRICTED_BOARD_CELLS\|MIDI_ROUTING_CHECKS\|snapshotModeState\|setupModeState" /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js | head -20
+
+
+### 2026-08-15T23:58:56.849Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 388: // flagged as a gap on the GitHub issue itself) into one shared [REDACTED_SECRET] config plus a 394: const [REDACTED_SECRET] = { 457: for (const mode of Object.keys([REDACTED_SECRET])) { 459: await [REDACTED_SECRET][mode](page); 515: const RESTRICTED_BOARD_CELLS = { 561: }, { m: mode, cellsSrc: RESTRICTED_BOARD_CELLS[mode].toString() }); 567: async function setupModeState(page, mode) { 601: async function snapshotModeState(page, mode) { 624: // RESTRICTED_BOARD_CELLS's own keys (the per-mode geometry this test needs for restricted 628: expect(Object.keys(RESTRICTED_BOARD_CELLS).sort()).toEqual([...restrictedModeNames].sort()); 644: await setupModeState(page, mode); 648: const restrictedBoard = mode in RESTRICTED_BOARD_CELLS; 684: const stateBefore = await snapshotModeState(page, mode); 688: expect(await snapshotModeState(page, mode), `[${mode}] state ${label}`).toEqual(stateBefore); 743: expect(await snapshotModeState(page, mode), `[${mode}] state after panning`).toEqual(stateBefore);
+
+
+### 2026-08-15T23:59:04.311Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: {"__unparsedToolInput": {"raw": "{\"file_path\": \"[REDACTED_PERSON]\", \"offset\": 385, 465, \"limit\": 80}", "len": 121}}
+
+
+### 2026-08-15T23:59:04.317Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: <tool_use_error>InputValidationError: Read was called with input that could not be parsed as JSON. You sent (first 121 of 121 bytes): {"file_path": "[REDACTED_PERSON]", "offset": 385, 465, "limit": 80} Common causes: unescaped backslashes in file paths (use / or \\), unescaped control characters, or truncated output. Retry with valid JSON.</tool_use_error>
+
+
+### 2026-08-15T23:59:08.152Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T23:59:08.193Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO], and beyond it to Life (added later, once Life itself existed -- [REDACTED_PRIVATE_INFO] Generalized from separately [REDACTED_PRIVATE_INFO] -- [REDACTED_PRIVATE_INFO] into one shared MIDI_ROUTING_CHECKS config plus a [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] Each mode's own routing logic is still genuinely different -- so each entry supplies its [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 393 [REDACTED_PRIVATE_INFO] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] 446 const key = `${target.p},${target.q}`; [REDACTED_PERSON] 448 }); 449 await sendFakeNoteOn(page, 60); [REDACTED_PERSON] 451 expect(hasLive, 'MIDI note 60 should toggle the cell nearest the view center for that pitch').toBe(!before.hadLive); 452 }, 453 }; 454 455 test('issue #11: live MIDI hardware input drives Gravity/Snake/Blast/Life, each per its own spec', async ({ page }) => { 456 await connectFakeMidiDevice(page); // hardware connection is session-level, not per-mode 457 for (const mode of Object.keys(MIDI_ROUTING_CHECKS)) { 458 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 459 await MIDI_ROUTING_CHECKS[mode](page);
+
+
+### 2026-08-15T23:59:16.913Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T23:59:16.947Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 567 async function setupModeState(page, mode) { 568 await page.evaluate((m) => { 569 switch (m) { 570 case 'snake': 571 [REDACTED_SECRET]; 572 document.getElementById('snake-score').textContent = '42'; 573 // Snake and Gravity both auto-advance on a real-time timer -- unrelated to what this 574 // test checks, but real enough to move the snake/piece during the async work a 575 // resize/rotate-view step does (opening the drawer, clicking a button), which would 576 // look identical to actual corruption. Pausing removes that real-time race entirely. 577 if (!SnakeMode.state.isPaused) SnakeMode.togglePause(); 578 break; 579 case 'gravity': 580 if (!GravityMode.state.isPaused) GravityMode.togglePause(); 581 break; 582 case 'blast': 583 // Real game state here (placed cells, lines cleared) depends on actual play; the 584 // fields themselves (Board.cells, linesCleared) already exist at their initial value, 585 // which is exactly what should survive untouched. Blast has no auto-ti …[1617 chars elided]… ion, and (where pannable) panning', async ({ page }) => { 620 const MODES = await getModes(page); 621 // Derived from production's own Render.RESTRICTED_MODES, not re-hand-picked here -- everything 622 // NOT restricted is free-pan, and free-pan is exactly the set that both supports a manual pan 623 // gesture and must preserve its exact view position. Cross-checked against 624 // RESTRICTED_BOARD_CELLS's own keys (the per-mode geometry this test needs for restricted 625 // boards) so the two can't silently drift apart -- a mode added to one without the other 626 // fails loudly here instead of quietly losing coverage. 627 const restrictedModeNames = await page.evaluate(() => Render.RESTRICTED_MODES); 628 expect(Object.keys(RESTRICTED_BOARD_CELLS).sort()).toEqual([...restrictedModeNames].sort()); 629 const RESTRICTED_MODES = new Set(restrictedModeNames); 630 const VIEW_PERSISTS_MODES = new Set(MODES.filter(m => !RESTRICTED_MODES.has(m))); 631 const PANNABLE_MODES = VIEW_PERSISTS_MODES;
+
+
+### 2026-08-15T23:59:34.812Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T23:59:34.848Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T23:59:43.375Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "216\|343\|combinations\|MODES.length \*\* 3\|triplet" [REDACTED_PERSON] | head -10
+
+
+### 2026-08-15T23:59:43.544Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1469: // -- generalized to every mode triplet (the mode list itself is fetched from the live UI, not 1498: test('switching through any 3-mode sequence leaves the shared palette/piece-list correct for the final mode ([REDACTED_PRIVATE_INFO])', async ({ page }) => { 1502: // The default 30s no longer covers every mode (adding Life took N^3 from 216 to 343 triplets).
+
+
+### 2026-08-15T23:59:51.271Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed real doc drift — the code was correctly generalized (343 triplets, 7 modes) but the doc still says "216". Let's fix that.
+
+
+### 2026-08-15T23:59:54.499Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T23:59:54.581Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T23:59:58.693Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T23:59:58.731Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 824 hypothetical ones — see [REDACTED_SECRET] above (no `ResizeObserver`, and a hardcoded fixed view that 825 never got the aspect-matched-fit treatment Gravity/Blast already had). 826 827 **Test:** `[REDACTED_PRIVATE_INFO]` — `${mode} board is centered...` and `every playable ${mode} 828 board cell is visible...` (looping `RESTRICTED_BOARD_CELLS`), and "switching through any 3-mode 829 sequence leaves the shared palette/piece-list correct for the final mode (6^3=216 triplets)".
+
+
+### 2026-08-16T00:00:04.983Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:05.059Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:00:10.609Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "6 modes\|six modes\|5 modes\|five modes\|7 modes\|seven modes\|216\|6x6\|6\^3\|5\^3\|6-mode" [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:10.719Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 566:orientation) as `20%`/`calc(20% - ...)` — "1/5", sized for exactly the 5 modes that existed 817: the live UI, not a fixed number written into the test -- N³ was 216 at 6 modes, became 343 the
+
+
+### 2026-08-16T00:00:15.627Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:15.663Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 560 --- 561 562 ### [REDACTED_SECRET]: The mode-slider's active-pill background exactly matches the active option's position, for however many modes there are 563 564 Found live via Compose mode's own visual QA screenshot, not written speculatively: `css/style. 565 css`'s `.mode-slider-active` hardcoded a width (default orientation) and height (landscape 566 orientation) as `20%`/`calc(20% - ...)` — "1/5", sized for exactly the 5 modes that existed 567 before Compose. Adding a 6th option didn't just leave the pill the wrong size; `App.setMode`'s 568 slide animation translates it by `idx * 100%` of *its own* box, so a mis-sized pill also lands in 569 the wrong place — every mode from the 3rd option onward highlighted a visibly incorrect slot. 570 571 Fixed by expressing both rules as `calc((100% - 4px) / 6)` — a plain count-based formula instead 572 of a magic percentage — with a comment on each naming the current option count, so the next mode 573 added or removed has an obvious single number to update instead of a silent trap. Also fixed 574 along the way, found in the same screenshot: the desktop-only "F T Y H B V: Move" / "Space / G /
+
+
+### 2026-08-16T00:00:22.185Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "mode-slider-active\|calc((100% - 4px)" [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:22.320Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 282:.mode-slider-active { 292: width: calc((100% - 4px) / 7); 1832: .mode-slider-active { 1834: height: calc((100% - 4px) / 7); /* one slot per .mode-option -- see the default rule's comment */
+
+
+### 2026-08-16T00:00:42.376Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good direction — let me find concrete, non-mode examples with the same shape (a count or list baked in once, not derived).
+
+
+### 2026-08-16T00:00:43.215Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "order = { easy\|order: { easy\|{ easy: 1, medium: 2, hard: 3 }" [REDACTED_PERSON]
+
+
+### 2026-08-16T00:00:43.339Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON]
+
+
+### 2026-08-16T00:00:52.298Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real duplication. Let me pull the exact code to show it precisely.
+
+
+### 2026-08-16T00:00:52.843Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:52.885Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T00:00:57.961Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -c 'class="weight-icon"' [REDACTED_PRIVATE_INFO] grep -n 'id="blast-difficulty"\|id="gravity-difficulty"\|id="melody-difficulty"' [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:00:58.103Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 9 93: <div id="blast-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"> 113: <div id="gravity-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: piece size"> 158: <div id="melody-difficulty" class="difficulty-weights" role="group" aria-label="Difficulty: practice hints">
+
+
+### 2026-08-16T00:01:06.711Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check one more category — the chord-guide catalog, and the piece-shape catalog's own self-check (a good counterexample).
+
+
+### 2026-08-16T00:01:07.570Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "[REDACTED_SECRET]" -A 15 [REDACTED_PRIVATE_INFO] | head -20
+
+
+### 2026-08-16T00:01:07.732Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 316:### [REDACTED_SECRET]: Every piece size has complete polyhex coverage 317- 318-For every cell-count the game defines a piece size for (1-cell, 2-cell, 3-cell, 4-cell, and any 319-future size), the registered pieces of that size must be exactly the full set of distinct 320-"one-sided" polyhexes of that size — every connected hex shape achievable with that many cells, 321-counted as distinct under rotation only (never reflection, since no piece here ever flips). No 322-duplicates (two pieces that are secretly the same reachable shape) and no gaps (a valid shape 323-with no piece for it). 324- 325-Real bug (GitHub issue [REDACTED_PRIVATE_INFO]): the two 3-cell "bendy" pieces `<` and `>` were coded as 326-byte-identical cell arrays — a plain duplicate, not two genuinely different shapes. The 327-tempting fix ("make them a real chiral pair") doesn't work: a plain 2-arm hex bend is always 328-self-mirroring under a rotation-only piece system — rotating it by some multiple of 60° reaches 329-its own mirror image, verified directly for both the 60° bend (`V`) and the 120° bend (`>`). So 330-there is no second, genuinely distinct 120°-bend shape to give `<` — the correct fix was 331-removing the duplicate outright (`<` no longer exists).
+
+
+### 2026-08-16T00:01:16.726Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "CHORD_TYPES\|chordTypes\|Object.keys(CHORD" [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 2>/dev/null | head -10
+
+
+### 2026-08-16T00:01:16.847Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:01:35.907Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two concrete findings, plus two good counterexamples worth knowing about as the right pattern.
+
+**Real duplication — the difficulty-barbell "how many icons to light" logic:**
+
+The exact same lookup table is copy-pasted in three separate files:
+
+```js
+// [REDACTED_SECRET] -- byte-identical
+const order = { easy: 1, medium: 2, hard: 3 };
+```
+
+And the markup itself is triplicated too — `index.html` has three separate `<div class="difficulty-weights">` blocks (`#blast-difficulty`, `#gravity-difficulty`, `#melody-difficulty`), each hand-authored with its own 3 `<button class="weight-icon">` elements (9 total, not generated). The CSS comment claims "a 4th+ difficulty level is just one more icon with no layout change" — true for the *CSS*, but adding a 4th level would still mean editing 3 JS files' `order` objects and manually adding 3 more buttons to the markup (one per mode), each easy to do in two of three places and forget the third. I know this one firsthand — I wrote Melody's copy myself a few turns ago, deliberately mirroring Blast/Gravity's pattern rather than centralizing it, for scope reasons at the time.
+
+**Two examples of the *right* pattern, for contrast:**
+- **[REDACTED_PRIVATE_INFO]** (piece-shape coverage) doesn't hardcode an "expected pieces" list at all — it *generates* the mathematically correct set of polyhexes independently and diffs the game's real catalog against that generated truth. A wrong/duplicate/missing piece is caught by real math, not a hand-copied list that could itself be wrong.
+- **The chord-guide tests** (`[REDACTED_PRIVATE_INFO]`) read chord types live from the actual `<select>`'s rendered `<option>`s, not a hardcoded array — so the test automatically covers however many chord types exist today.
+
+Want me to fix the barbell duplication too (extract one shared `updateDifficultyBarbell(idPrefix, difficulty)` helper and generate the markup from JS instead of hand-tripling it), or hold that as its own follow-up and let me get back to fixing the three confirmed mode-list gaps ([REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO] missing Compose/Life) I found before this detour?
+
+
+### 2026-08-16T00:16:40.050Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Different modes certainly have different meanings for each difficulty, and there is no particular reason there should be three in each mode, or that they should be called "easy", "medium", and "hard". The thing I want for barbells and difficulties is that they be represented by an integer rather than a word. And yes, the visual implementations of that integer should be consistent across modes and share code rather than duplicating it.
+
+
+### 2026-08-16T00:16:54.342Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a real architectural change — decoupling level count/meaning per mode from a shared integer-based rendering component. Let me plan this properly before touching code.
+
+
+### 2026-08-16T00:16:54.345Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ EnterPlanMode: {}
+
+
+### 2026-08-16T00:16:54.355Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:16:58.657Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a new, distinct task — I'll overwrite the plan file. Let me explore the current difficulty implementations across all three modes in parallel.
+
+
+### 2026-08-16T00:17:11.943Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Agent: {"description": "Explore difficulty implementations in Blast/Gravity/Melody", "subagent_type": "Explore", "run_in_background": false, "prompt": "In the Tonncade repo ([REDACTED_PRIVATE_INFO]), three modes (Blast, Gravity, Melody) each have their own \"difficulty\" setting, currently represented as the strings 'easy'/'medium'/'hard', rendered as a row of vertical dumbbell-barbell icons (task #93's design) where N of 3 icons light up. I'm planning to refactor this so difficulty is represented as a plain INTEGER level (not named strings), with the number of levels and what each level MEANS being independently chosen per mode, while the barbell RENDERING logic (lighting N of however-many icons) becomes ONE shared function/component instead of being copy-pasted per mode.\n\nI need full, precise detail on the current implementation before I can plan the refactor:\n\n1. Show the FULL relevant code in js/blast.js: `state.difficulty` default value, `setDifficulty(diff)`,  …[1364 chars elided]… ficulty setting (I recall Blast/Gravity persist theirs via `tonncade_blast_difficulty`/similar keys, but Melody's does NOT persist -- confirm exact key names and which modes persist vs don't).\n\n7. Search tests (tests/desktop.spec.js, tests/invariants.spec.js) for every test that references `data-difficulty`, `.weight-icon`, `setDifficulty`, or difficulty-related state/behavior in Blast/Gravity/Melody -- list each test name + what it asserts (e.g. \"blast: difficulty controls the generated piece sizes\" -- does it use the string values 'easy'/'medium'/'hard' directly, or could it be adapted to integers easily?).\n\n8. Search docs/invariants.md for any section describing this difficulty/barbell design (I recall task #39's piece-size difficulty and task #93's barbell redesign) -- show the relevant sections in full, since these will need updating too.\n\nReport full code for 1-5, and concise summaries with specific line/test-name references for 6-8. Keep total response under 800 lines."}
+
+
+### 2026-08-16T00:19:01.876Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: No dedicated INV section for task #39 (piece-size difficulty) or #93 (barbell redesign) exists in docs/invariants.md — only the two incidental mentions above ([REDACTED_PRIVATE_INFO], and [REDACTED_PRIVATE_INFO]). This gives a complete picture. Let me compile the final report. ## Summary of findings ### 1. js/blast.js — full difficulty-related code ```js // State default (line 35) difficulty: (typeof localStorage !== 'undefined' && localStorage.getItem('tonncade_blast_difficulty')) || 'hard', // Read to pick piece pool (line 129, inside randomPiece) randomPiece: function() { const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS; return keys[Math.floor(Math.random() * keys.length)]; }, // setDifficulty (lines 133-140) // Piece-size difficulty (task #39): easy=small pieces .. hard=tetrahexes only. Persisted, and // reflected in the dumbbell-triplet control. Takes effect for pieces dealt from here on. setDifficulty: function(diff) { …[12190 chars elided]… ulty`) since the buttons themselves "have no ids of their own at all, only `class=\"weight-icon\"`." This description is accurate and mode-structure-based, not string-based, so it likely needs no change for the refactor — though Melody's `#melody-difficulty` is also in `SECONDARY_ELEMENTS` per tests/invariants.spec.js:951 (not itself mentioned in this docs paragraph, only in the test file's own comment). - **INV-31 section, lines 624-650**: mentions "the difficulty selector" once in passing (line 636) as part of the list of controls that make up Melody's corner HUD/drawer real estate — purely a layout/chrome note, doesn't describe the difficulty mechanism itself, no update needed for this refactor. Both docs sections are structural/layout descriptions, not semantics-of-difficulty descriptions, so refactor documentation would likely need a **new** INV entry (or an addition to whichever section ends up covering the new shared barbell component) rather than an edit to either existing one.
+
+
+### 2026-08-16T00:20:00.791Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "DIFFICULTY_KEYS" -B2 -A15 [REDACTED_PERSON]
+
+
+### 2026-08-16T00:20:00.919Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 131- // medium -> 3-4 cells (trihexes + the tetrahexes) 132- // hard -> 4 cells only (the ten tetrahexes -- the historical default game) 133: [REDACTED_PERSON] { 134- [REDACTED_PRIVATE_INFO], 135- [REDACTED_PRIVATE_INFO], 136- [REDACTED_PRIVATE_INFO], 137- }, 138- 139- // Rotate 60 degrees counter-clockwise on screen (verified against Render.getScreenPos — 140- // despite the name, this is NOT the visual "clockwise" direction; see docs/invariants.md). 141- rotate: function(cells) { 142- return cells.map(c => ({ 143- p: -c.q, 144- q: c.p + c.q 145- })); 146- }, 147- 148- // Rotate 60 degrees clockwise on screen — the true inverse of rotate() above.
+
+
+### 2026-08-16T00:20:06.314Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "DIFFICULTY_KEYS" [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:20:06.450Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON]: const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS; [REDACTED_PERSON]: if (!Pieces.DIFFICULTY_KEYS[diff]) return; [REDACTED_PERSON]: const keys = Pieces.DIFFICULTY_KEYS[this.state.difficulty] || Pieces.TETRAHEX_KEYS; [REDACTED_PERSON]: if (!Pieces.DIFFICULTY_KEYS[diff]) return; [REDACTED_PERSON]: DIFFICULTY_KEYS: {
+
+
+### 2026-08-16T00:20:58.434Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Write: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:20:58.505Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:21:02.826Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ ToolSearch: {"query": "select:[REDACTED_SECRET]", "max_results": 1}
+
+
+### 2026-08-16T00:21:02.837Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (no output)
+
+
+### 2026-08-16T00:21:07.107Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ ExitPlanMode: {"plan": "# Difficulty as a shared, integer-level barbell component (not per-mode string triplication)\n\n## Context\n\nBlast, Gravity, and Melody each have their own \"difficulty\" barbell (task #93's vertical\ndumbbell-icon design), but the three copies are byte-identical implementations of the same idea,\nindependently hand-duplicated: the exact same `{ easy: 1, medium: 2, hard: 3 }` lookup object\nappears verbatim in `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, and `[REDACTED_PRIVATE_INFO]`; the exact same 3-button\nSVG markup is hand-authored three times in `[REDACTED_PRIVATE_INFO]` (9 buttons total, none generated). Found\nwhile reviewing the invariants test suite for exactly this shape of duplication risk.\n\nPer discussion: there's no reason every mode's difficulty needs exactly 3 levels, or that those\nlevels need to be called \"easy\"/\"medium\"/\"hard\" — different modes mean genuinely different things\nby \"difficulty\" (Blast/Gravity: which piece sizes get dealt; Melody: how many practice hints show).\nWhat S …[9287 chars elided]… n `DifficultyBarbell` component, the integer-level design, and the localStorage migration.\n\n## Verification\n\n- Manual: load Blast, confirm persisted difficulty (if previously set to a word under the old\n key) migrates correctly to the right lit count; click each barbell button in each of the three\n modes, confirm the right integer lands in `state.difficulty` and pieces/hints behave as before.\n- Migration-specific: manually set `localStorage.tonncade_blast_difficulty = 'medium'` (old\n format), reload, confirm 2 icons light and `BlastMode.state.difficulty === 2`.\n- Full `tests/desktop.spec.js` + `tests/invariants.spec.js` (Mobile Chrome) runs before committing,\n per this project's standing practice. Red/green discipline for the rewritten difficulty tests:\n confirm each updated assertion actually fails against the pre-refactor code path if reverted,\n not just passes trivially post-refactor.\n", "planFilePath": "/Users/[REDACTED_PERSON]/.claude/plans/shimmering-sniffing-aurora.md"}
+
+
+### 2026-08-16T00:25:51.987Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: User has approved your plan. You can now start coding. Start with updating your todo list if applicable Your plan has been saved to: [REDACTED_PERSON] You can refer back to it if needed during implementation. ## Approved Plan: # Difficulty as a shared, integer-level barbell component (not per-mode string triplication) ## Context Blast, Gravity, and Melody each have their own "difficulty" barbell (task #93's vertical dumbbell-icon design), but the three copies are byte-identical implementations of the same idea, independently hand-duplicated: the exact same `{ easy: 1, medium: 2, hard: 3 }` lookup object appears verbatim in `js/blast.js`, `js/gravity.js`, and `js/melody.js`; the exact same 3-button SVG markup is hand-authored three times in `index.html` (9 buttons total, none generated). Found while reviewing the invariants test suite for exactly this shape of duplication risk. Per discussion: there's no reason every mode's difficulty needs …[9097 chars elided]… ld into wherever seems most natural, e.g. near INV-13's SECONDARY_ELEMENTS discussion) documenting the shared `DifficultyBarbell` component, the integer-level design, and the localStorage migration. ## Verification - Manual: load Blast, confirm persisted difficulty (if previously set to a word under the old key) migrates correctly to the right lit count; click each barbell button in each of the three modes, confirm the right integer lands in `state.difficulty` and pieces/hints behave as before. - Migration-specific: manually set `localStorage.tonncade_blast_difficulty = 'medium'` (old format), reload, confirm 2 icons light and `BlastMode.state.difficulty === 2`. - Full `tests/desktop.spec.js` + `tests/invariants.spec.js` (Mobile Chrome) runs before committing, per this project's standing practice. Red/green discipline for the rewritten difficulty tests: confirm each updated assertion actually fails against the pre-refactor code path if reverted, not just passes trivially post-refactor.
+
+
+### 2026-08-16T00:29:38.714Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T00:29:42.275Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git status --short && echo --- && git diff --stat
+
+
+### 2026-08-16T00:29:42.433Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] ?? life_helpers/debug_alpha.js ?? life_helpers/debug_beehive.js ?? life_helpers/debug_reflector.js ?? [REDACTED_HIGH_ENTROPY_TOKEN] ?? life_helpers/debug_sym_gun.js ?? life_helpers/debug_true_puffer.js ?? life_helpers/find_puffer.js ?? life_helpers/find_reflector.js ?? life_helpers/find_shuttle.js ?? life_helpers/find_symmetric_gun.js ?? life_helpers/find_true_gun.js ?? life_helpers/find_true_gun_collision.js ?? life_helpers/find_true_gun_exhaustive.js ?? life_helpers/rename_yaml.js ?? life_helpers/verify_true_gun.js --- dev.log | 1353 ++++++++++++++++++++++++++++++++++++++++ [REDACTED_PRIVATE_INFO] | 6 +- [REDACTED_PRIVATE_INFO] | 37 +- [REDACTED_PRIVATE_INFO] | 30 +- 4 files changed, 1413 insertions(+), 13 deletions(-)
+
+
+### 2026-08-16T00:29:46.046Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committing the already-verified `[REDACTED_SECRET]` rename first, then fixing the three confirmed [REDACTED_SECRET] mode-list bugs before starting the difficulty-barbell work.
+
+
+### 2026-08-16T00:29:46.237Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "[REDACTED_SECRET]\|[REDACTED_SECRET]\|[REDACTED_SECRET]" [REDACTED_PRIVATE_INFO] | head -30
+
+
+### 2026-08-16T00:29:46.337Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 221: // -- the pannable view now centers on the origin (Render.panView / INV-44), where it used to 260: // (see INV-4 above / Render.panView / INV-44). 659: // Render.panView / INV-44), so a hardcoded 4:3/zoom-1 updateView would seed a baseline the 674: // the container with an aspect-matched viewBox (Render.panView / INV-44), so the top-left 714: // 2. Rotate the lattice view -- Gravity is the one documented exception (INV-24: always 1626: test('INV-44: pannable modes (Sandbox/Melody/Compose) fill the game-container -- viewBox aspect matches the container, no letterbox', async ({ page }) => { 1658: test('INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing', async ({ page }) => { 1709: // INV-24: rotating the Tonnetz view ([REDACTED_SECRET]'s #rotate-view-btn, [REDACTED_SECRET]'s 1718: test('INV-24: the rotate button steps the lattice-group transform by exactly 30 degrees per click', async ({ page }) => { 1732: test('INV-24: the rotate button wraps from 330 back to 0, and the chosen angle persists across a reload', async ({ page }) => { 1749: test('INV-24: rotating the view keeps every playable cell visible and unobscured', async ({ page }) => { 1759: test('INV-24: a placed Sandbox piece rotates together with the base lattice, not independently of it', async ({ page }) => { 1791: test('INV-24: note labels stay upright (same on-screen aspect ratio) regardless of lattice rotation', async ({ page }) => { 1820: test('INV-24: Gravity always renders at 0 degrees and hides the rotate control, regardless of the stored preference', async ({ page }) => {
+
+
+### 2026-08-16T00:29:48.409Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:29:48.477Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1626 test('[REDACTED_SECRET]', async ({ page }) => { 1627 // A pannable board is effectively infinite, so its visible window should match the 1628 // game-container's aspect ratio and fill it edge-to-edge. The old fixed 800x600 (4:3) viewBox 1629 // instead letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop 1630 // window (Melody at ~2:1 showed the board squished into a 4:3 center band). Restricted modes 1631 // already aspect-match (INV-40); this extends the same "fill the space" property to the 1632 // pannable modes. 1633 const modes = ['sandbox', 'melody', 'compose']; 1634 const viewports = [ 1635 { width: 1400, height: 600 }, // wide (2.33) 1636 { width: 700, height: 1100 }, // tall (0.64) 1637 { width: 950, height: 900 }, // near-square 1638 ]; 1639 for (const mode of modes) { 1640 for (const vp of viewports) { 1641 await page.setViewportSize(vp …[4014 chars elided]… , fillH: svg.height / gc.height }; 1701 }); 1702 expect(fill.inlineW, `${restricted} mobile->desktop should clear the inline SVG width`).toBe(''); 1703 expect(fill.fillW, `${restricted} mobile->desktop SVG should fill container width`).toBeGreaterThan(0.98); 1704 expect(fill.fillH, `${restricted} mobile->desktop SVG should fill container height`).toBeGreaterThan(0.98); 1705 } 1706 }); 1707 1708 // ──────────────────────────────────────────────────────────────────────── 1709 // INV-24: rotating the Tonnetz view ([REDACTED_PRIVATE_INFO]'s #rotate-view-btn, [REDACTED_PRIVATE_INFO]'s 1710 // Render.rotationDeg/getEffectiveRotation) keeps everything else about the board correct -- 1711 // nothing clipped, labels stay upright, and Gravity is immune (see docs/invariants.md). 1712 // ──────────────────────────────────────────────────────────────────────── 1713 1714 const clickRotateButton = (page, times = 1) => page.evaluate((n) => { 1715 for (let i = 0; i < n; i++) document.getElementById('rotate-view-btn').click();
+
+
+### 2026-08-16T00:29:50.184Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now fixing the mode lists in [REDACTED_SECRET] and [REDACTED_SECRET] (both missing 'life').
+
+
+### 2026-08-16T00:29:51.503Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:29:51.591Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:29:53.494Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:29:53.586Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:29:55.471Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Also update the "44"/"45" title comments if titles reference "(Sandbox/Melody/Compose)" explicitly.
+
+
+### 2026-08-16T00:29:55.655Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "Sandbox/Melody/Compose" [REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js [REDACTED_PERSON]/Documents/GitHub/Tonncade/docs/invariants.md
+
+
+### 2026-08-16T00:29:55.777Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] have an effectively infinite, pannable lattice, so their *visible window* [REDACTED_PRIVATE_INFO] // the same reason; an unrestricted/free-pan board (Sandbox/Melody/Compose) supports both. [REDACTED_PRIVATE_INFO] test('INV-44: pannable modes (Sandbox/Melody/Compose) fill the game-container -- viewBox aspect matches the container, no letterbox', async ({ page }) => {
+
+
+### 2026-08-16T00:29:59.378Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:29:59.410Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1155 keep the flat-clearance path -- their boards genuinely are bounded by full-width chrome bands. 1156 1157 **Test:** `tests/invariants.spec.js`'s "INV-43: ..." asserts, across a sweep of portrait sizes, 1158 that the board's rendered width spans more than 80% of the container width (a full-width hexagon's 1159 points reach the side edges) AND that no cell overlaps chrome (`measureBoardOcclusion`). Confirmed 1160 failing on the pre-fix flat-clearance code (~67% width at 397×537) before implementing, per 1161 red-green discipline. This is a Tonnetz-space maximization on top of INV-10's no-overlap floor and 1162 INV-40/41's aspect/edge-reach checks -- all four still hold for Snake under the new fit. 1163 1164 ### INV-44: pannable modes fill the game-container -- viewBox aspect matches the container 1165 1166 The restricted modes (INV-40) size themselves to their own fixed board. The **pannable** modes 1167 (Sandbox/Melody/Compose) have an effectively infinite, pannable lattice, so thei …[152 chars elided]…  the historical fixed 800×600 (4:3) reference box, which `preserveAspectRatio` 1170 then letterboxed inside any non-4:3 container -- wasting the sides of a wide desktop window (a wide 1171 Melody showed the lattice squished into a 4:3 center band). `Render.panView` (the pannable modes' 1172 shared view entry) now derives `refH` from the element's real aspect (`getAspectMatchedRefBox`, 1173 `refW` fixed at 800), so the viewBox maps onto the whole container with no letterbox. 1174 1175 `panView` works in view-**center** coordinates, not the viewBox top-left: aspect-matching makes 1176 the top-left depend on `refH`, so preserving the top-left across a resize/device-rotate would slide 1177 the content, whereas holding the center fixed keeps it put. It also **clears any inline SVG sizing** 1178 a previously-active restricted mode left (see INV-45), and the pannable modes refit on container 1179 resize via a `ResizeObserver` in `[REDACTED_PERSON]` (the synchronous window `resize` event fires before
+
+
+### 2026-08-16T00:30:01.615Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Life is not in `Render.RESTRICTED_MODES`, so it's pannable too — the doc text and test title were both stale. Fixing both.
+
+
+### 2026-08-16T00:30:02.904Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:30:03.001Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:30:06.016Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:30:06.086Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:30:07.816Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_SECRET]'s rotation test at line ~1749:
+
+
+### 2026-08-16T00:30:08.259Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:30:08.281Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1749 test('[REDACTED_PRIVATE_INFO]', async ({ page }) => { 1750 for (const mode of ['sandbox', 'melody', 'snake', 'blast']) { 1751 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 1752 await clickRotateButton(page, 3); // 90 degrees 1753 const { unobscured } = await measureBoardOcclusion(page); 1754 expect(unobscured, `mode=${mode} at 90 degrees`).toBeGreaterThanOrEqual(20); 1755 await page.evaluate(() => Render.setRotation(0)); 1756 } 1757 }); 1758 1759 test('[REDACTED_PRIVATE_INFO]', async ({ page }) => { 1760 await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click()); 1761 await page.evaluate(() => { 1762 SandboxMode.state.selectedPiece = '-'; 1763 SandboxMode.state.rotation = 0; 1764 SandboxMode.state.hoverCell = { p: 2, q: 2 }; 1765 SandboxMode.placePiece(2, 2); 1766 }); 1767 …[266 chars elided]… await clickRotateButton(page, 3); // 90 degrees 1775 await page.evaluate(() => SandboxMode.refreshLattice()); 1776 1777 const afterCenter = await page.evaluate(() => { 1778 const el = document.querySelector('polygon.placed-piece[data-p="2"][data-q="2"]'); 1779 const r = el.getBoundingClientRect(); 1780 return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; 1781 }); 1782 1783 // If the placed piece had stayed fixed while only the base lattice rotated under it (the 1784 // exact bug appendToLattice fixes), its screen position wouldn't move at all here. 1785 const moved = Math.hypot(afterCenter.x - beforeCenter.x, afterCenter.y - beforeCenter.y); 1786 expect(moved).toBeGreaterThan(5); 1787 1788 await page.evaluate(() => Render.setRotation(0)); 1789 }); 1790 1791 test('INV-24: note labels stay upright (same on-screen aspect ratio) regardless of lattice rotation', async ({ page }) => { 1792 await page.evaluate(() => document.querySelector('.mode-option[data-mode="sandbox"]').click()); 1793
+
+
+### 2026-08-16T00:30:12.798Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:30:12.863Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:30:14.437Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run these three tests to verify red/green (they should pass now that Life/Compose are actually included).
+
+
+### 2026-08-16T00:30:15.104Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_SECRET]" --project="Mobile Chrome" 2>&1 | tail -40
+
+
+### 2026-08-16T00:30:33.087Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run [REDACTED_SECRET] npx npm notice run 'playwright' test -g INV-24: rotating the view keeps|INV-44|INV-45 --project=Mobile Chrome Running 3 tests using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✘ 1 [Mobile Chrome] › tests/invariants.spec.js:1626:3 › Invariant tests › INV-44: pannable modes (Sandbox/Melody/Compose/Life) fill the game-container -- viewBox aspect matches the container, no letterbox (4.3s) [BROWSER] Service Worker registration blocked by Playwright ✓ 2 [Mobile Chrome] › tests/invariants.spec.js:1658:3 › Invariant tests › INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing (8.9s) [BROWSER] Service Worker registration blocked by Playwright ✓ 3 [Mobile Chrome] › tests/invariants.spec.js:1749:3 › Invariant tests › INV-24: rotating the view keeps every playable cell visible and unobscured (1.9s) 1) [Mobile Chrome] › tests/invariants.spec.js:1626:3 › Invariant tests › INV-44: pannable modes (Sandbox/ …[250 chars elided]… 1005 1651 | Math.abs(viewAspect - containerAspect) / containerAspect, 1652 | `[${mode} ${vp.width}x${vp.height}] viewBox aspect ${viewAspect.toFixed(2)} should match container ${containerAspect.toFixed(2)}` > 1653 | ).toBeLessThan(0.05); | ^ 1654 | } 1655 | } 1656 | }); at [REDACTED_PRIVATE_INFO] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Mobile Chrome] › tests/invariants.spec.js:1626:3 › Invariant tests › INV-44: pannable modes (Sandbox/Melody/Compose/Life) fill the game-container -- viewBox aspect matches the container, no letterbox 2 passed (16.8s)
+
+
+### 2026-08-16T00:30:35.714Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This surfaced a real bug: Life mode doesn't aspect-match its viewBox like the other pannable modes do. Let me look at how Life sets up its view versus Sandbox/Melody/Compose.
+
+
+### 2026-08-16T00:30:35.874Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "panView\|updateView\|Render\." [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/life.js | head -40
+
+
+### 2026-08-16T00:30:35.987Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 413: // null until the first draw: viewX/viewY center on the origin (see Render.panView / INV-44); 431: Render.init('tonnetz-svg'); 495: if (Render.svg) { this.refreshLattice(); this.updateControls(); } 519: // this bound only governs what's drawn. Wide enough that zooming out to Render.MAX_ZOOM never 537: Render.drawLattice(this.BOUNDS, {}); 538: this.state.zoom = this.state.zoom || Render.getResponsiveZoom(); 539: const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom); 548: if (!Render.svg) return; 549: Render.svg.querySelectorAll('polygon.cell.life-alive').forEach((p) => { 555: const poly = Render.svg.querySelector(`polygon.cell:not(.ghost)[data-p="${parts[0]}"][data-q="${parts[1]}"]`); 582: const W = Render.HEX_W, H = 45; // H matches getScreenPos's own fixed row-height constant 739: const svg = Render.svg; 742: // Sandbox/Melody/Compose -- see [REDACTED_SECRET] -- and wheel/pinch zoom 745: // on every init and torn down in cleanup() (#15/#16): `Render.svg` is the ONE <svg> 761: const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom); 831: if (Render.svg && this._onPointerDown) { 832: Render.svg.removeEventListener('pointerdown', this._onPointerDown); 833: Render.svg.removeEventListener('pointermove', this._onPointerMove); 834: Render.svg.removeEventListener('pointerup', this._onPointerUp);
+
+
+### 2026-08-16T00:30:38.885Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "ResizeObserver\|PANNABLE\|panView\|RESTRICTED_MODES" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js | head -40
+
+
+### 2026-08-16T00:30:39.011Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 147: // setupZoomGestures/setupTouchGestures). Restricted-board modes ([REDACTED_SECRET] -- 152: return typeof Render !== 'undefined' && ![REDACTED_SECRET].includes(this.currentMode); 167: const v = Render.panView(m.state.viewX, m.state.viewY, next); 252: // redrawn, and -- unlike the restricted modes, which each run their own ResizeObserver on 255: // Render.panView / INV-44). A ResizeObserver (not the synchronous window 'resize' event) 261: if (typeof ResizeObserver !== 'undefined') { 264: this._panResizeObserver = new ResizeObserver(() => { 270: this._panResizeObserver.observe(gc);
+
+
+### 2026-08-16T00:30:40.764Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:30:40.817Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 240 [REDACTED_PRIVATE_INFO]; 241 [REDACTED_PRIVATE_INFO]; 242 [REDACTED_PRIVATE_INFO]; 243 [REDACTED_PRIVATE_INFO]; 244 [REDACTED_PRIVATE_INFO]; 245 [REDACTED_PRIVATE_INFO]; 246 247 [REDACTED_PRIVATE_INFO] 248 [REDACTED_PRIVATE_INFO] 249 }); 250 251 // Pannable modes (Sandbox/Melody/Compose) refit their aspect-matched viewBox only when 252 // redrawn, and -- unlike the restricted modes, which each run their own ResizeObserver on 253 // #game-container -- nothing else redraws them on a resize. Without this their viewBox 254 // stays matched to the size at mode entry and letterboxes after any resize (see 255 // Render.panView / INV-44). A ResizeObserver (not the synchronous window 'resize' event) 256 // for the same reason the restricted modes use one: it fires AFTER layout settles, so it 257 // measures the final container size rather than a mid-transition one (a real bug on 258 // mobile-landscape, where the drawer's own reflow lands a frame after the resize event). 259 // Scoped to the pannable modes so the restricted modes aren't refreshed on top of their 260 // own observers. 261 if (typeof ResizeObserver !== 'undefined') { 262 const gc = document.getElementById('game-container'); 263 if (gc) { 264 this._panResizeObserver = new ResizeObserver(() => { 265 if (['sandbox', 'melody', 'compose'].includes(this.currentMode)) { 266 const refresh = this.modeRefreshFns[this.currentMode]; 267 if (refresh) refresh(); 268 } 269 }); 270 this._panResizeObserver.observe(gc); 271 } 272 } 273 274 // Open the mode named in the URL hash (shareable deep-link, e.g. #gravity), defaulting to 275 // Sandbox. Also re-route when the hash changes (back/forward or an edited URL). 276 this._applyHashRoute(); 277 window.addEventListener('hashchange', () => this._applyHashRoute()); 278 }, 279
+
+
+### 2026-08-16T00:30:42.838Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the exact bug: this `[REDACTED_STUDENT]` scope hardcodes `['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]']`, missing `'[REDACTED_PRIVATE_INFO]'`, so Life's viewBox never refits after a resize. This is the same drift bug class — fixing it.
+
+
+### 2026-08-16T00:30:44.230Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:30:44.316Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:30:51.689Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:30:51.765Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:30:53.231Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now re-run the [REDACTED_SECRET] test to confirm the fix.
+
+
+### 2026-08-16T00:30:53.332Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_SECRET]" --project="Mobile Chrome" 2>&1 | tail -25
+
+
+### 2026-08-16T00:30:59.346Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Error: [life 700x1100] viewBox aspect 2.04 should match container 0.73 expect(received).toBeLessThan(expected) Expected: < 0.05 Received: 1.805291005291005 1651 | Math.abs(viewAspect - containerAspect) / containerAspect, 1652 | `[${mode} ${vp.width}x${vp.height}] viewBox aspect ${viewAspect.toFixed(2)} should match container ${containerAspect.toFixed(2)}` > 1653 | ).toBeLessThan(0.05); | ^ 1654 | } 1655 | } 1656 | }); at [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:31:04.935Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "panView\|getAspectMatchedRefBox\|MAX_ZOOM\|getResponsiveZoom" [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:31:05.035Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 43: // applyZoomDelta). MAX_ZOOM is chosen so the full audible range (Tonnetz.audibleMinMidi().. 47: [REDACTED_SECRET], 516: // leftover-inline hazard panView clears for the pannable modes (INV-45). 644: // downstream (getAspectMatchedRefBox + getFitView(scale=1.15) + updateView), so this 716: getResponsiveZoom: function(baseZoom = 1) { 723: // calls panView anyway). Uses the true audible range (Tonnetz.audibleMinMidi().. 725: // audible pitches above 127 (up to ~20kHz) that drawLattice already renders and MAX_ZOOM is 831: getAspectMatchedRefBox: function() { 852: panView: function(centerX, centerY, zoom) { 868: const { refW, refH } = this.getAspectMatchedRefBox();
+
+
+### 2026-08-16T00:31:07.081Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:31:07.135Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 825 826 // The reference box [REDACTED_PRIVATE_INFO] should use so fitted content fills [REDACTED_PRIVATE_INFO]'s 827 // actual on-screen box edge-to-edge instead of being letterboxed inside a mismatched fixed 828 // 4:3 shape. Keeps width fixed at 800 (preserving the existing zoom-magnitude scale) and 829 // derives height from the SVG element's real current aspect ratio. Falls back to the 830 // historical 800x600 if the element isn't laid out yet (e.g. zero size before first paint). 831 getAspectMatchedRefBox: function() { 832 if (!this.svg) return { refW: 800, refH: 600 }; 833 const rect = this.svg.getBoundingClientRect(); 834 if (!rect.width || !rect.height) return { refW: 800, refH: 600 }; 835 return { refW: 800, refH: 800 * (rect.height / rect.width) }; 836 }, 837 838 // The pannable modes' (Sandbox/Melody/Compose) view update. A pannable board is effectively 839 // infinite, so its visible window should match the game-container's aspect ratio and fill it 840 // edge-to-edge -- not sit insid …[1493 chars elided]… 858 // Blast/Snake, then switch to Sandbox/Melody/Compose, and the lattice was stuck at the 859 // previous board's size. Restricted modes re-set these inline every fit, so clearing them 860 // here (pannable-only) is safe. 861 this.svg.style.position = ''; 862 this.svg.style.left = ''; 863 this.svg.style.top = ''; 864 this.svg.style.right = ''; 865 this.svg.style.bottom = ''; 866 this.svg.style.width = ''; 867 this.svg.style.height = ''; 868 const { refW, refH } = this.getAspectMatchedRefBox(); 869 if (centerX === null || centerX === undefined) centerX = 0; 870 if (centerY === null || centerY === undefined) centerY = 0; 871 this.updateView(centerX - refW * zoom / 2, centerY - refH * zoom / 2, zoom, refW, refH); 872 // updateView may have clamped the top-left against the pan bounds -- re-derive the center 873 // from what it actually applied so the stored center reflects any clamp. 874 return { viewX: this.viewX + refW * zoom / 2, viewY: this.viewY + refH * zoom / 2 }; 875 } 876 }; 877
+
+
+### 2026-08-16T00:31:12.841Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "fitContentBox\|style.width\|style.height\|svg.style" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/life.js
+
+
+### 2026-08-16T00:31:12.959Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-16T00:31:18.208Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "life-controls\|id=\"life\|game-container" [REDACTED_PERSON] | head -30
+
+
+### 2026-08-16T00:31:18.329Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 296: <div id="life-controls" style="display: none;"> 300: <div id="life-source-group" class="control-group" style="margin-bottom: 8px;"> 301: <select id="life-source" aria-label="Automaton source" style="width: 100%; padding: 4px; background: rgba(0,0,0,0.5); color: white; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;"></select> 302: <span id="life-source-status" style="font-size: 11px; color: var(--dim);"></span> 304: <div id="life-upload-group" class="control-group"> 308: <input id="life-file-input" type="file" accept=".yaml,.yml" style="display: none;" /> 309: <span [REDACTED_SECRET]></span> 312: <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button> 313: <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button> 314: <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↺</button> 315: <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button> 316: <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button> 319: <p title="Generation">gen <span id="[REDACTED_PRIVATE_INFO]">0</span></p> 408: <main id="game-container">
+
+
+### 2026-08-16T00:31:22.402Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: {"__unparsedToolInput": {"raw": "{\"file_path\": \"[REDACTED_PERSON]\", \"offset\": 400, \" }", "len": 94}}
+
+
+### 2026-08-16T00:31:22.404Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: <tool_use_error>InputValidationError: Read was called with input that could not be parsed as JSON. You sent (first 94 of 94 bytes): {"file_path": "[REDACTED_PERSON]", "offset": 400, " } Common causes: unescaped backslashes in file paths (use / or \\), unescaped control characters, or truncated output. Retry with valid JSON.</tool_use_error>
+
+
+### 2026-08-16T00:31:24.051Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:31:24.120Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 400 // ============================================================================================ 401 const LifeMode = { 402 state: { 403 live: new Map(), // "p,q" -> state (>=1); absent = dead/empty (state 0) 404 initial: [], // [key, state] seed pairs, for reset 405 rule: { survival: [], birth: [] }, 406 multi: null, // multi-state config {states, table, order} or null for 2-state 407 sound: { when: 'born', duration: 0.4, velocity: 80 }, 408 sounds: null, // per-state sound specs {state -> spec} (multi-state); null = use `sound` 409 tempo: 180, // generations per minute 410 running: false, 411 timer: null, 412 generation: 0, 413 // null until the first draw: viewX/viewY center on the origin (see Render.panView / INV-44); 414 // zoom picks the responsive default. Once the player zooms (wheel/pinch, see main.js's 415 // applyZoomDelta) it must persist across redraws, not reset to a fixed value. 416 viewX: null, viewY: null, zoom: null, 417 }, 418 419 // The first automaton, used unti …[5198 chars elided]… ide the drawn Tonnetz. 527 HARD_BOUNDS: { minP: -64, maxP: 64, minQ: -64, maxQ: 64 }, 528 529 inHardBounds: function(key) { return this._within(key, this.HARD_BOUNDS); }, // living cap 530 _within: function(key, b) { 531 const parts = key.split(','); 532 const p = +parts[0], q = +parts[1]; 533 return p >= b.minP && p <= b.maxP && q >= b.minQ && q <= b.maxQ; 534 }, 535 536 refreshLattice: function() { 537 Render.drawLattice(this.BOUNDS, {}); 538 this.state.zoom = this.state.zoom || Render.getResponsiveZoom(); 539 const v = Render.panView(this.state.viewX, this.state.viewY, this.state.zoom); 540 this.state.viewX = v.viewX; 541 this.state.viewY = v.viewY; 542 this.paintLive(); 543 }, 544 545 // Colour the live cells: .life-alive plus .life-s{state} so each state gets a distinct hue 546 // (see injectStateStyles / css/style.css). Clears prior colouring first. 547 paintLive: function() { 548 if (!Render.svg) return; 549 Render.svg.querySelectorAll('polygon.cell.life-alive').forEach((p) => {
+
+
+### 2026-08-16T00:31:38.490Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "_panResizeObserver = new ResizeObserver" -A3 /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js
+
+
+### 2026-08-16T00:31:38.605Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 265: this._panResizeObserver = new ResizeObserver(() => { 266- if (typeof Render !== 'undefined' && !Render.RESTRICTED_MODES.includes(this.currentMode)) { 267- const refresh = this.modeRefreshFns[this.currentMode]; 268- if (refresh) refresh();
+
+
+### 2026-08-16T00:31:40.665Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "modeRefreshFns" -A15 [REDACTED_PRIVATE_INFO] | head -30
+
+
+### 2026-08-16T00:31:40.783Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 267: const refresh = this.[REDACTED_SECRET][this.currentMode]; 268- if (refresh) refresh(); 269- } 270- }); 271- this._panResizeObserver.observe(gc); 272- } 273- } 274- 275- // Open the mode named in the URL hash (shareable deep-link, e.g. #gravity), defaulting to 276- // Sandbox. Also re-route when the hash changes (back/forward or an edited URL). 277- this._applyHashRoute(); 278- window.addEventListener('hashchange', () => this._applyHashRoute()); 279- }, 280- 281- // URL <-> mode names. Every mode's internal id already matches its own friendly URL name 282- // (Melody's internal id used to be 'midi', a mismatch this table existed to bridge -- see -- 1426: [REDACTED_SECRET]: { 1427- [REDACTED_SECRET]: () => SandboxMode.refreshLattice(), 1428- [REDACTED_SECRET]: () => BlastMode.refreshUI(), 1429- [REDACTED_SECRET]: () => MelodyMode.refreshBoard(), 1430- [REDACTED_SECRET]: () => SnakeMode.refreshBoard(), 1431- compose: () => ComposeMode.refreshBoard(), 1432- }, 1433- 1434- // A hexagon has 60-degree self-symmetry, so a hex lattice looks like a clean, uniformly- 1435- // rotated field of tiles at ANY rotation angle -- there's no "wrong" step size the way there 1436- // would be for e.g. a square grid. 30-degree steps cover both the pointy-top (0/60/120/...) 1437- // and flat-top (30/90/150/...) families, plus exact quarter-turns to match screen 1438- // portrait/landscape or a MIDI controller's own physical orientation.
+
+
+### 2026-08-16T00:31:42.697Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it: `modeRefreshFns` is missing a `life:` entry entirely — the exact same drift bug class. Adding it, plus `gravity` (used elsewhere too, worth checking scope, but only pannable modes matter here).
+
+
+### 2026-08-16T00:31:44.943Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:31:45.026Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:31:46.680Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_SECRET]" --project="Mobile Chrome" 2>&1 | tail -15
+
+
+### 2026-08-16T00:31:52.819Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET] --project=Mobile Chrome Running 1 test using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Mobile Chrome] › tests/invariants.spec.js:1626:3 › Invariant tests › [REDACTED_SECRET]: pannable modes (Sandbox/Melody/Compose/Life) fill the game-container -- viewBox aspect matches the container, no letterbox (4.2s) 1 passed (5.2s)
+
+
+### 2026-08-16T00:31:54.725Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That confirms a genuine live bug (Life's viewBox never refit on resize) that the missing test coverage had let through. Let's run the full three-INV group again plus [REDACTED_SECRET] coverage to confirm everything is green.
+
+
+### 2026-08-16T00:31:55.303Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_SECRET]: rotating the view keeps|[REDACTED_SECRET]|[REDACTED_SECRET]|[REDACTED_SECRET] coverage" --project="Mobile Chrome" 2>&1 | tail -20
+
+
+### 2026-08-16T00:32:13.108Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test -g [REDACTED_SECRET]: rotating the view keeps|[REDACTED_SECRET]|[REDACTED_SECRET]|[REDACTED_SECRET] coverage --project=Mobile Chrome Running 4 tests using 1 worker [BROWSER] Service Worker registration blocked by Playwright ✓ 1 [Mobile Chrome] › tests/invariants.spec.js:1626:3 › Invariant tests › [REDACTED_SECRET]: pannable modes (Sandbox/Melody/Compose/Life) fill the game-container -- viewBox aspect matches the container, no letterbox (4.2s) [BROWSER] Service Worker registration blocked by Playwright ✓ 2 [Mobile Chrome] › tests/invariants.spec.js:1658:3 › Invariant tests › [REDACTED_SECRET]: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing (8.8s) [BROWSER] Service Worker registration blocked by Playwright ✓ 3 [Mobile Chrome] › tests/invariants.spec.js:1749:3 › Invariant tests › [REDACTED_SECRET]: rotating the view keeps every playable cell visible and unobscured (2.1s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 4 [Mobile Chrome] › tests/invariants.spec.js:2063:3 › Invariant tests › [REDACTED_SECRET] coverage: every mode has a registered mutate() and counter, none forgotten (804ms) 4 passed (16.9s)
+
+
+### 2026-08-16T00:32:14.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four pass. Now let's run the full invariants suite on [REDACTED_PRIVATE_INFO] to make sure nothing else regressed.
+
+
+### 2026-08-16T00:32:15.317Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] --project="Mobile Chrome" 2>&1 | tail -60
+
+
+### 2026-08-16T00:34:14.033Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T00:34:15.692Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 58 invariant tests pass on Mobile Chrome. Let's also run Tablet Chrome (the other project invariants.spec.js runs on) to be thorough.
+
+
+### 2026-08-16T00:34:15.983Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] --project="Tablet Chrome" 2>&1 | tail -15
+
+
+### 2026-08-16T00:36:16.249Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: ✓ 54 [Tablet Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-48: gravity's state survives a switch to snake and back untouched (3.1s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 55 [Tablet Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-48: snake's state survives a switch to life and back untouched (3.5s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 56 [Tablet Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-48: life's state survives a switch to compose and back untouched (2.8s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 57 [Tablet Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-48: compose's state survives a switch to melody and back untouched (2.7s) [BROWSER] Service Worker registration blocked by Playwright [BROWSER] Service Worker registration blocked by Playwright ✓ 58 [Tablet Chrome] › [REDACTED_PRIVATE_INFO] › Invariant tests › INV-48: melody's state survives a switch to sandbox and back untouched (2.6s) 58 passed (2.0m)
+
+
+### 2026-08-16T00:36:18.629Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 58 pass on both. Now let's document this in [REDACTED_PRIVATE_INFO] near [REDACTED_PERSON], then commit everything as one coherent unit.
+
+
+### 2026-08-16T00:36:18.997Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "[REDACTED_SECRET]\|[REDACTED_SECRET]" [REDACTED_PRIVATE_INFO] | sed -n '1,20p'
+
+
+### 2026-08-16T00:36:19.106Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 80:### INV-4: Audio comes from exactly the notes it claims to 990:### INV-40: a restricted board's reference box matches ITS OWN shape, not whatever leftover space chrome happened to leave 1066:### INV-41: the restricted board reaches within one hex-diameter of two opposite edges of its available space 1094:### INV-42: exactly one of #blast-stats/#gravity-controls/#snake-controls is visible at a time on mobile 1134:### INV-43: Snake portrait fits the board shape-aware, not by a flat clearance rectangle 1164:### INV-44: pannable modes fill the game-container -- viewBox aspect matches the container 1179:a previously-active restricted mode left (see INV-45), and the pannable modes refit on container 1189:### INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing 1200:**Test:** `[REDACTED_SECRET]`'s "INV-45: ..." enters each restricted mode at a mobile 1205:### INV-46: a cell always sounds its own pitch — the founding invariant 1243:### INV-47: copy/paste preserves true pitch across modes 1270:### INV-48: mode state is independent, and switching modes pauses it — never discards or advances it
+
+
+### 2026-08-16T00:36:21.395Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:36:21.466Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1179 a previously-active restricted mode left (see INV-45), and the pannable modes refit on container 1180 resize via a `ResizeObserver` in `js/main.js` (the synchronous window `resize` event fires before 1181 the mobile-landscape reflow settles). 1182 1183 **Test:** `[REDACTED_STUDENT]`'s "INV-44: ..." asserts, for each pannable mode across wide/ 1184 tall/near-square containers, that the viewBox aspect ratio matches the container's within 5% (no 1185 letterbox). INV-9/INV-12's view-persistence check was correspondingly updated to compare the view 1186 *center* rather than the aspect-dependent top-left. Confirmed failing on the pre-fix fixed-4:3 code 1187 before implementing, per red-green discipline. 1188 1189 ### INV-45: a pannable mode entered after a restricted mode does not inherit its inline SVG sizing 1190 1191 On a mobile viewport the restricted modes size `#tonnetz-svg` with an inline `width`/`height` + 1192 `position:absolute` (`fitContentBox`, INV-40) fit to their own …[243 chars elided]…  screenshot fixture: play Gravity, switch to Sandbox, and the lattice stayed stuck at Gravity's 1196 board size). `Render.panView` clears that inline sizing at the start of every pannable draw, so the 1197 board falls back to filling the container. (At desktop widths `fitContentBox` no-ops, so this only 1198 reproduces at mobile viewports.) 1199 1200 **Test:** `[REDACTED_STUDENT]`'s "INV-45: ..." enters each restricted mode at a mobile 1201 viewport (confirming it set an inline SVG width), switches to each pannable mode, and asserts the 1202 inline `width`/`height`/`position` were cleared. Confirmed failing (inline sizing stuck) on the 1203 pre-fix code before implementing, per red-green discipline. 1204 1205 ### INV-46: a cell always sounds its own pitch — the founding invariant 1206 1207 This is the founding invariant of the whole project. A cell at `(p, q)` sounds **exactly** 1208 `Tonnetz.getFrequency(getMidi(p, q))` — its own pitch — *everywhere, always, in every mode*. What
+
+
+### 2026-08-16T00:36:28.415Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T00:36:28.476Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T00:36:30.827Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check INV-24's doc section for the stale mode list mention, and also verify the js/main.js `App.currentMode` guard at line ~152 is consistent (already uses `Render.RESTRICTED_MODES`, good — no change needed there).
+
+
+### 2026-08-16T00:36:30.898Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "### [REDACTED_SECRET]" [REDACTED_PERSON]/Documents/GitHub/Tonncade/docs/invariants.md
+
+
+### 2026-08-16T00:36:31.029Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 366:### [REDACTED_SECRET]: Rotating the Tonnetz view keeps everything else about the board correct
+
+
+### 2026-08-16T00:36:32.805Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:36:32.856Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T00:36:35.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This section already generically says "Gravity is the one exception" without an explicit mode list, so no doc edit needed there. Now let's check `[REDACTED_PRIVATE_INFO]` for the item about this session's work and update/clean it before committing.

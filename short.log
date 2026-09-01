@@ -3714,3 +3714,153 @@ Confirmed red/green properly. Now let's do the full systematic review of every i
 Found several more hardcoded mode-list arrays. Let me examine each in context.
 
 
+### 2026-08-15T23:58:01.177Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two real gaps found in INV-24 and INV-44/INV-45. Let me continue the systematic sweep for more.
+
+
+### 2026-08-15T23:58:55.693Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me also check for any other per-mode hardcoded structures (not just arrays) I might have missed via a different grep pattern.
+
+
+### 2026-08-15T23:59:51.271Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed real doc drift — the code was correctly generalized (343 triplets, 7 modes) but the doc still says "216". Let's fix that.
+
+
+### 2026-08-16T00:00:42.376Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good direction — let me find concrete, non-mode examples with the same shape (a count or list baked in once, not derived).
+
+
+### 2026-08-16T00:00:52.298Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real duplication. Let me pull the exact code to show it precisely.
+
+
+### 2026-08-16T00:01:06.711Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check one more category — the chord-guide catalog, and the piece-shape catalog's own self-check (a good counterexample).
+
+
+### 2026-08-16T00:01:35.907Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two concrete findings, plus two good counterexamples worth knowing about as the right pattern.
+
+**Real duplication — the difficulty-barbell "how many icons to light" logic:**
+
+The exact same lookup table is copy-pasted in three separate files:
+
+```js
+// [REDACTED_SECRET] -- byte-identical
+const order = { easy: 1, medium: 2, hard: 3 };
+```
+
+And the markup itself is triplicated too — `index.html` has three separate `<div class="difficulty-weights">` blocks (`#blast-difficulty`, `#gravity-difficulty`, `#melody-difficulty`), each hand-authored with its own 3 `<button class="weight-icon">` elements (9 total, not generated). The CSS comment claims "a 4th+ difficulty level is just one more icon with no layout change" — true for the *CSS*, but adding a 4th level would still mean editing 3 JS files' `order` objects and manually adding 3 more buttons to the markup (one per mode), each easy to do in two of three places and forget the third. I know this one firsthand — I wrote Melody's copy myself a few turns ago, deliberately mirroring Blast/Gravity's pattern rather than centralizing it, for scope reasons at the time.
+
+**Two examples of the *right* pattern, for contrast:**
+- **[REDACTED_PRIVATE_INFO]** (piece-shape coverage) doesn't hardcode an "expected pieces" list at all — it *generates* the mathematically correct set of polyhexes independently and diffs the game's real catalog against that generated truth. A wrong/duplicate/missing piece is caught by real math, not a hand-copied list that could itself be wrong.
+- **The chord-guide tests** (`[REDACTED_PRIVATE_INFO]`) read chord types live from the actual `<select>`'s rendered `<option>`s, not a hardcoded array — so the test automatically covers however many chord types exist today.
+
+Want me to fix the barbell duplication too (extract one shared `updateDifficultyBarbell(idPrefix, difficulty)` helper and generate the markup from JS instead of hand-tripling it), or hold that as its own follow-up and let me get back to fixing the three confirmed mode-list gaps ([REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO] missing Compose/Life) I found before this detour?
+
+
+### 2026-08-16T00:16:40.050Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Different modes certainly have different meanings for each difficulty, and there is no particular reason there should be three in each mode, or that they should be called "easy", "medium", and "hard". The thing I want for barbells and difficulties is that they be represented by an integer rather than a word. And yes, the visual implementations of that integer should be consistent across modes and share code rather than duplicating it.
+
+
+### 2026-08-16T00:16:54.342Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a real architectural change — decoupling level count/meaning per mode from a shared integer-based rendering component. Let me plan this properly before touching code.
+
+
+### 2026-08-16T00:16:58.657Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a new, distinct task — I'll overwrite the plan file. Let me explore the current difficulty implementations across all three modes in parallel.
+
+
+### 2026-08-16T00:29:38.714Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T00:29:46.046Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committing the already-verified `[REDACTED_SECRET]` rename first, then fixing the three confirmed [REDACTED_SECRET] mode-list bugs before starting the difficulty-barbell work.
+
+
+### 2026-08-16T00:29:50.184Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now fixing the mode lists in [REDACTED_SECRET] and [REDACTED_SECRET] (both missing 'life').
+
+
+### 2026-08-16T00:29:55.471Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Also update the "44"/"45" title comments if titles reference "(Sandbox/Melody/Compose)" explicitly.
+
+
+### 2026-08-16T00:30:01.615Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Life is not in `Render.RESTRICTED_MODES`, so it's pannable too — the doc text and test title were both stale. Fixing both.
+
+
+### 2026-08-16T00:30:07.816Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_SECRET]'s rotation test at line ~1749:
+
+
+### 2026-08-16T00:30:14.437Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run these three tests to verify red/green (they should pass now that Life/Compose are actually included).
+
+
+### 2026-08-16T00:30:35.714Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This surfaced a real bug: Life mode doesn't aspect-match its viewBox like the other pannable modes do. Let me look at how Life sets up its view versus Sandbox/Melody/Compose.
+
+
+### 2026-08-16T00:30:42.838Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the exact bug: this `[REDACTED_STUDENT]` scope hardcodes `['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]']`, missing `'[REDACTED_PRIVATE_INFO]'`, so Life's viewBox never refits after a resize. This is the same drift bug class — fixing it.
+
+
+### 2026-08-16T00:30:53.231Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now re-run the [REDACTED_SECRET] test to confirm the fix.
+
+
+### 2026-08-16T00:31:42.697Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it: `modeRefreshFns` is missing a `life:` entry entirely — the exact same drift bug class. Adding it, plus `gravity` (used elsewhere too, worth checking scope, but only pannable modes matter here).
+
+
+### 2026-08-16T00:31:54.725Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That confirms a genuine live bug (Life's viewBox never refit on resize) that the missing test coverage had let through. Let's run the full three-INV group again plus [REDACTED_SECRET] coverage to confirm everything is green.
+
+
+### 2026-08-16T00:32:14.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four pass. Now let's run the full invariants suite on [REDACTED_PRIVATE_INFO] to make sure nothing else regressed.
+
+
+### 2026-08-16T00:34:15.692Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 58 invariant tests pass on Mobile Chrome. Let's also run Tablet Chrome (the other project invariants.spec.js runs on) to be thorough.
+
+
+### 2026-08-16T00:36:18.629Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 58 pass on both. Now let's document this in [REDACTED_PRIVATE_INFO] near [REDACTED_PERSON], then commit everything as one coherent unit.
+
+
+### 2026-08-16T00:36:30.827Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check INV-24's doc section for the stale mode list mention, and also verify the js/main.js `App.currentMode` guard at line ~152 is consistent (already uses `Render.RESTRICTED_MODES`, good — no change needed there).
+
+
+### 2026-08-16T00:36:35.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This section already generically says "Gravity is the one exception" without an explicit mode list, so no doc edit needed there. Now let's check `[REDACTED_PRIVATE_INFO]` for the item about this session's work and update/clean it before committing.
