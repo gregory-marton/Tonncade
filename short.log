@@ -5272,3 +5272,158 @@ Excellent — the line-clear cascade reversal works perfectly: `cascadeRestored:
 Clean. Now let's implement Life. First, exact current code for `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`.
 
 
+### 2026-08-16T15:17:20.408Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `toggleCell`:
+
+
+### 2026-08-16T15:17:36.527Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `clear`/`reset`:
+
+
+### 2026-08-16T15:17:53.079Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]` and `[REDACTED_SECRET]`:
+
+
+### 2026-08-16T15:18:01.603Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `pasteClipboard` and adding `undo()`:
+
+
+### 2026-08-16T15:18:18.407Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the `[REDACTED_SECRET]` button:
+
+
+### 2026-08-16T15:18:37.030Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's verify Life's undo with a quick test covering toggle, clear/reset, paste, and confirming `[REDACTED_PRIVATE_INFO]` is never undo-able.
+
+
+### 2026-08-16T15:19:06.468Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The Life results confirm correct behavior: `[REDACTED_SECRET]` (generation untouched by undo) is the property that actually matters — `[REDACTED_SECRET]` is expected, not a bug (undo reverses the toggle on top of whatever the post-step board currently is, it doesn't rewind the simulation). Let's clean up and write real tests.
+
+
+### 2026-08-16T15:19:21.588Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, clean. Now let's write real regression tests for all three modes' undo, with red/green verification. First, [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T15:19:26.508Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add the new tests at the end of the file, organized by mode.
+
+
+### 2026-08-16T15:20:12.689Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me clean up a leftover redundant loop in the Blast cascade test.
+
+
+### 2026-08-16T15:20:28.344Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full new test group.
+
+
+### 2026-08-16T15:20:55.785Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — a known async-settle race (`LifeFolder`'s online/folder load can overwrite `state.live` after mode entry). Let me add the established wait pattern to all my Life tests, then check the Blast paste failure separately.
+
+
+### 2026-08-16T15:21:05.337Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at the [REDACTED_SECRET].
+
+
+### 2026-08-16T15:21:20.465Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+My test picked an out-of-bounds cell for Blast's radius-5 hex board (`p+q` must be ≤5). Let's fix.
+
+
+### 2026-08-16T15:21:29.030Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rerun the full group.
+
+
+### 2026-08-16T15:21:44.132Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 13 pass. Let's confirm red — stash the [REDACTED_PRIVATE_INFO] and rerun.
+
+
+### 2026-08-16T15:21:59.022Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The stash failed silently on the untracked file — nothing was actually reverted. Let me redo it properly.
+
+
+### 2026-08-16T15:24:18.526Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The revert genuinely happened (confirmed by the diffs above), and the run hung waiting on `[REDACTED_SECRET]`/`[REDACTED_SECRET]`/`[REDACTED_SECRET]` locators that no longer exist in the reverted `index.html` — that's a legitimate red state, just slow to observe via `click()` timeouts rather than a fast assertion failure. Restoring immediately rather than waiting out the full timeout.
+
+
+### 2026-08-16T15:24:27.120Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]. Let's confirm green once more and run the full desktop suite for regressions.
+
+
+### 2026-08-16T15:24:37.255Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green. Now let's run the full desktop suite plus the node harness (`[REDACTED_PRIVATE_INFO]`) for regressions.
+
+
+### 2026-08-16T15:24:45.590Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Node harness clean (no failures). Now the full Playwright desktop suite.
+
+
+### 2026-08-16T15:25:45.542Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 141 pass. Now let's run the invariants suite ([REDACTED_PRIVATE_INFO]) since I touched shared DOM/state across three modes.
+
+
+### 2026-08-16T15:27:49.402Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a real, expected finding — INV-13's coverage check is catching my new undo buttons as unclassified controls. Let's look at the exact failure and classify them properly.
+
+
+### 2026-08-16T15:28:40.236Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update `docs/invariants.md`'s Primary Elements table for consistency.
+
+
+### 2026-08-16T15:28:53.522Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rerun the INV-13 tests to confirm both pass.
+
+
+### 2026-08-16T15:29:02.900Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Now let's run the full invariants suite once more ([REDACTED_PRIVATE_INFO]) to confirm no other regressions.
+
+
+### 2026-08-16T15:31:08.676Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add an [REDACTED_SECRET] test confirming the undo history survives a mode switch, matching this session's established pattern for state that `paintedFingerprint`'s DOM-only check can't see.
+
+
+### 2026-08-16T15:31:43.305Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Passes. Let's confirm red by temporarily removing the state persistence (verify against the pre-fix baseline isn't meaningful here since it's a new feature) — instead let's do a quick sanity check that this test would fail if `undoStack` were reset on mode entry.
+
+
+### 2026-08-16T15:32:04.940Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]. [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T15:32:17.675Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green again. Now let's run the [REDACTED_STUDENT] (both projects) and the full desktop suite one more time for final confirmation.
+
+
+### 2026-08-16T15:34:16.471Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON] Let's run Tablet Chrome and the full desktop suite too.
+
+
