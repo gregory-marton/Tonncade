@@ -1601,3 +1601,669 @@ I used a script for that global replace, which goes against the "always use [RED
 Now let's fix all six `[REDACTED_PRIVATE_INFO]` call sites and the two `[REDACTED_PRIVATE_INFO]` assignments.
 
 
+### 2026-08-14T17:29:24.421Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the two `[REDACTED_PRIVATE_INFO]` sites:
+
+
+### 2026-08-14T17:29:48.287Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — [REDACTED_PRIVATE_INFO] also needs fixing. Let me check each context briefly, then apply a global replace since they're identical.
+
+
+### 2026-08-14T17:29:51.936Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the targeted verification tests.
+
+
+### 2026-08-14T17:31:55.323Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that to finish and continue reviewing other affected areas in the meantime — let me check the [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] for the mode-triplet test that iterates control groups.
+
+
+### 2026-08-14T17:31:58.386Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No references there — good, nothing else to fix in [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T17:32:01.069Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Let's check on the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T17:32:03.169Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll just wait for the background task notification instead of polling.
+
+
+### 2026-08-14T17:32:19.383Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T17:32:25.500Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the background task's completion notification before continuing.
+
+
+### 2026-08-14T17:33:01.333Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Exit code 0 — let's check the actual results.
+
+
+### 2026-08-14T17:33:19.836Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me write this as a proper scratchpad script instead of an inline one-liner.
+
+
+### 2026-08-14T17:33:35.360Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Need to run it from the repo directory so it resolves `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-14T17:36:22.669Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add temporary direct instrumentation inside `[REDACTED_PRIVATE_INFO]` itself rather than monkey-patching from outside.
+
+
+### 2026-08-14T17:38:44.622Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — `setMode()` unconditionally calls cleanup() for every mode on every switch (a pre-existing pattern), so my new `invalidate()` calls fire far more often than intended, racing against `setup()`. Let me scope the guard to only fire when this mode's [REDACTED_PRIVATE_INFO] instance was actually the active one.
+
+
+### 2026-08-14T17:38:50.346Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, the debug logging is cleanly reverted. Now let's guard the `invalidate()` calls so they only fire when this mode's folder instance was actually the active one.
+
+
+### 2026-08-14T17:39:07.662Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update the three call sites to pass the [REDACTED_PRIVATE_INFO]:
+
+
+### 2026-08-14T17:39:31.266Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T17:39:47.483Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll leave that debug server running until the current test finishes ([REDACTED_PERSON] may be reusing it), then clean it up.
+
+
+### 2026-08-14T17:39:50.026Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — [REDACTED_PERSON] reuses my already-running server. Good, no conflict. I'll wait for the test run to finish.
+
+
+### 2026-08-14T17:44:13.262Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON]
+
+
+### 2026-08-14T17:44:35.754Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's it — Playwright's config blocks service workers entirely, so my raw debug script's reload theory was a red herring. Let me revert the instrumentation and reproduce properly with SW blocked.
+
+
+### 2026-08-14T17:46:56.538Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — `MidiMode.resetGame()` internally calls `this.cleanup()` too (not just mode-exit), so my invalidate-in-cleanup design self-aborts its own fresh `setup()`. The right fix is to invalidate from `main.js`'s `setMode()`, which is the only place that truly knows a mode is being left.
+
+
+### 2026-08-14T17:47:02.244Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's simplify `invalidate()` back to unconditional, and move the actual call sites out of the three modes' `cleanup()` into `main.js`'s `setMode()`.
+
+
+### 2026-08-14T17:47:11.605Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now revert the three `cleanup()` call sites:
+
+
+### 2026-08-14T17:47:21.598Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add the invalidate calls into `main.js`'s `setMode()`, scoped by the outgoing `currentMode`, before it's reassigned.
+
+
+### 2026-08-14T17:47:33.360Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON]
+
+
+### 2026-08-14T17:47:42.799Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The fix works correctly end-to-end — dropdown populates, "Choose Local Folder" works, copy-defaults attempts (throws as expected since my fake `getFileHandle` doesn't support create), local files listed and auto-loaded (Apple.mid → midi 61). Let's clean up and rerun the real test suite.
+
+
+### 2026-08-14T17:47:48.579Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that to finish.
+
+
+### 2026-08-14T17:47:50.350Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> [Your previous response had no visible output. Please continue and produce a user-visible response.]
+
+
+### 2026-08-14T17:47:52.259Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That call was a mistake — no task tracking needed here. I'll just wait for the background test run to finish before continuing.
+
+
+### 2026-08-14T17:47:58.329Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 9 MidiFolder tests pass now. Let's run the Life and Compose test suites next.
+
+
+### 2026-08-14T17:48:00.943Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T17:48:13.329Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] Now Compose, and then the full suite plus invariants.
+
+
+### 2026-08-14T17:48:15.830Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T17:48:27.896Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 18 Compose tests pass. Now let's run the full desktop suite plus [REDACTED_PRIVATE_INFO] to catch any collateral effects.
+
+
+### 2026-08-14T17:48:31.198Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T17:48:33.745Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T17:49:34.977Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 108 tests passed — that "1" was just a test name match, not an actual failure. `[REDACTED_PRIVATE_INFO]` is fully green. Now let's run `[REDACTED_PRIVATE_INFO]` on its actual target projects (Mobile/Tablet Chrome), plus the Life-related invariants test on mobile.
+
+
+### 2026-08-14T17:49:37.484Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this run to complete.
+
+
+### 2026-08-14T17:52:13.394Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the real bug: my `autoLoadFirstBundled` re-fires on every re-entry into Life mode, overwriting the player's live cells with the pristine bundled seed — violating [REDACTED_SECRET]. The old code guarded this with a one-time `_loadedOnline` flag; I need the same guard in `FileFolder`.
+
+
+### 2026-08-14T17:52:25.239Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rerun the [REDACTED_SECRET] and the [REDACTED_SECRET] to confirm INV-18a is pre-existing (unrelated) flakiness.
+
+
+### 2026-08-14T17:52:28.394Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this to complete.
+
+
+### 2026-08-14T17:52:34.272Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed that [REDACTED_PRIVATE_INFO] existed unchanged before my current work — its logic is unrelated to file-folder changes, likely a timing flake. Waiting for the rerun now.
+
+
+### 2026-08-14T17:52:50.655Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 7 pass now, including [REDACTED_SECRET] (confirming it was flaky/unrelated). Let's do a final full run across desktop, invariants, and mobile suites to confirm everything's solid before wrapping up.
+
+
+### 2026-08-14T17:52:57.911Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While the full suite runs, let me update `[REDACTED_PRIVATE_INFO]`'s stale claim that Life's folder must stay separate from Melody/Compose's — that's exactly what changed.
+
+
+### 2026-08-14T17:53:10.168Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check on the full suite run.
+
+
+### 2026-08-14T17:53:14.093Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — I'll wait for the completion notification.
+
+
+### 2026-08-14T17:54:39.975Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this to complete.
+
+
+### 2026-08-14T17:54:47.732Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, confirmed clean. Waiting on the [REDACTED_SECRET] run.
+
+
+### 2026-08-14T17:56:31.690Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T17:56:38.499Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Consistent, not a flake. Let me verify it fails on the [REDACTED_SECRET] too (unrelated to this feature).
+
+
+### 2026-08-14T17:56:41.987Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this to finish, then restore my stashed changes.
+
+
+### 2026-08-14T17:56:51.349Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — fails identically on the committed baseline (before my changes). Pre-existing, unrelated. Let me restore my [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T17:57:43.180Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean, no debug logging left. [REDACTED_SECRET]
+
+
+### 2026-08-14T17:57:46.661Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both key fixes are intact. Let's rerun the [REDACTED_SECRET] once more to be certain, then commit.
+
+
+### 2026-08-14T17:57:49.529Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this.
+
+
+### 2026-08-14T17:58:09.889Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 43 pass. Everything is stable. Let's commit this work.
+
+
+### 2026-08-14T17:58:13.284Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — clean staging, leaving `[REDACTED_SECRET]`, `.gitignore`, `life/index.json`, and `life_helpers/*` (other work) untouched.
+
+
+### 2026-08-14T17:58:34.293Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed (`[REDACTED_SECRET]`). Summary of what changed:
+
+- **One dropdown per mode** (Melody, Compose, Life) replacing the old upload/folder/online triple-groups. Melody's top entry is "Random" (its existing offline default, now explicitly reselectable); then bundled songs, or the local folder's contents once one's chosen; then "Choose/Change/Reconnect Folder" at the bottom.
+- **Shared local folder**: per your suggestion, Melody, Compose, and Life all remember the *same* directory now (one picker, one IndexedDB entry) — each just filters it to `.mid` or `.yaml`. Choosing a folder also backfills it with that mode's bundled defaults it's missing.
+- **New `js/file-folder.js`**: generalized `MidiFolder`'s old hand-rolled logic into a `FileFolder.create()` factory (same pattern as `Board`/`GravityBoard`), instantiated once for MIDI (shared by Melody+Compose) and once for Life.
+- Two real bugs surfaced and fixed along the way, both confirmed via the existing Playwright/invariant tests rather than guesswork: a self-aborting setup race (fixed by moving the #15/#16 stale-fetch guard from each mode's `cleanup()` — which fires more often than "actually left" — into `main.js`'s `setMode`), and an INV-48 violation where re-entering Life re-loaded the bundled default over the player's live cells.
+- Full desktop + Mobile Chrome invariants suites pass; found and confirmed two pre-existing, unrelated failures (a Blast landscape-layout test, a flaky download-event test) that predate this work.
+
+You mentioned earlier there might be a design doc for this — I didn't find one in `docs/`, only the `next_steps.md` entry for #51, which I've updated to reflect the shared-folder decision.
+
+
+### 2026-08-14T21:11:45.116Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> If it's done, we can remove it from [REDACTED_PRIVATE_INFO]. Thanks!
+
+
+### 2026-08-14T21:12:02.163Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Removing the whole entry — Life mode has been fully built for a while, and this stale line just never got cleared.
+
+
+### 2026-08-14T21:12:22.017Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's gather both for the review — current `[REDACTED_PRIVATE_INFO]` and the open GitHub issues.
+
+
+### 2026-08-14T21:12:53.486Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let me pull the full current `next_steps.md` so we're reviewing accurate, current content.
+
+
+### 2026-08-14T21:13:20.766Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good pairing to check. Here's what stands out cross-referencing the two:
+
+**Likely regressions, high priority** — #15 ("Life keeps playing after return to Sandbox mode") and #16 ("notes spuriously appearing between modes... the life default pattern appears for a while") both smell exactly like the stale-async-repaint class of bug I was just elbow-deep in (the #15/#16 *invariant* — [REDACTED_SECRET] — was named after an earlier, different pair of issues with the same symptom). Worth investigating before anything else, since it's fresh in context and a real user (pingswept) hit it too.
+
+**Possibly already fixed by today's work** — #12 ("Melody instructions / midi folder control overlap the tonnetz," filed against the old three-group layout) may be resolved or much improved by today's single-dropdown reorg. #11 ("Gravity/Blast/Snake have no midi controls") reads as already implemented per the last session's work (issue never closed). Both worth you eyeballing before closing, rather than me asserting it.
+
+**Feature requests with no next_steps entry** — #17 (undo, already has a solid per-mode scope written in the issue itself) and #18 (MIDI keyboard transpose, plus a "midi button missing on localhost" sub-report) — these could get promoted into next_steps for design tracking, or just stay GH-only since the issue text is already fairly complete.
+
+**Pure bugs, correctly GH-only** — #8, #9, #10, #14 — per next_steps' own stated policy ("issues... tracked using GitHub's issue tracker... this document is for upcoming feature ideas"), these don't belong in next_steps regardless.
+
+Want me to start with #15/#16 given the overlap with what I just fixed, or would you rather walk the list top to bottom?
+
+
+### 2026-08-14T21:23:20.884Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> I bet [REDACTED_STUDENT] is fixed with the new work today? I'll try to check #12. Do the reports for [REDACTED_STUDENT] give you enough context to check?
+
+
+### 2026-08-14T21:23:35.001Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me try pulling the attached [REDACTED_PRIVATE_INFO] from both issues — that would give exact reproduction steps rather than guessing.
+
+
+### 2026-08-14T21:23:56.746Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Yes — plenty of context. Both issues already have detailed root-cause comments posted (from the earlier session, [REDACTED_SECRET]): a stale-fetch race and a leaked `addEventListener` on Life's tap-to-toggle handler, both fixed and covered by the INV-48 regression suite. These are the *same* #15/#16 I already knew about — just never closed.
+
+Today's refactor touched the fetch/load side (now generalized into `FileFolder`), not the event-listener side, so let me verify specifically against the exact pairs these reports describe — life→sandbox and life→blast, which aren't in the INV-48 test matrix (it only checks consecutive pairs in one cycle: …→life→compose→sandbox…).
+
+
+### 2026-08-14T21:24:45.188Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed both, using the exact scenarios from the reports:
+
+- **#15**: Life advanced 2 generations while playing, then froze immediately on switching to Sandbox (timer correctly paused, not "kept playing"), with zero stray Life cells painted into Sandbox.
+- **#16**: Zero stray Life cells appear in Blast after switching away, even waiting past any async fetch window (the non-deterministic race the report described).
+
+Both are genuinely fixed as of current `main` — the earlier session's fix ([REDACTED_SECRET]) held up, and today's refactor didn't reintroduce anything. Safe for you to close #15 and #16 whenever you like.
+
+
+### 2026-08-14T21:31:10.372Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Comment on #9 please as well -- I believe that was fixed yesterday or today?
+
+
+### 2026-08-14T21:31:41.341Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That fix is actually from three weeks ago (commit `62e4a93`, 2026-07-25), not today — and it's already got two explanatory comments on it from that session. Let me verify it's still holding after today's changes before I add anything.
+
+
+### 2026-08-14T21:31:44.567Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still intact. I'll add a comment confirming it's still fixed as of today's changes.
+
+
+### 2026-08-14T21:31:51.902Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Posted: [issues#9 comment](https://[REDACTED_HIGH_ENTROPY_TOKEN]#issuecomment-5298371384).
+
+Two things worth flagging: the actual fix is from commit `[REDACTED_SECRET]`, dated [REDACTED_DATE] — about three weeks ago, not yesterday/today — and it already had two explanatory comments from that session, just never closed. I re-verified it's still intact after today's unrelated dropdown refactor, and confirmed that in the new comment.
+
+
+### 2026-08-15T11:53:53.014Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> I went to make a playthrough for Melody, but its song dropdown has disappeared entirely! I could have noticed it if I had looked at screenshots. What could you have done to prevent such a serious regression?
+
+
+### 2026-08-15T11:54:00.934Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me reproduce this right away.
+
+
+### 2026-08-15T11:55:07.111Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-15T11:57:22.002Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I found it — and it's a real, structural bug, not just a one-off. Let me confirm the mechanism precisely, then fix it properly.
+
+
+### 2026-08-15T11:57:34.546Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's fix the root cause. I'll bump the cache version (self-heals everyone already affected) and switch the fetch strategy from cache-first to network-first — the standard fix for exactly this class of staleness bug.
+
+
+### 2026-08-15T11:57:56.052Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add a real regression test for this — it's exactly the kind of bug the current suite structurally can't catch (it always blocks or ignores service workers).
+
+
+### 2026-08-15T11:58:13.698Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's verify this test actually fails against the OLD (cache-first) sw.js, then passes against my fix — real red/green confirmation.
+
+
+### 2026-08-15T11:58:18.852Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that to finish.
+
+
+### 2026-08-15T11:58:28.407Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red against the old cache-first `sw.js` — this correctly reproduces the exact bug. Now let's restore my fix and confirm green.
+
+
+### 2026-08-15T11:58:32.940Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T11:58:41.253Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green. Let's also confirm nothing else regressed (the `file://` test and the rest of [REDACTED_PRIVATE_INFO]), then commit.
+
+
+### 2026-08-15T11:58:44.641Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T11:59:38.387Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 109 pass (108 + the new regression test). Let's commit.
+
+
+### 2026-08-15T11:59:59.699Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**Fixed and committed** (`[REDACTED_SECRET]`). Now, your actual question — what could have prevented this:
+
+**Root cause wasn't in yesterday's feature at all.** `sw.js` used a cache-first strategy: once a browser precached `index.html` on a player's *first-ever* visit, it kept serving that exact snapshot forever — nothing about a later code change invalidates a cache-first entry, only a manual `CACHE_NAME` bump does. That bump had never once happened in this project's history, despite `index.html` and `js/main.js` each being edited 60+ times. Yesterday's dropdown reorg just happened to be the edit that finally hit a file (`index.html`) whose staleness was *visible* — a returning player's browser kept the old markup while the new JS (fetched live, since it was never precached either) expected an element that didn't exist on their page.
+
+**What I could have done differently:**
+
+1. **Tested as a returning user, not just a fresh one.** Every verification I ran — the Playwright suite and my own manual repro scripts — used a brand-new browser profile every time. A fresh profile has no prior cache to be stale *from*, so this class of bug is invisible no matter how thoroughly you test that way. I only found it once you reported the symptom and I deliberately simulated "a browser that visited before."
+
+2. **Noticed the structural gap, not just the immediate fix.** The Playwright suite blocks service workers globally, and the one exception (the `file://` test) explicitly disables the caching path too — so *nothing* in the suite could ever have caught this, for any past or future change. That's now closed: I added a regression test that fakes a stale precache directly and confirmed it fails against the old code before passing against the fix.
+
+3. **The actual fix removes the failure mode itself**, rather than relying on remembering a version bump next time: `sw.js` is now network-first with cache-as-offline-fallback, so a code change reaches online players on their very next visit automatically. I also bumped `CACHE_NAME` once more to immediately self-heal anyone currently stuck on stale content from before this fix.
+
+
+### 2026-08-15T12:05:38.607Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> The only thing odd about this explanation is that I removed site data and reloaded and still observed the regression.
+
+
+### 2026-08-15T12:05:57.746Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch — that's a real contradiction. Clearing site data should wipe the SW registration entirely, so a stale cache can't be the (whole) explanation. Let me re-test the exact scenario I may have missed: a truly fresh visit with the service worker actually *running* (not blocked, which is how I verified my later fix).
+
+
+### 2026-08-15T12:06:24.596Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check whether this is actually about the deployed site vs. [REDACTED_PRIVATE_INFO] — if my fix (and even the original feature) was never pushed, the user could be testing an entirely different, older build.
+
+
+### 2026-08-15T12:06:48.639Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found something important — there are new commits I didn't make, including one titled "[REDACTED_SECRET]" Let me see exactly what that was.
+
+
+### 2026-08-15T12:07:16.330Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check whether there's an actual hosted deployment (vs. [REDACTED_PRIVATE_INFO]) — that changes what "cleared site data and reloaded" would have actually re-fetched.
+
+
+### 2026-08-15T12:07:42.280Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I think I found the real explanation, but it hinges on facts only you have — let me ask rather than guess further.
+
+There's an auto-deploy: every push to `main` publishes to `[REDACTED_PERSON]` via GitHub Actions. Checking just now, `origin/main`'s tip is `[REDACTED_SECRET]` — that already includes yesterday's dropdown feature, but **not** the service-worker fix I just made (`[REDACTED_SECRET]`), which is still sitting local-only on my end; I never ran `git push` this session.
+
+A few questions that would pin this down:
+1. **Were you testing the deployed GitHub Pages URL, or a local server?**
+2. If deployed — **did you (or something) push to `main` yourself?** I didn't push anything this session, so if the site's showing today's dropdown work at all, someone else did.
+3. Roughly **how long after that push did you test?** The Actions build+deploy takes a few minutes; testing mid-deploy could catch a half-published state.
+
+If it's the deployed site and my SW fix genuinely isn't live there yet, that alone would explain "cleared site data and still broken" — clearing data just gets you a fresh copy of the *still-buggy* cache-first `sw.js`, which precaches correctly on that first visit but would still be vulnerable to the *next* edit going stale. That's consistent with what you saw, but I'd rather confirm than assume.
+
+
+### 2026-08-15T12:11:13.470Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> 1. I did deploy it on faith and test it there, hours after deploy. Pushing is the easiest way for me to test on mobile. I do have simulators set up here, but they're less fun.
+
+
+### 2026-08-15T12:11:33.751Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — `[REDACTED_SECRET]` has its own separate logic still referencing the old ids I removed. Let me look at exactly what it does.
+
+
+### 2026-08-15T12:11:52.261Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is the real bug — mobile's drawer-redistribution logic in `[REDACTED_PRIVATE_INFO]` moves the old `#midi-folder-group`/`#midi-online-group` into the drawer, but never learned about my new `#midi-source-group`, so on mobile it stays trapped inside the now-hidden `#midi-controls`. Let me check the same pattern for Compose and Life.
+
+
+### 2026-08-15T12:12:03.512Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — only [REDACTED_PERSON] has this special drawer-redistribution logic; [REDACTED_PERSON] just show/hide their whole panel as one block, so they're unaffected. Let's fix [REDACTED_PERSON]'s.
+
+
+### 2026-08-15T12:12:15.333Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_PRIVATE_INFO]:
+
+
+### 2026-08-15T12:12:26.566Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's verify with a [REDACTED_PRIVATE_INFO], and add a [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T12:12:41.524Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's confirm this was indeed broken before my fix ([REDACTED_PRIVATE_INFO]).
+
+
+### 2026-08-15T12:12:50.322Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red→green. Now let's add a permanent regression test in `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T12:13:01.114Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good spot. I'll add the new test right after the queue-visibility test.
+
+
+### 2026-08-15T12:13:15.921Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fair — let me stash this and think about the general case rather than just patching the one instance.
+
+
+### 2026-08-15T12:13:53.095Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good call — this deserves real analysis before another patch-and-move-on cycle.
+
+**What actually happened:** `[REDACTED_PERSON]`'s mobile-drawer logic references DOM ids by string literal (`document.getElementById('midi-folder-group')`) to physically relocate elements between the sidebar and the drawer. When I restructured `[REDACTED_PERSON]`'s ids, I only checked *my own* files (`[REDACTED_PERSON]`, `[REDACTED_PERSON]`, `[REDACTED_PERSON]`, `[REDACTED_PERSON]`) for references — I never grepped the *whole* codebase for the old ids before deleting them. `[REDACTED_PERSON]` held three stale references (`#midi-folder-group`, `#midi-online-group`, plus the new `#midi-source-group` was never added anywhere). `getElementById` on a missing id doesn't throw — it just returns `null`, and every call site was already null-guarded (`if (midiFolder) ...`), so it failed *silently*. No console error, no crash, nothing my Desktop-only testing would ever surface.
+
+That silent-null failure mode is the actual class of bug, and it's not specific to this feature. Two different tests would catch it, at different levels:
+
+1. **Static reference-integrity check** (cheap, fast, no browser): scan every `.js` file for `getElementById('literal-id')` / `querySelector('#literal-id')` string literals, and assert each one exists as an `id="..."` somewhere in `[REDACTED_PERSON]`. This directly targets the actual failure mechanism (a stale id reference), runs in milliseconds, and would have caught this the moment I deleted the old ids — regardless of mobile vs. desktop, regardless of which mode. Misses only non-literal/dynamically-constructed ids (rare in this codebase from what I've seen).
+
+2. **Behavioral visibility smoke test** (real browser, more expensive): for every mode, at mobile and desktop viewports, assert that every control inside that mode's own `-controls` panel is actually visible (non-zero bounding box, no `display:none` ancestor) once that mode is active. This catches the same bug from the *symptom* side, and also catches other causes entirely unrelated to stale ids (a CSS rule, a wrong display toggle) — but it's slower and more work to get right (deciding what "should be visible" means per mode/control).
+
+I'd lean toward building (1) first — it's the more direct, general fix for exactly this failure mode and costs very little — and treating (2) as a good idea for later, not required to close this out. Want me to proceed that way, or do you want both before I touch the fix again?
+
+
+### 2026-08-15T12:16:31.264Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Yes of course 1, but I thought 2 was already an Invariant. Of course part of the testing strategy was missing: [REDACTED_PRIVATE_INFO] would have caught this also, and that's on me not providing them. So I'd like to build all three. The two you suggested to begin with, and then I'll prioritize playthroughs for story testing.
+
+
+### 2026-08-15T12:16:37.756Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check what invariant already exists — the user believes there should be one for this already.
+
+
+### 2026-08-15T12:18:11.199Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good distinction to raise — a naive "every mode-prefixed control must be visible" test would false-positive on legitimately conditional UI (like Compose's edit-group buttons, hidden until a note is selected). Let me design something more precise, then build all three pieces.
+
+
+### 2026-08-15T12:18:23.641Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's build [REDACTED_STUDENT]: a static reference-integrity check, run on every `npm test` (no browser needed, catches this immediately at edit time).
+
+
+### 2026-08-15T12:18:33.047Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the static reference-integrity checker.
+
+
+### 2026-08-15T12:19:00.815Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — RED, and it caught exactly the real bug (`midi-folder-group`, `midi-online-group`). But it also surfaced 6 pre-existing ones I need to sort out before this can be a clean gate — let me check whether those are real bugs or false positives from my regex.
+
+
+### 2026-08-15T12:19:20.383Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Those four D-pad ids and `mobile-dock` are genuinely dead (properly null-guarded, but the elements don't exist anywhere) — pre-existing, unrelated to my work, but cheap to clean up now that the tool found them. Let me confirm there's truly no trace of them, then remove the dead code and fix my `setAttribute('id', ...)` detection gap.
+
+
+### 2026-08-15T12:19:40.035Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix my detector's `setAttribute('id', ...)` gap so `[REDACTED_PRIVATE_INFO]` isn't a false positive.
+
+
+### 2026-08-15T12:19:46.398Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's confirm the checker is clean against the current (still-buggy, [REDACTED_SECRET] not yet unstashed) code — should now show only the two genuine `midi-*` findings.
+
+
+### 2026-08-15T12:19:51.335Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean red, exactly matching the real bug. Now let's build Test 2 — the general split-relocation completeness check extending INV-3.
+
+
+### 2026-08-15T12:19:54.735Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, I can reuse `getModes`. Let's add the new test right after the existing INV-3 test.
+
+
+### 2026-08-15T12:20:14.696Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's confirm this test is genuinely RED against the current (unfixed) `main.js`.
+
+
+### 2026-08-15T12:20:17.444Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for this.
+
+
+### 2026-08-15T12:20:26.214Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean RED — precisely `[REDACTED_SECRET]`, `"[REDACTED_SECRET]"` left behind. Both tests now confirm red against the real bug, with no false positives. Let's unstash the fix and confirm both go green.
+
+
+### 2026-08-15T12:20:46.383Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, the only real difference (besides the dead code I already removed, which the diff shows as "only in stash") is the drawer-relocation fix. Let me reapply just that part.
+
+
+### 2026-08-15T12:20:57.216Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_PRIVATE_INFO]:
+
+
+### 2026-08-15T12:21:10.870Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's drop the stash (fully merged manually) and also bring back the narrow [REDACTED_PRIVATE_INFO] test I wrote earlier (still useful as a targeted regression alongside the general ones).
+
+
+### 2026-08-15T12:21:16.893Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Only the intentional dead-code removal remains as a diff (which I added, deliberately not in the stash) — my drawer fix matches exactly. Let's grab the [REDACTED_STUDENT] from the stash and drop it.
+
+
+### 2026-08-15T12:21:24.787Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's now fully redundant with the general [REDACTED_SECRET] test — no need to duplicate it. I'll drop the stash.
+
+
