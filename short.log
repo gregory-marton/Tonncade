@@ -3864,3 +3864,233 @@ Now let's check INV-24's doc section for the stale mode list mention, and also v
 ### 2026-08-16T00:36:35.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 This section already generically says "Gravity is the one exception" without an explicit mode list, so no doc edit needed there. Now let's check `[REDACTED_PRIVATE_INFO]` for the item about this session's work and update/clean it before committing.
+
+
+### 2026-08-16T00:36:38.083Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's pre-existing content unrelated to this fix, fine to leave as-is. Now let's commit this whole batch of work.
+
+
+### 2026-08-16T00:36:42.023Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Only the intended files staged (dev.log and life_helpers are unrelated background work, left untouched).
+
+
+### 2026-08-16T00:36:50.402Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed. Now moving on to the approved difficulty-barbell refactor. Let's start with the new shared component.
+
+
+### 2026-08-16T00:36:52.728Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's look at the current markup for [REDACTED_PERSON] to get the exact SVG glyph to reuse verbatim.
+
+
+### 2026-08-16T00:36:55.506Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now I have the exact glyph. Let's create the shared component module.
+
+
+### 2026-08-16T00:37:12.364Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check [REDACTED_PRIVATE_INFO] (recently renamed, recently touched) for the exact convention/co-author line style, and see if other recently-added files include a co-author line at all.
+
+
+### 2026-08-16T00:37:18.735Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Matching the project's established [REDACTED_PRIVATE_INFO] convention rather than my own template.
+
+
+### 2026-08-16T00:37:28.817Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire this into `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`. First, pieces.js:
+
+
+### 2026-08-16T00:37:37.384Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at the exact current [REDACTED_SECRET] for difficulty to make precise edits.
+
+
+### 2026-08-16T00:37:45.526Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's make the edits to blast.js.
+
+
+### 2026-08-16T00:37:57.570Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the rest of [REDACTED_PRIVATE_INFO]: `randomPiece`, `setDifficulty`, `updateDifficultyUI`, and `setupEvents` wiring.
+
+
+### 2026-08-16T00:38:11.166Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check for any other `[REDACTED_SECRET]` references in blast.js (e.g. called elsewhere like on reset) that would now be stale.
+
+
+### 2026-08-16T00:38:13.308Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's do gravity.js — check for the same pattern.
+
+
+### 2026-08-16T00:38:15.666Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Byte-identical pattern (confirmed by the earlier explore report). Let's read exact surrounding lines for safe editing.
+
+
+### 2026-08-16T00:38:37.128Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_PERSON]. Let's view the current code precisely.
+
+
+### 2026-08-16T00:38:43.529Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now editing [REDACTED_PRIVATE_INFO]: state default, wiring, setDifficulty, remove updateDifficultyBarbell (replaced by shared component), and the `diff === 'hard'`/`'easy'` comparisons.
+
+
+### 2026-08-16T00:39:00.032Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]` comparisons inside `updateDifficultyUI`:
+
+
+### 2026-08-16T00:39:05.715Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check for any remaining `updateDifficultyBarbell` references (index.html comments, other files):
+
+
+### 2026-08-16T00:39:10.253Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's collapse all three blocks to empty containers.
+
+
+### 2026-08-16T00:39:36.939Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add the `[REDACTED_SECRET]` before the three consuming mode scripts.
+
+
+### 2026-08-16T00:39:44.758Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now check [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T00:39:47.116Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, that's still valid (updateDifficultyUI still exists, unchanged in meaning). Now sw.js:
+
+
+### 2026-08-16T00:39:55.412Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find and fix the affected tests in `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-16T00:40:00.723Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll replace all 5 simple `'[REDACTED_PERSON]'` → `1` occurrences, then handle the two more complex barbell tests.
+
+
+### 2026-08-16T00:40:04.340Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T00:40:07.285Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now rewriting these to integers, and reading each mode's own `levelCount` rather than a bare literal per the plan.
+
+
+### 2026-08-16T00:40:23.059Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the Blast/Gravity piece-size preset test block.
+
+
+### 2026-08-16T00:40:33.098Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's search for any other `easy`/`medium`/`hard`/DIFFICULTY_KEYS references across the whole test suite and other files I may have missed.
+
+
+### 2026-08-16T00:40:36.171Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Let's also check [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] for barbell references.
+
+
+### 2026-08-16T00:40:39.644Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's just an unaffected comment (as the plan noted). Now let's run the affected desktop tests to verify.
+
+
+### 2026-08-16T00:40:47.843Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four pass. Now let's run the Melody tests I touched earlier (the `[REDACTED_SECRET]` sites) to verify no regression.
+
+
+### 2026-08-16T00:43:00.346Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll just add a temporary debug test inline into [REDACTED_PRIVATE_INFO] instead.
+
+
+### 2026-08-16T00:43:21.756Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it: [REDACTED_PRIVATE_INFO] — I missed this second string comparison.
+
+
+### 2026-08-16T00:43:29.426Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, all use [REDACTED_PRIVATE_INFO]. Let's rerun those failing tests now.
+
+
+### 2026-08-16T00:43:33.933Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Debug test removed. Now rerun the full [REDACTED_PERSON] and the earlier [REDACTED_STUDENT].
+
+
+### 2026-08-16T00:43:49.290Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 16 pass now. Let's run the full [REDACTED_PRIVATE_INFO] suite to check for regressions elsewhere (Blast/Gravity difficulty related), plus invariants spec.
+
+
+### 2026-08-16T00:44:47.541Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 111 desktop tests pass. Now let's run the invariants suite too (Mobile + Tablet Chrome) to confirm no cross-effects.
+
+
+### 2026-08-16T00:46:49.153Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 58 pass. Now let's run [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] quickly since they might reference difficulty too.
+
+
+### 2026-08-16T00:46:52.897Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No references there. Now let's add the docs/invariants.md section documenting the new `DifficultyBarbell` component, near INV-13's SECONDARY_ELEMENTS discussion as the plan suggested.
+
+
+### 2026-08-16T00:47:00.779Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] is the last section. I'll append a new [REDACTED_PRIVATE_INFO] documenting the shared component, which is the cleanest fit since the doc is strictly INV-numbered.
+
+
+### 2026-08-16T00:47:25.058Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No entries to update there. Now let's do the manual verification steps from the plan — migration and click behavior — via a quick scripted check, then run the full suites one more time before committing.
+
+
+### 2026-08-16T00:47:32.876Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll append it to [REDACTED_PRIVATE_INFO] temporarily instead (matches testMatch).
+
+
+### 2026-08-16T00:47:41.351Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Migration works correctly. Removing the [REDACTED_SECRET].
+
+
+### 2026-08-16T00:47:47.900Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Directly removing with Edit.
+
+
+### 2026-08-16T00:47:54.029Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's do a final full run of both [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] to make sure everything is clean before committing.
+
+
+### 2026-08-16T00:48:50.351Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON] Now let's stage and commit the difficulty-barbell refactor.
