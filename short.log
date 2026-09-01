@@ -7045,3 +7045,203 @@ Now let's find the [REDACTED_SECRET] branch to reset the display.
 Let's clean up the speculative `[REDACTED_PRIVATE_INFO]` additions that didn't actually fix anything, now that the real fix is in place.
 
 
+### 2026-08-17T04:03:08.846Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's verify the fix.
+
+
+### 2026-08-17T04:03:14.023Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed. Let's run the full desktop suite plus invariants to catch any other regressions before committing.
+
+
+### 2026-08-17T04:04:35.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 166 pass. Let's run the invariants suite too, given I touched [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T04:06:46.652Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still nothing from Codex, node unit tests clean. Waiting on the invariants suite to finish before committing [REDACTED_SECRET].
+
+
+### 2026-08-17T04:07:11.591Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running. Let's continue — add [REDACTED_PERSON] labels and [REDACTED_PERSON] while waiting.
+
+
+### 2026-08-17T04:07:33.284Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire this into [REDACTED_PERSON]: a new `#melody-staff-labels` container and a call from `refreshStaff`.
+
+
+### 2026-08-17T04:07:52.964Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire `refreshStaff` in melody.js to call `renderLabels` too.
+
+
+### 2026-08-17T04:08:29.714Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Let's check on the [REDACTED_SECRET].
+
+
+### 2026-08-17T04:10:00.404Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 168 pass, and the invariants suite completed with exit code 0. Let's confirm its output.
+
+
+### 2026-08-17T04:10:05.265Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both failures are in the known-flaky [REDACTED_SECRET] MIDI area from earlier this session. Let me confirm they're unrelated to my changes by rerunning in isolation.
+
+
+### 2026-08-17T04:10:34.542Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me verify this predates my changes rather than assume — checking against the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T04:10:46.528Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:10:50.455Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, restored cleanly. Confirmed the [REDACTED_SECRET] flake is pre-existing and unrelated to my changes. Let's check `[REDACTED_PRIVATE_INFO]` for Codex notes, then commit task [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T04:12:35.931Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's build MusicXML read/write. Single-staff-declared (grand-staff split is a rendering decision `Notation.render` already recomputes from pitch, not something the file needs to encode) — keeps this bounded and avoids MusicXML's backup/forward multi-staff ceremony.
+
+
+### 2026-08-17T04:13:27.165Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:14:37.242Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:16:03.120Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found real bugs (notes crossing measure boundaries were being silently truncated, not tied) via the smoke test. Let me rewrite `[REDACTED_SECRET]` properly with a sequential cross-measure-aware tie algorithm.
+
+
+### 2026-08-17T04:16:07.772Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:16:48.830Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's re-run the smoke test to verify the fix.
+
+
+### 2026-08-17T04:16:58.707Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Exact round-trip now, including the cross-measure tie cases. Let's write real tests.
+
+
+### 2026-08-17T04:17:45.483Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Real bug — chord notes were reading the cursor *after* the anchor already advanced it. Fixing.
+
+
+### 2026-08-17T04:18:03.659Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now declare `[REDACTED_SECRET]` alongside `[REDACTED_SECRET]`.
+
+
+### 2026-08-17T04:18:17.509Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:19:41.834Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All [REDACTED_PERSON] pass, no regressions.
+
+
+### 2026-08-17T04:21:20.711Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire this into `MusicXML.parse()`.
+
+
+### 2026-08-17T04:22:22.271Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's test against hand-authored fixture MusicXML (since `write()` never emits repeat structure — these must be authored directly, like a real external tool would produce).
+
+
+### 2026-08-17T04:23:21.259Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:24:13.724Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch needed — let me verify this specific test since I suspect a design flaw (coda position needs to be known before the D.S. jump, not discovered lazily during the walk).
+
+
+### 2026-08-17T04:24:25.334Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed the bug — infinite loop until the guard limit. Fixing with a pre-scan pass.
+
+
+### 2026-08-17T04:25:05.520Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's actually the more musically correct behavior — "To Coda" marks a jump point *within* the measure, so that measure's own note still plays before jumping. My test's expectation was the one that was wrong, not the algorithm. Fixing the test.
+
+
+### 2026-08-17T04:25:20.984Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Also fix the header comment that referenced the old expectation, and the algorithm's own header comment if it references the old shape.
+
+
+### 2026-08-17T04:25:24.859Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Let's rerun.
+
+
+### 2026-08-17T04:25:32.915Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:27:09.401Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 179 pass.
+
+
+### 2026-08-17T04:28:01.157Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's build the key-signature-aware speller and a key-fit heuristic. First, extend `Tonnetz.getNoteName`.
+
+
+### 2026-08-17T04:28:25.143Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire this through `Render.drawLattice`'s shared label call site.
+
+
+### 2026-08-17T04:28:52.541Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's pass `[REDACTED_SECRET]` here and add `state.[REDACTED_SECRET]`, auto-detected on load.
+
+
+### 2026-08-17T04:28:56.864Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `state.keySignature` and set it whenever a song loads (`loadDefault`, `loadMelodyFromArrayBuffer`).
+
+
+### 2026-08-17T04:29:08.720Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find `[REDACTED_SECRET]` and `[REDACTED_SECRET]` to set `state.keySignature`.
+
+
+### 2026-08-17T04:29:27.850Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]`:
+
+
