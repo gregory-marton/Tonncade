@@ -531,3 +531,462 @@ Now wire the step-wise settling into `tick()`:
 Now let's update the two affected tests. First, the stub in my new test is no longer needed since paste never settles at all now:
 
 
+### 2026-08-14T02:36:40.403Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All three pass. Now let's run the broader [REDACTED_SECRET] test set and the node-level `[REDACTED_PRIVATE_INFO]`/[REDACTED_PRIVATE_INFO] logic isn't affected by refactoring `[REDACTED_SECRET]`.
+
+
+### 2026-08-14T02:36:49.887Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full [REDACTED_SECRET] suite plus the general test suite quickly for a final sanity check.
+
+
+### 2026-08-14T02:38:10.607Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:38:18.937Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While that runs in the background, let me commit this Gravity settling redesign now.
+
+
+### 2026-08-14T02:38:40.624Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+- `[REDACTED_PRIVATE_INFO]` no longer calls any [REDACTED_PRIVATE_INFO] — [REDACTED_PRIVATE_INFO]
+- [REDACTED_PRIVATE_INFO]
+- [REDACTED_PRIVATE_INFO]
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T02:40:51.974Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Oh, I would have assumed normal play would continue alongside the new pieces settling...
+
+
+### 2026-08-14T02:41:02.194Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That makes more sense — no reason to freeze the piece you're actively steering just because unrelated debris is also falling somewhere else on the board. Let me fix that.
+
+
+### 2026-08-14T02:41:43.510Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch — and there's a real gap matching that: pasted debris currently only tries falling straight down (via `getDown`), but the active piece *also* tries a diagonal slide when blocked straight down before giving up. Debris should get that too, or it stops short of resting spots a normal falling piece would reach. Let me fix that.
+
+
+### 2026-08-14T02:42:19.763Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, that's already consistent. Now update the test that relied on the old "debris blocks the active piece" behavior — let's check it still holds since I changed semantics.
+
+
+### 2026-08-14T02:42:31.320Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add regression coverage for both fixes: concurrent falling, and the diagonal-slide fallback for debris.
+
+
+### 2026-08-14T02:46:57.943Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add the [REDACTED_STUDENT] (debris and the active piece both moving in the same tick), then run everything.
+
+
+### 2026-08-14T02:48:01.167Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Excellent questions, and let me answer them honestly rather than guess — I traced the actual code:
+
+1. **Yes, there's still something special.** Debris settling (my new per-tick step) never checks for completed lines — only `[REDACTED_SECRET]` does, by calling `[REDACTED_SECRET]`. So a row completed by falling debris just... sits there, complete and uncleared, until the active piece happens to lock somewhere unrelated (if ever).
+2. **Also special.** When a line *does* clear (via a piece locking), everything above it collapses via `[REDACTED_SECRET]` — an instant, one-shot rigid shift, not the new tick-by-tick falling. That's inconsistent with what we just built for debris.
+3. **Your hole-filling scenario would likely break**, per both gaps above: the row would complete but not clear (no clear-check runs on debris settling), so it'd just sit there full, waiting for you to lock a piece somewhere else before anything happens — and probably not correctly even then, since the geometry `dropRowsAbove` expects may not match a debris-completed row.
+
+You're pointing at the same unification opportunity from a different angle: line-clearing's "everything above falls" should probably just *be* ordinary debris settling — delete the completed row, let the existing per-tick component-fall mechanism carry everything down naturally — rather than a separate instant-shift special case. And completed-line detection needs to run every tick (or whenever debris moves), not only on piece-lock.
+
+Let me write your three scenarios as tests first (expecting them to fail), then fix it properly.
+
+
+### 2026-08-14T02:49:18.345Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now replace `[REDACTED_SECRET]` and `[REDACTED_SECRET]`, and remove `dropRowsAbove`:
+
+
+### 2026-08-14T02:49:32.217Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove `[REDACTED_SECRET]` entirely.
+
+
+### 2026-08-14T02:50:14.369Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's remove the now-obsolete `[REDACTED_SECRET]`-specific Node tests, since that function no longer exists.
+
+
+### 2026-08-14T02:51:41.432Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the Playwright tests for all three scenarios plus the real-workflow integration test.
+
+
+### 2026-08-14T02:52:55.712Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me isolate whether the issue is in detection or in my test's tick loop.
+
+
+### 2026-08-14T02:54:22.320Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add per-tick diagnostics to see exactly where this goes wrong, rather than guess further.
+
+
+### 2026-08-14T02:54:50.851Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's actually great news — the debug output reveals my test had a bug, not the product. `linesCleared` was already `1` on the very first tick, and the row cleared immediately. My debug edit accidentally replaced the real `final` computation with a dummy object (my mistake mid-diagnosis), and separately my expected landing cell (`[REDACTED_PRIVATE_INFO]`) was wrong — hex "straight down" zigzags by design, so a cell starting at `[REDACTED_PRIVATE_INFO]` naturally drifts to `(4,0)` after 3 rows of fall, not straight down to `([REDACTED_PRIVATE_INFO])`. Let me fix both.
+
+
+### 2026-08-14T02:55:24.079Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Another test bug on my part, not a product bug — the satellite cell's zigzag fall happened to land on `[REDACTED_PRIVATE_INFO]`, which is one of the *original* row's coordinate keys (now home to an unrelated single cell, not a complete row). My "is any original coordinate occupied" check was the wrong question; I should check whether the row is a *complete line*, not whether any of its cell keys are occupied at all.
+
+
+### 2026-08-14T02:55:44.092Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All three scenarios now pass, confirming the actual behavior is correct — including your literal "cheat" scenario. Let's run the broader test set to confirm no regressions, then check the full-suite background run that finished earlier.
+
+
+### 2026-08-14T02:55:56.260Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That earlier full-suite background result is now stale given the substantial redesign since. Let me kick off a fresh full run.
+
+
+### 2026-08-14T02:56:09.728Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No stale doc references. Let me answer your questions directly, now confirmed by passing tests:
+
+1. **Is anything still special about pasted debris vs. a regular falling piece?** No — as of this pass, both fall and lock into the pile through the same physics, and both get detected by the same per-tick line-check.
+2. **Does everything above a cleared row fall debris-style, or something special?** Now debris-style — I removed the old instant `dropRowsAbove` shift entirely. Clearing a line just deletes it; whatever's above falls naturally, one row per tick, through the same `settleFloatingCellsStep()` debris uses.
+3. **Your hole-filling scenario** — tested literally (paste via real header buttons, resume, then run ticks): the row clears on the very first tick after resuming, and the cell that was sitting above cascades down correctly (landing one column over from directly-above, because of the hex "straight down" zigzag — expected geometry, not a bug).
+
+The only real bug this round was that **line-clear detection itself only ran on piece-lock**, never on debris settling — so a row completed by paste (or by any future non-piece source) would sit there uncleared. Fixed: `checkForClears()` now runs every tick, same as settling.
+
+
+### 2026-08-14T02:56:14.025Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T03:06:04.996Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll just wait for the background task notification without further action.
+
+
+### 2026-08-14T03:08:49.824Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed flaky (passes cleanly in isolation) — all failures across this run are pre-existing flakiness, unrelated to my changes. Let's commit this final batch.
+
+
+### 2026-08-14T03:09:12.907Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Everything's committed. Quick summary of this session's work, now all green and pushed to local `[REDACTED_PRIVATE_INFO]` (5 commits, not yet pushed to origin):
+
+1. **README** — documented `file://` vs. local server, and the service-worker caveat.
+2. **Life mode** — fixed the stale-fetch race and a leaked `addEventListener` that let Life's tap-to-toggle handler keep firing in other modes after switching away (root cause of #15/#16's "notes appearing between modes").
+3. **INV-48** (new invariant, documented in `docs/invariants.md`) — mode state must be independent and pause (not reset or share) across switches. Comprehensive black-box test suite covering all 6 stateful modes. Fixed real violations: Blast and Gravity used to share one global `Board`; Blast/Gravity/Snake reset on every re-entry instead of resuming.
+4. **Compose paste** — was silently doing nothing visible (missing highlight + note-count update) despite working correctly underneath.
+5. **Gravity falling physics**, redesigned through your questions: paste never precomputes a settle, debris falls one row per tick just like a normal piece, alongside (not blocking) the active piece, with the same diagonal-slide fallback — and line-clearing is now just "delete the row," with the cascade above it emerging from that same ordinary per-tick falling rather than a special instant shift. Verified against your literal "cheat by pasting the missing note" scenario.
+
+Open items I haven't acted on: your zoom-out-range request (separate feature, not a bug), and whether you want #15/#16 closed on GitHub now that their root causes are fixed.
+
+
+### 2026-08-14T03:21:04.551Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> There were a few tasks noted today but not acted on: save in life and what else?
+
+
+### 2026-08-14T03:21:20.903Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Three things, by my count:
+
+1. **Life "Save As" button** — a 💾 icon like Compose's, saving the current automaton (rule/state/tempo) as YAML to a remembered local folder. This was the original plan before the [REDACTED_SECRET] investigation pulled everything sideways.
+2. **Zoom-out range** — you reported being able to zoom in but not out far enough to see the full audible range. Not yet a filed issue, not investigated.
+3. **Whether to close [REDACTED_SECRET] on GitHub** — I asked and we never landed on an answer, now that their root causes ([REDACTED_SECRET]) are fixed and committed.
+
+Want me to start with Life's Save As, or handle these in a different order?
+
+
+### 2026-08-14T03:21:40.951Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> I want you to comment on [REDACTED_STUDENT], but I'll do all the closing after push and test.
+
+
+### 2026-08-14T03:22:16.144Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both comments posted. Now let's tackle the zoom range and Life Save As. Let's start by investigating the zoom limits.
+
+
+### 2026-08-14T03:23:25.029Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check how zoom currently works before deciding — since I found there's actually no in-app zoom control at all right now (no scroll-wheel handler, no pinch-to-zoom, no buttons); two-finger touch is already used for pan+twist and explicitly blocks the browser's native pinch. What you're hitting is almost certainly the browser's own page zoom (ctrl+/- or trackpad pinch on the page), which most browsers cap around 25-33% zoomed out — that's a browser limit, not something the app can extend. The real fix is giving the [REDACTED_PRIVATE_INFO] its own zoom, independent of page zoom.
+
+
+### 2026-08-14T03:24:31.013Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Right — checked again, and there's genuinely no in-app zoom control (no wheel handler, no pinch handler, no zoom buttons anywhere in the code). What "already zooms" for you is your browser's own page zoom ([REDACTED_PRIVATE_INFO]) — which scales the whole page including UI chrome, and most browsers cap it around 25-33% zoomed out. That's the wall you're hitting, and it's outside the app's control.
+
+To let you zoom out further than that, I'd need to add a real in-app zoom for the Tonnetz view itself (independent of the browser's page zoom). That brings back the question: how should *that* be triggered — scroll/pinch, dedicated +/- buttons, or both?
+
+
+### 2026-08-14T03:29:12.132Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Huh. Okay. On touch devices, including multitouch trackpad, pinch of course. On devices with scroll mice, yes, the scroll wheel. This is a low enough use case that if it doesn't have a natural trigger I'm okay with it not working, but I can also imagine hiding it under something like a long press the rotate icon to bring up a view menu or something. I dunno.
+
+
+### 2026-08-14T03:29:37.707Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check how zoom state is currently tracked per-mode, since that determines how much needs to change.
+
+
+### 2026-08-14T03:31:31.942Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — that confirms the plan then: I'll listen for `wheel` events with `ctrlKey: true` (that's exactly how browsers report trackpad pinch and ctrl+scroll to JS) and `preventDefault()` them, so the app handles the zoom instead of the browser's page zoom — same gesture you're already using, just no longer capped by the browser's floor. Plain scroll-wheel gets the same treatment for scroll-mouse users, and real touchscreen pinch needs separate distance-tracking since browsers don't route that through `wheel` events. Let me implement this, scoped to [REDACTED_PRIVATE_INFO] first (where "seeing the full audible range" actually matters).
+
+
+### 2026-08-14T03:32:26.965Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now widen `getPanBounds()` to use the full audible range instead of hardcoded MIDI 0-127:
+
+
+### 2026-08-14T03:34:58.107Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `getPanBounds()` to derive from `RESTRICTED_MODES`:
+
+
+### 2026-08-14T03:35:15.661Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — that's exactly the design now: `getPanBounds()` and zoom eligibility both derive from the single `[REDACTED_PRIVATE_INFO]` list, so they can never diverge. Let me finish wiring `main.js` to use that instead of the separate `ZOOM_MODES` list I'd started with.
+
+
+### 2026-08-14T03:36:00.649Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire `[REDACTED_SECRET]` into `[REDACTED_SECRET]`, and add pinch to the touch handler.
+
+
+### 2026-08-14T03:36:39.987Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Here's the full inventory:
+
+**Production code (`js/`):** just my new `[REDACTED_SECRET]`. No pre-existing duplication there.
+
+**Tests** — three near-identical hand-maintained lists, and none of them include `'life'`:
+- `tests/invariants.spec.js`: top-level `MODES = ['sandbox', 'midi', 'compose', 'snake', 'blast', 'gravity']`, plus a separately-derived `RESTRICTED_MODES` Set built from a *different* structure (`RESTRICTED_BOARD_CELLS`, a map of per-mode cell-shape functions used for board-size assertions — can't be fully eliminated, but the mode-name Set it produces could point at `[REDACTED_SECRET]` instead of being re-derived).
+- `tests/exploratory.spec.js`: `MATRIX_MODES`, same 6 names.
+- `tests/mobile.spec.js`: `MODES`, same 6 names again.
+
+Two things worth doing, but they're separate from finishing zoom:
+1. **Consolidate**: point all three at `[REDACTED_SECRET]` (via `page.evaluate`) instead of re-declaring it, so a future mode addition/reclassification can't silently drift out of sync the way the old `getPanBounds` inline list already had.
+2. **Real gap**: `'life'` is missing from every one of these mode-iteration lists — meaning INV-1 (every mode reachable), the exploratory random-tap fuzzer, and the mobile layout sweep never exercise Life at all. Independent of the zoom work, but real.
+
+Want me to finish wiring the zoom gesture first and come back to this consolidation, or handle it now before continuing?
+
+
+### 2026-08-14T03:38:08.765Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> This is a bigger find than zoom, and so higher priority, but okay, go ahead and finish zoom just this once.
+
+
+### 2026-08-14T03:38:22.325Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add the tracking variable and initialize it at both two-finger-gesture-start points:
+
+
+### 2026-08-14T03:38:46.847Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find the shared two-finger `touchmove` handler where twist/pan already happen, to add pinch-zoom:
+
+
+### 2026-08-14T03:39:45.607Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix the per-mode zoom persistence. First, Sandbox and Life (which already have a `state.zoom` field, but overwrite it unconditionally):
+
+
+### 2026-08-14T03:40:01.950Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Need to fix the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T03:40:11.433Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Life:
+
+
+### 2026-08-14T03:40:31.501Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check Life's drawn lattice extent — it's likely too narrow for the new max zoom, same issue Sandbox had.
+
+
+### 2026-08-14T03:40:50.570Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's widen Sandbox's actual drawn viewport too (I only widened the pan-bounds scan range so far, not the drawn extent):
+
+
+### 2026-08-14T03:40:59.738Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's handle Melody and Compose, which don't have persistent zoom state at all yet.
+
+
+### 2026-08-14T03:41:13.476Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add `zoom: null` to Melody's state object:
+
+
+### 2026-08-14T03:41:32.949Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Compose:
+
+
+### 2026-08-14T03:42:01.520Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-14T03:42:18.124Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is an expected consequence of correctly reclassifying [REDACTED_SECRET] as restricted — let's look at the test and fix it to match.
+
+
+### 2026-08-14T03:44:00.375Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All wheel-zoom tests pass. Now let's add a touch-pinch test in `mobile.spec.js`, reusing the existing multi-touch dispatcher pattern.
+
+
+### 2026-08-14T03:44:42.323Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run the broader [REDACTED_PRIVATE_INFO] test set for regressions before the full suite.
+
+
+### 2026-08-14T03:45:20.970Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Expected — this test hardcoded the old default viewport extent (22), which I intentionally widened to 26 for the zoom feature. Let me fix it.
+
+
+### 2026-08-14T03:45:36.266Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] Let's run the full suite as a final check before committing.
+
+
+### 2026-08-14T03:45:40.564Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that to finish before committing. Meanwhile, let me double-check the `docs/invariants.md` for anything worth updating regarding this new zoom capability, and verify there's no stray reference to the old `getPanBounds` allowlist elsewhere.
+
+
+### 2026-08-14T03:45:52.563Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's unrelated (keyboard cluster keys, not pan/zoom). No stale references to fix. Waiting for the full suite now.
+
+
+### 2026-08-14T03:45:58.372Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the background task notification rather than poll further.
+
+
+### 2026-08-14T03:48:26.861Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Commit early, commit often, commit (nearly) everything. How many times should I say it?
+
+
+### 2026-08-14T03:48:31.368Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-14T03:48:58.073Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — I'll wait for its completion notification. Committed the zoom feature (6 commits so far this session, all pushed to local `[REDACTED_SECRET]` but not yet to `origin`). Let me know if you'd like me to push, or move on to the `*_MODES` test-consolidation you flagged as higher priority.
+
+
+### 2026-08-14T03:49:23.451Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Please start on the testing gaps / mode gaps that the previous discussion uncovered.
+
+
+### 2026-08-14T03:50:28.049Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check all usages of `MODES` across `[REDACTED_PRIVATE_INFO]` to see the full scope of converting it to a dynamic, DOM-derived list.
+
+
+### 2026-08-14T03:51:03.900Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a bigger refactor than a quick patch — let me convert these hardcoded lists to genuinely derive from the UI/production code, not just add `'life'` as a patch. Starting with `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-14T03:54:01.673Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update the INV-1 test:
+
+
+### 2026-08-14T03:54:13.293Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_SECRET] test (needs both `MODES` and the `RESTRICTED_MODES` fix). Let's view the full block again to edit precisely.
+
+
+### 2026-08-14T03:54:50.875Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `case 'life':` to `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-14T03:55:12.231Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-14T03:56:17.082Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's use a more central cell for the Life setup to avoid that [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-14T03:56:25.479Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix the remaining two `MODES` sites ([REDACTED_SECRET] and [REDACTED_SECRET]):
+
+
+### 2026-08-14T03:56:46.203Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run all four affected tests to confirm everything works with the dynamic mode list, including Life.
+
+
+### 2026-08-14T03:57:16.578Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run the full `[REDACTED_PRIVATE_INFO]` file to catch any other regressions from removing the describe-level consts.
+
+
+### 2026-08-14T03:59:29.668Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check — is Life missing mouse-drag panning entirely (unlike Sandbox/Melody/Compose)?
+
+
+### 2026-08-14T03:59:53.800Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add drag-to-pan, matching [REDACTED_SECRET], while keeping tap-to-toggle working:
+
+
+### 2026-08-14T04:00:08.911Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `cleanup()` to remove the new `pointermove` listener too:
+
+
+### 2026-08-14T04:01:10.834Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — that confirms the earlier zoom work is clean (only the known pre-existing flake). Now let's add a regression test for Life's new drag-to-pan.
+
+
+### 2026-08-14T04:01:36.148Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix `[REDACTED_FILE]`'s `MATRIX_MODES`.
+
+
+### 2026-08-14T04:04:14.660Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`'s `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-14T04:05:23.283Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch, and no — it doesn't. `App.clipboard` (in `[REDACTED_PRIVATE_INFO]`) is a plain in-memory JS array, not `navigator.clipboard` (the real OS/system clipboard). It only exists inside one page's JS state, so it's scoped to a single tab/window — copying in one Tonncade window and pasting in a separate window (or tab) can't work, since they don't share any memory. It was only ever built for moving cells *between modes within one running session*, never advertised as cross-window.
+
+Want me to wire it to the real OS clipboard (`navigator.clipboard.writeText`/`readText`, e.g. as JSON) so copy/paste works across separate windows/tabs too? That's a distinct, real feature, not a bug fix. I'll finish the test-timeout issue I just hit first, then come back to this if you want it.
