@@ -3000,3 +3000,216 @@ That's a real but separate cleanup — a mechanical rename across `data-mode` at
 Given the scope, I'll make the call rather than ask: this rename touches dozens of references (`data-mode`, `MidiMode`, `js/midi.js`, ~10 CSS ids, `App.currentMode === 'midi'` checks across multiple files, and a `localStorage` key that would need migration to avoid silently losing players' best-streak data) — genuinely a separate, dedicated pass, not something to fold into a focused statefulness bugfix without adding real review/regression risk. I'll keep this fix scoped to the `[REDACTED_SECRET]` bug using the existing `'midi'` identifier (consistent with every other mode-id reference already in that file), and log the rename as its own next_steps.md item.
 
 
+### 2026-08-15T21:58:48.028Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Understood — I'll treat it as next-in-line, not "someday": finish the [REDACTED_SECRET] statefulness fix first (bugfixes before enhancements, as you said), then do the rename as its own follow-up commit in this same session, right after. Let me adjust the next_steps.md wording to reflect that it's not low-priority.
+
+
+### 2026-08-15T21:58:57.965Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement the [REDACTED_SECRET] statefulness fix. First, the `js/midi.js` change.
+
+
+### 2026-08-15T21:59:07.493Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add `[REDACTED_SECRET]` to the state defaults and update `init()`.
+
+
+### 2026-08-15T21:59:18.773Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update `init()`.
+
+
+### 2026-08-15T21:59:30.630Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — `resetGame()` itself already calls `this.updateGhost()` with no argument, so that's a safe established pattern. Now let's add the `midi` entry to the INV-48 test.
+
+
+### 2026-08-15T21:59:38.907Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the `[REDACTED_SECRET]` entry to `STATEFUL_MODES`.
+
+
+### 2026-08-15T22:00:10.771Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify this properly with red/green discipline — I'll temporarily stash the `[REDACTED_SECRET]` fix to confirm the new test fails against the original buggy behavior first.
+
+
+### 2026-08-15T22:00:17.325Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:00:24.496Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — that shows the pre-fix, [REDACTED_SECRET]. Waiting for the test result.
+
+
+### 2026-08-15T22:00:32.942Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red — streak counter reverted from "[REDACTED_SECRET]" to "[REDACTED_SECRET]" on resume, exactly the reported bug. Now let's restore the fix and confirm green.
+
+
+### 2026-08-15T22:00:38.286Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored cleanly. [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:00:41.947Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:00:56.625Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run the full [REDACTED_SECRET] suite (both directions of the new pairing) and then the broader invariants suite.
+
+
+### 2026-08-15T22:01:01.370Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:01:15.592Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification instead of continuing to poll.
+
+
+### 2026-08-15T22:01:27.982Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 7 pass, including both new pairings (`[REDACTED_SECRET]`, `[REDACTED_SECRET]`). Now let's run the full invariants suite and the desktop suite to catch any collateral effects, then update `docs/invariants.md`.
+
+
+### 2026-08-15T22:01:33.236Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that, and meanwhile update `docs/invariants.md`'s [REDACTED_SECRET] section.
+
+
+### 2026-08-15T22:02:00.457Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Because it's deliberately round-robin, not full pairwise — and that's a documented tradeoff already in the test file (`tests/invariants.spec.js`, right above `STATEFUL_MODES`):
+
+> "Paired with the NEXT mode in the list (wrapping around) rather than every possible pair — round-robin still puts every mode through both roles (the one switched away from, and the one switched to) across the full suite, at 1/5th the runtime of a full pairwise sweep."
+
+The actual property INV-48 needs proven is: *does leaving-and-returning-to mode X ever get corrupted by whatever happened in some other mode Y in between?* A full n² sweep (every mode paired with every other mode) would prove that for all C(n,2) combinations, but the failure mode INV-48 guards against — shared mutable state, a leaked timer, a stale async callback repainting the wrong canvas — is a property of the *pair of modes involved*, not something that varies meaningfully across which specific *other* mode Y happens to be, once every mode has been exercised in both roles (switched away from, and switched into) at least once.
+
+With 7 modes now, round-robin gives 7 tests instead of 21 (`C(7,2)`) — each mode plays "the one being tested" exactly once and "the other mode" exactly once, so every mode passes through both roles across the full suite, just not against every possible partner. The tradeoff: if some *specific* pair (say, [REDACTED_PRIVATE_INFO] specifically) had a bug that only manifests with that exact combination and not with either mode's round-robin neighbor, this suite wouldn't catch it. Given the actual historical bugs it was built to catch (#15/#16 — a stale fetch repainting whatever's on screen, unrelated to which mode is showing; Blast/Gravity's shared `Board.cells` — a property of those two specific modes now permanently fixed by `createBoard()`), that residual risk was judged acceptable for a 5x runtime saving. Worth knowing as a known gap, not an oversight.
+
+
+### 2026-08-15T22:02:04.901Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — I'll wait for the completion notification.
+
+
+### 2026-08-15T22:02:52.860Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Great, yes, you're right. Round robin makes perfect sense.
+
+
+### 2026-08-15T22:03:04.238Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the background invariants suite to finish.
+
+
+### 2026-08-15T22:03:13.351Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop polling and wait for the actual completion notification.
+
+
+### 2026-08-15T22:03:21.282Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification rather than keep polling.
+
+
+### 2026-08-15T22:03:32.192Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON] [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:03:35.836Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:03:41.884Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Waiting for the desktop suite.
+
+
+### 2026-08-15T22:03:46.527Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T22:03:55.643Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification instead of continuing to poll.
+
+
+### 2026-08-15T22:04:03.849Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-15T22:04:36.608Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 111 pass, including all existing [REDACTED_SECRET]. Let's commit.
+
+
+### 2026-08-15T22:04:42.466Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Staging only my own files.
+
+
+### 2026-08-15T22:05:09.370Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**Fixed and committed** (`[REDACTED_SECRET]`). Melody now pauses and resumes its drill exactly across a mode switch — confirmed red (streak reverted 1→0) against the pre-fix code, then green after. Full desktop (111 tests) and mobile invariants (57 tests) suites pass clean.
+
+Now moving to the rename, as agreed — since it touches dozens of references across JS, CSS, tests, and a localStorage key needing migration, I'll plan it properly first rather than free-hand a mechanical rename this wide.
+
+
+### 2026-08-15T22:05:13.062Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a new, distinct task (the `midi`→Melody rename) — I'll overwrite the plan file. Let me survey the full blast radius before designing the approach.
+
+
+### 2026-08-15T22:07:04.073Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me get precise counts of `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]` references directly before finalizing scope.
+
+
+### 2026-08-15T22:33:20.313Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-15T22:33:28.665Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's do the mechanical `[REDACTED_SECRET]` → `MelodyMode` rename across every JS and test file in one pass (safe: no other identifier contains this substring).
+
+
+### 2026-08-15T22:33:39.673Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`[REDACTED_SECRET]`→`[REDACTED_PRIVATE_INFO]` rename complete across all files. Now the DOM id renames.
+
+
+### 2026-08-15T22:33:57.280Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — a legitimate old-style test harness with mock elements. It needs the same rename treatment. Let's proceed with the full sweep.
+
+
+### 2026-08-15T22:34:17.161Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify the id rename landed cleanly and didn't touch `[REDACTED_SECRET]`.
+
+
+### 2026-08-15T22:34:25.030Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 19 ids renamed cleanly, zero leftover, and `midi-connect-btn` untouched. Now let's handle the [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:02.712Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check the comments that need fuller rewording (not just word substitution) and the special-case lines.
+
+
