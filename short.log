@@ -6179,3 +6179,454 @@ Let's flush all pending timers via `cleanupPlayback()` in the test right before 
 Now targetLength=5 (userIndex+1 as expected pre-fix) — confirmed genuinely red against the real app bug. Let's implement the fix.
 
 
+### 2026-08-17T01:34:06.212Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green, no regressions. [REDACTED_SECRET]
+
+
+### 2026-08-17T01:35:29.800Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 155 pass. Let's also run the invariants suite to check `PRIMARY_ELEMENTS.life` and INV-13 coverage.
+
+
+### 2026-08-17T01:35:45.340Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green. Let's commit these two units of work ([REDACTED_PRIVATE_INFO] + [REDACTED_PRIVATE_INFO]), keeping the concurrent process's files out.
+
+
+### 2026-08-17T01:35:55.680Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll split this into two commits — [REDACTED_PRIVATE_INFO] and the [REDACTED_PRIVATE_INFO] — since they're unrelated units of work.
+
+
+### 2026-08-17T01:36:03.611Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, since the [REDACTED_PRIVATE_INFO] changes are interleaved I'll do one combined commit for both units of work.
+
+
+### 2026-08-17T01:36:15.956Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed as `[REDACTED_SECRET]`. Summary of what shipped:
+
+**Life mode:**
+- Automaton source dropdown now has an "Upload File…" menu item (scoped to Life only, via a new `hasUpload` flag on the shared `FileFolder`), replacing the separate button that vanished entirely on Chrome.
+- A plain download link (⬇) always serves the *current* board as `.yaml`, no filename prompt — distinct from Save As.
+- Current rule (Survival/Birth, or state count + order for multi-state automata) now shows under the generation counter.
+
+**Melody mode:** the "3 clean reps" measure-jump was already correctly gated, but a separate unconditional timeout was growing the drilled segment by one note after every single clean pass regardless — so in practice advancement always felt like it took 1 rep. Fixed so song mode only advances via that same 3-rep gate; Random is untouched.
+
+All new/existing tests pass (155 desktop, node unit tests, INV-13).
+
+---
+
+Now let's design the musical-notation feature for Melody mode.
+
+
+### 2026-08-17T01:37:22.517Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T01:41:30.455Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I've written this up as `[REDACTED_PRIVATE_INFO]`. Here's the shape of the plan:
+
+**Pipeline:** internal note array → a new hand-rolled `notesToMusicXML()` (JS, no music21/Python needed) → Verovio (vendored WASM, renders SVG) → read each note's rendered x-position back out of the SVG by id → that x-map drives three things in lockstep: our own note-name/octave labels, a re-laid-out version of the existing token-timeline, and barline overlays spanning from the staff down through the timeline. Verovio's x-positions are the single source of truth everything else aligns to — that's what gets you "perfect sync" without three layers coincidentally agreeing.
+
+**Key calls I made, flagged for your review:**
+- **No music21.** Our note array already has everything needed (time/duration/midi); MIDI→MusicXML for a monophonic melody is a bounded quantize-and-emit algorithm, not something needing a full notation-intelligence library. Keeps this a self-contained JS module reusable later by Compose's own MusicXML export (explicitly deferred as Phase 2, not part of this pass).
+- **Grand staff split at MIDI 60 (middle C)**, standard piano convention — flagged to revisit if a real song reads awkwardly.
+- **Labels are our own text elements, not MusicXML `<lyric>`s** — same reasoning as the sync requirement: one coordinate source (Verovio's rendered note x-positions) drives everything, rather than trusting Verovio's own lyric layout to coincidentally match our overlay.
+- **Bundled `midi/*.mid` songs get a one-time offline conversion** (our own converter, run once, checked in as `.musicxml`) — MusicXML becomes canonical going forward; existing `.mid` uploads keep working unchanged.
+
+Sleep well — this is ready to pick up whenever you want to start building it.
+
+
+### 2026-08-17T01:47:01.078Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> So why reinvent what music21 does well in turning keyboard input into music rather than use music21? Separately, compose becomes a Smoosic wrapper?
+
+
+### 2026-08-17T01:47:53.282Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both are [REDACTED_PRIVATE_INFO] — let me verify some facts before revising the design rather than guess.
+
+
+### 2026-08-17T01:49:03.563Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good calls on both counts. Verified: Smoosic ([REDACTED_PRIVATE_INFO]) has an actual "library mode for custom applications" and does MIDI+MusicXML import/export natively — so it likely already solves quantization internally (that's table stakes for any MIDI-import feature), and Pyodide+music21 checks in heavy (~6MB core alone, ~5s first load, size grows fast once music21's own dependencies join) for something we may not need at runtime at all.
+
+That changes the design more than incrementally:
+
+
+### 2026-08-17T01:49:46.156Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — LibreJS works by scanning each served `.js` file for a recognized license comment (this project's own `@licstart`/`@licend` GPL blocks, per `[REDACTED_PRIVATE_INFO]`). Vendoring MIT-licensed code doesn't break compliance, but it isn't automatic either: whatever build we ship has to actually carry a LibreJS-recognized license marker for its *real* license (MIT), not our GPL notice slapped on someone else's code — and a lot of npm `dist/` bundles strip comments entirely, so we can't assume `npm install` output is ready to serve as-is. That's a concrete, checkable action item, not a blocker.
+
+Let me update the design doc with all of this.
+
+
+### 2026-08-17T01:49:52.025Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Quick answer to the parenthetical: `npm run test:librejs` (documented in `[REDACTED_PRIVATE_INFO]`) — it drives the *actual* LibreJS extension via a sibling checkout + Selenium/geckodriver against your local dev server and reports PASS/FAIL from the real tool's own output, not a reimplementation of its detection logic. Requires Firefox, a `../librejs` checkout with `librejs.xpi` built, and the dev server running. I'd run this against any vendored Smoosic/VexFlow build before it's considered done.
+
+Now let me rewrite the design doc with the revised architecture.
+
+
+### 2026-08-17T01:50:40.227Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Doc's updated (`[REDACTED_PRIVATE_INFO]`). Summary of where the design landed:
+
+- **Smoosic (MIT, VexFlow-based) replaces Verovio entirely** — one library for both Melody's display and Compose's editing, instead of two.
+- **No hand-rolled quantizer, no music21/Pyodide.** Smoosic's own MIDI import already has to solve "timed notes → notated rhythm," and we already have a working `writeMIDI()` (Compose's Save) to feed it. music21 stays available only as a fallback one-off script if some bundled song imports badly.
+- **Coordinate sync should come from Smoosic's own editor API** (it has to track note positions for its own click/drag editing), not from screen-scraping a display-only renderer's SVG — though I flagged that the exact API needs confirming against Smoosic's actual Demos repo, not just its README.
+- **LibreJS stays achievable but isn't automatic** — MIT is a free license LibreJS recognizes, but it scans the *served file* for a license comment, not npm metadata, and minified builds often strip that. Real verification path already exists (`npm run test:librejs`, runs the actual extension via a sibling checkout).
+- **One open question I did not decide for you:** does Compose stay Tonnetz-tap-primary with Smoosic as a synced secondary editing view, or does staff-click become primary? I leaned toward the former (matches the app's whole identity and the existing undo system) but flagged it as your call, not mine.
+
+This is committed to the doc, not code — ready to pick up whenever you want to build it.
+
+
+### 2026-08-17T01:55:05.995Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> We're no longer ever writing midi, but instead writing musicXML?
+
+
+### 2026-08-17T01:55:38.113Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+You're right, and that's a real correction — my last revision walked back your original direction without meaning to. Let me fix that.
+
+The mistake: I conflated "what format do we feed [REDACTED_PERSON]" with "what format is canonical." MIDI is a performance format — timestamps and velocities, no notated rhythm, no rests-as-such, no key/time signature. Getting notation out of it always means *inferring* — quantizing guesses at what the composer meant. MusicXML is a notation format — it already says "this is a dotted eighth in 3/4," no guessing required. That's exactly why you wanted it as the starting point, and [REDACTED_PERSON] being a genuine notation editor (not just a MIDI-import tool) makes MusicXML its *native* format, not MIDI.
+
+So, corrected:
+
+- **Bundled songs**: authored/stored as MusicXML, not derived from MIDI at all. Exact notation, nothing inferred.
+- **Compose's Save**: writes MusicXML via [REDACTED_PERSON]'s own export — [REDACTED_PERSON]'s internal document model already has real durations/rests/measures (it's an editor, not a timestamp array), so there's no quantization step to write badly. `writeMIDI()` likely becomes dead code once this lands, unless you want to keep a "Export as MIDI" option for compatibility with other tools.
+- **MIDI's only remaining role**: reading in a `.mid` file someone already has (existing uploads, and the current `midi/*.mid` library until it's re-authored). That's the one place quantization-on-import is unavoidable, because the source data genuinely doesn't carry notated rhythm — no format choice changes that.
+
+
+### 2026-08-17T01:55:44.693Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now rewriting that section (and the Random case, which also needs reconsidering — Random has no notated rhythm either, same inference problem):
+
+
+### 2026-08-17T01:56:16.008Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed. Doc now correctly distinguishes: [REDACTED_STUDENT] is the canonical/write format (bundled songs, Compose's Save) — nothing there ever gets quantized because it's notation from the start. [REDACTED_STUDENT] survives only as an *import* path for the two sources that never had notated rhythm to begin with (uploaded `.mid` files, Random's generated sequence), both funneling through Smoosic's own [REDACTED_STUDENT] import via the existing `write[REDACTED_STUDENT]()`. `write[REDACTED_STUDENT]()` stays alive for Random; Compose's Save moving to [REDACTED_STUDENT] likely retires it there specifically, unless you want a separate "Export as [REDACTED_STUDENT]" for interop.
+
+
+### 2026-08-17T02:02:53.930Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Sorry, show the current state of the doc please?
+
+
+### 2026-08-17T02:03:11.937Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Here's the full current state of `docs/melody-notation-design.md` (149 lines):
+
+---
+
+# Melody/Compose: grand-staff notation via Smoosic (design, not yet implemented)
+
+Requested live: show the song (or Random's generated sequence) on an actual grand staff (treble + bass, like piano notation), with each note's name+octave printed underneath it, and measure barlines that visually span the WHOLE stack — staff, the name/octave row, and the existing note-token timeline below it — as one connected block per measure. The staff is a new display sitting ABOVE the existing timeline, not a replacement for it: the existing timeline keeps doing the interactive job (scrub marker, drag-to-seek, tri-coloured upcoming notes, edge-scroll). The two views must stay in perfect horizontal sync — every note's staff position, its name/octave label, and its existing timeline token all line up at the same x-coordinate, with barlines connecting straight through all three.
+
+**Revision note:** an earlier draft proposed a hand-rolled `notesToMusicXML()` plus Verovio (display-only rendering). Superseded after two pieces of pushback: (1) rhythm quantization is a genuinely hard, well-solved problem, not worth reinventing badly; (2) Compose wants an actual notation EDITOR, not just a read-only renderer. Verovio and the hand-rolled serializer are dropped.
+
+**## The pivot: Smoosic, not Verovio + hand-rolled MusicXML**
+[REDACTED_SECRET] One library instead of two; quantization only needed for the one case that still needs any (see below); coordinate sync comes from the editor's own note-position API instead of screen-scraping SVG.
+
+**## Why not music21 (Pyodide) after all**
+Checked concretely: Pyodide core ~6.4MB before any package, ~5s first load, music21 adds more on top — all to solve a problem Smoosic's own MIDI import already solves in-browser with no second language runtime. Kept as a fallback option for a one-off offline conversion script only, not planned for day one.
+
+**## Open, unresolved question: what does this make Compose?**
+Does Tonnetz-tap stay primary with Smoosic as a synced secondary editing view, or does staff-click become primary? Leaning toward the former (matches the app's identity, existing undo system) but explicitly left as your call.
+
+**## LibreJS compliance**
+MIT is free and LibreJS-recognized, but compliance isn't automatic — LibreJS scans the *served file* for a license comment; minified npm builds often strip it. Action item: verify whatever build gets vendored actually carries one. Verification path: `npm run test:librejs`.
+
+**## MusicXML is the canonical/write format; MIDI is import-only (correction)**
+This is the section you just prompted the fix on: bundled songs and Compose's Save both write/store MusicXML (notation from the start, nothing inferred); MIDI survives only as an import path for the two sources that never had notated rhythm to begin with — uploaded `.mid` files and Random's generated sequence — both funneled through Smoosic's MIDI import via the existing `writeMIDI()`.
+
+**## Open items to settle when implementation actually starts**
+Confirm Smoosic's real API (read-only mode, note-coordinate access) against its Demos repo; clef-split threshold; barline-overlay mechanics; vendoring/build mechanics; structural (not pixel-level) testing approach.
+
+---
+
+Want the raw file instead of this summary, or is this enough to confirm it reads right?
+
+
+### 2026-08-17T02:15:10.966Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Does the Tonnetz stay primary for what action?
+
+
+### 2026-08-17T02:15:25.661Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Primary for **note entry and editing** — i.e., which interaction surface is the main way you actually build/change a composition, as opposed to just displaying it.
+
+Concretely, Compose currently supports these actions entirely through Tonnetz-tap gestures:
+- **Add a note**: tap a hex cell (records it into `[REDACTED_PRIVATE_INFO]`)
+- **Select notes**: tap/drag-select on the lattice
+- **Delete selected**: a button, acting on the tap-based selection
+- **Insert**: insert a note after the current selection
+- **Translate**: drag the selection to a new position (shifts pitch/time)
+- **Rotate**: rotate the selection around a pivot
+
+The open question is whether *those same actions* — add, select, delete, insert, move, rotate — stay driven by tapping/dragging on the hex Tonnetz (with Smoosic just rendering a synced, read-along staff view above it), or whether clicking/dragging directly on the staff notation becomes the way you do them, with Tonnetz-tap demoted to secondary or dropped to display-only.
+
+It's not an all-or-nothing question either — a middle ground exists where both surfaces can edit (tap a hex *or* click a notehead, either one updates the same underlying `[REDACTED_PRIVATE_INFO]` and both views refresh), and "primary" then just means which one is documented/default/gets new features first. I left it open rather than picking, since it changes how much of Compose's existing test suite and undo-stack wiring (`[REDACTED_SECRET]`, [REDACTED_SECRET] — all currently keyed off Tonnetz-native mutators) stays as-is versus needs rethinking around a second input surface.
+
+
+### 2026-08-17T02:16:08.225Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> How about if it becomes *a* way to do them, alongside the Tonnetz?
+
+
+### 2026-08-17T02:16:42.957Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That works, and it's cleaner than a "primary/secondary" split — both surfaces are just alternate ways to edit the same `[REDACTED_PRIVATE_INFO]`, no favorite. A few implications worth being explicit about before I write it into the doc:
+
+1. **Sync has to become bidirectional.** A Tonnetz tap already needs to update the staff (that was true even in the "secondary view" framing). Now a staff edit also needs to update the Tonnetz lattice and push a proper undo entry — same as any other mutator.
+
+2. **Cleanest way to get that undo entry right: route staff edits through the existing mutators, not through a second parallel edit path.** Rather than treating Smoosic's own internal document as an independent source of truth we diff against, Smoosic's edit *gestures* (click to add a note, drag a notehead to a new pitch, drag its edge to resize) should call into the same `insertAfterSelected`/`translateSelection`/etc. functions Tonnetz-tap already calls — so `js/undo-stack.js` doesn't care which surface an edit came from, and Ctrl+Z stays coherent regardless. Whether Smoosic's API actually lets us intercept edit *intent* like that (vs. only exposing "here's the new document, good luck diffing it") is unconfirmed — this becomes a load-bearing open item, not a minor one.
+
+3. **Not every action necessarily gets a staff equivalent, and that's fine.** Translate and rotate-around-a-pivot are geometric operations specific to the hex lattice — "rotate this group 60° around a hex" has no natural staff gesture. Smoosic more realistically contributes its *own* native vocabulary (add/delete/re-pitch/re-time/select by clicking notation), while a few Tonnetz-specific operations likely stay Tonnetz-only. Worth not promising full 1:1 parity across both surfaces.
+
+I'll update the doc to reflect this as the settled answer rather than a lean.
+
+
+### 2026-08-17T02:16:58.230Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Updated. That question is now resolved in the doc rather than left as an open lean — the remaining unknown is purely technical (whether [REDACTED_SECRET] exposes edit intent we can hook, or only a post-edit document we'd have to diff), which I've folded into the existing "confirm Smoosic's real API" open item so it doesn't get lost once implementation starts.
+
+
+### 2026-08-17T02:18:29.395Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Okay, that sounds good. I saw you deferred some other items to the start of implementation. Can you take implementation far enough now to bring up those decisions?
+
+
+### 2026-08-17T02:20:51.480Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That "implementation spike" immediately surfaced the decision that actually matters. I downloaded and inspected the real `smoosic` npm package rather than trusting its README, and it changes the recommendation:
+
+**What's actually in the `smoosic` package (v1.0.44):**
+- 21MB npm tarball; its published `build/smoosic.js` is **25MB, unminified, explicitly a dev build** (`eval-source-map` devtool — its own header says "neither made for production nor for readable output files"). There's no production bundle shipped at all; we'd have to run [REDACTED_SECRET]osic's own webpack build ourselves.
+- Its "library mode" export (`exports.d.ts`) isn't a lean API — it's the **entire desktop notation application**: every dialog (tempo, key signature, lyrics, articulation...), every menu (File, Edit, Voices, Beams...), its own i18n/translation editor, help system, and — critically — **its own audio player/oscillator/sampler/reverb**, which would duplicate this project's existing `js/synth.js` rather than complement it.
+- It bundles Vue (a whole UI framework), its own VexFlow fork, and the dev bundle confirms Vue's reactivity internals are baked directly into the same file — so even using one class off the `[REDACTED_SECRET]` export likely drags in a large fraction of all of it, since nothing suggests it's built to tree-shake.
+
+That's a real architecture mismatch for a project that currently has **zero external JS dependencies** and is built entirely hand-rolled (Life's own YAML parser, this project's own MIDI reader/writer, etc.) — [REDACTED_SECRET]osic isn't a component we'd embed, it's a whole other application we'd be wedged inside of.
+
+**What I checked instead: VexFlow directly** (the engraving engine [REDACTED_SECRET]osic itself sits on top of) — MIT, zero dependencies, and its actual production bundle is **~1.1MB, minified, with a preserved copyright header** (not yet confirmed against the real LibreJS tool, but a real comment survives minification, unlike needing to check [REDACTED_SECRET]osic at all since it's a non-starter anyway). VexFlow is a *renderer*, not an editor — no dialogs, no menus, no audio. We'd write our own thin, scoped edit-gesture layer on top of it (click empty space → add note, drag a notehead → re-pitch), which is a bounded, project-specific amount of new code — much more in keeping with this codebase's own conventions than adopting someone else's whole application.
+
+**The decision to bring to you:** drop [REDACTED_SECRET]osic, vendor VexFlow directly, and build our own minimal notation-editing gestures for Compose instead of getting them "for free." That's more of *our* code to own, but it's the honest tradeoff — the alternative is 25MB of someone else's desktop app, most of which (dialogs, menus, its own synth) we'd never use.
+
+Want me to proceed on that basis — updating the design doc, and then actually vendoring VexFlow + writing a first proof-of-concept (render one note, read its x-position back) to de-risk the rendering/coordinate-sync assumptions before going further?
+
+
+### 2026-08-17T02:24:50.108Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Wait, why did Life hand-roll a yaml parser? That sounds dumb.  Anyway, does rolling our own editing on top of VexFlow give reason to bring back music21?
+
+
+### 2026-08-17T02:25:29.540Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both fair. Let me actually check something concrete before answering the [REDACTED_PRIVATE_INFO] question, since it hinges on a fact about Compose I haven't verified this session.
+
+
+### 2026-08-17T02:26:25.936Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both fair, and the second one turned up something I should have checked before answering last time.
+
+**On Life's YAML parser** — yeah, on reflection that's a fair "sounds dumb." I went back and read the actual justification in the code: *"keeps the app free-software-clean, no vendored lib."* That conflates two different things. A vendored MIT library (like `[REDACTED_SECRET]`) is exactly as free-software-clean as hand-rolled code — freedom isn't about dependency count, it's about license. "Zero dependencies" is a separate preference that happened to get bundled into the same sentence as a genuine principle, and nobody seems to have re-examined whether it earned its keep for a well-specified, mature, standard format where a real parser would've been less code, fewer edge-case bugs, and better error messages for anyone hand-editing a `[REDACTED_PRIVATE_INFO]` file. I shouldn't defend it just to stay consistent with past decisions — I was about to repeat exactly this mistake by defaulting to "hand-roll it" for VexFlow-based editing before actually checking whether that was warranted.
+
+**On music21 — checked before answering, and it changes things.** I went and read Compose's actual recording code rather than reasoning from the design doc's prior framing. Finding: `tapCell` already records raw `[REDACTED_PRIVATE_INFO]` timestamps (`[REDACTED_PRIVATE_INFO]`), and there's already a hand-rolled `[REDACTED_PERSON]` (line 574) — a one-line `Math.round(n.time / gridSeconds) * gridSeconds` per note, independently, opt-in and off by default.
+
+That matters because it means quantization isn't the narrow edge case I'd framed it as (just MIDI uploads + Random) — it's Compose's own *primary* recording path too, any time someone taps along freely. So:
+
+- Rolling our own click/drag editing gestures on VexFlow doesn't itself need quantization — clicking a beat position or dragging to a grid-snapped duration is inherently already-quantized by construction, no inference involved.
+- But that's a narrow slice. The real question is separate: is the *existing* naive round-each-note-independently quantizer good enough, or does free-tapped Compose input deserve better rhythm inference (grouping notes into sensible triplets/dotted-notes/syncopation instead of each note rounding blindly)? That's a real quality gap, and it's the same kind of problem music21 is genuinely good at and a naive quantizer isn't.
+
+So: not "bring back music21 because we're rolling our own editor" — but "reconsider it because quantization turned out to be Compose's main-path problem, not a rare corner case," which is a better-grounded reason than the one I had before. I don't think that alone settles it either way yet — Pyodide's weight (~6.4MB+, ~5s first load) is the same cost as before, and a hobby tap-to-compose game may not need engraving-grade rhythm inference, a smarter hand-rolled heuristic might clear the bar fine. That's a judgment call on required quality, not something the VexFlow-vs-Smoosic choice resolves for us.
+
+Want me to update the design doc with this reopened question, or dig into what a "smarter than one-line round()" hand-rolled quantizer would actually look like before deciding?
+
+
+### 2026-08-17T02:30:18.723Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Okay, let's try the lightweight version first and see how it goes and keep in mind that music21 might help. It's also not just about rhythm. Right now the Tonnetz shows everything as sharps, but when we're learning a song, it has signatures, and some notes may be better named as flats, etc. There's time signature inference, which is about measures, separate from pure rhythm. There's a lot that existing professional tools can buy us that will be a pain to hand-roll.
+
+
+### 2026-08-17T02:31:13.156Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed exactly — `Tonnetz.getNoteName` (`[REDACTED_SECRET]`) is a hardcoded sharps-only array with zero key-signature parameter, used everywhere (Tonnetz labels, clipboard text, everything). It's a pre-existing simplification across the *whole app*, not something new to this feature — but a hex-lattice label reading "D#" is unremarkable, while a staff with a key signature showing "D#" where it should read "Eb" looks like a mistake in a way that's much more visible on real notation.
+
+That's a good scope broaden — three separate "professional tools solve this well" problems, not one:
+
+1. **Rhythm quantization** (already found) — timed input → notated duration.
+2. **Enharmonic spelling** — pitch-class + key context → sharp or flat.
+3. **Time-signature/measure inference** — where do barlines go, separate from note duration.
+
+Useful pattern across all three: each one only needs *inference* when the source is raw performance data with nothing authored. Content that's already notation-shaped doesn't have this problem at all:
+
+- **Bundled songs, as MusicXML**: key signature and time signature are already in the file — an author wrote them down. Zero inference needed, for any of the three.
+- **Compose**: rather than inferring a key/time-signature from what got tapped, make it an explicit setting (same shape as the existing tempo/subdivision controls) — sidesteps spelling and measure inference entirely for anything composed here.
+- **MIDI uploads and Random**: the only genuinely raw-performance-data sources left — nothing authored, so this is the one place all three problems are real and unavoidable. This was already the scope for rhythm quantization; now it's also where spelling and measure-inference quality actually matters.
+
+That third bucket is the one place I'd actually expect the lightweight hand-rolled version to look noticeably worse than something music21-grade — worth watching specifically there, not across the whole feature.
+
+Let me put this in the doc.
+
+
+### 2026-08-17T02:32:35.801Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a strong point, and it changes the framing from "defer the hard version" to "the lightweight version is plausibly *correct*, not just a stopgap." Two separate reasons stack in favor of it:
+
+1. **Strong prior on simplicity.** A kid tapping out [REDACTED_PRIVATE_INFO] is producing mostly-diatonic, mostly-on-the-beat, regularly-barred material — exactly the input distribution where a naive quantizer and a simple key-fit heuristic (count pitch classes used, compare against the 24 major/minor scale profiles, pick the best match — a small, genuinely hand-rollable algorithm, not full Krumhansl-Schmuckler) work well. The failure modes that need music21-grade sophistication (heavy syncopation, chromatic passages, ambiguous meter) are rare in that population, not the common case to optimize for.
+
+2. **The upload-your-own-MusicXML path already serves the professional case honestly.** Someone with sophisticated material has their own real notation editor already. They export MusicXML from *that* and upload it — which, per the "authored notation never needs inference" pattern already in the doc, sidesteps our quantizer/speller/barring entirely. We're not the tool asking to be as good as Finale/MuseScore for that user; we're the tool that gets out of the way and accepts their file.
+
+So the lightweight version isn't "v1, revisit if it's bad" so much as "probably the right permanent shape for this app's actual audience, with a clean escape hatch already designed in for anyone who needs more." Let me fold that into the doc.
+
+
+### 2026-08-17T02:32:59.369Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Updated. The doc now frames the lightweight approach as plausibly the right permanent scope for this app's actual audience (simple, mostly-diatonic tapped-in folk tunes), with the professional case already served honestly by "export your own [REDACTED_PRIVATE_INFO] and upload it" rather than something we need to internally out-engineer music21 for. music21 stays documented as the fallback, gated on watching real usage rather than assumed necessary.
+
+That settles the design-level decisions this doc set out to surface. Remaining before any code gets written: confirming VexFlow's actual API for note-position readback and hit-testing (still unverified against real docs), and picking the concrete lightweight quantize/spell/bar algorithm. Want me to go verify the VexFlow API next, or pause here since it's late?
+
+
+### 2026-08-17T02:34:51.408Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> It does mean that Compose might want to let you select a key signature and time signature before recording, and I would like to support recording with key and time signature changes, so does this mean we should pass a current key signature (if any) to the Tonnetz to display?
+
+
+### 2026-08-17T02:35:16.361Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Yes — and it also means "pass a current key signature" can't quite be a single static value, since you want changes mid-piece. Let me check where the Tonnetz's labels actually get drawn before answering concretely.
+
+
+### 2026-08-17T02:35:55.127Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-17T02:37:20.723Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Let's do a quick review of what in the MusicXML format is actually supported in Tonncade's melody and compose (as planned) vs. explicitly excluded?
+
+
+### 2026-08-17T02:38:30.037Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good exercise — [REDACTED_PRIVATE_INFO]
+
+## Supported (planned)
+
+| Feature | Notes |
+|---|---|
+| Pitch (step/alter/octave) | The whole point — MIDI↔pitch already exists via `Tonnetz.getMidi`/`getNoteName`; enharmonic spelling per key sig is the piece just discussed |
+| Duration / note values (whole–16th, dotted) | Core to the staff display and Compose editing |
+| Rests | Needed to represent gaps between notes |
+| Key signature, incl. mid-piece changes | Just designed — a `{time, key}` track, Compose can insert changes |
+| Time signature, incl. mid-piece changes | Same track mechanism as key |
+| Measures / barlines | The explicit "bar spans everything" requirement |
+| Tempo | Already have `state.tempo`; MusicXML's `<sound tempo>`/`<metronome>` maps directly |
+| Grand staff (one part, two staves split by register) | What was designed — a *register split* of one monophonic line, not genuine independent-hands piano writing |
+| Chords (simultaneous notes) | Compose's existing `flushChordBuffer` already records true simultaneous notes — maps onto MusicXML's `<chord/>` marker within one voice |
+
+## Explicitly excluded
+
+| Feature | Why |
+|---|---|
+| Multiple parts/instruments | Tonncade is one Tonnetz, one voice, by its whole nature |
+| Multiple independent voices per staff (polyphony) | Note model is a flat monophonic sequence (+ chords, above) — no independent voice lines |
+| Guitar tab, percussion/unpitched notation | Not relevant to a pitched hex-lattice app |
+| Lyrics (`<lyric>`) | Gameplay is instrumental note-matching; a file's actual sung words, if present, get ignored |
+| Dynamics, articulations, ornaments, technical marks (fingering etc.) | Performance nuance — nothing in this app's model checks or sonifies per-note dynamics/articulation today |
+| Chord symbols (`<harmony>`, e.g. "Cmaj7" chart annotations) | Not part of the current design |
+| Grace notes, tremolo, glissando | Beyond the "simple diatonic tapped melody" scope already agreed on |
+| Page layout/engraving directives (margins, breaks, fonts) | No print output, in-browser only |
+| Cross-staff notation, manual beam/stem overrides | Left to VexFlow's default engraving |
+| Transposing instruments (`<transpose>`) | Concert pitch only, matches the existing "true pitch" invariant (INV-46) |
+
+## Worth a real decision, not a clean yes/no
+
+- **Repeat signs / voltas / D.C./D.S.** — a MusicXML with a repeat bar would currently just be read linearly, once through, silently *not* expanding the repeat. This is a real, likely-to-be-hit gap (most real folk tunes have a repeat sign) with a genuinely confusing failure mode (practicing a "shorter" song than the real one, with no error). Worth explicitly deciding: silently flatten (current default), warn, or actually expand repeats into the linear note sequence at import time (bounded, doable — repeat barlines are a well-defined structure).
+- **Ties** — not just cosmetic. Whenever quantized duration doesn't fit a single notatable value, or a note should sustain across a barline, correct notation needs a tie curve connecting two noteheads of the same pitch. Excluding ties means such a note renders as two unconnected same-pitch noteheads back-to-back — plausibly misread as two separate notes rather than one held one. Worth explicitly deciding whether v1 emits ties (real, bounded work — detect "duration crosses boundary or isn't a single legal value," split, tie) or accepts that visual ambiguity for now.
+- **Compressed MusicXML (`.mxl`)** — most real notation software (MuseScore, Finale, etc.) exports `.mxl` (a zip container) by default, not plain `.musicxml`/`.xml`. This directly affects the "professional exports their own file and uploads it" escape hatch the whole music21-avoidance argument leans on — if we only parse plain XML text, that path silently fails for anyone whose tool defaults to `.mxl`. Needs deciding: support unzipping on upload (a small, well-defined addition — it's just a zip container), or document "export uncompressed XML" as a requirement.
+
+Want any of those three folded into the doc as open items, or decided now?
+
+
+### 2026-08-17T02:45:47.032Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Repeats: expand, including especially variant endings. Ties: yes. Didn't see: pedal? Revisit from the excluded list: [REDACTED_PERSON] and [REDACTED_PRIVATE_INFO] seem like really meaningful notation choices, e.g. [REDACTED_PRIVATE_INFO] are the sort of thing that [REDACTED_PERSON] should really be accepting of variations for, like not playing them at all or perhaps some other choices. Transpose was an explicit transformation that I want to have as part of [REDACTED_SECRET], that I think might even be in [REDACTED_PRIVATE_INFO] along with more exotic transformations like rotate.
+
+
+### 2026-08-17T02:46:28.358Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check `[REDACTED_PRIVATE_INFO]` before answering the Transpose point, since you referenced it directly.
+
+
+### 2026-08-17T02:46:52.094Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch on pedal, and good calls on the other two. And the Transpose point resolves cleanly: checked `next_steps.md` line 11, and what you're describing there is already built, not a gap. `translateSelection` *is* "drag-to-transpose (linear, so it's an exact transposition)" and `rotateSelection` *is* "Rotate CW/CCW" — both already shipped, already undo-stack-covered. That's unrelated to MusicXML's own `<transpose>` element (which marks a transposing instrument's written-vs-sounding pitch offset, e.g. Bb clarinet) — that one correctly stays excluded, since Tonncade only ever deals in true/concert pitch (INV-46). Two different "transpose"s, no actual gap here.
+
+Let me write the full coverage section into the doc now, with everything settled this round.
+
+
+### 2026-08-17T02:47:22.122Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Written into the doc. Summary of what moved where this round:
+
+- **Ties**: in, correctness-relevant (not cosmetic).
+- **Repeats + variant endings**: in, expanded at import into the real linear sequence — flagged that [REDACTED_SECRET] are a related but distinct, harder case, not yet decided.
+- **Pedal**: confirmed excluded — same bucket as dynamics/articulations (performance nuance, nothing in the current Synth model represents it).
+- **Grace notes** and **glissando**: moved from excluded to "supported, but each needs its own design pass" — both have a real payload beyond notation rendering (grace notes touch Melody's strict note-matching logic; glissando touches both Compose's gesture input and Melody's matching), flagged rather than hand-waved.
+- **Transpose**: not actually a gap — what you meant is already built (`translateSelection`/`rotateSelection`, confirmed in `next_steps.md`), distinct from MusicXML's own `<transpose>` element (which correctly stays excluded).
+- **Two new open items**: D.C./S./Coda/Fine forms, and whether to support compressed `[REDACTED_SECRET]` uploads (real risk to the "professional uploads their own file" escape hatch if their tool defaults to `[REDACTED_SECRET]`, which most do).
+
+
+### 2026-08-17T02:49:08.363Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Even while we're planning, ensuring next_steps is up to date is a good idea. Can you remove whatever you find that's already implemented and flag anything else related to the current plan?
+
+
+### 2026-08-17T02:52:20.012Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fair question — let me explain the actual distinction, then you can decide.
+
+**Why I split them out:** simple repeats and voltas are one well-defined [REDACTED_PRIVATE_INFO] (`<repeat direction="forward/backward">` + `<ending number="1/2">`), with clean, purely local semantics — replay a measure range, pick the right ending by pass count. D.C./D.S./Coda/Fine are a different shape entirely: they're encoded as a handful of loosely-related text directives and `<sound>` attributes (`dacapo`, `dalsegno`, `tocoda`, `fine`, `segno`, `coda`), and combine in real pieces in several distinct ways — "D.C. al Fine" (go back to the start, play until the Fine mark, stop) is different logic from "D.S. al Coda" (go back to the marked Segno, play until "To Coda," then jump to the Coda section). Getting this right means recognizing that small vocabulary and building the right little navigation state machine, not one expansion pass. It's not that I think it's undesirable — it's a meaningfully bigger, differently-shaped piece of work than "expand repeats," and you'd only mentioned variant endings by name, so I didn't want to silently fold in the larger scope without flagging it.
+
+Given that's the actual distinction (not a soft "maybe never"), do you want it in scope now alongside repeats/voltas, or left for later once the simpler expansion is working and you've seen how often real songs actually use D.C./D.S. in practice?
+
+Meanwhile, updating the doc for the `.mxl` decision:
+
+
+### 2026-08-17T02:52:35.888Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Also need to move `.mxl` out of the "Supported" list's repeats bullet area — let me check it's not duplicated, and fix the reference to "the music21 section above" ordering since `.mxl` is now decided before that section appears in the doc.
+
+
+### 2026-08-17T02:52:48.642Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — "music21 section above" (line 101) does correctly precede the `.mxl` decision (line ~193 in the coverage section, line 125+). Reference is accurate. Doc's in good shape.
+
+Summary of this round:
+- `[REDACTED_PRIVATE_INFO]` cleaned up: removed 8 fully-implemented entries (rename, tap-and-hold highlight, the whole old `#27` MIDI-source block, `#47`/`#49` fixes, `#52` quantization, chord entry, two mobile-whitespace items), trimmed done sub-bullets out of still-open parents (`#46`), and added a new top-level entry summarizing the notation plan pointing at the design doc instead of duplicating it. Flagged four existing open items as related: `#46`'s error-tolerance/pedagogical-redesign (same theme as grace-note matching flexibility), the pannable-portrait-fill gap (gets worse once a staff view stacks on top), Compose overdub/extend-recording (same "session timeline" concept as key/meter-change tracks), and `#53`'s external-MIDI-editor item (real tension — it says Compose deliberately avoids in-app timing editing, which the notation plan now adds).
+- Doc updated: `.mxl` support decided (yes), and the D.C./S./Coda/Fine item reframed as open on *timing*, not desirability, with the actual complexity reason spelled out (a small navigation state machine vs. one clean expansion pass).
+
+
+### 2026-08-17T02:54:29.665Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Codas: yes, build the state machine to be able to unroll music input correctly: don't display it, because we're displaying a [REDACTED_PRIVATE_INFO], and don't save it for new compositions; user can do that editing in a real editor themselves.
+
+
+### 2026-08-17T02:54:44.393Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean, well-scoped decision — the read/write asymmetry (full unroll on import, never emit on export) means Compose's writer stays simple regardless of how much state-machine complexity the import side needs. Updating the doc.
+
+
+### 2026-08-17T02:54:59.975Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove the now-resolved "[REDACTED_PRIVATE_INFO]" bullet for D.C./S./Coda/Fine.
+
+
