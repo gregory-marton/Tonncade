@@ -3398,3 +3398,319 @@ Good, already correct. Now let's do one more precise sweep specifically for bare
 All 11 mode-registry keys fixed, none left. Let's re-run the failing test plus the full [REDACTED_PRIVATE_INFO].
 
 
+### 2026-08-15T22:44:12.351Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:44:21.100Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full desktop, mobile invariants, and mobile suites, plus the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:44:32.886Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:44:37.800Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification.
+
+
+### 2026-08-15T22:44:48.653Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop the pings and wait for the notification.
+
+
+### 2026-08-15T22:44:59.180Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification instead of continuing to poll.
+
+
+### 2026-08-15T22:45:10.906Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T22:45:20.501Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:45:30.737Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:46:29.316Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T22:46:42.615Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed flaky, passes in isolation — not a rename bug, pre-existing timing sensitivity in that test suite (consistent with earlier flakiness patterns observed this session). Let's run the full desktop suite once more to confirm everything else is clean.
+
+
+### 2026-08-15T22:46:48.307Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:46:54.308Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification.
+
+
+### 2026-08-15T22:47:04.221Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop pinging and wait for the notification.
+
+
+### 2026-08-15T22:47:15.087Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification instead of continuing to poll.
+
+
+### 2026-08-15T22:47:26.600Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the actual notification rather than continue polling.
+
+
+### 2026-08-15T22:47:50.765Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 111 pass. Now let's run mobile invariants and mobile suites, plus the Node test runner.
+
+
+### 2026-08-15T22:47:55.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:48:00.338Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification instead of polling further.
+
+
+### 2026-08-15T22:48:09.667Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop pinging and wait for the notification.
+
+
+### 2026-08-15T22:48:19.687Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification.
+
+
+### 2026-08-15T22:48:29.004Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the actual notification without further polling.
+
+
+### 2026-08-15T22:48:39.718Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:48:49.209Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification.
+
+
+### 2026-08-15T22:48:59.639Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop polling and wait for the completion notification to arrive naturally.
+
+
+### 2026-08-15T22:49:57.612Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 57 pass, correctly renamed test titles too (`compose→melody`, `melody→sandbox`). Now let's run `[REDACTED_PRIVATE_INFO]` and the Node test runner.
+
+
+### 2026-08-15T22:50:01.882Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:50:08.559Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's the same pre-existing, unrelated `App.init()` failure confirmed earlier this session (reproduces on the clean committed tree too). Let's wait for the mobile suite.
+
+
+### 2026-08-15T22:50:13.577Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:50:24.583Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop polling and wait for the notification.
+
+
+### 2026-08-15T22:50:35.304Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:50:46.014Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
+
+
+### 2026-08-15T22:50:57.195Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification without further polling.
+
+
+### 2026-08-15T22:51:08.480Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:52:19.731Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's the same pre-existing, already-confirmed-unrelated Blast landscape flake from earlier in this session (verified independent of my work then). All 75 other tests pass. Let's commit.
+
+
+### 2026-08-15T22:52:34.783Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, correct comment-only rename. Let's stage all [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:52:52.097Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's correct — `git mv` already staged the rename; subsequent edits layer on top as normal modifications to the new path. Let's commit.
+
+
+### 2026-08-15T22:53:19.795Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`js/melody.js` is tracked as a clean rename from `js/midi.js` (git recognized it despite the content edits). **Committed** (`[REDACTED_SECRET]`).
+
+Summary of both commits this session:
+
+1. **`e2d78e7`** — fixed the actual INV-48 regression (Melody silently reset progress on mode switch), added the missing `midi`/`melody` entry to `STATEFUL_MODES`, confirmed red before green.
+2. **`[REDACTED_SECRET]`** — the mode-identifier rename `midi` → `melody`, resolving the naming collision with genuine MIDI-capability concepts (`MidiInput`, `MidiFolder`). Building it surfaced two more real bugs invisible to static grep — bare unquoted object keys (`{ midi: ... }`) in mode-registry maps across `main.js` and four test files — caught only by running the full suite, not by inspection.
+
+Full desktop (111), mobile invariants (57), and mobile (75, one pre-existing unrelated flake) suites all pass; static id-checker clean.
+
+
+### 2026-08-15T23:51:28.160Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> When I add the next mode, will anything need to be updated for [REDACTED_SECRET] to include it in the check, or does it use a shared list of modes that's must be updated or else the mode wouldn't even work?
+
+
+### 2026-08-15T23:51:36.966Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good question — and the honest answer is: **nothing forces you to add it, and nothing will fail to remind you.** Let me confirm precisely before answering, since this is exactly the kind of silent-gap risk that bit Melody.
+
+
+### 2026-08-15T23:51:57.329Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two different things, and they don't line up — that mismatch is exactly the shape of gap that bit Melody:
+
+- **The app itself** doesn't need anything in `invariants.spec.js` to work — a new mode just needs its own `data-mode="..."` option and JS module, same as always.
+- **Most other invariant tests auto-include it for free** — INV-1, INV-3's follow-up, INV-9/12, INV-11, and the reachability half of INV-13 all call a shared `getModes(page)` helper that reads `data-mode` attributes live off the DOM, so a new mode is automatically swept in with zero maintenance.
+- **[REDACTED_SECRET] does NOT.** `[REDACTED_PRIVATE_INFO]` (`[REDACTED_PRIVATE_INFO]`) is a hand-written array — each entry needs its own `mutate()` function (a real UI interaction that changes that mode's state), which can't be auto-derived since every mode's "do something" gesture is different. Add a new mode without touching this array, and [REDACTED_SECRET] simply never tests it — no failure, no warning, nothing. That's precisely how Melody went unchecked for as long as it did, just with the omission moved one level up (missing from a list, rather than a wrong claim about that list).
+- The same is true of `[REDACTED_PRIVATE_INFO]`, and separately `PRIMARY_ELEMENTS`/`SECONDARY_ELEMENTS`/`CONTAINER_ID` for INV-13's coverage-nudge test — all hand-maintained per-mode maps, none derived from `getModes()`.
+
+So the honest answer to "will I need to update anything": yes, `[REDACTED_PRIVATE_INFO]` (+ `[REDACTED_PRIVATE_INFO]` if the mode has a meaningful counter) — but the test suite won't tell you to. Want me to build a coverage-nudge check for this too, the same pattern used for INV-13 (fail loud if a mode from `getModes()` is missing from `[REDACTED_PRIVATE_INFO]`), so this stops depending on remembering?
+
+
+### 2026-08-15T23:53:25.506Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> That's just what you know about right now? What's the mechanism that all invariants can share to avoid this kind of testing failure in the future?
+
+
+### 2026-08-15T23:54:28.005Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good push — let me think about this at the mechanism level rather than patch-by-patch.
+
+**What already works, structurally:** `getModes(page)` (`[REDACTED_FILENAME]`) reads the mode list live off the DOM (`data-mode` attributes), so INV-1, INV-3's follow-up, INV-9/12, INV-11, and INV-13's reachability check can never drift — they ask the app what modes exist, every run. That's the actual fix pattern, not a one-off.
+
+**What can't fully follow that pattern, and why:** `STATEFUL_MODES`, `COUNTER_ID_FOR_MODE`, `PRIMARY_ELEMENTS`, `SECONDARY_ELEMENTS`, `CONTAINER_ID` are all hand-maintained maps keyed by mode, and none of them can be *auto-generated* from the DOM — each needs a human decision that isn't observable from markup alone: `mutate()` needs a genuine mode-specific UI gesture; `PRIMARY_ELEMENTS`/`SECONDARY_ELEMENTS` need a judgment call about what's primary vs. secondary (I hit this explicitly building the INV-13 coverage test — a naive "every visible control counts" scan would misclassify Compose's own settings inputs). So the content of these maps genuinely can't be automated away.
+
+**But whether every mode has *an entry at all* can be checked automatically** — that's exactly the axis `getModes()` already nails, just never cross-referenced against these maps. The general mechanism: one shared assertion that diffs `getModes()`'s live output against a map's own keys and fails loud, listing exactly which modes are missing an entry. This is the same shape as the INV-13 coverage-nudge test I already built (which checks "every *control* is classified" against `PRIMARY_ELEMENTS`/`SECONDARY_ELEMENTS`) — but that one operates one level down (controls within a known mode); this would be the missing sibling layer (modes themselves within a known map), applied uniformly to every such map instead of writing a bespoke check only after each one gets bitten — which is exactly what's happened twice now: INV-13 got its coverage test, `STATEFUL_MODES` currently has none.
+
+One thing this deliberately does *not* try to do: auto-generate `mutate()` itself by poking internal state. `STATEFUL_MODES`'s own comment is explicit that every `mutate()` must be "a genuine UI interaction... never a direct call into a mode's internal API" — that's a real, intentional design constraint (this project consistently avoids test-only hooks baked into production mode objects, driving everything through real clicks/keypresses instead), and a coverage check should enforce *presence*, not manufacture the content.
+
+Want me to build this — one shared `assertCoversAllModes(page, map, label)` helper, wired into a single new test that checks all five maps at once, so adding a mode without an entry fails loud instead of silently skipping coverage?
+
+
+### 2026-08-15T23:54:28.403Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Also, I'm not at all sure what a non-stateful mode would look like. Every mode is stateful.
+
+
+### 2026-08-15T23:54:44.362Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me verify that precisely before answering.
+
+
+### 2026-08-15T23:55:16.417Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — exactly 7 modes exist, and `[REDACTED_SECRET]` already has exactly those same 7. The name implies an opt-in category that doesn't exist in practice. And your logic about the hypothetical case is airtight: a mode with genuinely no state can't fail "state survives a switch" either — there's nothing to lose, so the check holds vacuously. There's no legitimate reason for *any* mode to be excluded, ever. That simplifies the fix — no exemption bucket needed, just a plain equality check.
+
+Let's build this properly: rename the misleading list and add the coverage check.
+
+
+### 2026-08-15T23:55:27.291Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's rename it and update the comment to reflect the corrected understanding.
+
+
+### 2026-08-15T23:55:38.226Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T23:55:49.900Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the [REDACTED_PRIVATE_INFO] right after `MODE_MUTATIONS`'s definition, before the per-pair test loop.
+
+
+### 2026-08-15T23:56:07.936Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify it passes now, then confirm it would actually catch a regression (temporarily removing an entry).
+
+
+### 2026-08-15T23:56:12.684Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T23:56:22.511Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Passes. Now let's confirm it would actually catch a regression — temporarily remove `life` from `[REDACTED_SECRET]` and confirm red.
+
+
+### 2026-08-15T23:56:37.617Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Understood — I'll finish this quick red/green check first, then do a full systematic review of every invariant test for this same class of issue.
+
+
+### 2026-08-15T23:56:46.321Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T23:56:55.836Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red, clean failure message. Let's restore the entry.
+
+
+### 2026-08-15T23:57:04.859Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T23:57:14.483Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red/green properly. Now let's do the full systematic review of every invariant test, looking specifically for this same class of drift-prone hand-maintained structures.
+
+
+### 2026-08-15T23:57:32.513Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found several more hardcoded mode-list arrays. Let me examine each in context.
+
+
