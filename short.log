@@ -5733,3 +5733,192 @@ Let's also fix the now-stale header comment in `[REDACTED_FILENAME]` describing 
 All 149 pass, node harness clean. Let's stage and commit — carefully, this time double-checking scope before committing.
 
 
+### 2026-08-16T22:05:12.052Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly scoped — only the 6 files I touched are staged, `[REDACTED_SECRET]`/`[REDACTED_SECRET]`/`[REDACTED_SECRET]` remain untouched (the concurrent process's own work).
+
+
+### 2026-08-16T22:05:26.763Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Content matches the message exactly (`js/version.js`'s auto-stamp bump is expected from the pre-commit hook, harmless). Clean this time.
+
+Compose's Undo is now fixed: all seven mutators (record, chord, delete, insert, translate, rotate, paste-group) plus Clear correctly reverse via the same `UndoStack` mechanism, replacing the old `notes.pop()` that only worked by coincidence for the simplest case. Full desktop suite (149) and invariants (60, only the pre-existing unrelated flake) pass. Committed as `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T22:47:02.032Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Why does Life have two undo buttons?
+
+
+### 2026-08-16T22:47:32.188Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed and it's a real bug — `[REDACTED_SECRET]` uses `↺` (counter-clockwise circular arrow) and I put `[REDACTED_SECRET]` right next to it using `↶` (counter-clockwise semicircle arrow). Both rotate the same direction and look nearly identical at icon size. Every other mode's reset/restart button (Blast, Snake, Melody) already uses `↻` (clockwise) — Life's `↺` was already the odd one out, and adding Undo right beside it is what exposed the clash.
+
+
+### 2026-08-16T22:47:38.019Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No test depends on `[REDACTED_SECRET]`'s glyph specifically (only its `title`/`aria-label`, which I'll leave untouched). Fixing it to match the established convention.
+
+
+### 2026-08-16T22:47:48.181Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]. Let's run a quick sanity check and the relevant test suite before committing.
+
+
+### 2026-08-16T22:48:25.865Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check if this is literal [REDACTED_SECRET] rather than a glyph-confusion issue this time.
+
+
+### 2026-08-16T22:48:51.056Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This points to a real bug — the [REDACTED_PRIVATE_INFO] undo button might not be scoped to only show in [REDACTED_PRIVATE_INFO] mode. Let me check how mode-specific sidebar sections get shown/hidden.
+
+
+### 2026-08-16T22:49:34.375Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed the exact bug: `[REDACTED_SECRET]` sits in a sibling `<div class="control-buttons">` with no id, right before `[REDACTED_SECRET]` — never covered by `setMode`'s per-mode hide/show logic at all, so it's visible in *every* mode (Blast: the extra "second undo"; Life: a third button beside the real one; Snake: a leaked, out-of-scope button that shouldn't exist there at all). Fixing it properly by giving it its own id and wiring it into `setMode`'s existing sandbox-exclusive show/hide pattern.
+
+
+### 2026-08-16T22:49:44.820Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire it into `[REDACTED_SECRET]`'s [REDACTED_SECRET] block and the [REDACTED_SECRET] branch.
+
+
+### 2026-08-16T22:50:07.447Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed — `#sandbox-undo` is now only visible in Sandbox mode. Let's clean up the debug test and add a real regression test for this.
+
+
+### 2026-08-16T22:50:41.343Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four undo buttons are now correctly scoped, each visible only in its own mode. Only Sandbox had the leak (now fixed). Let's clean up and add a real regression test.
+
+
+### 2026-08-16T22:50:57.625Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's add the real regression test — this is exactly an [REDACTED_SECRET], so let's add it there for consistency with the established convention.
+
+
+### 2026-08-16T22:51:16.169Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green. Let's confirm red by reverting the `index.html`/`main.js` fix.
+
+
+### 2026-08-16T22:51:44.264Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the same class of issue as before — my Life-glyph and sandbox-undo-leak fixes got swept into the concurrent process's own commit (`[REDACTED_SECRET]`, "Fix YAML serialization bug..."), currently HEAD. Following the same resolution you asked for last time (reword, don't split), since it's the tip commit.
+
+
+### 2026-08-16T22:51:48.055Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] Amending the message to describe both units of work accurately.
+
+
+### 2026-08-16T22:52:10.025Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+My [REDACTED_SECRET] claims the regression test is included, but it isn't — the [REDACTED_PRIVATE_INFO] was just leftover blank lines. Let me fix this properly by amending again to actually include the real test.
+
+
+### 2026-08-16T22:52:14.117Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me clean up the extra blank lines and confirm red before including it.
+
+
+### 2026-08-16T22:52:27.547Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's confirm red/green properly for this test before amending it into the commit.
+
+
+### 2026-08-16T22:52:34.915Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green with the fix in place (already committed in HEAD). Let's confirm red by temporarily reverting just the `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]` fix.
+
+
+### 2026-08-16T22:52:46.588Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Red confirmed. Restoring the fix.
+
+
+### 2026-08-16T22:52:52.688Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored. Let's verify [REDACTED_PERSON] once more and run the full desktop + invariants suites before amending the commit.
+
+
+### 2026-08-16T22:54:10.651Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:24.084Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The concurrent process committed again in between my steps — my amend attached to a completely different, newer commit with an unrelated message. Let me check the full picture.
+
+
+### 2026-08-16T22:54:39.219Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:50.990Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify this landed correctly and nothing shifted again.
+
+
+### 2026-08-16T22:55:01.108Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly landed, matches its content exactly, and stayed as HEAD without further interference. All three fixes are now properly committed and labeled:
+
+1. **`[REDACTED_SECRET]`→`2697552`**: Life's ↺→↻ glyph fix + Sandbox's undo-leak fix (the actual code).
+2. **`[REDACTED_SECRET]`→`51d078b`**: the regression test proving that leak fix, confirmed red/green.
+
+**Summary of what happened and why**, answering your three questions:
+- **Life's "two undo buttons"**: `#life-reset` used `↺`, visually near-identical to `#life-undo`'s `↶` at icon size — fixed to `↻`, matching every other mode's reset glyph.
+- **Blast's "two undos" / Snake's mystery undo**: `#sandbox-undo` was never actually scoped to Sandbox mode — it sat in an un-ID'd div outside any of `setMode`'s per-mode hide/show logic, so it stayed visible in *every* mode. In Blast that showed as a second undo button; in Snake it showed as an undo button that shouldn't exist there at all (it would have called `SandboxMode.undo()`, harmlessly no-op'ing on Snake's board, but confusingly present).
+
+Both are genuine bugs from my original implementation, not intentional — thank you for catching them by just using the thing. Twice now a concurrent process sharing this working tree has swept my changes into its own mislabeled commits; I've been catching and correcting each one, but you may want to get that other session into its own worktree sooner rather than later, as you mentioned.
+
+
+### 2026-08-16T23:03:58.645Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Moved it. Sorry again. Undo should live in the top bar with copy/paste and simply be disabled when not applicable, I think.
+
+
+### 2026-08-16T23:04:41.778Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check how [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:24.232Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T23:08:47.852Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove the four per-mode [REDACTED_PRIVATE_INFO] from their respective control panels.
+
+
+### 2026-08-16T23:09:10.277Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T23:09:13.760Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's see the rest of [REDACTED_PRIVATE_INFO] to find where it ends, so I can add a `App.refreshUndoButton()` call at the end.
+
+
+### 2026-08-16T23:09:16.967Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's make the edits. First remove `[REDACTED_SECRET]` handling in setMode and add `[REDACTED_PRIVATE_INFO]` call at the end.
+
+
+### 2026-08-16T23:09:34.769Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire the keyboard shortcut and button click in `[REDACTED_PERSON]` (renaming scope-wise it's fine to add there since it's the same keydown listener):
+
+
+### 2026-08-16T23:09:43.964Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `[REDACTED_PRIVATE_INFO]` to add `canUndo()` and auto-refresh hooks.

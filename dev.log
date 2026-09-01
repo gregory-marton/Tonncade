@@ -26921,3 +26921,934 @@ All 149 pass, node harness clean. Let's stage and commit — carefully, this tim
 ### 2026-08-16T22:05:03.938Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 ←: M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:05:07.218Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git add docs/invariants.md js/compose.js js/undo-stack.js tests/desktop.spec.js tests/invariants.spec.js tests/run_tests.js git status --short
+
+
+### 2026-08-16T22:05:07.373Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M dev.log M docs/invariants.md M js/compose.js M js/undo-stack.js M tests/desktop.spec.js M tests/invariants.spec.js M tests/run_tests.js ?? life/directional-gun.yaml ?? life/turing-universes.json ?? life_helpers/analyze_burster.js ?? life_helpers/autonomous_hunter.js ?? life_helpers/build_directional_gun.js ?? life_helpers/debug_alpha.js ?? life_helpers/debug_beehive.js ?? life_helpers/debug_reflector.js ?? [[REDACTED_SECRET]] ?? life_helpers/debug_sym_gun.js ?? life_helpers/debug_true_puffer.js ?? life_helpers/find_annihilation.js ?? life_helpers/find_puffer.js ?? life_helpers/find_reflector.js ?? life_helpers/find_shuttle.js ?? life_helpers/find_stationary.js ?? life_helpers/find_symmetric_gun.js ?? life_helpers/find_true_gun.js ?? life_helpers/find_true_gun_collision.js ?? life_helpers/find_true_gun_exhaustive.js ?? life_helpers/rename_yaml.js ?? life_helpers/verify_true_gun.js
+
+
+### 2026-08-16T22:05:12.052Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly scoped — only the 6 files I touched are staged, `[REDACTED_SECRET]`/`[REDACTED_SECRET]`/`[REDACTED_SECRET]` remain untouched (the concurrent process's own work).
+
+
+### 2026-08-16T22:05:18.314Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git commit -m "$(cat <<'EOF' Extend Undo to Compose: fix delete/insert/translate/rotate/paste not being undo-safe Compose already had an Undo button, but it was a plain notes.pop() -- only ever correctly reversed "the last note I just recorded". Delete, rotate, translate, and paste-group (task #82) each mutate state.notes in ways pop() doesn't correctly invert: Delete/Clear replace the whole array, insert/translate/rotate mutate existing note objects in place, and a paste-group can add several notes at once. Doing any of those and hitting Undo either silently did nothing useful or removed the wrong note. Extended to the same UndoStack (js/undo-stack.js, introduced for Sandbox/ Blast/Life) rather than patching the old pop(): each mutator now pushes its own inversion closure. deleteSelected/clear snapshot and restore the whole notes array (never mutated in place, so this is safe). insertAfter Selected/translateSelection/rotateSelection snapshot the prior p/q/midi/ time of every note they're about to touch before touching it. A recorded chord (multiple simultaneous notes) is one undo action, not one per note. loadMelodyFromArrayBuffer clears the history, matching Blast/Life's own "loading something new is a fresh start" boundary. Two of the new tests (Insert, paste-group) deliberately use multi-note, non-trailing-position scenarios -- simpler setups would have coincidentally produced the same result under the old pop() too, so wouldn't have actually caught this bug. Confirmed all 8 new tests red against the old code before landing. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-16T22:05:18.507Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main [REDACTED_SECRET]] Extend Undo to Compose: fix delete/insert/translate/rotate/paste not being undo-safe 7 files changed, 297 insertions(+), 42 deletions(-)
+
+
+### 2026-08-16T22:05:21.928Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git show --stat 95af883 git status --short | grep -v "^??"
+
+
+### 2026-08-16T22:05:22.142Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: commit 95af883e957285ff7e85bf466e5e2f441914bb95 Author: [REDACTED_PERSON] Date: Sun Aug 16 18:05:18 2026 -0400 Extend Undo to Compose: fix delete/insert/translate/rotate/paste not being undo-safe Compose already had an Undo button, but it was a plain notes.pop() -- only ever correctly reversed "the last note I just recorded". Delete, rotate, translate, and paste-group (task #82) each mutate state.notes in ways pop() doesn't correctly invert: Delete/Clear replace the whole array, insert/translate/rotate mutate existing note objects in place, and a paste-group can add several notes at once. Doing any of those and hitting Undo either silently did nothing useful or removed the wrong note. Extended to the same UndoStack (js/undo-stack.js, introduced for Sandbox/ Blast/Life) rather than patching the old pop(): each mutator now pushes its own inversion closure. deleteSelected/clear snapshot and restore the whole notes array (never mutated in place, so this is safe). insertAfter  …[37 chars elided]… ection snapshot the prior p/q/midi/ time of every note they're about to touch before touching it. A recorded chord (multiple simultaneous notes) is one undo action, not one per note. loadMelodyFromArrayBuffer clears the history, matching Blast/Life's own "loading something new is a fresh start" boundary. Two of the new tests (Insert, paste-group) deliberately use multi-note, non-trailing-position scenarios -- simpler setups would have coincidentally produced the same result under the old pop() too, so wouldn't have actually caught this bug. Confirmed all 8 new tests red against the old code before landing. Co-Authored-By: [REDACTED_PERSON] docs/invariants.md | 46 +++++++++---- js/compose.js | 93 ++++++++++++++++++++++---- js/undo-stack.js | 2 +- js/version.js | 2 +- tests/desktop.spec.js | 169 +++++++++++++++++++++++++++++++++++++++++++++-- tests/invariants.spec.js | 25 +++++-- tests/run_tests.js | 2 +- 7 files changed, 297 insertions(+), 42 deletions(-) M dev.log
+
+
+### 2026-08-16T22:05:26.763Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Content matches the message exactly (`js/version.js`'s auto-stamp bump is expected from the pre-commit hook, harmless). Clean this time.
+
+Compose's Undo is now fixed: all seven mutators (record, chord, delete, insert, translate, rotate, paste-group) plus Clear correctly reverse via the same `UndoStack` mechanism, replacing the old `notes.pop()` that only worked by coincidence for the simplest case. Full desktop suite (149) and invariants (60, only the pre-existing unrelated flake) pass. Committed as `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T22:47:02.032Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Why does Life have two undo buttons?
+
+
+### 2026-08-16T22:47:07.113Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "life-undo\|life-clear\|life-reset\|life-step\|life-play-pause\|life-save" /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/index.html
+
+
+### 2026-08-16T22:47:07.239Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 299: <button id="[REDACTED_SECRET]" class="icon-btn" title="Play" aria-label="Play">▶</button> 300: <button id="[REDACTED_SECRET]" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button> 301: <button id="[REDACTED_SECRET]" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↺</button> 302: <button id="[REDACTED_SECRET]" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button> 303: <button id="[REDACTED_SECRET]" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 304: <button id="[REDACTED_SECRET]" class="icon-btn" title="Save As" aria-label="Save As">💾</button>
+
+
+### 2026-08-16T22:47:17.974Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "icon-btn.*↺\|icon-btn.*↶\|icon-btn.*↻" /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/index.html
+
+
+### 2026-08-16T22:47:18.085Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] 92: <button id="blast-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> [REDACTED_SECRET] 225: <button id="compose-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] 303: <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 312: <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
+
+
+### 2026-08-16T22:47:32.188Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed and it's a real bug — `[REDACTED_SECRET]` uses `↺` (counter-clockwise circular arrow) and I put `[REDACTED_SECRET]` right next to it using `↶` (counter-clockwise semicircle arrow). Both rotate the same direction and look nearly identical at icon size. Every other mode's reset/restart button (Blast, Snake, Melody) already uses `↻` (clockwise) — Life's `↺` was already the odd one out, and adding Undo right beside it is what exposed the clash.
+
+
+### 2026-08-16T22:47:32.727Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "'↺'\|\"↺\"\|↺" [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 2>/dev/null
+
+
+### 2026-08-16T22:47:32.831Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON]: // previously swapped, making the ↻/↺ icons rotate backwards from what they show. [REDACTED_PERSON]: // Gravity's D-pad buttons — the one place in the app with an explicit ↻/↺ icon promising a [REDACTED_PERSON]: // clockwise step (+5), ↺ (m-btn-ccw) the counter-clockwise step (+1). They were swapped.
+
+
+### 2026-08-16T22:47:38.019Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No test depends on `[REDACTED_SECRET]`'s glyph specifically (only its `title`/`aria-label`, which I'll leave untouched). Fixing it to match the established convention.
+
+
+### 2026-08-16T22:47:39.579Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T22:47:39.633Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (note: the file had been modified on disk since you last read it — the edit applied cleanly, but the file contains other changes not in your context. Read it before edits that depend on surrounding content.)
+
+
+### 2026-08-16T22:47:44.495Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:47:44.557Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 296 <span id="life-filename"></span> 297 </div> 298 <div class="control-buttons"> 299 <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button> 300 <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button> 301 <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↻</button> 302 <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button> 303 <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 304 <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button> 305 </div>
+
+
+### 2026-08-16T22:47:48.181Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]. Let's run a quick sanity check and the relevant test suite before committing.
+
+
+### 2026-08-16T22:47:48.926Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade node scripts/check-dom-ids.js npx playwright test tests/desktop.spec.js --project="Desktop Chrome" -g "Life:" 2>&1 | tail -30
+
+
+### 2026-08-16T22:48:03.544Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: PASS: every literal DOM id referenced from js/*.js (87 distinct ids checked) exists in index.html. npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test tests/desktop.spec.js --project=Desktop Chrome -g Life: Running 13 tests using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:2043:1 › Life: switching away before its online fetch resolves does not repaint the shared canvas (#15, #16) (1.7s) ✓ 2 [Desktop Chrome] › tests/desktop.spec.js:2097:1 › Life: off-board cells keep living and sound their own pitch, never a stale one (#13) (386ms) ✓ 3 [Desktop Chrome] › tests/desktop.spec.js:2127:1 › Life: tapping a cell cycles it through all states (#85) (434ms) ✓ 4 [Desktop Chrome] › tests/desktop.spec.js:2154:1 › Life: dragging the mouse pans the view; a short click still toggles the cell (621ms) ✓ 5 [Desktop Chrome] › tests/desktop.spec.js:2181:1 › Life: Save As writes a YAML file that round-trips back to the same rule and live cells (433ms) ✓ 6 [Desktop Chrome] › tests/des …[42 chars elided]… trips a multi-state automaton (transition table + per-cell state) (467ms) ✓ 7 [Desktop Chrome] › tests/desktop.spec.js:2301:1 › Life: Save As refuses an empty board with a clear message, instead of writing an empty file (421ms) ✓ 8 [Desktop Chrome] › tests/desktop.spec.js:2317:1 › Life: opening a local automaton file loads its rule and cells (436ms) ✓ 9 [Desktop Chrome] › tests/desktop.spec.js:3369:1 › Life: Undo reverses a single cell toggle (467ms) ✓ 10 [Desktop Chrome] › tests/desktop.spec.js:3381:1 › Life: Undo reverses Clear and Reset (human edits), restoring the exact prior board + generation (473ms) ✓ 11 [Desktop Chrome] › tests/desktop.spec.js:3395:1 › Life: a simulation step is never undo-able -- undo after Step reverses the last EDIT, not the step (477ms) ✓ 12 [Desktop Chrome] › tests/desktop.spec.js:3411:1 › Life: Undo reverses a paste (459ms) ✓ 13 [Desktop Chrome] › tests/desktop.spec.js:3423:1 › Life: loading a new automaton clears the undo history (445ms) 13 passed (8.4s)
+
+
+### 2026-08-16T22:48:09.482Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "top-header\|id=\"copy\|id=\"paste\|App.copy\|App.paste\|clipboard-btn" [REDACTED_PERSON] | head -20
+
+
+### 2026-08-16T22:48:09.595Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 22: <header id="top-header"> 46: <button type="button" id="copy-btn" 51: <button type="button" id="paste-btn" 240: the header's cross-mode copy/paste ([REDACTED_PRIVATE_INFO]) -- that transfers the
+
+
+### 2026-08-16T22:48:13.680Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T22:48:13.723Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 22 <header id="top-header"> 23 <div id="top-drawer"> 24 <div class="header-left" id="menu-toggle" style="display: flex; flex-direction: column; justify-content: center; gap: 2px;"> 25 <h1 id="game-title" style="margin: 0; line-height: 1.1; font-size: 24px;">[REDACTED_PRIVATE_INFO] <a href="[REDACTED_PERSON]" target="_blank" rel="noopener noreferrer" id="see-the-code-link" 27 aria-label="View source code on GitHub" title="View source code on GitHub" 28 style="color: var(--dim); text-decoration: none; transition: color 0.15s ease;" 29 onmouseover="this.style.color='var(--accent)'" 30 onmouseout="this.style.color='var(--dim)'">&lt;/&gt; <span class="version-tag">local</span></a> 31 <a href="#" id="report-bug-link" 32 aria-label="Report a bug on GitHub" title="Report a bug on GitHub" 33 style="text-decoration: none; opacity: 0.6; transition: opacity 0.15s ease;" 34 onmouseover="this.style.opacity='1'" 35 onmouseout="this.style.opacity='0.6'">&#x1F99F;</a> 36 <button type="butt …[1990 chars elided]… --accent)'" 60 onmouseout="this.style.color='var(--dim)'"> 61 Based on Leonhard Euler's (1739) Tonnetz ↗ 62 </a> 63 </div> 64 <div id="mode-controls"> 65 <div class="mode-slider"> 66 <div class="mode-slider-active"></div> 67 <div class="mode-option active" data-mode="sandbox">Sandbox</div> 68 <div class="mode-option" data-mode="melody">Melody</div> 69 <div class="mode-option" data-mode="compose">Compose</div> 70 <div class="mode-option" data-mode="snake">Snake</div> 71 <div class="mode-option" data-mode="blast">Blast</div> 72 <div class="mode-option" data-mode="gravity">Gravity</div> 73 <div class="mode-option" data-mode="life">Life</div> 74 </div> 75 </div> 76 <div id="drawer-injected-tools" style="display: none; padding: 10px; border-top: 1px solid var(--border);"></div> 77 </div> 78 79 <div id="mobile-always-visible" class="mobile-only" style="width: 100%;"> 80 <div id="sandbox-mobile-tools" style="display: none;"></div> 81 <div id="melody-mobile-tools" style="display: none;"></div>
+
+
+### 2026-08-16T22:48:25.865Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check if this is literal [REDACTED_SECRET] rather than a glyph-confusion issue this time.
+
+
+### 2026-08-16T22:48:26.396Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "blast-stats\|mobile.*inject\|cloneNode\|drawer-injected-tools\|mobile-always-visible" [REDACTED_PERSON] | head -30
+
+
+### 2026-08-16T22:48:26.514Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 312: const stats = document.getElementById('[REDACTED_PRIVATE_INFO]'); 463: // '' (not 'block'): #[REDACTED_PRIVATE_INFO] needs to be a flex row on mobile but a plain block 658: const drawerInjected = document.getElementById('[REDACTED_PRIVATE_INFO]');
+
+
+### 2026-08-16T22:48:34.525Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "snake-controls\|snake-reset\|snake-undo" [REDACTED_PERSON]
+
+
+### 2026-08-16T22:48:34.636Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 259: <div id="[REDACTED_PRIVATE_INFO]" style="display: none;"> 262: <button id="[REDACTED_PRIVATE_INFO]" class="icon-btn" title="Restart" aria-label="Restart">↻</button>
+
+
+### 2026-08-16T22:48:51.056Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This points to a real bug — the [REDACTED_PRIVATE_INFO] undo button might not be scoped to only show in [REDACTED_PRIVATE_INFO] mode. Let me check how mode-specific sidebar sections get shown/hidden.
+
+
+### 2026-08-16T22:48:51.058Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "function setMode\|setMode:" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js | head -5
+
+
+### 2026-08-16T22:48:51.161Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 304: setMode: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:48:55.444Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:48:55.492Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 304 setMode: function(mode, idx) { 305 if (this.currentMode === mode) return; 306 307 // Picking a mode is "done with the menu" -- same as selecting a piece from the Sandbox 308 // chord-guide ([REDACTED_SECRET]), the drawer should get out of the way afterward instead of 309 // permanently occupying screen space on mobile. 310 this.collapseMobileDrawer(); 311 312 const stats = document.getElementById('blast-stats'); 313 const sandboxCtrls = document.getElementById('sandbox-controls'); 314 const clickAction = document.getElementById('click-action'); 315 const activePill = document.querySelector('.mode-slider-active'); 316 const options = document.querySelectorAll('.mode-option'); 317 318 // Update active class on options 319 options.forEach(opt => opt.classList.remove('active')); 320 options[idx].classList.add('active'); 321 322 // Slide the active background indicator 323 if (activePill) { 324 const isLandscape = window.innerWidth <= 950 && window.innerWidth > window.innerHeight; 325 if (i …[1042 chars elided]… nstance ([REDACTED_SECRET]) the OUTGOING mode actually 368 // owns, so a bundled/folder load still in flight for it never lands after the player has 369 // moved elsewhere (#15, #16, generalized from Life-only). Scoped to this.currentMode (the 370 // mode we're actually leaving) rather than each mode's own cleanup() -- several modes' 371 // cleanup() is reused internally too (e.g. MelodyMode.resetGame() calls it on normal entry, 372 // not just on exit), so invalidating from there fires far more often than "really left." 373 if ((this.currentMode === 'melody' || this.currentMode === 'compose') && typeof MidiFolder !== 'undefined') { 374 MidiFolder.invalidate(); 375 } 376 if (this.currentMode === 'life' && typeof LifeFolder !== 'undefined') { 377 LifeFolder.invalidate(); 378 } 379 380 this.currentMode = mode; 381 382 // Reflect the mode in the address bar so the deep-link is shareable and discoverable 383 // (replaceState doesn't fire hashchange, so no re-route loop). Skip if unchanged.
+
+
+### 2026-08-16T22:49:08.964Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T22:49:09.008Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 384 if (typeof history !== 'undefined' && history.replaceState) { 385 const want = '#' + this._[REDACTED_PRIVATE_INFO]ToUrl([REDACTED_PRIVATE_INFO]); 386 if (location.hash !== want) history.replaceState(null, '', want); 387 } 388 document.getElementById('app').setAttribute('data-[REDACTED_PRIVATE_INFO]', [REDACTED_PRIVATE_INFO]); 389 390 // Gravity's "down" is fixed in its own falling-piece logic (see Render.getEffectiveRotation), 391 // so rotating its view would desync what the player sees from what the game means by 392 // "down" -- hide the control there rather than let it silently do nothing. 393 const rotateBtn = document.getElementById('rotate-view-btn'); 394 if (rotateBtn) rotateBtn.style.display = [REDACTED_PRIVATE_INFO] === '[REDACTED_STUDENT]' ? 'none' : 'inline'; 395 396 // Configure mobile action button text based on active [REDACTED_PRIVATE_INFO]. Compose has no 397 // selected-piece/"place" concept this button [REDACTED_PRIVATE_INFO]ls -- its own Record/Play/Undo/Clear/ 398 // Save buttons in #compose-controls are the real controls, so this one just stays out 399 // of the way (same reasoning as hiding the palet …[2290 chars elided]… uide.style.display = 'block'; 460 if (clickAction) clickAction.textContent = 'Place/Pick up'; 461 SandboxMode.init(); 462 } else if ([REDACTED_PRIVATE_INFO] === '[REDACTED_STUDENT]') { 463 // '' (not 'block'): #[REDACTED_STUDENT]-stats needs to be a flex row on mobile but a plain block 464 // on desktop (see css/style.css), and CSS alone can't express that once JS also owns 465 // this same inline property for hide/show -- clearing it lets each breakpoint's own 466 // CSS rule apply. Found live: hardcoding either 'block' or 'flex' here needs a CSS 467 // !important to win on the OTHER breakpoint, and !important on 'display: flex' also 468 // defeats this same inline style's 'none' when hiding the panel in other [REDACTED_PRIVATE_INFO]s -- 469 // that's exactly what made all three panels stack visibly on top of each other. 470 stats.style.display = ''; 471 document.getElementById('placement-controls').style.display = 'block'; 472 if (hexNavControls) hexNavControls.style.display = 'block'; 473 if (clickAction) clickAction.textContent = 'Place Piece';
+
+
+### 2026-08-16T22:49:34.375Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed the exact bug: `[REDACTED_SECRET]` sits in a sibling `<div class="control-buttons">` with no id, right before `[REDACTED_SECRET]` — never covered by `setMode`'s per-mode hide/show logic at all, so it's visible in *every* mode (Blast: the extra "second undo"; Life: a third button beside the real one; Snake: a leaked, out-of-scope button that shouldn't exist there at all). Fixing it properly by giving it its own id and wiring it into `setMode`'s existing sandbox-exclusive show/hide pattern.
+
+
+### 2026-08-16T22:49:35.564Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:49:35.610Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 3[REDACTED_SECRET]6 <div class="stats-panel"> 3[REDACTED_SECRET]7 <p title="Generation">gen <span id="life-generation">[REDACTED_SECRET]</span></p> 3[REDACTED_SECRET]8 </div> 3[REDACTED_SECRET]9 </div> 31[REDACTED_SECRET] 311 <div class="control-buttons"> 312 <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 313 </div> 314 <div id="palette"> 315 <div id="piece-list"></div>
+
+
+### 2026-08-16T22:49:41.228Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:49:41.293Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T22:49:44.820Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire it into `[REDACTED_SECRET]`'s [REDACTED_SECRET] block and the [REDACTED_SECRET] branch.
+
+
+### 2026-08-16T22:49:48.193Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:49:48.239Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T22:49:51.943Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "\.control-buttons {" -A5 [REDACTED_PERSON]
+
+
+### 2026-08-16T22:49:52.078Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] { 559- display: flex; 560- gap: 10px; 561- margin-bottom: 15px; 562-} 563- -- [REDACTED_PRIVATE_INFO], #melody-controls .control-buttons { 826- display: flex; 827- flex-direction: row !important; 828- gap: var(--chrome-gap); 829- margin-top: var(--chrome-gap); 830- } -- 841: #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons { 842- margin-top: 0; 843- flex: 0 0 auto; 844- width: max-content; 845- } 846- -- 1339: #melody-controls .control-buttons { [REDACTED_PRIVATE_INFO] 1341- flex-direction: row !important; 1342- gap: var(--chrome-gap); 1343- } 1344- -- 1364: #blast-stats .control-buttons, #gravity-controls .control-buttons, #snake-controls .control-buttons { 1365- display: flex; 1366- flex-direction: row !important; 1367- gap: var(--chrome-gap); 1368- margin-top: 0; 1369- flex: 0 0 auto; -- 1722:#app[data-gravity-sides="1"][data-mode="gravity"] #gravity-controls .control-buttons { 1723- display: flex; 1724- /* Beat the shared mobile strip's `flex-direction: row !important` and `width: max-content` 1725- (css line ~657/674): in a 62px gutter column the transport stacks vertically, it doesn't 1726- run in a row that would overflow the panel and shove Restart out over the board (INV-13). */ 1727- flex-direction: column !important;
+
+
+### 2026-08-16T22:49:59.474Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] cat >> [REDACTED_STUDENT] <<'EOF' test('[REDACTED_SECRET]', async ({ page }) => { await page.goto('/'); const results = {}; for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) { await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); results[mode] = await page.evaluate(() => { const el = document.getElementById('sandbox-undo'); if (!el) return 'missing'; const r = el.getBoundingClientRect(); return (r.width > 0 && r.height > 0) ? 'visible' : 'hidden'; }); } console.log(JSON.stringify(results, null, 2)); }); EOF npx playwright test [REDACTED_STUDENT] --project="Desktop Chrome" -g "[REDACTED_SECRET]" 2>&1 | tail -25
+
+
+### 2026-08-16T22:50:03.957Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: PASS: every literal DOM id referenced from js/*.js (88 distinct ids checked) exists in index.html. npm notice run [REDACTED_SECRET] npx npm notice run '[REDACTED_SECRET]' test [REDACTED_PRIVATE_INFO] --project=Desktop Chrome -g [REDACTED_SECRET] Running 1 test using 1 worker { "sandbox": "visible", "blast": "hidden", "life": "hidden", "snake": "hidden", "gravity": "hidden", "melody": "hidden", "compose": "hidden" } ✓ 1 [Desktop Chrome] › [REDACTED_PRIVATE_INFO]:3589:1 › [REDACTED_SECRET] (641ms) 1 passed (1.8s)
+
+
+### 2026-08-16T22:50:07.447Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed — `#sandbox-undo` is now only visible in Sandbox mode. Let's clean up the debug test and add a real regression test for this.
+
+
+### 2026-08-16T22:50:07.844Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade grep -n "^test('DEBUGSANDBOXLEAK'" tests/desktop.spec.js
+
+
+### 2026-08-16T22:50:07.947Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 3589:test('[REDACTED_SECRET]', async ({ page }) => {
+
+
+### 2026-08-16T22:50:11.608Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade wc -l tests/desktop.spec.js head -n 3588 tests/desktop.spec.js > /tmp/desktop_trimmed.spec.js echo "" >> /tmp/desktop_trimmed.spec.js mv /tmp/desktop_trimmed.spec.js tests/desktop.spec.js tail -5 tests/desktop.spec.js
+
+
+### 2026-08-16T22:50:13.442Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] await page.locator('#compose-undo').click(); expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op });
+
+
+### 2026-08-16T22:50:19.401Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "only be visible in the mode\|hex-nav-controls.*only show" [REDACTED_PERSON] [REDACTED_PERSON]
+
+
+### 2026-08-16T22:50:19.512Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-16T22:50:22.718Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "F/T/Y/H/B/V" [REDACTED_PERSON]
+
+
+### 2026-08-16T22:50:22.826Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 640:[REDACTED_PRIVATE_INFO], async ({ page }) => {
+
+
+### 2026-08-16T22:50:32.842Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade cat >> tests/desktop.spec.js <<'EOF' test('DEBUGALLUNDOLEAK', async ({ page }) => { await page.goto('/'); const buttons = ['sandbox-undo', 'blast-undo', 'life-undo', 'compose-undo']; const results = {}; for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) { await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); results[mode] = await page.evaluate((buttons) => { const out = {}; for (const id of buttons) { const el = document.getElementById(id); if (!el) { out[id] = 'missing'; continue; } const r = el.getBoundingClientRect(); out[id] = (r.width > 0 && r.height > 0) ? 'visible' : 'hidden'; } return out; }, buttons); } console.log(JSON.stringify(results, null, 2)); }); EOF npx playwright test tests/desktop.spec.js --project="Desktop Chrome" -g "DEBUGALLUNDOLEAK" 2>&1 | tail -50
+
+
+### 2026-08-16T22:50:37.368Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Running 1 test using 1 worker { "sandbox": { "sandbox-undo": "visible", "blast-undo": "hidden", "life-undo": "hidden", "compose-undo": "hidden" }, "blast": { "sandbox-undo": "hidden", "blast-undo": "visible", "life-undo": "hidden", "compose-undo": "hidden" }, "life": { "sandbox-undo": "hidden", "blast-undo": "hidden", "life-undo": "visible", "compose-undo": "hidden" }, "snake": { "sandbox-undo": "hidden", "blast-undo": "hidden", "life-undo": "hidden", "compose-undo": "hidden" }, "gravity": { "sandbox-undo": "hidden", "blast-undo": "hidden", "life-undo": "hidden", "compose-undo": "hidden" }, "melody": { "sandbox-undo": "hidden", "blast-undo": "hidden", "life-undo": "hidden", "compose-undo": "hidden" }, "compose": { "sandbox-undo": "hidden", "blast-undo": "hidden", "life-undo": "hidden", "compose-undo": "visible" } } ✓ 1 [Desktop Chrome] › [REDACTED_PRIVATE_INFO] › DEBUGALLUNDOLEAK (617ms) 1 passed (1.8s)
+
+
+### 2026-08-16T22:50:41.343Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four undo buttons are now correctly scoped, each visible only in its own mode. Only Sandbox had the leak (now fixed). Let's clean up and add a real regression test.
+
+
+### 2026-08-16T22:50:41.855Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade grep -n "^test('DEBUGALLUNDOLEAK'" tests/desktop.spec.js
+
+
+### 2026-08-16T22:50:41.962Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 3591:test('[REDACTED_SECRET]', async ({ page }) => {
+
+
+### 2026-08-16T22:50:47.786Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade wc -l tests/desktop.spec.js head -n 3590 tests/desktop.spec.js > /tmp/desktop_trimmed.spec.js echo "" >> /tmp/desktop_trimmed.spec.js mv /tmp/desktop_trimmed.spec.js tests/desktop.spec.js tail -3 tests/desktop.spec.js
+
+
+### 2026-08-16T22:50:49.805Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:50:53.580Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade tail -5 tests/desktop.spec.js grep -n "DEBUG" tests/desktop.spec.js
+
+
+### 2026-08-16T22:50:53.685Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: });
+
+
+### 2026-08-16T22:50:57.625Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's add the real regression test — this is exactly an [REDACTED_SECRET], so let's add it there for consistency with the established convention.
+
+
+### 2026-08-16T22:51:03.820Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cat >> [REDACTED_PERSON] <<'EOF' // Found live: #sandbox-undo (issue #17) sat in a bare, un-ID'd sibling div right before #palette // -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY // mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked // Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions // wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one // #sandbox-guide already uses). This checks the general property -- every mode's own Undo button // is visible ONLY in that mode -- not just the one specific leak that was reported. test('Undo buttons (#17) are each visible only in their own mode, never leaking into another', async ({ page }) => { await page.goto('/'); const undoButtons = { sandbox: 'sandbox-undo', blast: 'blast-undo', life: 'life-undo', compose: 'compose-undo' }; for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) { await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); for (const [owningMode, id] of Object.entries(undoButtons)) { const visible = await page.evaluate((id) => { const el = document.getElementById(id); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, id); const expected = mode === owningMode; expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected); } } }); EOF
+
+
+### 2026-08-16T22:51:05.836Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-16T22:51:09.902Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade npx playwright test tests/desktop.spec.js --project="Desktop Chrome" -g "Undo buttons.*are each visible only" 2>&1 | tail -20
+
+
+### 2026-08-16T22:51:12.738Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test [REDACTED_PRIVATE_INFO] --project=Desktop Chrome -g Undo buttons.*are each visible only Running 1 test using 1 worker ✓ 1 [Desktop Chrome] › [REDACTED_PRIVATE_INFO]:3600:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another (694ms) 1 passed (1.8s)
+
+
+### 2026-08-16T22:51:16.169Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green. Let's confirm red by reverting the `index.html`/`main.js` fix.
+
+
+### 2026-08-16T22:51:16.477Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git diff index.html js/main.js | head -60
+
+
+### 2026-08-16T22:51:16.621Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-16T22:51:20.694Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git status --short | grep -v "^??" grep -n "sandbox-actions" index.html js/main.js
+
+
+### 2026-08-16T22:51:20.839Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO]: <div id="sandbox-actions" class="control-buttons" style="display: none;"> [REDACTED_PRIVATE_INFO]: const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17
+
+
+### 2026-08-16T22:51:25.767Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git log --oneline -5 git log -S "sandbox-actions" --oneline -- index.html js/main.js
+
+
+### 2026-08-16T22:51:26.178Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] Fix YAML serialization bug causing literal backslash n in generated demo files [REDACTED_SECRET] Extend Undo to Compose: fix delete/insert/translate/rotate/paste not being undo-safe [REDACTED_SECRET] Add Undo (issue #17), scoped per-mode; plus a terminal cell-count histogram script [REDACTED_SECRET] Phase 6 Complete: Discovered and extracted a Glider Gun via Glider-Block collision. Added to Tonncade UI. [REDACTED_SECRET] Phase 6: Add Glider Gun synthesis (Glider-Block collision) to turing_search.js; browser-zoom fix + screenshot cell-count histogram [REDACTED_SECRET] Fix YAML serialization bug causing literal backslash n in generated demo files
+
+
+### 2026-08-16T22:51:33.277Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git rev-parse HEAD git show --stat d1f35d0
+
+
+### 2026-08-16T22:51:33.428Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] commit [REDACTED_SECRET] Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: Sun Aug 16 18:50:23 2026 -0400 Fix YAML serialization bug causing literal backslash n in generated demo files dev.log | 260 ++++++++++++++++++++++++++++++++++++++++++ index.html | 4 +- js/main.js | 3 + js/version.js | 2 +- life/turing-eater-demo.yaml | 11 +- life/turing-gun-demo.yaml | 16 ++- life_helpers/turing_search.js | 4 +- tests/desktop.spec.js | 2 + 8 files changed, 293 insertions(+), 9 deletions(-)
+
+
+### 2026-08-16T22:51:44.264Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the same class of issue as before — my Life-glyph and sandbox-undo-leak fixes got swept into the concurrent process's own commit (`[REDACTED_SECRET]`, "Fix YAML serialization bug..."), currently HEAD. Following the same resolution you asked for last time (reword, don't split), since it's the tip commit.
+
+
+### 2026-08-16T22:51:44.464Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git show d1f35d0 -- index.html js/main.js
+
+
+### 2026-08-16T22:51:44.590Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: commit d1f35d015496f4a78faa389d94e25845ea44505d Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: [REDACTED_PRIVATE_INFO] Fix YAML serialization bug causing literal backslash n in generated demo files diff --git a/index.html b/index.html index 29927bb..269dc83 100644 --- a/index.html +++ b/index.html @@ -298,7 +298,7 @@ See the LICENSE file, or <[REDACTED_SECRET]>, for detail <div class="control-buttons"> <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button> <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button> - <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↺</button> + <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↻</button> <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button> <button id="life- …[229 chars elided]… pl-3.0.html>, for detail </div> </div> - <div class="control-buttons"> + <div id="sandbox-actions" class="control-buttons" style="display: none;"> <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> </div> <div id="palette"> diff --git a/js/main.js b/js/main.js index ba15c05..8a20917 100644 --- a/js/main.js +++ b/js/main.js @@ -451,12 +451,15 @@ const App = { if (guide) { guide.style.display = 'none'; } + const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17 + if (sandboxActions) sandboxActions.style.display = 'none'; if (mode === 'sandbox') { document.getElementById('placement-controls').style.display = 'block'; if (hexNavControls) hexNavControls.style.display = 'block'; sandboxCtrls.style.display = 'block'; if (guide) guide.style.display = 'block'; + if (sandboxActions) sandboxActions.style.display = 'flex'; if (clickAction) clickAction.textContent = 'Place/Pick up'; SandboxMode.init(); } else if (mode === 'blast') {
+
+
+### 2026-08-16T22:51:48.055Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] Amending the message to describe both units of work accurately.
+
+
+### 2026-08-16T22:51:55.787Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git commit --amend -m "$(cat <<'EOF' Fix YAML serialization bug causing literal backslash n in generated demo files; fix two Undo (#17) UI bugs found live Two unrelated units of work landed in this commit together (a concurrent session's working-tree changes were swept in alongside this one's own git add/commit) -- message rewritten to describe both, per established practice this session, rather than split the commit. YAML serialization (life_helpers/turing_search.js, life/turing-eater-demo.yaml, life/turing-gun-demo.yaml, dev.log): fixes literal backslash-n appearing in generated demo automaton files. Two Undo UI bugs (index.html, js/main.js), both reported live right after issue #17 shipped: 1. "Why does Life have two undo buttons?" -- #life-reset used the glyph ↺ (counter-clockwise circle arrow), visually near-identical at icon size to #life-undo's ↶ (counter-clockwise semicircle arrow), sitting right next to it. Every other mode's reset/restart button (Blast, Snake, Melody) already uses ↻ (clockwise) -- Life's ↺ was the odd one out; changed to match, resolving the visual clash. 2. "Why are there two undos in Blast?" / "What does Undo do in Snake?" -- #sandbox-undo sat in a bare, un-ID'd sibling div right before #palette, never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY mode, not just Sandbox: a second, out-of-place Undo button showing in Blast, a third button in Life, and a leaked Undo in Snake (which has no undo at all). Fixed by giving it its own #sandbox-actions wrapper, wired into setMode's existing sandbox- exclusive show/hide pattern (the same one #sandbox-guide already uses). New test: "Undo buttons (#17) are each visible only in their own mode, never leaking into another" -- checks the general property, not just the one specific leak that was reported. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-16T22:51:55.946Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main 2697552] Fix YAML serialization bug causing literal backslash n in generated demo files; fix two Undo (#17) UI bugs found live Date: [REDACTED_PRIVATE_INFO] 8 files changed, 293 insertions(+), 9 deletions(-)
+
+
+### 2026-08-16T22:52:02.649Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git status --short | grep -v "^??" git show d1f35d0 -- tests/desktop.spec.js 2>&1 | head -20 git show 2697552 -- tests/desktop.spec.js 2>&1 | head -20
+
+
+### 2026-08-16T22:52:02.810Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M tests/desktop.spec.js commit d1f35d015496f4a78faa389d94e25845ea44505d Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: [REDACTED_PRIVATE_INFO] Fix YAML serialization bug causing literal backslash n in generated demo files diff --git a/tests/desktop.spec.js b/tests/desktop.spec.js index 9638626..2c45f9b 100644 --- a/tests/desktop.spec.js +++ b/tests/desktop.spec.js @@ -3585,3 +3585,5 @@ test('Compose: loading a file clears the undo history', async ({ page }) => { await page.locator('#compose-undo').click(); expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op }); + + commit 269755219dd23646104302b218045a3cac4fb9fb Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: [REDACTED_PRIVATE_INFO] Fix YAML serialization bug causing literal backslash n in generated demo files; fix two Undo (#17) UI bugs found live Two unrelated units of work landed in this commit together (a concurrent session's working-tree changes were swept in alongside this one's own git add/commit) -- message rewritten to describe both, per established practice this session, rather than split the commit. YAML serialization (life_helpers/turing_search.js, life/turing-eater-demo.yaml, life/turing-gun-demo.yaml, dev.log): fixes literal backslash-n appearing in generated demo automaton files. Two Undo UI bugs (index.html, js/main.js), both reported live right after issue #17 shipped: 1. "Why does Life have two undo buttons?" -- #life-reset used the glyph ↺ (counter-clockwise circle arrow), visually near-identical at icon
+
+
+### 2026-08-16T22:52:10.025Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+My [REDACTED_SECRET] claims the regression test is included, but it isn't — the [REDACTED_PRIVATE_INFO] was just leftover blank lines. Let me fix this properly by amending again to actually include the real test.
+
+
+### 2026-08-16T22:52:10.027Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] | head -40
+
+
+### 2026-08-16T22:52:10.150Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: diff --git a/tests/desktop.spec.js b/tests/desktop.spec.js index 2c45f9b..6d2ee34 100644 --- a/tests/desktop.spec.js +++ b/tests/desktop.spec.js @@ -3587,3 +3587,30 @@ test('Compose: loading a file clears the undo history', async ({ page }) => { }); + + + +// Found live: [REDACTED_PRIVATE_INFO] +// -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY +// mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked +// Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions +// wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one +// #sandbox-guide already uses). This checks the general property -- every mode's own Undo button +// is visible ONLY in that mode -- not just the one specific leak that was reported. +test('[REDACTED_PRIVATE_INFO]', async ({ page }) => { + await page.goto('/'); + const undoButtons = { sandbox: 'sandbox-undo', blast: 'blast-undo', life: 'life-undo', compose: 'compose-undo' }; + for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) { + await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); + for (const [owningMode, id] of Object.entries(undoButtons)) { + const visible = await page.evaluate((id) => { + const el = document.getElementById(id); + if (!el) return false; + const r = el.getBoundingClientRect(); + return r.width > 0 && r.height > 0; + }, id); + const expected = mode === owningMode; + expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected); + } + } +});
+
+
+### 2026-08-16T22:52:14.117Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me clean up the extra blank lines and confirm red before including it.
+
+
+### 2026-08-16T22:52:15.143Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:52:15.197Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 3583 }, bytes); 3584 const sizeBeforeUndo = await page.evaluate(() => ComposeMode.state.notes.length); 3585 await page.locator('#compose-undo').click(); 3586 expect(await page.evaluate(() => ComposeMode.state.notes.length)).toBe(sizeBeforeUndo); // undo was a no-op 3587 }); 3588 3589 3590 3591 3592 3593 // Found live: [REDACTED_PRIVATE_INFO] 3594 // -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY 3595 // mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked 3596 // Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions 3597 // wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one
+
+
+### 2026-08-16T22:52:19.032Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T22:52:19.075Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+✗ denied: <tool_use_error>Found 2 matches of the string to replace, but replace_all is false. To replace all occurrences, set replace_all to true. To replace only one occurrence, please provide more context to uniquely identify the instance. String: }); </tool_use_error>
+
+
+### 2026-08-16T22:52:24.050Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:52:24.128Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T22:52:27.547Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's confirm red/green properly for this test before amending it into the commit.
+
+
+### 2026-08-16T22:52:28.180Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade npx playwright test tests/desktop.spec.js --project="Desktop Chrome" -g "Undo buttons.*are each visible only" 2>&1 | tail -15
+
+
+### 2026-08-16T22:52:30.983Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run tonncade@1.0.0 npx npm notice run 'playwright' test [REDACTED_PRIVATE_INFO] --project=Desktop Chrome -g Undo buttons.*are each visible only Running 1 test using 1 worker ✓ 1 [Desktop Chrome] › [REDACTED_PRIVATE_INFO]:3597:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another (703ms) 1 passed (1.9s)
+
+
+### 2026-08-16T22:52:34.915Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green with the fix in place (already committed in HEAD). Let's confirm red by temporarily reverting just the `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]` fix.
+
+
+### 2026-08-16T22:52:38.354Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade cp index.html /tmp/index_fixed.html cp js/main.js /tmp/main_fixed.js python3 - <<'EOF' with open('index.html') as f: c = f.read() c = c.replace( '<div id="sandbox-actions" class="control-buttons" style="display: none;">', '<div class="control-buttons">' ) with open('index.html', 'w') as f: f.write(c) with open('js/main.js') as f: c = f.read() old = """ const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17 if (sandboxActions) sandboxActions.style.display = 'none'; if (mode === 'sandbox') { document.getElementById('placement-controls').style.display = 'block'; if (hexNavControls) hexNavControls.style.display = 'block'; sandboxCtrls.style.display = 'block'; if (guide) guide.style.display = 'block'; if (sandboxActions) sandboxActions.style.display = 'flex';""" new = """ if (mode === 'sandbox') { document.getElementById('placement-controls').style.display = 'block'; if (hexNavControls) hexNavControls.style.display = 'block'; sandboxCtrls.style.display = 'block'; if (guide) guide.style.display = 'block';""" assert old in c c = c.replace(old, new) with open('js/main.js', 'w') as f: f.write(c) EOF npx playwright test tests/desktop.spec.js --project="Desktop Chrome" -g "Undo buttons.*are each visible only" 2>&1 | tail -30
+
+
+### 2026-08-16T22:52:42.641Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: ✘ 1 [Desktop Chrome] › tests/desktop.spec.js:3597:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another (450ms) 1) [Desktop Chrome] › tests/desktop.spec.js:3597:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another Error: #sandbox-undo in mode=blast (should belong only to sandbox) expect(received).toBe(expected) // Object.is equality Expected: false Received: true 3608 | }, id); 3609 | const expected = mode === owningMode; > 3610 | expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected); | ^ 3611 | } 3612 | } 3613 | }); at [REDACTED_PRIVATE_INFO] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [Desktop Chrome] › tests/desktop.spec.js:3597:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another
+
+
+### 2026-08-16T22:52:46.588Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Red confirmed. Restoring the fix.
+
+
+### 2026-08-16T22:52:47.218Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] cp /tmp/index_fixed.html index.html cp /tmp/main_fixed.js js/main.js grep -n "sandbox-actions" index.html js/main.js
+
+
+### 2026-08-16T22:52:49.454Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]: <div id="sandbox-actions" class="control-buttons" style="display: none;"> [REDACTED_PRIVATE_INFO]: const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17
+
+
+### 2026-08-16T22:52:52.688Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored. Let's verify [REDACTED_PERSON] once more and run the full desktop + invariants suites before amending the commit.
+
+
+### 2026-08-16T22:52:53.373Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade node scripts/check-dom-ids.js npx playwright test tests/desktop.spec.js --project="Desktop Chrome" 2>&1 | tail -15
+
+
+### 2026-08-16T22:54:05.952Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: PASS: every literal DOM id referenced from js/*.js (88 distinct ids checked) exists in index.html. ✓ 138 [Desktop Chrome] › tests/desktop.spec.js:3381:1 › Life: Undo reverses Clear and Reset (human edits), restoring the exact prior board + generation (469ms) ✓ 139 [Desktop Chrome] › tests/desktop.spec.js:3395:1 › Life: a simulation step is never undo-able -- undo after Step reverses the last EDIT, not the step (495ms) ✓ 140 [Desktop Chrome] › tests/desktop.spec.js:3411:1 › Life: Undo reverses a paste (459ms) ✓ 141 [Desktop Chrome] › tests/desktop.spec.js:3423:1 › Life: loading a new automaton clears the undo history (463ms) ✓ 142 [Desktop Chrome] › tests/desktop.spec.js:3444:1 › Compose: Undo reverses a recorded chord (multiple simultaneous notes) as ONE action (389ms) ✓ 143 [Desktop Chrome] › tests/desktop.spec.js:3461:1 › Compose: Undo reverses Delete, restoring the exact prior notes and selection (431ms) ✓ 144 [Desktop Chrome] › tests/desktop.spec.js:3483:1 › Compose: Undo reverses Insert, including the time-shift it applied to LATER notes (424ms) ✓ 145 [Desktop Chrome] › tests/desktop.spec.js:3508:1 › Compose: Undo reverses a translate (drag) of the selection (435ms) ✓ 146 [Desktop Chrome] › tests/desktop.spec.js:3522:1 › Compose: Undo reverses a rotate of the selection around its pivot (423ms) ✓ 147 [Desktop Chrome] › tests/desktop.spec.js:3540:1 › Compose: Undo reverses a paste-group (#82) of MULTIPLE notes as one action, restoring notes and selection (429ms) ✓ 148 [Desktop Chrome] › tests/desktop.spec.js:3561:1 › Compose: Undo reverses Clear (449ms) ✓ 149 [Desktop Chrome] › tests/desktop.spec.js:3572:1 › Compose: loading a file clears the undo history (448ms) ✓ 150 [Desktop Chrome] › tests/desktop.spec.js:3597:1 › Undo buttons (#17) are each visible only in their own mode, never leaking into another (549ms) 150 passed (1.2m)
+
+
+### 2026-08-16T22:54:10.651Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:11.586Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git add tests/desktop.spec.js git status --short | grep -v "^??"
+
+
+### 2026-08-16T22:54:11.742Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M [REDACTED_PRIVATE_INFO] M [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:15.821Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git commit --amend --no-edit git show --stat HEAD
+
+
+### 2026-08-16T22:54:16.013Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main 5cd0631] Remove redundant beehive glider burst demo Date: Sun Aug 16 18:52:59 2026 -0400 3 files changed, 25 insertions(+), 34 deletions(-) delete mode 100644 life/beehive-glider-burst.yaml commit 5cd0631803501456e6c1b037356eeb71a6b6114d Author: [REDACTED_PERSON] Date: Sun Aug 16 18:52:59 2026 -0400 Remove redundant beehive glider burst demo js/version.js | 2 +- life/beehive-glider-burst.yaml | 33 --------------------------------- tests/desktop.spec.js | 24 ++++++++++++++++++++++++ 3 files changed, 25 insertions(+), 34 deletions(-)
+
+
+### 2026-08-16T22:54:24.084Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The concurrent process committed again in between my steps — my amend attached to a completely different, newer commit with an unrelated message. Let me check the full picture.
+
+
+### 2026-08-16T22:54:24.341Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git log --oneline -8
+
+
+### 2026-08-16T22:54:24.463Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] Remove redundant beehive glider burst demo 2697552 Fix YAML serialization bug causing literal backslash n in generated demo files; fix two Undo (#17) UI bugs found live [REDACTED_SECRET] Extend Undo to Compose: fix delete/insert/translate/rotate/paste not being undo-safe [REDACTED_SECRET] Add Undo (issue #17), scoped per-mode; plus a terminal cell-count histogram script [REDACTED_SECRET] Phase 6 Complete: Discovered and extracted a Glider Gun via Glider-Block collision. Added to Tonncade UI. [REDACTED_SECRET] Phase 6: Add Glider Gun synthesis (Glider-Block collision) to turing_search.js; browser-zoom fix + screenshot cell-count histogram [REDACTED_SECRET] Phase 5: Add Logic Gate synthesis (Glider-Glider mutual annihilation) to turing_search.js [REDACTED_SECRET] Add Turing Eater Demo to index.json
+
+
+### 2026-08-16T22:54:34.483Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git show 5cd0631 -- tests/desktop.spec.js | head -40
+
+
+### 2026-08-16T22:54:34.616Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: commit 5cd0631803501456e6c1b037356eeb71a6b6114d Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: Sun Aug 16 18:52:59 2026 -0400 Remove redundant beehive glider burst demo diff --git a/tests/desktop.spec.js b/tests/desktop.spec.js index 2c45f9b..a4290fd 100644 --- a/tests/desktop.spec.js +++ b/tests/desktop.spec.js @@ -3587,3 +3587,27 @@ test('Compose: loading a file clears the undo history', async ({ page }) => { }); +// Found live: #sandbox-undo (issue #17) sat in a bare, un-ID'd sibling div right before #palette +// -- never covered by setMode's per-mode hide/show logic at all, so it stayed visible in EVERY +// mode, not just Sandbox (reported as "two undos in Blast", a third button in Life, and a leaked +// Undo showing up in Snake, which has no undo at all). Fixed by giving it its own #sandbox-actions +// wrapper and wiring it into setMode's existing sandbox-exclusive show/hide pattern (the same one +// #sandbox-guide already uses). This checks the general property -- every mode's own Undo button +// is visible ONLY in that mode -- not just the one specific leak that was reported. +test('Undo buttons (#17) are each visible only in their own mode, never leaking into another', async ({ page }) => { + await page.goto('/'); + const undoButtons = { sandbox: 'sandbox-undo', blast: 'blast-undo', life: 'life-undo', compose: 'compose-undo' }; + for (const mode of ['sandbox', 'blast', 'life', 'snake', 'gravity', 'melody', 'compose']) { + await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); + for (const [owningMode, id] of Object.entries(undoButtons)) { + const visible = await page.evaluate((id) => { + const el = document.getElementById(id); + if (!el) return false; + const r = el.getBoundingClientRect(); + return r.width > 0 && r.height > 0; + }, id); + const expected = mode === owningMode; + expect(visible, `#${id} in mode=${mode} (should belong only to ${owningMode})`).toBe(expected); + } + } +});
+
+
+### 2026-08-16T22:54:39.219Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:39.397Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git status --short | grep -v "^??"
+
+
+### 2026-08-16T22:54:39.524Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: M [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T22:54:47.408Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] git commit --amend -m "$(cat <<'EOF' Remove redundant beehive glider burst demo; add regression test for the Undo-button-leak fix Two unrelated units of work landed in this commit together (a concurrent session's own commit swept in this one's already-staged test file change) -- message rewritten to describe both, per established practice this session, rather than split the commit. Removes life/beehive-glider-burst.yaml (superseded/redundant demo file). Adds the regression test for the previous commit's #sandbox-undo leak fix ("Undo buttons (#17) are each visible only in their own mode, never leaking into another") -- confirmed red against the pre-fix code (reverted index.html/js/main.js locally, reran, watched it fail with #sandbox-undo visible in blast mode; restored and reran green) before landing here. Co-Authored-By: [REDACTED_PERSON] <[REDACTED_PERSON]> EOF )"
+
+
+### 2026-08-16T22:54:47.560Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [main [REDACTED_SECRET]] Remove redundant beehive glider burst demo; add regression test for the Undo-button-leak fix [REDACTED_PRIVATE_INFO] 3 files changed, 25 insertions(+), 34 deletions(-) delete mode 100644 life/beehive-glider-burst.yaml
+
+
+### 2026-08-16T22:54:50.990Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify this landed correctly and nothing shifted again.
+
+
+### 2026-08-16T22:54:51.406Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade git log -1 --format="%H %s" git show --stat HEAD git status --short | grep -v "^??"
+
+
+### 2026-08-16T22:54:51.560Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] Remove redundant beehive glider burst demo; add regression test for the Undo-button-leak fix commit [REDACTED_SECRET] Author: [REDACTED_PERSON] <[REDACTED_PERSON]> Date: Sun Aug 16 18:52:59 2026 -0400 Remove redundant beehive glider burst demo; add regression test for the Undo-button-leak fix Two unrelated units of work landed in this commit together (a concurrent session's own commit swept in this one's already-staged test file change) -- message rewritten to describe both, per established practice this session, rather than split the commit. Removes life/beehive-glider-burst.yaml (superseded/redundant demo file). Adds the regression test for the previous commit's #sandbox-undo leak fix ("Undo buttons (#17) are each visible only in their own mode, never leaking into another") -- confirmed red against the pre-fix code (reverted index.html/js/main.js locally, reran, watched it fail with #sandbox-undo visible in blast mode; restored and reran green) before landing here. Co-Authored-By: [REDACTED_PERSON] 5 <[REDACTED_PERSON]> js/version.js | 2 +- life/beehive-glider-burst.yaml | 33 --------------------------------- tests/desktop.spec.js | 24 ++++++++++++++++++++++++ 3 files changed, 25 insertions(+), 34 deletions(-) M life/index.json
+
+
+### 2026-08-16T22:55:01.108Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly landed, matches its content exactly, and stayed as HEAD without further interference. All three fixes are now properly committed and labeled:
+
+1. **`[REDACTED_SECRET]`→`2697552`**: Life's ↺→↻ glyph fix + Sandbox's undo-leak fix (the actual code).
+2. **`[REDACTED_SECRET]`→`51d078b`**: the regression test proving that leak fix, confirmed red/green.
+
+**Summary of what happened and why**, answering your three questions:
+- **Life's "two undo buttons"**: `#life-reset` used `↺`, visually near-identical to `#life-undo`'s `↶` at icon size — fixed to `↻`, matching every other mode's reset glyph.
+- **Blast's "two undos" / Snake's mystery undo**: `#sandbox-undo` was never actually scoped to Sandbox mode — it sat in an un-ID'd div outside any of `setMode`'s per-mode hide/show logic, so it stayed visible in *every* mode. In Blast that showed as a second undo button; in Snake it showed as an undo button that shouldn't exist there at all (it would have called `SandboxMode.undo()`, harmlessly no-op'ing on Snake's board, but confusingly present).
+
+Both are genuine bugs from my original implementation, not intentional — thank you for catching them by just using the thing. Twice now a concurrent process sharing this working tree has swept my changes into its own mislabeled commits; I've been catching and correcting each one, but you may want to get that other session into its own worktree sooner rather than later, as you mentioned.
+
+
+### 2026-08-16T23:03:58.645Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Moved it. Sorry again. Undo should live in the top bar with copy/paste and simply be disabled when not applicable, I think.
+
+
+### 2026-08-16T23:04:08.385Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:04:08.454Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 /* 2 @licstart The following is the entire license notice for the 3 JavaScript code in this file. 4 5 [REDACTED_PERSON] 6 7 The JavaScript code in this file is free software: you can 8 redistribute it and/or modify it under the terms of the GNU 9 General Public License (GNU GPL) as published by the Free Software 10 Foundation, either version 3 of the License, or (at your option) 11 any later version. The code is distributed WITHOUT ANY WARRANTY; 12 without even the implied warranty of MERCHANTABILITY or FITNESS 13 FOR A PARTICULAR PURPOSE. See the GNU GPL for more details. 14 15 As additional permission under GNU GPL version 3 section 7, you 16 may distribute non-source (e.g., minimized or compacted) forms of 17 that code without the copy of the GNU GPL normally required by 18 section 4, provided you include this license notice and a URL 19 through which recipients can access the Corresponding Source. 20 21 @licend The above is the entire license notice 22 for the Jav …[1332 chars elided]… aller's own undo() does that 47 // once, after invoking whichever closure comes off the stack). 48 push: function(invert) { 49 this._entries.push(invert); 50 if (this._entries.length > this._limit) this._entries.shift(); 51 }, 52 53 // Pops and runs the most recent inversion closure. Returns true if there was one to run 54 // (so the caller knows whether a redraw is actually needed), false on an empty stack -- 55 // undoing with nothing to undo is a silent no-op, not an error. 56 undo: function() { 57 const invert = this._entries.pop(); 58 if (!invert) return false; 59 invert(); 60 return true; 61 }, 62 63 // Called wherever a mode's own "this is a fresh start, not a correction" boundary 64 // already exists (Blast's New Game, Life's loading a new automaton) -- undoing PAST that 65 // boundary back into a previous game/automaton doesn't mean anything, so the history 66 // resets there rather than accumulating across it. 67 clear: function() { 68 this._entries = []; 69 }, 70 }, 71 }; 72
+
+
+### 2026-08-16T23:04:41.778Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check how [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:04:42.565Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "copy-btn\|paste-btn\|App.copy\|App.paste\|App.clipboard" [REDACTED_PERSON] | head -30
+
+
+### 2026-08-16T23:04:42.709Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 63: this.flashClipboardButton('copy-btn'); 66: // App.clipboard is just this one tab's own JS memory: invisible to a second [REDACTED_PRIVATE_INFO] 111: // Reads App.clipboard -- this tab's own in-memory copy -- directly and synchronously; see 113: // refresh App.clipboard from the real OS clipboard (so paste can pull from a DIFFERENT 119: this.flashClipboardButton('paste-btn'); 124: // App.clipboard (this tab's own last copy) if the Clipboard API is unavailable, permission is 132: } catch (e) { /* permission denied/unavailable -- fall back to App.clipboard as-is */ } 206: const copyBtn = document.getElementById('copy-btn'); 207: const pasteBtn = document.getElementById('paste-btn');
+
+
+### 2026-08-16T23:08:24.232Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-16T23:08:29.724Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:29.777Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 /* 2 @licstart The following is the entire license notice for the 3 JavaScript code in this file. 4 5 Copyright (C) [REDACTED_PERSON] 6 7 The JavaScript code in this file is free software: you can 8 redistribute it and/or modify it under the terms of the GNU 9 General Public License (GNU GPL) as published by the Free Software 10 Foundation, either version 3 of the License, or (at your option) 11 any later version. The code is distributed WITHOUT ANY WARRANTY; 12 without even the implied warranty of MERCHANTABILITY or FITNESS 13 FOR A PARTICULAR PURPOSE. See the GNU GPL for more details. 14 15 As additional permission under GNU GPL version 3 section 7, you 16 may distribute non-source (e.g., minimized or compacted) forms of 17 that code without the copy of the GNU GPL normally required by 18 section 4, provided you include this license notice and a URL 19 through which recipients can access the Corresponding Source. 20 21 @licend The above is the entire license notice 22 for the Jav …[9486 chars elided]… 07 const pasteBtn = document.getElementById('paste-btn'); 208 if (copyBtn) copyBtn.onclick = () => this.copy(); 209 if (pasteBtn) pasteBtn.onclick = () => this.pasteFromClipboardOrOS(); 210 }, 211 212 init: function() { 213 if (typeof Replay !== 'undefined') Replay.init(); 214 215 // Migrate localStorage keys from Tonntris to Tonncade to preserve player scores 216 const oldKeys = ['tonntris_gravity_best', 'tonntris_midi_best', 'tonntris_puzzle_best', 'tonntris_snake_best']; 217 oldKeys.forEach(oldKey => { 218 const val = localStorage.getItem(oldKey); 219 if (val !== null) { 220 const newKey = oldKey.replace('tonntris', 'tonncade'); 221 localStorage.setItem(newKey, val); 222 localStorage.removeItem(oldKey); 223 } 224 }); 225 226 // Migrate the Puzzle Mode -> Blast Mode rename's localStorage key too 227 const oldBlastKey = 'tonncade_puzzle_best'; 228 const blastVal = localStorage.getItem(oldBlastKey); 229 if (blastVal !== null) { 230 localStorage.setItem('tonncade_blast_best', blastVal);
+
+
+### 2026-08-16T23:08:34.537Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]\|[REDACTED_PRIVATE_INFO]" [REDACTED_PERSON]
+
+
+### 2026-08-16T23:08:34.723Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 46: <button type="button" id="[REDACTED_PRIVATE_INFO]" 51: <button type="button" id="[REDACTED_PRIVATE_INFO]" 92: <button id="[REDACTED_PRIVATE_INFO]" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 225: <button id="[REDACTED_PRIVATE_INFO]" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 303: <button id="[REDACTED_PRIVATE_INFO]" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 312: <button id="[REDACTED_PRIVATE_INFO]" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
+
+
+### 2026-08-16T23:08:36.394Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:36.447Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 <!DOCTYPE html> 2 <html lang="en"> 3 <!-- 4 Copyright (C) [REDACTED_PERSON] 5 6 This file is part of Tonncade. Tonncade is free software: you can redistribute it and/or 7 modify it under the terms of the GNU General Public License as published by the Free 8 Software Foundation, either version 3 of the License, or (at your option) any later version. 9 See the LICENSE file, or <[REDACTED_SECRET]>, for details. 10 --> 11 <head> 12 <meta charset="utf-8"> 13 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"> 14 <title>Tonncade</title> 15 <link rel="icon" type="image/svg+xml" href="favicon.svg"> 16 <link rel="manifest" href="manifest.json"> 17 <meta name="theme-color" content="#7fe0d0"> 18 <link rel="stylesheet" href="css/style.css"> 19 </head> 20 <body> 21 <div id="app"> 22 <header id="top-header"> 23 <div id="top-drawer"> 24 <div class="header-left" id="menu-toggle" style="display: flex; flex-direction: column; justify-conte …[1891 chars elided]… ; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;" 49 onmouseover="this.style.opacity='1'" 50 onmouseout="this.style.opacity='0.6'">&#x29C9;</button> 51 <button type="button" id="paste-btn" 52 aria-label="Paste cells here (Ctrl/Cmd+V)" title="Paste cells here (Ctrl/Cmd+V)" 53 style="background: none; border: none; cursor: pointer; padding: 0; width: auto; font-size: 1em; opacity: 0.6; transition: opacity 0.15s ease, transform 0.15s ease; vertical-align: middle;" 54 onmouseover="this.style.opacity='1'" 55 onmouseout="this.style.opacity='0.6'">&#x1F4CB;</button> 56 </h1> 57 <a href="https://en.wikipedia.org/wiki/Special:MyLanguage/Tonnetz" target="_blank" rel="noopener noreferrer" 58 style="color: var(--dim); font-size: 11px; text-decoration: none; border-bottom: 1px dashed rgba(255, 255, 255, 0.2); transition: color 0.15s ease; width: fit-content;" 59 onmouseover="this.style.color='var(--accent)'" 60 onmouseout="this.style.color='var(--dim)'">
+
+
+### 2026-08-16T23:08:46.227Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:46.319Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:08:47.852Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now remove the four per-mode [REDACTED_PRIVATE_INFO] from their respective control panels.
+
+
+### 2026-08-16T23:08:48.442Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:48.494Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 85 <div id="sandbox-mobile-tools" style="display: none;"></div> 86 <div id="melody-mobile-tools" style="display: none;"></div> 87 </div> 88 89 <div id="drawer-handle" class="mobile-only"></div> 90 </header> 91 92 <div id="main-content"> 93 <aside id="sidebar"> 94 <div id="blast-stats" style="display: none;">
+
+
+### 2026-08-16T23:08:50.895Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "sandbox-undo\|blast-undo\|life-undo\|compose-undo" [REDACTED_PERSON]/Documents/GitHub/Tonncade/index.html
+
+
+### 2026-08-16T23:08:51.020Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 97: <button id="blast-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 230: <button id="compose-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 308: <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 317: <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button>
+
+
+### 2026-08-16T23:08:52.624Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-16T23:08:52.664Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] <aside [REDACTED_SECRET]> [REDACTED_SECRET] <div id="blast-stats" style="display: none;"> [REDACTED_SECRET] <[REDACTED_SECRET]> [REDACTED_SECRET] <[REDACTED_SECRET] [REDACTED_SECRET] <button id="blast-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET] [REDACTED_SECRET]</div>
+
+
+### 2026-08-16T23:08:55.426Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:55.478Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:08:57.177Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:08:57.231Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 224 </div> 225 </div> 226 <div id="compose-transport-group" class="control-buttons" style="margin-top: 10px;"> 227 <button id="compose-record" class="icon-btn" title="Record" aria-label="Record">⏺</button> 228 <button id="compose-play" class="icon-btn" title="Play" aria-label="Play">▶</button> 229 <button id="compose-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 230 <button id="compose-clear" class="icon-btn" title="Clear" aria-label="Clear">✕</button> 231 <button id="compose-save" class="icon-btn" title="Save" aria-label="Save">💾</button> 232 </div> 233 <!-- Shown only once at least one note is selected (see ComposeMode.updateEditControls).
+
+
+### 2026-08-16T23:09:00.576Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:00.667Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:02.287Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:02.330Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 298 <input id="life-file-input" type="file" accept=".yaml,.yml" style="display: none;" /> 299 <span id="life-filename"></span> 300 </div> 301 <div class="control-buttons"> 302 <button id="life-play-pause" class="icon-btn" title="Play" aria-label="Play">▶</button> 303 <button id="life-step" class="icon-btn" title="Step one generation" aria-label="Step one generation">⏭</button> 304 <button id="life-reset" class="icon-btn" title="Reset to the automaton's start" aria-label="Reset to start">↻</button> 305 <button id="life-clear" class="icon-btn" title="Clear all cells" aria-label="Clear all cells">✕</button> 306 <button id="life-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 307 <button id="life-save" class="icon-btn" title="Save As" aria-label="Save As">💾</button> 308 </div> 309 <div class="stats-panel"> 310 <p title="Generation">gen <span id="life-generation">0</span></p> 311 </div> 312 </div> 313 314 <div id="sandbox-actions" class="control-buttons" style="display: none;"> 315 <button id="sandbox-undo" class="icon-btn" title="Undo" aria-label="Undo">↶</button> 316 </div> 317 <div id="palette"> 318 <div id="piece-list"></div> 319 </div> 320 321 <!-- Sandbox Mode Chord Guide --> 322 <div id="sandbox-guide" style="display: none; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+
+
+### 2026-08-16T23:09:08.021Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:08.071Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:10.277Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T23:09:10.435Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "sandbox-actions\|sandboxActions" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js
+
+
+### 2026-08-16T23:09:10.557Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 454: const sandboxActions = document.getElementById('[REDACTED_PRIVATE_INFO]'); // #sandbox-undo, #17 455: if (sandboxActions) sandboxActions.style.display = 'none'; 462: if (sandboxActions) sandboxActions.style.display = 'flex';
+
+
+### 2026-08-16T23:09:12.226Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:12.275Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 400 const actionBtn = document.getElementById('m-btn-action'); 401 if (actionBtn) { 402 if ([REDACTED_PRIVATE_INFO]) { 403 actionBtn.style.display = 'none'; 404 } else { 405 actionBtn.style.display = 'block'; 406 if ([REDACTED_PRIVATE_INFO]) { 407 [REDACTED_PRIVATE_INFO] 408 } else { 409 actionBtn.textContent = [REDACTED_PERSON]; 410 } 411 } 412 } 413 414 // Hide/show palette 415 const palette = document.getElementById('palette'); 416 if (palette) { 417 palette.style.display = (mode === 'melody' || mode === 'snake' || [REDACTED_PRIVATE_INFO]) ? 'none' : 'block'; 418 } 419 420 // Hide/show mobile controls 421 const mobileContainer = document.getElementById('mobile-controls'); 422 if (mobileContainer) { 423 const isMobileWidth = Render.isMobileViewport(); 424 if (isMobileWidth && [REDACTED_PRIVATE_INFO]) { 425 mobileContainer.style.display = 'flex'; 426 } else { 427 mobileContainer.style.display = 'none'; 428 } 429 } 430  …[994 chars elided]… { 452 guide.style.display = 'none'; 453 } 454 const sandboxActions = document.getElementById('sandbox-actions'); // #sandbox-undo, #17 455 if (sandboxActions) sandboxActions.style.display = 'none'; 456 457 if (mode === 'sandbox') { 458 document.getElementById('placement-controls').style.display = 'block'; 459 if (hexNavControls) hexNavControls.style.display = 'block'; 460 sandboxCtrls.style.display = 'block'; 461 if (guide) guide.style.display = 'block'; 462 if (sandboxActions) sandboxActions.style.display = 'flex'; 463 if (clickAction) clickAction.textContent = 'Place/Pick up'; 464 SandboxMode.init(); 465 } else if (mode === 'blast') { 466 // '' (not 'block'): #blast-stats needs to be a flex row on mobile but a plain block 467 // on desktop (see css/style.css), and CSS alone can't express that once JS also owns 468 // this same inline property for hide/show -- clearing it lets each breakpoint's own 469 // CSS rule apply. Found live: hardcoding either 'block' or 'flex' here needs a CSS
+
+
+### 2026-08-16T23:09:13.760Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's see the rest of [REDACTED_PRIVATE_INFO] to find where it ends, so I can add a `App.refreshUndoButton()` call at the end.
+
+
+### 2026-08-16T23:09:15.165Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:15.207Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 470 // !important to win on the OTHER breakpoint, and !important on 'display: flex' also 471 // defeats this same inline style's 'none' when hiding the panel in other modes -- 472 // that's exactly what made all three panels stack visibly on top of each other. 473 stats.style.display = ''; 474 document.getElementById('placement-controls').style.display = 'block'; 475 if (hexNavControls) hexNavControls.style.display = 'block'; 476 if (clickAction) clickAction.textContent = 'Place Piece'; 477 BlastMode.init(); 478 } else if (mode === 'gravity') { 479 document.getElementById('gravity-controls').style.display = ''; 480 GravityMode.init(); 481 } else if (mode === 'melody') { 482 document.getElementById('melody-controls').style.display = 'block'; 483 MelodyMode.init(); 484 } else if (mode === 'snake') { 485 document.getElementById('snake-controls').style.display = ''; 486 SnakeMode.init(); 487 } else if (mode === 'compose') { 488 document.getElementById('compose-controls').style.display = 'b …[1659 chars elided]… [REDACTED_SECRET]'s "rotation direction" test), +1 is actually 545 // counter-clockwise on screen and +5 is actually clockwise. These two bindings were 546 // previously swapped, making the ↻/↺ icons rotate backwards from what they show. 547 bindBtn('m-btn-ccw', ' ', 'Space', false); // CCW Rotate (Space -> rotation+1, actually CCW) 548 bindBtn('m-btn-cw', ' ', 'Space', true); // CW Rotate (Shift+Space -> rotation+5, actually CW) 549 bindBtn('m-btn-left', 'f'); // Left (f) 550 bindBtn('m-btn-right', 'h'); // Right (h) 551 bindBtn('m-btn-action', 'g', '', true); // Shift-G to place/pick 552 bindBtn('m-btn-action-2', 'v'); // Gravity-only duplicate soft-drop button (landscape clusters only, never shown outside Gravity) 553 554 // Snake's 6-direction pad — matches the T/Y/F/H/V/B keyboard scheme SnakeMode's 555 // own keydown handler already listens for. 556 bindBtn('snake-btn-ul', 't'); 557 bindBtn('snake-btn-ur', 'y'); 558 bindBtn('snake-btn-left', 'f'); 559 bindBtn('snake-btn-right', 'h');
+
+
+### 2026-08-16T23:09:16.967Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's make the edits. First remove `[REDACTED_SECRET]` handling in setMode and add `[REDACTED_PRIVATE_INFO]` call at the end.
+
+
+### 2026-08-16T23:09:20.868Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:20.993Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:23.521Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:23.583Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:32.495Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-16T23:09:32.545Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:34.769Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire the keyboard shortcut and button click in `[REDACTED_PERSON]` (renaming scope-wise it's fine to add there since it's the same keydown listener):
+
+
+### 2026-08-16T23:09:41.854Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T23:09:41.926Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-16T23:09:43.964Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `[REDACTED_PRIVATE_INFO]` to add `canUndo()` and auto-refresh hooks.
