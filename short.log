@@ -4813,3 +4813,188 @@ All 124 pass. Let's run [REDACTED_PRIVATE_INFO] too since it also touches folder
 No folder-related tests in [REDACTED_PRIVATE_INFO]. Let's commit.
 
 
+### 2026-08-16T13:07:12.308Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both bugs are fixed and committed (`[REDACTED_SECRET]`):
+
+1. **Save downgrading to a download** — the folder picker/permission calls only ever requested `'read'`, never `'readwrite'`, so `saveFileAs`'s write threw silently and fell back to a browser download. Now requests `'readwrite'` throughout; if you'd already granted the folder under the old read-only default, you'll see the existing "Reconnect Folder" prompt once to re-grant it.
+2. **Stale dropdown after moving files** — the listing only refreshed at four fixed moments (restore/reconnect/choose-folder/post-save), never on opening the dropdown. It now re-lists in the background when you click/focus the dropdown — best-effort, since a native `<select>` can't wait on an async refresh before it paints, so the very next open may still show the old list, but the one after that will be current.
+
+Both bugs live in the shared `js/file-folder.js` code, so this fixes Melody/Compose's folder too, not just Life's. Full desktop suite (124) and invariants (59 on Mobile Chrome) pass.
+
+
+### 2026-08-16T13:14:42.441Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Also a user noticed that while pinch works as expected, the Tonnetz and the controls respond in opposite ways to browser zoom: so if in Chrome I say control-minus to make everything smaller, the controls get appropriately smaller, but the Tonnetz actually gets bigger.
+
+
+### 2026-08-16T13:18:42.712Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me reproduce this empirically rather than keep theorizing — Chrome's `document.documentElement.style.zoom` is the same non-standard mechanism Ctrl+/Ctrl- uses internally, so I can simulate it directly in Playwright.
+
+
+### 2026-08-16T13:20:43.324Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed with real numbers: the button scales correctly with zoom (57.1→38.3px physical, tracking the 0.67 factor exactly), but the Tonnetz SVG grows physically (1100→1199px) when zooming out. This isn't a devicePixelRatio or JS logic bug — it's a CSS layout interaction. Let me check the exact layout mechanism.
+
+
+### 2026-08-16T13:21:41.385Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed and root-caused — this is a real, understandable CSS layout effect, not a simple logic bug. Let me clean up my debug test first.
+
+
+### 2026-08-16T13:22:03.817Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean, no diff left over from debugging. Now let me explain the finding and propose a fix direction before writing code, since this involves a real design tradeoff.
+
+
+### 2026-08-16T13:41:56.435Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That clarifies things — the sidebar-vs-board area ratio shifting is fine/expected; what's actually broken is that individual hex cells don't shrink in sync with the rest of the page's zoom at all (they're rendered by a "fill whatever container space exists" viewBox computation that's totally decoupled from real browser zoom). This needs `devicePixelRatio`-based zoom detection touching the core render math, so let me plan it properly before implementing.
+
+
+### 2026-08-16T14:01:13.924Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Implementing. Let's look at the exact current code in `[REDACTED_PRIVATE_INFO]` first.
+
+
+### 2026-08-16T14:01:28.773Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's edit `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T14:01:41.362Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the test per the plan, and check red/green.
+
+
+### 2026-08-16T14:01:48.247Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good insertion point. Let's add the new tests right after this one.
+
+
+### 2026-08-16T14:02:11.453Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Now let's confirm red — revert `[REDACTED_SECRET]` and rerun.
+
+
+### 2026-08-16T14:02:18.638Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both fail cleanly against the pre-fix code (viewBox span stays constant, [REDACTED_SECRET], regardless of the simulated dPR change) — red confirmed. Restoring the fix.
+
+
+### 2026-08-16T14:02:23.940Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored ([REDACTED_PRIVATE_INFO] are unrelated concurrent background work, not mine). Let's run the two new tests green, then the full desktop and invariants suites for regressions.
+
+
+### 2026-08-16T14:02:29.165Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T14:03:32.270Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 126 pass. Now the invariants suite (both [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO], since they run with different `deviceScaleFactor` — good regression coverage for the baseline-ratio design).
+
+
+### 2026-08-16T14:05:35.655Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's the same pre-existing flaky test confirmed earlier this session (passes in isolation, unrelated to render changes). Let's verify quickly.
+
+
+### 2026-08-16T14:05:42.953Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed flaky, not a regression. Let's run Tablet Chrome too, since it has a different `deviceScaleFactor` baseline.
+
+
+### 2026-08-16T14:07:47.540Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 59 pass on Tablet Chrome, confirming the baseline-ratio design correctly stays inert at its fixed `deviceScaleFactor` (2.25). Now let's document this and add the INV-53 section per plan.
+
+
+### 2026-08-16T14:08:23.390Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's [REDACTED_SECRET]
+
+
+### 2026-08-16T14:09:30.049Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Noted — that's useful context on why this bug bit you specifically (ChromeOS at tablet-ish sizes starts from a less-comfortable default before any zoom even happens). I'll add it to `next_steps.md` as a deferred item rather than touch it now, since you're explicitly not ready to try per-viewport tuning yet.
+
+
+### 2026-08-16T14:09:50.431Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T14:12:15.780Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check the existing [REDACTED_PRIVATE_INFO] and write a quick measurement script to replay those exact scenarios and count on-screen cells.
+
+
+### 2026-08-16T14:12:23.583Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 59 pass (INV-23 flake didn't recur). Now let's write the histogram script.
+
+
+### 2026-08-16T14:12:58.331Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a better home for it than a one-off script. Let me remove the throwaway script and wire this into the actual fixture instead.
+
+
+### 2026-08-16T14:13:07.865Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`edge.cells` already computes exactly this — it's just not propagated out. Let's wire it through.
+
+
+### 2026-08-16T14:13:35.921Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update `[REDACTED_PRIVATE_INFO]` to display cell counts and a per-mode histogram.
+
+
+### 2026-08-16T14:13:44.505Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add CSS for a simple histogram and update the JS/legend/caption.
+
+
+### 2026-08-16T14:13:51.998Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T14:14:09.168Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the cell count to each screenshot's caption.
+
+
+### 2026-08-16T14:14:22.103Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's regenerate the screenshots fixture to actually populate `cellCount` and verify everything renders correctly.
+
+
+### 2026-08-16T14:16:26.411Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for it in the background, and meanwhile run the [REDACTED_PRIVATE_INFO] suite to make sure my edits to `[REDACTED_PRIVATE_INFO]` didn't break anything there (unlikely, but the file is shared with other exploratory tests).
+
+
+### 2026-08-16T14:16:46.078Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Let's check the [REDACTED_SECRET].
+
+
+### 2026-08-16T14:17:09.120Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+It finished (didn't need the scheduled wakeup after all). Let's check the results.
+
+
+### 2026-08-16T14:17:13.726Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Passed clean, and cell counts are flowing through ([REDACTED_PRIVATE_INFO], [REDACTED_PRIVATE_INFO]). Let's verify the manifest actually has `cellCount` and spot-check the pannable-mode range the user cares about.
+
+
+### 2026-08-16T14:17:19.078Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify the page itself renders correctly with the new histogram, using [REDACTED_PRIVATE_INFO].
+
+
