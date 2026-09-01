@@ -7245,3 +7245,173 @@ Now let's find `[REDACTED_SECRET]` and `[REDACTED_SECRET]` to set `state.keySign
 Now `[REDACTED_SECRET]`:
 
 
+### 2026-08-17T04:29:37.129Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now thread `[REDACTED_SECRET]` through `[REDACTED_PERSON]` (Notation.render + renderLabels) too, so staff and Tonnetz stay consistent.
+
+
+### 2026-08-17T04:29:55.883Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real mismatch — VexFlow's `addKeySignature` expects a key-name string ("G", "Db"), not a fifths integer. Fixing.
+
+
+### 2026-08-17T04:30:10.685Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now fix the actual `[REDACTED_SECRET]` call sites to convert.
+
+
+### 2026-08-17T04:30:35.660Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's write real tests for the speller, key detection, and the Melody/render integration.
+
+
+### 2026-08-17T04:31:03.067Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check `createLabel`'s actual DOM structure before running this, rather than guess.
+
+
+### 2026-08-17T04:31:16.417Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me clean up the dead speculative lookup, keeping only the working assertion.
+
+
+### 2026-08-17T04:31:23.911Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run all the new tests.
+
+
+### 2026-08-17T04:31:32.660Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 6 pass on the first real run. Now let's also verify the [REDACTED_PRIVATE_INFO] [REDACTED_SECRET] fix with a quick test, then run the full regression suite.
+
+
+### 2026-08-17T04:31:49.406Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Renders cleanly with a real key signature glyph on both staves (`[REDACTED_PRIVATE_INFO]`). Let's clean up and run the full regression suite.
+
+
+### 2026-08-17T04:33:25.033Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 185 pass. Let's also spot-check invariants since I touched `[REDACTED_SECRET]`'s shared draw path (used by all seven modes).
+
+
+### 2026-08-17T04:33:45.513Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All pass, including [REDACTED_PERSON] (which reads note-name labels — the exact function I modified). Let's check Codex log and commit.
+
+
+### 2026-08-17T04:35:50.092Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `resolveFileType` and wire it into the three read sites.
+
+
+### 2026-08-17T04:36:12.242Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the local-folder loading site (`[REDACTED_SECRET]`), and `[REDACTED_SECRET]` (which also does a text/arrayBuffer read).
+
+
+### 2026-08-17T04:36:50.390Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `[REDACTED_SECRET]` to both `MelodyMode` and `ComposeMode` (shared folder, both need it to avoid a crash).
+
+
+### 2026-08-17T04:37:22.677Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update the return value.
+
+
+### 2026-08-17T04:37:52.012Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Compose's counterpart, mirroring its own `[REDACTED_SECRET]`.
+
+
+### 2026-08-17T04:38:24.867Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's write the generation script and run it.
+
+
+### 2026-08-17T04:39:46.232Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real issue in my own generation approach — I fed audio-oriented ([REDACTED_SECRET]) durations into the notation writer, producing ugly tied-note artifacts instead of clean single durations. Fixing.
+
+
+### 2026-08-17T04:40:26.793Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's re-run and check the output.
+
+
+### 2026-08-17T04:40:35.849Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean, no more tied artifacts. Let's spot-check the [REDACTED_PERSON] too.
+
+
+### 2026-08-17T04:40:49.453Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify these load correctly through the real app UI ([REDACTED_PRIVATE_INFO]) — the integration point that actually matters.
+
+
+### 2026-08-17T04:41:53.687Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`autoLoadFirstBundled: false` for Melody (by design — it has its own Random offline-degrade default) — my test wrongly assumed auto-load. Fixing to explicitly select the song, like test #4 correctly does.
+
+
+### 2026-08-17T04:42:15.746Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON]
+
+
+### 2026-08-17T04:43:50.568Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All [REDACTED_PRIVATE_INFO] pass. Let's also run the full invariants suite since this touches shared bundled-content loading paths used by multiple modes.
+
+
+### 2026-08-17T04:45:54.926Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Running in background. Let's check [REDACTED_SECRET] while waiting.
+
+
+### 2026-08-17T04:46:18.786Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T04:46:31.017Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That tool doesn't apply outside `/loop` — the background task will notify me automatically when it finishes. Waiting for that now rather than polling further.
+
+
+### 2026-08-17T04:48:06.859Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Same pre-existing flaky [REDACTED_SECRET] MIDI area confirmed earlier this session — unrelated to bundled-song loading. Committing task #8.
+
+
+### 2026-08-17T04:49:48.405Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Given the remaining scope and context budget, let me implement this pragmatically — checking [REDACTED_PRIVATE_INFO] empirically rather than over-designing in the abstract.
+
+
+### 2026-08-17T04:52:28.717Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-17T04:52:44.501Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That plan file is for an unrelated browser-zoom bug from a different work thread — not part of tonight's notation mandate, so I'll leave it aside and stay on Task #9. Let me run the VexFlow Y-coordinate smoke test.
+
+
+### 2026-08-17T04:52:56.313Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Repo state confirms [REDACTED_STUDENT] hasn't started yet — matches the summary exactly. Continuing with the VexFlow Y-coordinate investigation.
+
+
+### 2026-08-17T04:54:03.386Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Right, let me just extend the browser smoke test instead.
+
+
+### 2026-08-17T04:54:19.452Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add the [REDACTED_SECRET]/[REDACTED_SECRET] helpers and [REDACTED_PRIVATE_INFO] + [REDACTED_PRIVATE_INFO] into render():
+
+
