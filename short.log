@@ -2267,3 +2267,442 @@ Only the intentional dead-code removal remains as a diff (which I added, deliber
 That's now fully redundant with the general [REDACTED_SECRET] test — no need to duplicate it. I'll drop the stash.
 
 
+### 2026-08-15T12:21:30.215Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's confirm both tests go GREEN, plus the static checker.
+
+
+### 2026-08-15T12:21:39.446Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T12:21:47.921Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both green. Let's wire the static checker into `package.json`'s test script, document [REDACTED_SECRET]'s extension in `docs/invariants.md`, then run the fuller suites before committing.
+
+
+### 2026-08-15T12:22:09.525Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T12:22:16.173Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's the same pre-existing, unrelated `App.init()` failure I flagged earlier (reproduces on the clean committed tree too — not from today's work). Continuing with the Playwright suites.
+
+
+### 2026-08-15T12:22:19.749Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T12:24:19.430Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T12:24:26.217Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed flaky/unrelated (passes in isolation). Now let's run the full [REDACTED_PRIVATE_INFO] too, then commit.
+
+
+### 2026-08-15T12:24:28.865Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T12:25:26.648Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green. Let's commit.
+
+
+### 2026-08-15T12:25:57.257Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**Committed** (`[REDACTED_SECRET]`). Recap of the three-part strategy, built in order, each confirmed red before the fix went in:
+
+1. **`[REDACTED_PRIVATE_INFO]`** (new, wired into `npm test`) — static, no browser: cross-checks every literal id `js/*.js` looks up against every id `index.html` actually defines. Caught the exact two stale references (`[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`), and as a bonus flagged genuinely dead pre-existing code (four `[REDACTED_PRIVATE_INFO]` D-pad lookups and `#mobile-dock`, leftover from a since-redesigned mobile control scheme) — cleaned that up too since it was free.
+
+2. **Generalized INV-3** — the existing test only checked elements that *did* get relocated for ending up orphaned; it structurally couldn't see an element that was supposed to move but didn't. New test checks the actual invariant: once a mode's `#<mode>-controls` panel is hidden wholesale for mobile split-relocation, it must contain zero remaining interactive elements. No id list, no maintenance burden, covers any future mode that adopts this pattern.
+
+3. **Playthroughs** — yours to prioritize, as you said. Worth knowing the plumbing's ready whenever you want to send one: "Report Bug" → download/copy the replay JSON.
+
+Both automated tests reproduced the live bug (confirmed red against the actual broken `main.js`) before I touched the fix, then passed after. Full desktop + mobile invariants suites are clean (one flaky, unrelated MIDI-ghost test that passes in isolation).
+
+
+### 2026-08-15T12:56:36.364Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> INV-3 is half of it. There was another invariant that was about every element that was supposed to be visible actually being reachable, as you said.
+
+
+### 2026-08-15T12:56:52.230Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's the one — [REDACTED_SECRET], driven by a "Primary Elements" table. Let me find that table and check whether Melody's dropdown was ever listed in it.
+
+
+### 2026-08-15T12:57:23.186Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — that's the real gap. `PRIMARY_ELEMENTS.midi` never included the song-source control (even in the old three-group design), and Compose/Life aren't in the `PRIMARY_ELEMENTS` map at all. Let me check the actual markup ids for Compose and Life, then fix both the test and the doc table properly.
+
+
+### 2026-08-15T12:58:19.288Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Partially — but not fully automatically, and it's worth being precise about where the line falls.
+
+I checked: the doc's own definition of "primary element" is explicitly a *semantic* one ("a top-level interactive affordance a player can point to and name," as opposed to a repeated sub-item like one carousel piece or one chord-guide result). Repeated/templated sub-items are JS-generated at runtime, not present in `index.html`'s static markup at all — so a structural scan would never mistake them for primary elements; that part is naturally safe.
+
+The real obstacle: primary elements aren't all scoped inside one predictable container per mode. [REDACTED_PERSON] (`[REDACTED_PERSON]`, `[REDACTED_PERSON]`, etc.) and `[REDACTED_PERSON]`/`#drawer-handle` live *outside* `#gravity-controls`/`#snake-controls` entirely — shared markup, relabeled per mode by JS. A scan of "everything inside `#<mode>-controls`" would miss those, and there's no existing structural signal that says "this button belongs to Gravity" the way an id prefix says "this belongs to Melody."
+
+What I *can* build: tag every element the doc table currently enumerates with a shared marker (e.g. `data-primary="gravity"` or similar) directly in `index.html`, then have the test derive its per-mode list from `[data-primary]` instead of the hand-written `PRIMARY_ELEMENTS` map — and pair that with a static check (same style as `check-dom-ids.js`) that flags any *new* interactive element added to a mode's controls block that's neither tagged `data-primary` nor inside a container that starts `display:none` in the static markup (the existing signal for "deliberately conditional," like `#compose-edit-group`). That doesn't make tagging fully automatic, but it converts "silently forgot to update a list" into "the check stops you until you consciously tag it or exclude it" — the same shape of fix as today's id-checker.
+
+Want me to build that now, or land today's `PRIMARY_ELEMENTS` addition first (confirmed red/green) and treat the `data-primary` retrofit as its own follow-up?
+
+
+### 2026-08-15T13:00:38.959Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Yes, then when red for today's missed conditions, only then please proceed to fix.
+
+
+### 2026-08-15T13:00:51.880Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run it now with the new `compose`/`life` entries and confirm the `[REDACTED_SECRET]` line (already fixed) is green, while checking whether the newly-added coverage surfaces any real, previously-undiscovered gaps.
+
+
+### 2026-08-15T13:00:54.600Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:01:11.435Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All green — no new gaps in Compose/Life's reachability, and `[REDACTED_SECRET]` checks out (already fixed by the earlier commit). Nothing to fix here. Let's commit this coverage addition, then move to the `data-primary` retrofit.
+
+
+### 2026-08-15T13:01:17.211Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me update the doc table to match before committing.
+
+
+### 2026-08-15T13:01:31.519Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:03:24.051Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET] Everything else clean. Let's commit this coverage addition.
+
+
+### 2026-08-15T13:03:44.818Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's build the `[REDACTED_PRIVATE_INFO]` retrofit. First, the full current map, to plan tagging precisely.
+
+
+### 2026-08-15T13:04:43.939Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed the semantic snag I flagged: e.g. [REDACTED_PRIVATE_INFO] are plain, always-visible `<input>`/`<select>` elements — a pure structural scan would sweep them in as "primary," but the doc deliberately excludes them (they're settings, not primary affordances). So full auto-discovery isn't right. What I *can* build: a coverage-nudge check that fails closed on anything new and unclassified, rather than silently dropping it. Let me build that.
+
+
+### 2026-08-15T13:05:21.012Z | claude (<synthetic>) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Login expired · Please run [REDACTED_SECRET]
+
+
+### 2026-08-15T13:06:27.876Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's build the [REDACTED_PRIVATE_INFO] now. I'll classify every current interactive element per mode's controls block, then write a test that fails on anything new and unclassified.
+
+
+### 2026-08-15T13:06:32.160Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the coverage-nudge test. Approach: for each mode's own `-controls`/`-stats` container, enumerate interactive elements; every one must be either listed in `PRIMARY_ELEMENTS`, or explicitly listed in a new `SECONDARY_ELEMENTS` exclude-map (with a reason), or nested inside a sub-container that starts `display:none` in the static markup (the existing signal for "conditional, not primary").
+
+
+### 2026-08-15T13:06:35.950Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's insert the new coverage-nudge test right after the [REDACTED_SECRET] test.
+
+
+### 2026-08-15T13:07:02.815Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:07:15.886Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — the [REDACTED_PRIVATE_INFO] have no ids at all (only `data-difficulty` and `class="weight-icon"`). These are genuinely a real, deliberate settings control (like `#midi-difficulty`), just implemented without ids. Let me add them to `SECONDARY_ELEMENTS` by selector class since they have no id.
+
+
+### 2026-08-15T13:07:30.847Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T13:07:54.403Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:08:09.700Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Real, separate gap found — [REDACTED_SECRET] was never in `PRIMARY_ELEMENTS.blast` at all, unlike Gravity/Snake's Restart which are both listed. Let's confirm and fix that too.
+
+
+### 2026-08-15T13:08:13.333Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Only functionally tested (click resets state), never checked for reachability under [REDACTED_SECRET]'s discipline. Genuine gap. Let's fix both the test map and the doc table.
+
+
+### 2026-08-15T13:08:20.296Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rerun both [REDACTED_SECRET] and the coverage-nudge test together to confirm everything's clean.
+
+
+### 2026-08-15T13:08:24.190Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:08:28.585Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Sandbox isn't in my `[REDACTED_PRIVATE_INFO]` map (its controls live under `#sandbox-guide`, not a `#sandbox-controls` panel) — deliberately out of scope, since Sandbox already has dedicated INV-2/INV-3 coverage of its own. Let's check the test run.
+
+
+### 2026-08-15T13:08:35.497Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both green. This confirms `#blast-reset` is now checked both for classification *and* actual reachability. Let's run the full invariants suite once more, plus a quick sanity red-check by temporarily reverting the classification map, before committing.
+
+
+### 2026-08-15T13:08:38.754Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T13:08:49.053Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop polling and just wait for the actual completion notification.
+
+
+### 2026-08-15T13:10:28.971Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 56 pass (including the previously-flaky one, clean this time). Let's document this in `[REDACTED_PRIVATE_INFO]` and commit.
+
+
+### 2026-08-15T13:11:06.021Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**Committed** (`[REDACTED_SECRET]`). Summary of the full response to this week's regression, all four commits in order:
+
+1. `[REDACTED_SECRET]` — network-first service worker (fixed the "cleared site data, still broken" report — a separate, structural staleness bug)
+2. `[REDACTED_SECRET]` — fixed the actual `#midi-source` mobile-drawer bug, plus a static `check-dom-ids.js` cross-checker (wired into `npm test`) and the first INV-3 extension
+3. `[REDACTED_SECRET]` — extended INV-13's coverage to include Melody/Compose/Life's source dropdowns (confirmed all-green, no hidden regressions)
+4. `[REDACTED_SECRET]` — the coverage-nudge test you were pointing at: instead of a hand-maintained list that can silently drift, every interactive control in a mode's panel must now be explicitly classified (primary, secondary, or conditional) or the test fails loud. Building it immediately found a second real gap of the same shape — Blast's own Restart button had never been in the list at all — fixed that too.
+
+Playthroughs are the one piece still outstanding, and that's on your plate whenever you're ready to prioritize it.
+
+
+### 2026-08-15T13:23:51.370Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> The difficuly setting on Melody is still a dropdown instead of a barbell sequence?
+
+
+### 2026-08-15T13:24:00.732Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — Melody's difficulty is still a plain `<select>`, unlike Blast/Gravity which use the vertical dumbbell-barbell control. Let's look at that pattern to replicate it correctly.
+
+
+### 2026-08-15T13:24:16.437Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check the CSS for the barbell styling.
+
+
+### 2026-08-15T13:24:19.518Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at [REDACTED_PERSON] current select-based difficulty markup and JS, to replace them with the same barbell pattern.
+
+
+### 2026-08-15T13:24:37.148Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — `#39`/`#93`'s barbell redesign was explicitly scoped to Blast/Gravity only; Melody's difficulty select is a separate, older, unrelated feature that was simply never converted. Not a regression, just an inconsistency worth fixing now that the pattern exists. Let's check [REDACTED_PRIVATE_INFO] before touching it.
+
+
+### 2026-08-15T13:25:16.468Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check tests referencing `midi-difficulty` before editing, to understand blast radius.
+
+
+### 2026-08-15T13:25:19.931Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No other test coverage to worry about breaking. Let's make the change: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T13:25:40.709Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the JS wiring in `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-15T13:25:45.746Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]` near the existing `updateDifficultyUI`.
+
+
+### 2026-08-15T13:26:04.086Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's write a red/green regression test.
+
+
+### 2026-08-15T13:26:10.223Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add a [REDACTED_SECRET] right after the offline-degrade test.
+
+
+### 2026-08-15T13:26:19.256Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T13:26:24.947Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:26:29.481Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That system note confirms the stash correctly reverted `index.html`/`js/midi.js` to the pre-fix state. Let's check the test result.
+
+
+### 2026-08-15T13:26:33.645Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T13:26:39.120Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:26:46.138Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Green. Now let's confirm the note-list hint-level behavior itself is unchanged, and run the broader suites for collateral effects.
+
+
+### 2026-08-15T13:26:49.937Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No other coverage to check separately — good, [REDACTED_PRIVATE_INFO]. Let's run the full desktop and mobile invariants suites to confirm nothing regressed.
+
+
+### 2026-08-15T13:26:53.313Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T13:27:00.275Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll stop polling and wait for the completion notification.
+
+
+### 2026-08-15T13:27:14.442Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the background task notification rather than continue polling.
+
+
+### 2026-08-15T13:27:47.098Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 110 pass. Let's run the mobile invariants suite too, since this touches `[REDACTED_SECRET]`, which is referenced by the INV-13 coverage test.
+
+
+### 2026-08-15T13:27:49.888Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification.
+
+
+### 2026-08-15T13:29:47.803Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 56 pass, including the newly-generalized [REDACTED_SECRET] coverage check. Now let's also run the static checker and Node runner sanity, then commit.
+
+
+### 2026-08-15T13:29:52.720Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T13:29:57.682Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Only staging my own files — leaving `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, and `[REDACTED_PRIVATE_INFO]` (other work) untouched.
+
+
+### 2026-08-15T13:30:10.038Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+**Fixed and committed** (`[REDACTED_SECRET]`). Melody's difficulty is now the same vertical dumbbell-barbell as Blast/Gravity, not a leftover `<select>` — it was simply never migrated when task #93 converted the other two modes, since Melody's difficulty (hint visibility during drilling) is a separate, older feature from Blast/Gravity's (piece size).
+
+Confirmed red against the old `<select>` before green with the fix; full desktop (110 tests) and mobile invariants (56 tests) suites pass clean, and the static id-checker is clean too.
+
+
+### 2026-08-15T13:32:45.406Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> The notation in Melody (C4) is inconsistent with what's shown on Melody's Tonnetz, which only shows the letter-code, not the octave.  This makes it so one can't just "read the music" to be successful. One of those should change: either accept any C or show the octave on the Tonnetz. We already have octave-showing with click to hold in Sandbox, and allowing any octave would meaningfully change some songs, so showing the octave on the Tonnetz for Melody and Compose seems like a meaningful enhancement.  There is an argument for showing it everywhere. The only reason not to is that it clutters the Tonnetz. My preference would be to show octave markers by default in every mode, but in a subtle way, so a much lower contrast gray, with the white note mark still centered, and the octave marker either to its right on equal footing or as a right subscript. What do you think?
+
+
+### 2026-08-15T13:32:49.161Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I agree with your instinct — showing octave everywhere, subtly, is the right call: it's a real correctness gap (Melody's target note is octave-specific but the board doesn't show that), and doing it once globally beats a Melody-only special case. Let me look at the current label rendering before planning the details.
+
+
+### 2026-08-15T13:45:28.697Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — `var(--dim)` (`#9aa0ad`) is the existing muted-gray token, more visible than `.qwerty-label`'s `#727b8e`, and used throughout the app for exactly this "secondary, present but quiet" role. Let me write the plan.
+
+
+### 2026-08-15T20:33:11.771Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Understood — the note letter must stay exactly centered as it is today; the octave digit is an addition beside it, not something that re-centers the pair together. That means a separate sibling `<text>` element (positioned to the right of center, own anchor), not a `<tspan>` inside the centered label. Let me fix the plan.
+
+
+### 2026-08-15T20:33:29.083Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update the [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] to match the sibling-element approach.
+
+
+### 2026-08-15T20:33:41.293Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T20:35:03.926Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good catch — let me think through this precisely before finalizing.
+
+Since [REDACTED_PRIVATE_INFO] and the [REDACTED_PRIVATE_INFO] are both plain SVG user-unit values (not CSS-pixel-fixed relative to viewport), they live inside the same `[REDACTED_PRIVATE_INFO]`-scaled coordinate system as the hexagons and the existing note-name label. That means as `[REDACTED_PRIVATE_INFO]` changes the `[REDACTED_PRIVATE_INFO]` (via `panView`), the octave digit's size and its `+7` offset from the note letter shrink/grow in exact proportion to the hex itself and the note-name label — same behavior the app already has today for the primary label, not something new my change introduces. So the *relative* positioning stays correct at any zoom level.
+
+The real risk is the opposite: at the zoomed-*out* extreme (`[REDACTED_PRIVATE_INFO]`), hexes get small and the existing 11px note label is already near the edge of legibility — stacking an even smaller 9px octave digit next to it compounds that. Since it's deliberately secondary, some illegibility at extreme zoom-out is an acceptable trade-off, but I should note it rather than assume it away. Let me add that to the plan.
+
+
+### 2026-08-15T20:37:19.291Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's find every `createLabel` call site before touching anything.
+
+
+### 2026-08-15T20:37:22.319Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — 5 call sites, all pass `Tonnetz.getNoteName(midi)` with `midi` already computed in scope. Let's look at each context before editing.
+
+
+### 2026-08-15T20:37:27.835Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add `[REDACTED_PRIVATE_INFO]` right after `createLabel`.
+
+
+### 2026-08-15T20:37:36.847Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the `drawLattice` call site:
+
+
+### 2026-08-15T20:37:44.711Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check and update the other three call sites in `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T20:37:54.154Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the three `[REDACTED_SECRET]` sites.
+
+
