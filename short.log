@@ -6016,3 +6016,166 @@ The [REDACTED_PRIVATE_INFO] will notify me automatically when finished — no ne
 That confirms it — same commit (my changes are already committed, stash had nothing to move), passed cleanly on rerun. This is the known pre-existing INV-23 flake, not a regression from the Undo work.
 
 Everything's done and verified: single header `#undo-btn` (Ctrl/Cmd+Z, disabled when inapplicable) replacing the four per-mode buttons, full desktop suite (150/150) and invariants suite (119/120, one pre-existing unrelated flake that passes on rerun) green, `docs/invariants.md` and `PRIMARY_ELEMENTS` updated, committed as `[REDACTED_SECRET]` along with `dev.log` as requested.
+
+
+### 2026-08-17T01:15:24.425Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Possible bug: new user visiting [REDACTED_PRIVATE_INFO] sees emptiness rather than a mode: resolves itself on reload.
+
+
+### 2026-08-17T01:18:42.135Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I found the likely cause. Let's confirm the mechanism precisely before fixing it.
+
+
+### 2026-08-17T01:18:51.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the regression test first (red/green discipline), using the reproduction script's approach adapted into the test suite, then fix.
+
+
+### 2026-08-17T01:19:00.681Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+There's already precedent for this. [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T01:19:13.771Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the regression test.
+
+
+### 2026-08-17T01:19:23.031Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's confirm this is red against the current (unfixed) code.
+
+
+### 2026-08-17T01:19:30.319Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red. Now let's fix `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-17T01:19:43.132Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T01:21:16.889Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All [REDACTED_PERSON] pass. Let's also add a doc note (a short one) and clean up the scratch repro script, then commit.
+
+
+### 2026-08-17T01:21:35.419Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed and committed as `[REDACTED_SECRET]`.
+
+**Root cause**: `main.js`'s `controllerchange` listener force-reloaded the page whenever it transitioned from uncontrolled to controlled by the service worker — but that transition fires on *every* first-ever visit too (`sw.js`'s `activate` handler calls `clients.claim()`, which claims the page that's already open), not just when an update swaps out an old worker. So a new visitor's page rendered once and then immediately force-reloaded itself for no real reason. On localhost this self-heals near-instantly and is invisible, but on a real network it's exactly the kind of extra navigation that can leave the app caught mid-initialization — matching "sees emptiness, resolves itself on reload."
+
+**Fix**: capture whether the page already had a controller *before* calling `register()`; only force-reload on `controllerchange` if it did (a genuine update), never on a first-ever visit.
+
+Verified red→green (wrote the regression test first, confirmed it failed against the old code, then fixed it), and the full desktop suite (151/151) still passes, including the existing stale-cache test that exercises the same SW lifecycle.
+
+
+### 2026-08-17T01:22:36.212Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Separately, Life needs two things: one menu item should offer to upload a yaml file, there should be a download link for the current yaml file, and it would be nice to display the current rules underneath the generation counter.  Melody mode: the number of times you have to get it right to advance seems to be 1. Could it be 3?
+
+
+### 2026-08-17T01:25:34.881Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — generic selector, safe on an `<a>`. Now let's check `PRIMARY_ELEMENTS`/`custom-file-upload` CSS and the `[REDACTED_SECRET]` coverage test which scans `button, select, input` inside containers — the new `<a>` won't be auto-caught there, but let's check if there's a similar coverage check for anchors.
+
+
+### 2026-08-17T01:25:43.791Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, generic selector-based, fine with `<a>`. I'll add `#life-download-link` and `#life-source .../upload-file` isn't a DOM id (it's a select option, not separately reachable) so no addition needed there. Let's add the download link to `PRIMARY_ELEMENTS.life`.
+
+
+### 2026-08-17T01:25:52.973Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll finish the Life-mode work and the Melody streak fix first, then switch to designing the notation feature with you before you head to bed.
+
+
+### 2026-08-17T01:26:09.779Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the three new regression tests right after this.
+
+
+### 2026-08-17T01:26:25.057Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirming red first.
+
+
+### 2026-08-17T01:26:33.658Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 3 confirmed red. Now let's implement. First `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-17T01:26:44.765Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PERSON]`, `[REDACTED_PERSON]`, and the new `[REDACTED_PERSON]` method:
+
+
+### 2026-08-17T01:26:54.912Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`: add `hasUpload`/`uploadInput`, track `state.name`, add rule-display + download-link wiring.
+
+
+### 2026-08-17T01:27:02.125Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now add `state.name` and update `loadAutomaton`:
+
+
+### 2026-08-17T01:27:12.058Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now update `loadAutomatonFromText` (to fall back to filename when the YAML lacks `name:`) and `loadAutomaton` (to record `state.name`, and refresh the rule display/download link):
+
+
+### 2026-08-17T01:27:22.299Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's find `[REDACTED_PRIVATE_INFO]` to hook in the rule display + download link refresh.
+
+
+### 2026-08-17T01:27:53.692Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the three new red tests to confirm green.
+
+
+### 2026-08-17T01:28:41.020Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 3 new Life tests pass. Now let's move to the Melody streak-threshold fix. Let's find where the advance threshold is set.
+
+
+### 2026-08-17T01:30:17.823Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Noted on MusicXML/Verovio — I'll fold that into the notation design shortly. Let me finish the streak fix first.
+
+
+### 2026-08-17T01:31:38.744Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Got it — noting that for the design discussion. Let me finish this fix (almost done) then switch over fully.
+
+
+### 2026-08-17T01:31:55.365Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write the regression test first (red), then implement the fix.
+
+
+### 2026-08-17T01:32:09.166Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirm red first.
+
+
+### 2026-08-17T01:32:50.793Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+My own test had a stale-timer bug (the auto-kickoff from `[REDACTED_SECRET]` firing mid-test), not the app. Let me fix that.
+
+
+### 2026-08-17T01:33:37.933Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's flush all pending timers via `cleanupPlayback()` in the test right before setting up the scenario.
+
+
+### 2026-08-17T01:33:52.788Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now targetLength=5 (userIndex+1 as expected pre-fix) — confirmed genuinely red against the real app bug. Let's implement the fix.
+
+
