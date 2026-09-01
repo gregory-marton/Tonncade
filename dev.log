@@ -15351,3 +15351,1003 @@ Now let's check the comments that need fuller rewording (not just word substitut
 ### 2026-08-15T22:35:10.923Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 ←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:35:16.437Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check line 1165's comment and the local variable renames in `main.js`.
+
+
+### 2026-08-15T22:35:17.034Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:35:17.080Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1158 const currentAngle = getAngle(e.touches[0], e.touches[1]); 1159 let diff = currentAngle - lastAngle; 1160 1161 // Handle angular boundary wrap around 1162 if (diff > 180) diff -= 360; 1163 if (diff < -180) diff += 360; 1164 1165 // Twist angle threshold: 30 degrees. Melody has no selected/active-piece concept 1166 // to rotate this way, so this whole sub-branch is Sandbox/Blast only -- letting 1167 // 'melody' fall through here would read/write [REDACTED_SECRET]'s own state from inside a 1168 // completely unrelated mode's gesture. 1169 if (Math.abs(diff) > 30 && (this.currentMode === 'sandbox' || this.currentMode === 'blast')) { 1170 const modeObj = this.currentMode === 'sandbox' ? [REDACTED_SECRET] : [REDACTED_SECRET]; 1171 const rotateDir = diff > 0 ? -1 : 1; // Physical CW twist → CW piece rotation 1172 const pieceType = this.currentMode === 'sandbox' ? [REDACTED_SECRET].state.selectedPiece : [REDACTED_SECRET].state.activePiece;
+
+
+### 2026-08-15T22:35:20.918Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That comment is fine as-is now — my substitution correctly updated it and it still reads naturally. Now let's check `[REDACTED_PRIVATE_INFO]`'s two comment blocks and `[REDACTED_PRIVATE_INFO]`'s comment.
+
+
+### 2026-08-15T22:35:21.356Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:21.420Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 2693 2694 // #94: a URL hash deep-links to a mode, and clicking a mode updates the URL so links are shareable 2695 // and discoverable. Melody's URL name is the friendly "[REDACTED_PRIVATE_INFO]" (its data-mode is "[REDACTED_PRIVATE_INFO]"). 2696 test('URL routing: hash deep-links to a mode and the URL updates on click', async ({ page }) => { 2697 // A shared deep-link opens that mode on load... 2698 await page.goto('/#gravity'); 2699 await expect.poll(() => page.evaluate(() => typeof App !== 'undefined' && App.currentMode), { timeout: 5000 }).toBe('gravity'); 2700 2701 // ...and clicking a mode reflects it in the address bar (discoverable to copy). 2702 await page.evaluate(() => document.querySelector('.mode-option[data-mode="compose"]').click()); 2703 expect(await page.evaluate(() => App.currentMode)).toBe('compose'); 2704 expect(await page.evaluate(() => location.hash)).toBe('#compose'); 2705 2706 // More deep-links (fresh loads): the friendly "[REDACTED_PRIVATE_INFO]" alias -> midi mode, an unknown hash -> 2707 // sandbox, and a normal one. (about:blank between forces a real reload -- goto to a hash-only 2708 // change on the same path wouldn't re-init.) 2709 // An unknown hash falls back to sandbox and NORMALIZES the bar to #sandbox (it reflects the 2710 // actual mode). Known ones keep their friendly name. 2711 for (const [url, mode, hash] of [['/#[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '#[REDACTED_PRIVATE_INFO]'], ['/#nonsense', 'sandbox', '#sandbox'], ['/#blast', 'blast', '#blast']]) { 2712 await page.goto('about:blank'); 2713 await page.goto(url); 2714 await expect.poll(() => page.evaluate(() => App.currentMode), { timeout: 5000 }).toBe(mode); 2715 expect(await page.evaluate(() => location.hash)).toBe(hash); 2716 } 2717 });
+
+
+### 2026-08-15T22:35:24.858Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:26.410Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:35:26.493Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:35:31.623Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:31.690Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:35:34.915Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check `[REDACTED_SECRET]` and `[REDACTED_SECRET]` comments.
+
+
+### 2026-08-15T22:35:35.532Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:35.575Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1038 // ──────────────────────────────────────────────────────────────────────── 1039 // Melody mode mouse-drag panning -- real report: rotating the view ([REDACTED_SECRET]) could move a 1040 // melody's notes off-screen with no way back, since Melody had no pan capability at all (touch 1041 // OR mouse), despite Render.getPanBounds() already listing 'melody' among the free-pan modes. 1042 // Uses Playwright's real mouse API (not a synthetic .click()), matching this project's existing 1043 // discipline for touch events -- a real mousedown-then-move sequence is what actually exercises
+
+
+### 2026-08-15T22:35:44.584Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "getPanBounds" -A 15 [REDACTED_PRIVATE_INFO] | head -20
+
+
+### 2026-08-15T22:35:44.740Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 38: // by getPanBounds below and by main.js's zoom gestures -- neither hand-maintains its own 39- // mode list, so the two can't drift apart the way an inline allowlist per call site would. 40- RESTRICTED_MODES: ['blast', 'gravity', 'snake'], 41- 42- // Zoom range for non-restricted modes' own in-app zoom (wheel/pinch -- see main.js's 43- // applyZoomDelta). MAX_ZOOM is chosen so the full audible range (Tonnetz.audibleMinMidi().. 44- // audibleMaxMidi()) fits the viewport at once, matching Sandbox's own drawn content bounds 45- // (see sandbox.js's _contentViewport). MIN_ZOOM allows a modest zoom-in past the default. 46- MIN_ZOOM: 0.5, 47- MAX_ZOOM: 3.5, 48- 49- init: function(svgId) { 50- this.svg = document.getElementById(svgId); 51- const stored = parseInt(localStorage.getItem('[REDACTED_SECRET]') || '0', 10); 52- this.rotationDeg = isNaN(stored) ? 0 : ((stored % 360) + 360) % 360; 53- }, -- 78: // applied. Bounding-box math (getFitView, getPanBounds) needs THIS, not the raw unrotated 79- // position, to correctly fit/clamp against what's actually visible on screen. 80- getRotatedScreenPos: function(p, q) {
+
+
+### 2026-08-15T22:35:51.256Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a pre-existing loose description (not literal), unaffected by my rename — fine as-is. Let's check `[REDACTED_PRIVATE_INFO]` and move on to the remaining special cases.
+
+
+### 2026-08-15T22:35:51.789Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:51.866Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 544 545 // Real report: rotating [REDACTED_PERSON]'s view (INV-24) could move a melody's notes off-screen with 546 // no way back, since [REDACTED_PERSON] had no pan capability at all (touch OR mouse) -- despite 547 // Render.getPanBounds() already listing 'melody' among the free-pan modes, its touchstart/ 548 // touchmove handlers (js/main.js) unconditionally blocked it. Two real, simultaneous touch 549 // points (not one dispatched twice) are required to exercise the actual 2-finger gesture path.
+
+
+### 2026-08-15T22:35:56.150Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Same pre-existing loose comment, fine after substitution. Now let's handle the `[REDACTED_PRIVATE_INFO]` tag, the localStorage key, and the `[REDACTED_PRIVATE_INFO]` local variable renames.
+
+
+### 2026-08-15T22:35:56.814Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n 'src="js/midi\.js"\|midi\.js' [REDACTED_PERSON]/Documents/GitHub/Tonncade/index.html
+
+
+### 2026-08-15T22:35:56.953Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 182: Range is clamped in [REDACTED_SECRET] to [0, targetLength-1] -- "anywhere 427: <script src="[REDACTED_SECRET]"></script>
+
+
+### 2026-08-15T22:36:00.772Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade perl -pi -e 's/js\/midi\.js/js\/melody.js/g' index.html grep -n 'melody\.js' index.html
+
+
+### 2026-08-15T22:36:02.824Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 182: Range is clamped in [REDACTED_SECRET] to [0, targetLength-1] -- "anywhere 427: <script src="[REDACTED_SECRET]"></script>
+
+
+### 2026-08-15T22:36:08.075Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:36:08.458Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "tonncade_midi_best" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/melody.js
+
+
+### 2026-08-15T22:36:08.573Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 127: this.state.bestStreak = parseInt(localStorage.getItem('[REDACTED_SECRET]') || '0'); 411: localStorage.setItem('[REDACTED_SECRET]', streak.toString());
+
+
+### 2026-08-15T22:36:12.103Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:36:12.148Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 120 this.refreshBoard(); 121 }, 122 123 init: function() { 124 Render.init('tonnetz-svg'); 125 126 // Load best streak from localStorage 127 this.state.bestStreak = parseInt(localStorage.getItem('[REDACTED_SECRET]') || '0'); 128 this.updateStreakUI(); 129
+
+
+### 2026-08-15T22:36:17.760Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:36:17.843Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:36:23.236Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:36:23.304Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:36:26.274Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rename the local JS variable names in `[REDACTED_PRIVATE_INFO]`'s drawer-injection block.
+
+
+### 2026-08-15T22:36:27.404Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "\bmidiTools\b\|\bmidiControls\b\|\bmidiUpload\b\|\bmidiSource\b\|\bmidiActions\b\|\bmidiStats\b\|\bmidiSettings\b" [REDACTED_PERSON]/Documents/GitHub/Tonncade/js/main.js
+
+
+### 2026-08-15T22:36:27.533Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 656: const midiTools = document.getElementById('[REDACTED_PRIVATE_INFO]'); 662: const midiSource = document.getElementById('[REDACTED_PRIVATE_INFO]'); 663: const midiUpload = document.getElementById('[REDACTED_PRIVATE_INFO]'); 664: const midiStats = document.getElementById('[REDACTED_PRIVATE_INFO]'); 665: const midiActions = document.getElementById('[REDACTED_PRIVATE_INFO]'); 694: if (midiTools) midiTools.style.display = 'none'; 703: if (midiTools) { 704: midiTools.style.display = 'flex'; 705: if (midiStats) midiTools.appendChild(midiStats); 706: if (midiActions) midiTools.appendChild(midiActions); 711: // always-visible area (midiTools, appended above). See task #77. 714: const midiSettings = document.getElementById('[REDACTED_PRIVATE_INFO]'); 715: if (midiSource) drawerInjected.appendChild(midiSource); 716: if (midiUpload) drawerInjected.appendChild(midiUpload); 717: if (midiSettings) drawerInjected.appendChild(midiSettings); 728: if (midiTools) midiTools.style.display = 'none'; 739: if (midiTools) midiTo …[98 chars elided]… 752: const midiSource = document.getElementById('[REDACTED_PRIVATE_INFO]'); 753: const midiUpload = document.getElementById('[REDACTED_PRIVATE_INFO]'); 754: const midiActions = document.getElementById('[REDACTED_PRIVATE_INFO]'); 755: const midiStats = document.getElementById('[REDACTED_PRIVATE_INFO]'); 757: if (midiControls) { 761: midiControls.style.display = (this.currentMode === 'melody') ? 'block' : 'none'; 764: const midiSettings = document.getElementById('[REDACTED_PRIVATE_INFO]'); 765: if (midiSource && midiSource.parentElement !== midiControls) midiControls.appendChild(midiSource); 766: if (midiUpload && midiUpload.parentElement !== midiControls) midiControls.appendChild(midiUpload); 767: if (midiSettings && midiSettings.parentElement !== midiControls) midiControls.appendChild(midiSettings); 768: if (midiActions && midiActions.parentElement !== midiControls) midiControls.appendChild(midiActions); 769: if (midiStats && midiStats.parentElement !== midiControls) midiControls.appendChild(midiStats);
+
+
+### 2026-08-15T22:36:32.845Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade perl -pi -e ' s/\bmidiTools\b/melodyTools/g; s/\bmidiControls\b/melodyControls/g; s/\bmidiUpload\b/melodyUpload/g; s/\bmidiSource\b/melodySource/g; s/\bmidiActions\b/melodyActions/g; s/\bmidiStats\b/melodyStats/g; s/\bmidiSettings\b/melodySettings/g; ' js/main.js grep -n "\bmidiTools\b\|\bmidiControls\b\|\bmidiUpload\b\|\bmidiSource\b\|\bmidiActions\b\|\bmidiStats\b\|\bmidiSettings\b" js/main.js echo "(should be empty above)"
+
+
+### 2026-08-15T22:36:34.744Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (should be empty above)
+
+
+### 2026-08-15T22:36:38.058Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's update `[REDACTED_PRIVATE_INFO]` (asset path + cache version bump).
+
+
+### 2026-08-15T22:36:38.729Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:36:38.764Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 const CACHE_NAME = '[REDACTED_SECRET]'; 2 const ASSETS = [ 3 './', 4 './index.html', 5 './css/style.css', 6 './js/version.js', 7 './js/tonnetz.js', 8 './js/synth.js', 9 './js/pieces.js', 10 './js/board.js', 11 './js/render.js', 12 './js/sandbox.js', 13 './js/blast.js', 14 './js/gravity.js', 15 './js/midi.js', 16 './js/file-folder.js', 17 './js/midi-folder.js', 18 './js/midi-input.js', 19 './js/compose.js', 20 './js/snake.js',
+
+
+### 2026-08-15T22:36:45.432Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:36:45.511Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:36:49.068Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PERSON]` (loadScript call + `filesToScan` array).
+
+
+### 2026-08-15T22:36:49.829Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "loadScript('midi\|midi\.js" [REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/run_tests.js
+
+
+### 2026-08-15T22:36:49.960Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 121:loadScript('midi.js'); 829: const filesToScan = ['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]'];
+
+
+### 2026-08-15T22:36:54.646Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] perl -pi -e "s/loadScript\('midi\.js'\)/loadScript('melody.js')/; s/js\/midi\.js/js\/melody.js/g" tests/run_tests.js grep -n "melody\.js\|midi\.js" tests/run_tests.js
+
+
+### 2026-08-15T22:36:56.933Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 121:loadScript('melody.js'); 829: const filesToScan = ['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]'];
+
+
+### 2026-08-15T22:37:02.186Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "App.currentMode = 'melody'\|getAttribute: () => 'melody'" [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:37:02.336Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 66: { getAttribute: () => '[REDACTED_PRIVATE_INFO]', classList: { add: () => {}, remove: () => {} } }, 181: App.currentMode = '[REDACTED_PRIVATE_INFO]'; // Standard mode formula 638: App.currentMode = '[REDACTED_PRIVATE_INFO]';
+
+
+### 2026-08-15T22:37:06.296Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already renamed. Now let's check `[REDACTED_PRIVATE_INFO]` for any remaining `MidiMode`/mode-string/prose references, and confirm the `[REDACTED_PRIVATE_INFO]` mention is untouched.
+
+
+### 2026-08-15T22:37:07.990Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "midi\|Midi" [REDACTED_PERSON]/Documents/GitHub/Tonncade/docs/invariants.md | grep -v "generate-bundled-midi\|MidiInput\|MidiFolder\|midi-input\.js\|midi-folder\.js\|midi-connect-btn\|midi/index\.json\|'\./midi/\|\bmidi\b keyboard\|hardware MIDI\|MIDI file\|MIDI keyboard\|MIDI hardware\|live MIDI"
+
+
+### 2026-08-15T22:37:08.121Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 55:(`#midi-folder-group`/`#midi-online-group`) — those lookups silently returned `null` (an 178:`'midi'` among the free-pan modes well before anything actually wired up input to move Melody's 348:`Render.highlightByMidi` (a Tonnetz places the same pitch at multiple lattice positions by 350:must also reach the practice game's own logic (`MidiMode.handleUserInputNote`), so playing the 405:Melody mode's matching (`MidiMode.handleUserInputNote`) compares exact MIDI pitch, not just 413:Fixed at the legibility layer rather than by relaxing the match: `MidiMode.updateDifficultyUI`'s 431:The "Simon says" drill (`MidiMode.playTargetSequence`) always used to replay the whole growing 437:`MidiMode.state.startIndex` now tracks where the drilled segment begins, clamped to 438:`[0, targetLength - 1]` — never past the notes already reached. `MidiMode.seekTo(index)` clears 453:the marker sits between D4 and C4. `MidiMode.positionScrubMarker(targetIdx)` places it (and 529:- `MidiMode.writeMIDI(melodySe …[1332 chars elided]… nce this is a 847:`MidiMode.writeMIDI` — the correct tool now that it exists and is tested, rather than hand-rolling 864:full `-15..15` rendered range for any `(p,q)` whose `Tonnetz.getMidi(p,q) % 12` matches. Each 917:`MidiMode.writeMIDI` gained an optional second `tempoBPM` argument to make any of this 979:**Test:** `[REDACTED_SECRET]` — "MidiMode.writeMIDI explicit-tempo tests" (raw-byte tempo-event 1205:`Tonnetz.getFrequency(getMidi(p, q))` — its own pitch — *everywhere, always, in every mode*. What 1220: (`Tonnetz.audibleMaxMidi()` ≈ MIDI 135 ≈ 20 kHz), not the old MIDI-protocol ceiling of 127. 1224: a pitch from a position it has left. Since a cell always sounds its own *current* `getMidi`, a 1228:getFrequency(midi), never octave-shifted" sweeps a range of MIDI values (including the extremes the 1229:old fold used to relocate) and asserts the synth commands exactly `getFrequency(midi)` for each. 1308:exemption-from-exemption already covers. `MidiMode.init()` called `resetGame()`
+
+
+### 2026-08-15T22:37:17.069Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:37:17.119Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 45 `#sandbox-guide`, which then got hidden, orphaning it. 46 47 **Test:** `[REDACTED_PRIVATE_INFO]` — "INV-3: nothing moved into the always-visible mobile 48 area is left unreachable by a hidden ancestor" 49 50 **Follow-up gap, found live:** the test above only checks elements that DID get relocated for 51 ending up orphaned afterward — it has no way to catch an element that was supposed to be 52 relocated but wasn't, since it never looks anywhere else. That's exactly what happened: 53 Melody's dropdown reorg (task, one-`<select>` [REDACTED_PERSON]) added a new control, but 54 `js/main.js`'s mobile-drawer relocation logic still only knew the OLD ids it replaced 55 (`#midi-folder-group`/`#midi-online-group`) — those lookups silently returned `null` (an 56 already-existing `if (el) ...` guard swallowed it with no error), so `[REDACTED_PERSON]` was 57 never moved anywhere and stayed stranded inside `#melody-controls`, which this same code 58 correctly hides wholesale on mobile once redistribution is done. The dropdown existed in the 59 DOM the entire time — invisible to any check that doesn't measure actual rendered visibility. 60 61 Fixed the code, and closed the general gap with a second, deliberately id-agnostic test: once a 62 mode's own `#<mode>-controls` panel ends up `display:none` (the split-relocation pattern, today 63 only Melody), that panel must contain zero remaining interactive descendants — everything in it 64 was supposed to have somewhere else to go. This needs no id list and needs no maintenance as
+
+
+### 2026-08-15T22:37:23.370Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:37:23.404Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 835 fetched via a plain relative `fetch('./midi/index.json')` in `js/midi-folder.js`'s new 836 `setupOnline`/`loadOnlineFile`. Deliberately a relative path, not an absolute 837 `raw.githubusercontent.com` URL: works identically on any http(s) host (GitHub Pages, a local 838 dev server, anything else this app is ever served from) and simply fails under `file://` (no 839 origin to fetch from) or offline — the same already-established file://-degradation philosophy 840 as #47, not a new failure mode. Any failure (offline, `file://`, a 404) just hides 841 `#midi-online-group`/`#compose-online-group` rather than surfacing an error, since this is a 842 bonus tier, not a required one — the app works identically without it. 843 844 The six bundled songs (Hot Cross Buns plus Frère Jacques, Happy Birthday, the Alphabet Song/ 845 Twinkle Twinkle, Mary Had a Little Lamb, Row Row Row Your Boat) are real `.mid` files, generated 846 by `scripts/generate-bundled-midi.js` from plain `[noteName, beats]` data using the actual
+
+
+### 2026-08-15T22:37:28.717Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:37:28.766Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 172 check, indistinguishable from a real bug. And Snake/Gravity both auto-advance on a real-time 173 timer, unrelated to what's being tested but real enough to move the snake/piece during a 174 resize/rotate step's own async work (opening the drawer, clicking a button) — both are paused 175 for the duration of their own check. 176 177 Melody's own pan capability has its own history worth keeping: `Render.getPanBounds()` listed 178 `'[REDACTED_SECRET]'` among the free-pan modes well before anything actually wired up input to move Melody's 179 view — no mouse-drag, no two-finger touch drag, and `refreshBoard()` always reset to a hardcoded 180 `(-400, -300)`. Real report: rotating the view (INV-24) could move a melody's notes off-screen 181 with no way back. Fixed by mirroring Sandbox's exact mouse-drag pattern and extending the shared
+
+
+### 2026-08-15T22:37:51.205Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`docs/invariants.md` wasn't included in my `MidiMode`→`MelodyMode` sweep. Let's fix that — those references point at a still-existing object (just renamed), unlike the dead old-id references which are accurate history and should stay.
+
+
+### 2026-08-15T22:37:51.774Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -c '\bMidiMode\b' [REDACTED_PERSON]
+
+
+### 2026-08-15T22:37:51.909Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:37:56.330Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON]/Documents/GitHub/Tonncade perl -pi -e 's/\bMidiMode\b/MelodyMode/g' docs/invariants.md grep -c '\bMidiMode\b\|\bMelodyMode\b' docs/invariants.md
+
+
+### 2026-08-15T22:37:58.665Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:38:04.887Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "MidiMode.writeMIDI explicit-tempo\|MelodyMode.writeMIDI explicit-tempo" [REDACTED_PERSON]
+
+
+### 2026-08-15T22:38:04.998Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 446: console.log("Running [REDACTED_SECRET]...");
+
+
+### 2026-08-15T22:38:08.710Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already caught by the earlier `MidiMode`→`MelodyMode` sweep since `[REDACTED_SECRET]` was included in that file list. Now let's do the final comprehensive grep sweep for anything remaining.
+
+
+### 2026-08-15T22:38:10.109Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] echo "=== Remaining MidiMode (should be none) ===" grep -rn '\bMidiMode\b' . --include="*.js" --include="*.html" --include="*.md" 2>/dev/null | grep -v node_modules echo "=== Remaining bare mode-string 'midi'/\"midi\" (should show only genuinely historical/unrelated) ===" grep -rn "'midi'\|\"midi\"" . --include="*.js" --include="*.html" --include="*.md" 2>/dev/null | grep -v node_modules
+
+
+### 2026-08-15T22:38:10.255Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: === Remaining MidiMode (should be none) === index.html:153: Tonnetz hinting shows while drilling (see MidiMode.updateDifficultyUI, index.html:155: update, MidiMode.updateDifficultyBarbell), not piece size like Blast/ next_steps.md:6:- **Priority: rename Melody mode's internal identifier from `midi` to something Melody-specific** (found live: `midi` is a cross-mode CAPABILITY name -- hardware keyboard input (`js/midi-input.js`'s `MidiInput`), MIDI *file* browsing (`js/midi-folder.js`'s `MidiFolder`, shared with Compose) -- not a mode name, so reusing it as the practice-game mode's own internal id (`data-mode="midi"`, `App.currentMode === 'midi'`, the `MidiMode` object, `js/midi.js`, `#midi-controls`/`#midi-note-list`/etc. CSS ids, the `tonncade_midi_best` localStorage key) is a real, confusing naming collision, not just cosmetic. Touches index.html, css/style.css, js/midi.js (possible filename rename too) and every file referencing `App.currentMode === 'midi'`, plus every test referenci …[4753 chars elided]… cing the `'midi'` mode string -- dozens of occurrences. The `tonncade_midi_best` localStorage key specifically needs a migration path (read the old key as a fallback) so renaming doesn't silently reset existing players' best streak. Deliberately kept as its own separate commit from the INV-48 statefulness fix (to keep that fix small/reviewable), but done as the very next task afterward, not deferred. screenshots/index.html:114: // The app's internal mode ids don't all match their UI names -- 'midi' is the mode the UI calls js/main.js:281: // (Melody's internal id used to be 'midi', a mismatch this table existed to bridge -- see docs/invariants.md:178:`'midi'` among the free-pan modes well before anything actually wired up input to move Melody's [[REDACTED_PERSON]]:613: if (mode !== 'sandbox' && mode !== 'blast' && mode !== 'midi') return null; scripts/generate-bundled-midi.js:118:const midiDir = path.join(__dirname, '..', 'midi');
+
+
+### 2026-08-15T22:38:27.109Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:38:27.147Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 148 folder/song selectors so it routes into the drawer on mobile (see [REDACTED_SECRET]), 149 out of the board's way. --> 150 <!-- Vertical dumbbell-barbell triplet (task #93), matching Blast/Gravity's own 151 difficulty control exactly -- this one was never converted when they were, 152 a leftover plain <select>. Difficulty here means how much of the note-list/ 153 Tonnetz hinting shows while drilling (see MidiMode.updateDifficultyUI, 154 which repaints those hints -- distinct from the barbell's own lit-icon 155 update, MidiMode.updateDifficultyBarbell), not piece size like Blast/ 156 Gravity's own control, so its title text says so instead. --> 157 <div id="melody-settings-group" class="control-group" style="margin-top: 6px;">
+
+
+### 2026-08-15T22:38:32.357Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:38:32.430Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:38:36.222Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:38:36.631Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:38:36.670Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 105 <script src="manifest-mobile-safari.js" onerror="void 0"></script> 106 <script> 107 (function() { 108 const manifest = window.SCREENSHOT_MANIFEST; 109 if (!manifest || !manifest.length) { 110 document.getElementById('empty').style.display = 'block'; 111 return; 112 } 113 114 // The app's internal mode ids don't all match their UI names -- 'midi' is the mode the UI calls 115 // "Melody". Show the user-facing name here. 116 const DISPLAY_NAME = { sandbox: '[REDACTED_PRIVATE_INFO]', midi: 'Melody', compose: 'Compose', snake: 'Snake', blast: 'Blast', gravity: 'Gravity' }; 117 118 // Group by device profile first (Desktop / Android phone / Tablet / iOS), then by mode within 119 // each, so every profile is visible side by side rather than one clobbering the others. 120 const PROFILE_ORDER = ['Desktop', 'Android phone', 'Tablet', 'iOS (Safari)']; 121 const byProfile = {}; 122 manifest.forEach(entry => { 123 const p = entry.profile || 'Other'; 124 (byProfile[p] = byProfile[p] || []).push(entry);
+
+
+### 2026-08-15T22:38:44.015Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: git -C [REDACTED_PERSON] log --oneline -1 -- screenshots/index.html 2>&1 git -C [REDACTED_PERSON] check-ignore screenshots/index.html 2>&1; echo "exit=$?"
+
+
+### 2026-08-15T22:38:46.678Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] Fixture: generate + show four device profiles (Desktop/Android/Tablet/iOS), never clobbering exit=1
+
+
+### 2026-08-15T22:38:50.148Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+It's a real, tracked source file — a genuine dependency, not generated/ignored. Let's fix it.
+
+
+### 2026-08-15T22:38:52.102Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:38:52.200Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:38:56.496Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rln "midi" [REDACTED_PERSON]2>/dev/null
+
+
+### 2026-08-15T22:38:56.618Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:00.862Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "midi" [REDACTED_PERSON]/Documents/GitHub/Tonncade/screenshots/manifest-desktop-chrome.js | head -5 git -C [REDACTED_PERSON]/Documents/GitHub/Tonncade log --oneline -1 -- screenshots/manifest-desktop-chrome.js
+
+
+### 2026-08-15T22:39:02.889Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 205: "mode": "midi", 209: "file": "[REDACTED_SECRET]", 225: "mode": "midi", 229: "file": "[REDACTED_SECRET]", 245: "mode": "midi",
+
+
+### 2026-08-15T22:39:13.761Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "manifest-\|screenshots/" [REDACTED_PERSON]/Documents/GitHub/Tonncade/docs/ci-pages.md | head -10
+
+
+### 2026-08-15T22:39:13.864Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 4:`[REDACTED_PRIVATE_INFO]` fixture to a `[REDACTED_PRIVATE_INFO]` branch that GitHub Pages serves. 10:| push to `[REDACTED_PRIVATE_INFO]` | root: app at `/`, fixture at `/[REDACTED_PRIVATE_INFO]` | `[REDACTED_PERSON]` and `…/[REDACTED_PRIVATE_INFO]` | 11:| pull request | `/previews/pr-<N>/` (that PR's app + fixture) | `…/Tonncade/previews/pr-<N>/` and `…/previews/pr-<N>/[REDACTED_PRIVATE_INFO]` | 29: root with the app + `/[REDACTED_PRIVATE_INFO]`. ⚠️ Do this *before* step 2 — switching Pages to an empty 35:After that, every `[REDACTED_PRIVATE_INFO]` push refreshes the app + `/[REDACTED_PRIVATE_INFO]`, and every PR gets a 36:`/previews/pr-<N>/` link commented on it (comparable against `/[REDACTED_PRIVATE_INFO]`). 43:- The fixture's `*.png` / `manifest-*.js` stay **gitignored** — CI regenerates them into
+
+
+### 2026-08-15T22:39:20.973Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`screenshots/index.html` is real tracked source (fixed); the `manifest-*.js` files are gitignored generated artifacts — no action needed there. Now let's fix `[REDACTED_PRIVATE_INFO]`, which has a genuine functional dependency on the old filename/object.
+
+
+### 2026-08-15T22:39:21.460Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:21.504Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1 /* 2 @licstart The following is the entire license notice for the 3 JavaScript code in this file. 4 5 [REDACTED_PERSON] 6 7 The JavaScript code in this file is free software: you can 8 redistribute it and/or modify it under the terms of the GNU 9 General Public License (GNU GPL) as published by the Free Software 10 Foundation, either version 3 of the License, or (at your option) 11 any later version. The code is distributed WITHOUT ANY WARRANTY; 12 without even the implied warranty of MERCHANTABILITY or FITNESS 13 FOR A PARTICULAR PURPOSE. See the GNU GPL for more details. 14 15 As additional permission under GNU GPL version 3 section 7, you 16 may distribute non-source (e.g., minimized or compacted) forms of 17 that code without the copy of the GNU GPL normally required by 18 section 4, provided you include this license notice and a URL 19 through which recipients can access the Corresponding Source. 20 21 @licend The above is the entire license notice 22 for the Jav …[715 chars elided]… wn `const MidiMode = {...}`, so it can see the binding 40 // and attach it to the context object (`this` at top level of a non-strict script). 41 const code = fs.readFileSync(path.join(__dirname, '..', 'js', '[REDACTED_PRIVATE_INFO]'), 'utf8') + '\nthis.MidiMode = MidiMode;'; 42 vm.runInContext(code, context, { filename: '[REDACTED_PRIVATE_INFO]' }); 43 const MidiMode = context.MidiMode; 44 45 // C4=60, D4=62, E4=64, F4=65, G4=67, A4=69, B4=71, C5=72, D5=74, E5=76, F5=77, G5=79, G3=55 46 const NOTE = { C4: 60, D4: 62, E4: 64, F4: 65, G4: 67, A4: 69, B4: 71, C5: 72, D5: 74, E5: 76, F5: 77, G5: 79, G3: 55 }; 47 48 // Each song: array of [noteName, beats] pairs. 1 beat = 0.5s (matches MidiMode.defaultMelody's 49 // own implicit 120bpm), sound duration is 80% of the beat slot (same duty-cycle convention 50 // defaultMelody already uses: quarter=0.4s sound in a 0.5s slot, eighth=0.2s sound in a 0.25s 51 // slot, half=0.8s sound in a 1.0s slot). 52 const SONGS = { 53 'frere-jacques': { 54 name: 'Frère Jacques', 55 notes: [
+
+
+### 2026-08-15T22:39:28.037Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:28.087Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 113 time += slot; 114 return note; 115 }); 116 } 117 118 const midiDir = path.join(__dirname, '..', 'midi'); 119 fs.mkdirSync(midiDir, { recursive: true }); 120 121 const index = [{ name: 'Hot Cross Buns', file: '[REDACTED_PRIVATE_INFO]' }]; 122 fs.writeFileSync(path.join(midiDir, '[REDACTED_PRIVATE_INFO]'), Buffer.from(MidiMode.writeMIDI(MidiMode.defaultMelody))); 123 124 for (const [file, song] of Object.entries(SONGS)) { 125 const buffer = MidiMode.writeMIDI(toMelodySeq(song.notes)); 126 fs.writeFileSync(path.join(midiDir, `${file}.mid`), Buffer.from(buffer)); 127 index.push({ name: song.name, file: `${file}.mid` }); 128 } 129 130 fs.writeFileSync(path.join(midiDir, '[REDACTED_PRIVATE_INFO]'), JSON.stringify(index, null, 2) + '\n'); 131 console.log(`Wrote ${index.length} songs to ${midiDir}`); 132
+
+
+### 2026-08-15T22:39:32.426Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`[REDACTED_PRIVATE_INFO]` correctly stays as-is (the real `midi/` bundled-songs directory, unrelated to the mode rename). Let's fix the object/file references.
+
+
+### 2026-08-15T22:39:34.816Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:34.887Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:39:42.668Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:39:42.720Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:39:47.778Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:47.815Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:39:53.740Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:39:53.800Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:40:00.150Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: cd [REDACTED_PERSON] echo "=== Remaining MidiMode ===" grep -rn '\bMidiMode\b' . --include="*.js" --include="*.html" --include="*.md" 2>/dev/null | grep -v node_modules echo "=== Remaining bare 'midi'/\"midi\" mode-string (excluding known-intentional historical/archive) ===" grep -rn "'midi'\|\"midi\"" . --include="*.js" --include="*.html" --include="*.md" 2>/dev/null | grep -v node_modules | grep -v "docs/superpowers/plans/\|docs/invariants.md:178\|js/main.js:281\|next_steps.md"
+
+
+### 2026-08-15T22:40:00.270Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: === Remaining MidiMode === next_steps.md:6:- **Priority: rename Melody mode's internal identifier from `midi` to something Melody-specific** (found live: `midi` is a cross-mode CAPABILITY name -- hardware keyboard input (`js/midi-input.js`'s `MidiInput`), MIDI *file* browsing (`js/midi-folder.js`'s `MidiFolder`, shared with Compose) -- not a mode name, so reusing it as the practice-game mode's own internal id (`data-mode="midi"`, `App.currentMode === 'midi'`, the `MidiMode` object, `js/midi.js`, `#midi-controls`/`#midi-note-list`/etc. CSS ids, the `tonncade_midi_best` localStorage key) is a real, confusing naming collision, not just cosmetic. Touches index.html, css/style.css, js/midi.js (possible filename rename too) and every file referencing `App.currentMode === 'midi'`, plus every test referencing the `'midi'` mode string -- dozens of occurrences. The `tonncade_midi_best` localStorage key specifically needs a migration path (read the old key as a fallback) so renaming doesn't silen …[1994 chars elided]… `'s new `setupOnline`/`loadOnlineFile` fetch it via a relative path (works on any http(s) host, absent under `file://`/offline), shown for both Melody and Compose. next_steps.md:36:- ~~**#52 Compose mode: symbolic tempo/tick grid, quantization, metronome**~~ Done: a recording-session tempo (BPM input, default 120) + subdivision grid (1/8 through 1/32, plus both triplet subdivisions) setting, an opt-in `Quantize` checkbox (snaps notes onto the grid when recording stops -- not automatic, so a rough take stays untouched unless asked), and an opt-in metronome click while recording. `MidiMode.writeMIDI` gained an optional `tempoBPM` argument, emitting a real tempo meta event only when quantize was actually used -- every existing caller (and Compose's own Save when not quantizing) is byte-for-byte unchanged. === Remaining bare 'midi'/"midi" mode-string (excluding known-intentional historical/archive) === scripts/generate-bundled-midi.js:118:const [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:05.155Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All clean — remaining hits are intentional historical record or unrelated. Let's mark the `[REDACTED_PRIVATE_INFO]` priority item done.
+
+
+### 2026-08-15T22:40:05.957Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:40:05.998Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 6 - **Priority: rename Melody mode's internal identifier from `[REDACTED_SECRET]` to something Melody-specific** (found live: `[REDACTED_SECRET]` is a cross-mode CAPABILITY name -- hardware keyboard input (`js/[REDACTED_SECRET]-input.js`'s `MidiInput`), MIDI *file* browsing (`js/[REDACTED_SECRET]-folder.js`'s `MidiFolder`, shared with Compose) -- not a mode name, so reusing it as the practice-game mode's own internal id (`data-mode="[REDACTED_SECRET]"`, `App.currentMode === '[REDACTED_SECRET]'`, the `MidiMode` object, `js/[REDACTED_SECRET].js`, `#[REDACTED_SECRET]-controls`/`#[REDACTED_SECRET]-note-list`/etc. CSS ids, the `tonncade_[REDACTED_SECRET]_best` localStorage key) is a real, confusing naming collision, not just cosmetic. Touches index.html, css/style.css, js/[REDACTED_SECRET].js (possible filename rename too) and every file referencing `App.currentMode === '[REDACTED_SECRET]'`, plus every test referencing the `'[REDACTED_SECRET]'` mode string -- dozens of occurrences. The `tonncade_[REDACTED_SECRET]_best` localStorage key specifically needs a migration path (read the old key as a fallback) so renaming doesn't silently reset existing players' best streak. Deliberately kept as its own separate commit from the INV-48 statefulness fix (to keep that fix small/reviewable), but done as the very next task afterward, not deferred.
+
+
+### 2026-08-15T22:40:15.544Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:40:15.641Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:40:18.883Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full verification suite: static id checker, Node tests, `URL routing` test, then the full Playwright suites.
+
+
+### 2026-08-15T22:40:19.479Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: node [REDACTED_PERSON]/Documents/GitHub/Tonncade/scripts/check-dom-ids.js
+
+
+### 2026-08-15T22:40:21.611Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET]
+
+
+### 2026-08-15T22:40:25.459Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Let's run the URL routing test and [REDACTED_SECRET] tests first, since they're the highest-signal checks for this rename.
+
+
+### 2026-08-15T22:40:26.003Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "URL routing" --project="[REDACTED_PERSON]" 2>&1 | tail -30
+
+
+### 2026-08-15T22:40:26.091Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command running in background with ID: [REDACTED_SECRET]. Output is being written to: /[[REDACTED_SECRET]]-[[REDACTED_PERSON]]-[[REDACTED_SECRET]]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-15T22:40:29.226Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T22:40:29.303Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:40:30.403Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:34.357Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification.
+
+
+### 2026-08-15T22:40:34.681Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:40:35.794Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:39.657Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -15 /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-15T22:40:39.756Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: npm notice run [REDACTED_PERSON] npx npm notice run 'playwright' test -g URL routing --project=Desktop Chrome Running 1 test using 1 worker ✓ 1 [Desktop Chrome] › tests/desktop.spec.js:2696:1 › URL routing: hash deep-links to a mode and the URL updates on click (2.2s) 1 passed (3.5s)
+
+
+### 2026-08-15T22:40:43.410Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:43.856Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test [REDACTED_PRIVATE_INFO] --project="Desktop Chrome" 2>&1 | tail -30
+
+
+### 2026-08-15T22:40:43.944Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: Command running in background with ID: [REDACTED_SECRET]. Output is being written to: [REDACTED_PRIVATE_INFO]. You will be notified when it completes. To check interim output, use Read on that file path.
+
+
+### 2026-08-15T22:40:48.306Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:40:48.728Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:40:49.846Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:53.467Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification.
+
+
+### 2026-08-15T22:40:53.468Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:40:54.596Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:57.783Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:40:58.884Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:41:02.245Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:41:02.305Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ [REDACTED_PRIVATE_INFO]: sleep 1; echo waiting
+
+
+### 2026-08-15T22:41:03.403Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:41:06.901Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: sleep 1; echo waiting
+
+
+### 2026-08-15T22:41:08.010Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: waiting
+
+
+### 2026-08-15T22:41:11.018Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification instead of continuing to poll.
+
+
+### 2026-08-15T22:41:46.021Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: tail -20 /[REDACTED_HIGH_ENTROPY_TOKEN]-[[REDACTED_PERSON]]-[REDACTED_HIGH_ENTROPY_TOKEN]
+
+
+### 2026-08-15T22:41:46.173Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1) [REDACTED_PRIVATE_INFO] Error: page.evaluate: TypeError: Cannot read properties of null (reading 'state') at eval (eval at evaluate (:303:30), <anonymous>:1:23) at UtilityScript.evaluate (<anonymous>:305:16) at UtilityScript.<anonymous> (<anonymous>:1:44) at eval (eval at evaluate (:303:30), <anonymous>:1:23) at UtilityScript.evaluate (<anonymous>:305:16) at UtilityScript.<anonymous> (<anonymous>:1:44) at [REDACTED_PRIVATE_INFO] attachment #1: screenshot (image/png) ────────────────────────────────────────────────────────── [REDACTED_SECRET] ──────────────────────────────────────────────────────────────────────────────────────────────── Error Context: [REDACTED_SECRET] 1 failed [REDACTED_PRIVATE_INFO] 110 passed (56.5s)
+
+
+### 2026-08-15T22:41:50.886Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real leftover reference. Let's find the mode-object lookup this test depends on.
+
+
+### 2026-08-15T22:41:51.451Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:41:51.508Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1330 // modes, not just Sandbox, so a future mode added to (or accidentally dropped from) that set gets 1331 // caught here instead of only being noticed by whichever mode someone happens to test by hand. 1332 for (const mode of ['sandbox', 'melody', 'compose', 'life']) { 1333 test(`panning cannot scroll far past the edge of the audible tonnetz (${mode})`, async ({ page }) => { 1334 await page.goto('/'); 1335 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 1336 1337 const result = await page.evaluate(() => { 1338 Render.updateView(-1000000, -1000000, 1); 1339 const afterNegative = { x: Render.viewX, y: Render.viewY }; 1340 Render.updateView(1000000, 1000000, 1); 1341 const afterPositive = { x: Render.viewX, y: Render.viewY }; 1342 const bounds = Render.getPanBounds(); 1343 return { afterNegative, afterPositive, bounds }; 1344 }); 1345 1346 expect(result.bounds, `${mode} should allow free panning with real bounds`).not.toBeNull(); 1347 …[584 chars elided]…  pinch)/touch pinch, independent of 1357 // the browser's own zoom and not subject to its floor. Scroll-wheel here; touch pinch is covered 1358 // in [REDACTED_PRIVATE_INFO]. 1359 for (const mode of ['sandbox', 'melody', 'compose', 'life']) { 1360 test(`Scroll-wheel zoom works in ${mode} and persists across a redraw`, async ({ page }) => { 1361 await page.goto('/'); 1362 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 1363 if (mode === 'life') await page.waitForFunction(() => typeof LifeFolder !== 'undefined' && LifeFolder.currentValue !== null, { timeout: 3000 }); 1364 1365 const before = await page.evaluate(() => App.modeModule().state.zoom || Render.getResponsiveZoom()); 1366 const container = page.locator('#game-container'); 1367 await container.hover(); 1368 await page.mouse.wheel(0, 400); // scroll down -- zooms OUT (larger zoom value, more world visible) 1369 const afterOut = await page.evaluate(() => App.modeModule().state.zoom);
+
+
+### 2026-08-15T22:41:55.699Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`App.modeModule()` — that's the mode-registry lookup. Let's check it in `main.js`.
+
+
+### 2026-08-15T22:41:56.630Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "modeModule:" -A 10 [REDACTED_PERSON]
+
+
+### 2026-08-15T22:41:56.756Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 38: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:06.453Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the gap — bare unquoted object keys (`[REDACTED_SECRET]`) weren't caught by my quoted-string substitution. Let me find every occurrence of this pattern.
+
+
+### 2026-08-15T22:42:07.480Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "^\s*midi:\|[{,]\s*midi:" [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 2>/dev/null
+
+
+### 2026-08-15T22:42:07.631Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] [REDACTED_PERSON] /User …[7625 chars elided]… oxMode.refreshLattice(), midi: () => MelodyMode.refreshBoard(), compose: () => ComposeMode.refreshBoard(), life: () => LifeMode.refreshLattice() }[m]; /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js:849: midi: ['#tonnetz-svg', '#drawer-handle', '#melody-source', '#melody-play-preview', '#melody-game-restart', '#melody-stats-group', '#melody-game-status'], /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js:951: midi: ['#melody-file-input', '#melody-difficulty'], // upload fallback + a setting, not a top-level action /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js:963: midi: 'melody-controls', compose: 'compose-controls', life: 'life-controls', /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js:1931: return { midi: m, commanded: created[0].frequency.value, expected: Tonnetz.getFrequency(m) }; /Users/[REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js:1984: midi: 'melody-current-streak',
+
+
+### 2026-08-15T22:42:20.789Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Precise list — 11 genuine [REDACTED_SECRET] sites need fixing, distinct from the many `{midi: <pitch>, ...}` note-object properties that must stay untouched. Let's fix each.
+
+
+### 2026-08-15T22:42:21.297Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:21.372Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 38 [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:26.023Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:26.086Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PRIVATE_INFO] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:42:30.078Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:30.148Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_SECRET] // deliberately absent: its rotate button stays hidden (see setMode below), since [REDACTED_SECRET] // Render.getEffectiveRotation() always renders Gravity at 0 regardless of this setting. [REDACTED_SECRET] modeRefreshFns: { [REDACTED_SECRET] sandbox: () => SandboxMode.refreshLattice(), [REDACTED_SECRET] blast: () => BlastMode.refreshUI(), [REDACTED_SECRET] midi: () => MelodyMode.refreshBoard(), [REDACTED_SECRET] snake: () => SnakeMode.refreshBoard(), [REDACTED_SECRET] compose: () => ComposeMode.refreshBoard(), [REDACTED_PRIVATE_INFO] }, 1432
+
+
+### 2026-08-15T22:42:35.387Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:42:35.453Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:42:40.969Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:42:41.402Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:42:41.443Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 235 await page.evaluate((m) => { 236 // Recenter the pannable modes on the origin first: their view center persists across 237 // consecutive same-mode scenarios, so an earlier scenario's interactions would otherwise 238 // leave the board panned off to one side in this scenario's frame. Each captured image 239 // should show the clean default centered view (null -> origin, see Render.panView). 240 const modeObj = { sandbox: [REDACTED_STUDENT], midi: [REDACTED_STUDENT], compose: [REDACTED_STUDENT] }[m]; 241 if (modeObj) { modeObj.state.viewX = null; modeObj.state.viewY = null; } 242 const fns = { 243 sandbox: () => [REDACTED_STUDENT].refreshLattice(), 244 midi: () => [REDACTED_STUDENT].refreshBoard(), 245 compose: () => [REDACTED_STUDENT].refreshBoard(), 246 snake: () => [REDACTED_STUDENT].refreshBoard(), 247 blast: () => [REDACTED_STUDENT].refreshUI(), 248 gravity: () => [REDACTED_STUDENT].refreshBoard(), 249 };
+
+
+### 2026-08-15T22:42:46.904Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "'midi'\|\"midi\"" [REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/exploratory.spec.js
+
+
+### 2026-08-15T22:42:47.025Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-15T22:42:54.712Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:42:54.793Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:42:58.474Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:42:59.078Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:42:59.127Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1480 [REDACTED_SECRET] 1481 const box = await page.locator('#palette').boundingBox(); 1482 expect(box).not.toBeNull(); 1483 expect(box.width).toBeGreaterThan(0); 1484 expect(box.height).toBeGreaterThan(0); 1485 const count = await page.evaluate(() => document.getElementById('piece-list').children.length); 1486 expect(count).toBeGreaterThan(0); 1487 }, 1488 [REDACTED_SECRET], 1489 [REDACTED_SECRET] 1490 const hidden = await page.evaluate(() => getComputedStyle(document.getElementById('palette')).display === 'none'); 1491 expect(hidden).toBe(true); 1492 }, 1493 snake: async (page) => PALETTE_EXPECTATION.midi(page), 1494 compose: async (page) => PALETTE_EXPECTATION.midi(page),
+
+
+### 2026-08-15T22:43:04.249Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:43:04.286Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 1493 snake: async (page) => [REDACTED_PRIVATE_INFO], 1494 compose: async (page) => [REDACTED_PRIVATE_INFO], 1495 life: async (page) => [REDACTED_PRIVATE_INFO], 1496 }; 1497
+
+
+### 2026-08-15T22:43:10.583Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:10.687Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:14.840Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]` — 6 sites (664, 665, 849, 951, 963, 1984).
+
+
+### 2026-08-15T22:43:15.095Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:43:15.165Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 660 // app never actually produces -- the very next refresh would "correct" it and look like a 661 // corruption. Offsetting the stored center by a modest amount and refreshing mirrors a real 662 // pan exactly. 663 await page.evaluate((m) => { 664 const modeObj = { sandbox: [REDACTED_PRIVATE_INFO], midi: [REDACTED_PRIVATE_INFO], compose: [REDACTED_PRIVATE_INFO], life: [REDACTED_PRIVATE_INFO] }[m]; 665 const refresh = { sandbox: () => [REDACTED_PRIVATE_INFO].refreshLattice(), midi: () => [REDACTED_PRIVATE_INFO].refreshBoard(), compose: () => [REDACTED_PRIVATE_INFO].refreshBoard(), life: () => [REDACTED_PRIVATE_INFO].refreshLattice() }[m]; 666 refresh(); // ensure the view center is initialized (null -> origin) before offsetting it 667 modeObj.state.viewX -= 60; 668 modeObj.state.viewY -= 40; 669 refresh();
+
+
+### 2026-08-15T22:43:20.871Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:43:20.972Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:24.852Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:24.899Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 845 snake: [ 846 '[REDACTED_PRIVATE_INFO]', '#snake-btn-ul', '#snake-btn-ur', '#snake-btn-left', '#snake-btn-right', 847 '#snake-btn-dl', '#snake-btn-dr', '#snake-start-pause', '#snake-reset', '#snake-controls .stats-panel', '[REDACTED_PRIVATE_INFO]', 848 ], 849 midi: ['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '#melody-game-status'], 850 sandbox: ['[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '#piece-list', '#chord-guide-select'], 851 compose: [ 852 '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', 853 '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', 854 ], 855 life: [ 856 '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', 857 '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', '[REDACTED_PRIVATE_INFO]', 858 ], 859 };
+
+
+### 2026-08-15T22:43:30.150Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:30.222Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:33.693Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:33.735Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: 945 // Entries may name a single control's own id, OR a container's id whose entire subtree is 946 // covered (matching how PRIMARY_ELEMENTS itself already uses container-scoped selectors like 947 // '#gravity-controls .stats-panel') -- Blast/Gravity's Easy/Medium/Hard difficulty buttons 948 // have no ids of their own at all (`class="weight-icon"` only), so the group is classified by 949 // its own wrapping `#blast-difficulty`/`#gravity-difficulty` container instead. 950 const SECONDARY_ELEMENTS = { 951 midi: ['#melody-file-input', '#melody-difficulty'], // upload fallback + a setting, not a top-level action 952 blast: ['#blast-difficulty'], // Easy/Medium/Hard piece-size setting, not a top-level action 953 gravity: ['#gravity-difficulty'], // same setting, Gravity's own copy 954 compose: [ 955 '#compose-file-input', '#compose-tempo', '#compose-subdivision', '#compose-quantize', '#compose-metronome', 956 ], // upload fallback + recording settings, not top-level actions 957 life: ['#life-file-input'], // upload fallback, not a top-level action 958 }; 959 960 test('[REDACTED_SECRET] coverage: every interactive control in a mode\'s panel is classified as primary or secondary, none forgotten', async ({ page }) => { 961 const CONTAINER_ID = { 962 gravity: 'gravity-controls', blast: 'blast-stats', snake: 'snake-controls', 963 midi: 'melody-controls', compose: 'compose-controls', life: 'life-controls', 964 }; 965 for (const [mode, containerId] of Object.entries(CONTAINER_ID)) { 966 await page.evaluate((m) => document.querySelector(`.mode-option[data-mode="${m}"]`).click(), mode); 967 968 const unclassified = await page.evaluate(({ containerId, primary, secondary }) => { 969 const container = document.getElementById(containerId);
+
+
+### 2026-08-15T22:43:38.102Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:43:38.146Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:42.592Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PERSON]
+
+
+### 2026-08-15T22:43:42.676Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:46.296Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the last one, `[REDACTED_PRIVATE_INFO]` at line ~1984.
+
+
+### 2026-08-15T22:43:46.937Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Read: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:46.978Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO] // observe, not just what happens to be in memory or how a given mode happens to render it. [REDACTED_PRIVATE_INFO] const [REDACTED_PRIVATE_INFO] = { [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] sandbox: null, [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 1986 const paintedFingerprint = async (page, mode) => page.evaluate((counterId) => { 1987 const MEANINGFUL_CLASSES = [
+
+
+### 2026-08-15T22:43:52.452Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Edit: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:43:52.508Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: The file [REDACTED_PERSON] has been updated successfully. (file state is current in your context — no need to Read it back)
+
+
+### 2026-08-15T22:43:57.765Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -n "mode: 'melody'\|mode: 'midi'" [REDACTED_PERSON]/Documents/GitHub/Tonncade/tests/invariants.spec.js
+
+
+### 2026-08-15T22:43:58.018Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:44:01.756Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already correct. Now let's do one more precise sweep specifically for bare `midi:` object keys across the whole repo.
+
+
+### 2026-08-15T22:44:03.599Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: grep -rn "^\s*midi:\|[{,]\s*midi:" [REDACTED_PRIVATE_INFO] [REDACTED_PRIVATE_INFO] 2>/dev/null | grep -v "note.midi\|n.midi\|c.midi\|midi: n\.\|midi: c\.\|midi: base\|midi: note\|midi: Tonnetz\|midi: [0-9]\|midi: m,\|midi: candidate"
+
+
+### 2026-08-15T22:44:03.747Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+←: (Bash completed with no output)
+
+
+### 2026-08-15T22:44:07.960Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 11 mode-registry keys fixed, none left. Let's re-run the failing test plus the full [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:44:08.699Z | claude (sonnet) | claude tools | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+→ Bash: npx playwright test -g "[REDACTED_SECRET]" --project="[REDACTED_PRIVATE_INFO]" 2>&1 | tail -20

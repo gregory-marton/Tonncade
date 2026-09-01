@@ -3213,3 +3213,188 @@ All 19 ids renamed cleanly, zero leftover, and `midi-connect-btn` untouched. Now
 Now let's check the comments that need fuller rewording (not just word substitution) and the special-case lines.
 
 
+### 2026-08-15T22:35:16.437Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check line 1165's comment and the local variable renames in `main.js`.
+
+
+### 2026-08-15T22:35:20.918Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That comment is fine as-is now — my substitution correctly updated it and it still reads naturally. Now let's check `[REDACTED_PRIVATE_INFO]`'s two comment blocks and `[REDACTED_PRIVATE_INFO]`'s comment.
+
+
+### 2026-08-15T22:35:24.858Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:35:34.915Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check `[REDACTED_SECRET]` and `[REDACTED_SECRET]` comments.
+
+
+### 2026-08-15T22:35:51.256Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a pre-existing loose description (not literal), unaffected by my rename — fine as-is. Let's check `[REDACTED_PRIVATE_INFO]` and move on to the remaining special cases.
+
+
+### 2026-08-15T22:35:56.150Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Same pre-existing loose comment, fine after substitution. Now let's handle the `[REDACTED_PRIVATE_INFO]` tag, the localStorage key, and the `[REDACTED_PRIVATE_INFO]` local variable renames.
+
+
+### 2026-08-15T22:36:08.075Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-15T22:36:26.274Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rename the local JS variable names in `[REDACTED_PRIVATE_INFO]`'s drawer-injection block.
+
+
+### 2026-08-15T22:36:38.058Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's update `[REDACTED_PRIVATE_INFO]` (asset path + cache version bump).
+
+
+### 2026-08-15T22:36:49.068Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PERSON]` (loadScript call + `filesToScan` array).
+
+
+### 2026-08-15T22:37:06.296Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already renamed. Now let's check `[REDACTED_PRIVATE_INFO]` for any remaining `MidiMode`/mode-string/prose references, and confirm the `[REDACTED_PRIVATE_INFO]` mention is untouched.
+
+
+### 2026-08-15T22:37:51.205Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`docs/invariants.md` wasn't included in my `MidiMode`→`MelodyMode` sweep. Let's fix that — those references point at a still-existing object (just renamed), unlike the dead old-id references which are accurate history and should stay.
+
+
+### 2026-08-15T22:38:08.710Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already caught by the earlier `MidiMode`→`MelodyMode` sweep since `[REDACTED_SECRET]` was included in that file list. Now let's do the final comprehensive grep sweep for anything remaining.
+
+
+### 2026-08-15T22:38:36.222Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's check `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:38:50.148Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+It's a real, tracked source file — a genuine dependency, not generated/ignored. Let's fix it.
+
+
+### 2026-08-15T22:39:20.973Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`screenshots/index.html` is real tracked source (fixed); the `manifest-*.js` files are gitignored generated artifacts — no action needed there. Now let's fix `[REDACTED_PRIVATE_INFO]`, which has a genuine functional dependency on the old filename/object.
+
+
+### 2026-08-15T22:39:32.426Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`[REDACTED_PRIVATE_INFO]` correctly stays as-is (the real `midi/` bundled-songs directory, unrelated to the mode rename). Let's fix the object/file references.
+
+
+### 2026-08-15T22:40:05.155Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All clean — remaining hits are intentional historical record or unrelated. Let's mark the `[REDACTED_PRIVATE_INFO]` priority item done.
+
+
+### 2026-08-15T22:40:18.883Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full verification suite: static id checker, Node tests, `URL routing` test, then the full Playwright suites.
+
+
+### 2026-08-15T22:40:25.459Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Let's run the URL routing test and [REDACTED_SECRET] tests first, since they're the highest-signal checks for this rename.
+
+
+### 2026-08-15T22:40:29.226Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTION_FAILED_CLOSED]
+
+
+### 2026-08-15T22:40:34.357Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the notification.
+
+
+### 2026-08-15T22:40:43.410Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:40:48.306Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that.
+
+
+### 2026-08-15T22:40:53.467Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification.
+
+
+### 2026-08-15T22:41:02.245Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-15T22:41:11.018Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for the completion notification instead of continuing to poll.
+
+
+### 2026-08-15T22:41:50.886Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real leftover reference. Let's find the mode-object lookup this test depends on.
+
+
+### 2026-08-15T22:41:55.699Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`App.modeModule()` — that's the mode-registry lookup. Let's check it in `main.js`.
+
+
+### 2026-08-15T22:42:06.453Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the gap — bare unquoted object keys (`[REDACTED_SECRET]`) weren't caught by my quoted-string substitution. Let me find every occurrence of this pattern.
+
+
+### 2026-08-15T22:42:20.789Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Precise list — 11 genuine [REDACTED_SECRET] sites need fixing, distinct from the many `{midi: <pitch>, ...}` note-object properties that must stay untouched. Let's fix each.
+
+
+### 2026-08-15T22:42:40.969Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:42:58.474Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-15T22:43:14.840Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]` — 6 sites (664, 665, 849, 951, 963, 1984).
+
+
+### 2026-08-15T22:43:46.296Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the last one, `[REDACTED_PRIVATE_INFO]` at line ~1984.
+
+
+### 2026-08-15T22:44:01.756Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, already correct. Now let's do one more precise sweep specifically for bare `midi:` object keys across the whole repo.
+
+
+### 2026-08-15T22:44:07.960Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 11 mode-registry keys fixed, none left. Let's re-run the failing test plus the full [REDACTED_PRIVATE_INFO].
+
+
