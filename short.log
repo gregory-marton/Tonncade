@@ -4998,3 +4998,277 @@ Passed clean, and cell counts are flowing through ([REDACTED_PRIVATE_INFO], [RED
 Let's verify the page itself renders correctly with the new histogram, using [REDACTED_PRIVATE_INFO].
 
 
+### 2026-08-16T14:17:29.301Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No errors, 7 histograms rendered (one per mode in the [REDACTED_PRIVATE_INFO]), 32 bars total, stats text formatting correctly. Let's clean up the debug test.
+
+
+### 2026-08-16T14:17:54.516Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T14:17:57.658Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No existing tests for this page — I'll add a new self-contained block at the end of `desktop.spec.js`.
+
+
+### 2026-08-16T14:18:24.281Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Let's confirm red — revert the `[REDACTED_PRIVATE_INFO]` changes and verify these fail.
+
+
+### 2026-08-16T14:18:35.783Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Red confirmed ([REDACTED_PRIVATE_INFO]). Restoring the fix.
+
+
+### 2026-08-16T14:18:39.728Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored. [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-16T14:21:48.164Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll wait for that in the background. Let's also regenerate screenshots for the other profiles so the fixture is fully consistent, and answer the user's earlier question about the actual pannable-mode histogram numbers now that data exists.
+
+
+### 2026-08-16T14:21:57.820Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 59 pass on Mobile Chrome. Let's write a small durable script to properly report the histogram from the manifest, matching the project's own preference for versioned tools over ad-hoc greps.
+
+
+### 2026-08-16T14:22:24.927Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Only `desktop-chrome`'s manifest has been regenerated so far (the other three profiles still have their pre-`cellCount` manifests from earlier, correctly excluded rather than showing stale zeros). Desktop histogram:
+
+```
+   50-74:  ## (2)
+   75-99:  ### (3)
+  100-124: ####### (7)
+  125-149: ##### (5)
+  150-174: ########## (10)
+  175-199: ### (3)
+  200-224: ## (2)
+  225-249: ### (3)
+  250-274: ## (2)
+  275-299: ## (2)
+  300-324: # (1)
+[REDACTED_PRIVATE_INFO]
+```
+
+So against your "100–150 would be great" target: only 12/40 scenarios (30%) land in that band. Median (161) sits just above it, and there's a long tail up to 311 — plus 5/40 scenarios (12%) fall *below* 100, down to 53, which is the cramped end matching your tablet report. It's a wide spread either way, not a small miss. I didn't regenerate the Mobile/Tablet/Safari profiles yet — want me to run those too so you have the full picture, or is Desktop enough for now?
+
+
+### 2026-08-16T14:22:25.328Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> &lt;&lt;autonomous-loop-dynamic&gt;&gt;
+
+
+### 2026-08-16T14:22:33.807Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Since I'm waiting on a real answer to my last question, I'll use this cycle to commit the verified, completed work rather than guess at a response.
+
+
+### 2026-08-16T14:23:15.407Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found something important: my last batch of [REDACTED_PRIVATE_INFO] (the browser-zoom fix, the screenshot histogram feature, tests, docs) got swept into someone else's commit. Let me verify the full scope before reporting.
+
+
+### 2026-08-16T14:23:29.783Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed and worth flagging directly: commit `[REDACTED_SECRET]` ("Phase 6: Add Glider Gun synthesis (Glider-Block collision) to turing_search.js") bundles two completely unrelated units of work under one commit message that only describes one of them:
+
+1. **What the message says**: `life_helpers/turing_search.js` + `js/version.js` (the Life/Turing-search automaton work — presumably from a concurrent session running in this same repo, since I didn't touch those files).
+2. **What's silently also in there**: my entire browser-zoom fix and screenshot-histogram feature — `js/render.js`, `screenshots/index.html`, `tests/desktop.spec.js`, `tests/exploratory.spec.js`, `docs/invariants.md`, `next_steps.md` — none mentioned in the commit message at all.
+
+This looks like a concurrent process (same git identity, same working tree) ran a broad `git add`/commit while my uncommitted edits were sitting in the working tree, and swept them in. Nothing is lost — the diff is complete and correct — but the history is now mislabeled: `git log`/`git blame` on `js/render.js` or `screenshots/index.html` will point at a commit about Life automata, not the zoom fix.
+
+I'm not going to rewrite history to fix this on my own (that's exactly the kind of action that could collide badly with whatever the other session does next). Flagging it so you can decide — split it via interactive rebase yourself later, or just leave it since nothing's actually broken. Let me know if you want me to do anything about it, or if you'd rather I just move on.
+
+
+### 2026-08-16T14:26:12.350Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Sigh. I'd like you to rewrite just the message to reflect both changes please, and I'll move the other process to its own sandbox.
+
+
+### 2026-08-16T14:26:38.211Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Working tree has other uncommitted changes (from the concurrent process, plus my own untracked script) — I'll use `[REDACTED_SECRET]` so the rebase doesn't disturb them.
+
+
+### 2026-08-16T14:27:03.047Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That reword attempt hit an error mid-rebase (the message wasn't actually captured, and it's now stuck applying the second commit). Let's inspect carefully before doing anything else.
+
+
+### 2026-08-16T14:27:12.114Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is actually in the expected "stopped for reword" state — just needs the amend and continue.
+
+
+### 2026-08-16T14:27:57.014Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is just a self-referential [REDACTED_SECRET] version stamp (`js/version.js`'s `GIT_VERSION` embeds the current commit hash), which inherently conflicts whenever a rebase changes hashes. Let me check if it's auto-regenerated by a hook.
+
+
+### 2026-08-16T14:28:23.230Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That hook re-stamps with the parent's hash on every commit — it'll self-correct the moment the rebase continues. Resolving trivially and continuing.
+
+
+### 2026-08-16T14:28:28.392Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Rebase completed successfully and the autostash was reapplied cleanly. Let's verify the final state.
+
+
+### 2026-08-16T14:28:45.347Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The message rewrite succeeded and the autostash restored cleanly (only the concurrent process's own untracked files and `dev.log` remain, as before — nothing of mine or theirs was lost). One minor wrinkle: the pre-commit hook didn't re-fire during the rebase's conflict resolution, so `js/version.js`'s embedded hash is now cosmetically stale (`[REDACTED_SECRET]` instead of the current tip) — purely a display string, no functional effect, and outside what you asked me to touch, so I left it as-is rather than making another unrequested commit.
+
+
+### 2026-08-16T14:28:48.087Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Content is identical to before — [REDACTED_SECRET]
+
+
+### 2026-08-16T14:59:31.213Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> What big chunk from the future can you work on on your own for a few hours?
+
+
+### 2026-08-16T15:00:39.145Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — the replay data downloaded and is usable (real event log with the exact MIDI-connect-and-record sequence, meta shows [REDACTED_PRIVATE_INFO] — worth noting, since this app targets Chrome-only MIDI). Let me present the candidates and get your call before committing hours to one.
+
+
+### 2026-08-16T15:07:14.418Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Undo it is. Let me first check Compose — earlier work this session suggests it may already have undo — before scoping the rest.
+
+
+### 2026-08-16T15:07:21.103Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Compose already has [REDACTED_SECRET] — that part of the issue is already satisfied. Let's explore the remaining three modes (Sandbox, Blast, Life) in parallel to scope the actual new work.
+
+
+### 2026-08-16T15:08:28.950Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Three research agents launched in parallel for Sandbox, Blast, and Life. I'll wait for them to finish before designing the implementation plan.
+
+
+### 2026-08-16T15:08:35.985Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Kicked off three background research agents (Sandbox, Blast, Life) to scope [REDACTED_SECRET]'s undo feature, per your pick. I'll design and implement once they report back.
+
+
+### 2026-08-16T15:09:16.036Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Blast research is in. Waiting for [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] to finish before I design the implementation.
+
+
+### 2026-08-16T15:09:33.377Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Sandbox research is in. Still waiting on [REDACTED_PERSON].
+
+
+### 2026-08-16T15:11:51.783Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All three research reports are in. Let me design a shared `[REDACTED_PRIVATE_INFO]` factory (matching this project's established `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]` pattern) and implement per-mode. First, exact current code for each function I need to touch.
+
+
+### 2026-08-16T15:11:59.358Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's create the shared `UndoStack` factory first.
+
+
+### 2026-08-16T15:12:13.889Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire it into `index.html`'s script order and `tests/run_tests.js` (learning from the earlier `difficulty-barbell.js` load-order bug).
+
+
+### 2026-08-16T15:12:28.486Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-16T15:12:36.471Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]`:
+
+
+### 2026-08-16T15:12:48.504Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement Sandbox. First, exact current code.
+
+
+### 2026-08-16T15:13:02.218Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]` initialization, and the `[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]`/`[REDACTED_PRIVATE_INFO]` mutators.
+
+
+### 2026-08-16T15:13:21.396Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll insert the undo push at both sites with enough surrounding context to disambiguate.
+
+
+### 2026-08-16T15:13:34.225Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `placePiece`:
+
+
+### 2026-08-16T15:13:46.197Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's wire the `#[REDACTED_SECRET]` button. First let's find `[REDACTED_PRIVATE_INFO]` and where buttons get bound in [REDACTED_PERSON].
+
+
+### 2026-08-16T15:14:24.491Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire the click handler in `init()`.
+
+
+### 2026-08-16T15:14:31.283Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify [REDACTED_SECRET] works before moving on.
+
+
+### 2026-08-16T15:14:44.266Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All three Sandbox undo paths work correctly. Let's remove the debug test and move on to [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T15:14:55.130Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement Blast. First, exact current code.
+
+
+### 2026-08-16T15:15:11.161Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-16T15:15:24.234Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_PRIVATE_INFO]` and `[REDACTED_PRIVATE_INFO]`:
+
+
+### 2026-08-16T15:15:50.150Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add and wire the `[REDACTED_SECRET]` button.
+
+
+### 2026-08-16T15:16:07.287Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now wire it in `setupEvents`.
+
+
+### 2026-08-16T15:16:49.919Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Excellent — the line-clear cascade reversal works perfectly: `cascadeRestored: true` means the board state after undo matches exactly what it was before the placement that triggered the clear. Let's clean up the debug test and move to Life.
+
+
+### 2026-08-16T15:17:07.219Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Clean. Now let's implement Life. First, exact current code for `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`, `[REDACTED_SECRET]`.
+
+
