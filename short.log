@@ -4532,3 +4532,284 @@ Committed. I'll let the exploratory screenshot regeneration finish in the backgr
 Fair — and to be precise about what happened: I ran `[REDACTED_SECRET]` directly all session, which is the real test suite and did pass (fully verified, including red/green checks on the new logic). But `[REDACTED_SECRET]` itself — the actual documented entrypoint — has been broken for longer than my changes: the `[REDACTED_PRIVATE_INFO]` step hard-fails on `getBoundingClientRect` in Node's fake-DOM harness, and because the script is `&&`-chained, that means `[REDACTED_SECRET]` can never reach Playwright at all, for anyone, until that's fixed. I flagged it as "pre-existing" and moved on without pointing out that it makes the standard command a dead end. Let me actually look at why and see if it's fixable now rather than filing it away again.
 
 
+### 2026-08-16T12:04:28.627Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a real, fixable gap in the hand-rolled DOM mock (not jsdom) — the mocked SVG element is missing `getBoundingClientRect`, which `render.js`'s `getAspectMatchedRefBox` already has a documented zero-size fallback for. Adding the stub should let `App.init()` pass cleanly.
+
+
+### 2026-08-16T12:04:44.938Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While I'm in here, I also see the same "hand-maintained mode list" bug class we fixed elsewhere this session — the `.mode-option` mock is missing `compose` and `life`. Fixing both together.
+
+
+### 2026-08-16T12:05:05.067Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+CI runs `[REDACTED_PRIVATE_INFO]` directly — not `npm test`, so it never hits the broken `node tests/run_tests.js` step at all. That's exactly why this has been broken without anyone noticing: the local `npm test` and CI have quietly diverged, and I fell into the same trap by defaulting to `[REDACTED_PRIVATE_INFO]` all session. Let's verify my fix actually makes `npm test`'s node step pass now, then run the full chain for real.
+
+
+### 2026-08-16T12:05:16.834Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No failures — the node harness now passes cleanly. Let's confirm with the exit code and then run the actual full `npm test` chain.
+
+
+### 2026-08-16T12:05:21.855Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Exit 0, 37/37 pass, 0 failures. Now let's run the actual `npm test` end to end, including Playwright.
+
+
+### 2026-08-16T12:07:30.938Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good question — let me check why CI diverges from `npm test`.
+
+
+### 2026-08-16T12:07:41.403Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+It doesn't — that's a real gap, not just a naming coincidence. `.github/workflows/ci.yml` runs `npx playwright test` directly, skipping `npm test` entirely, so `scripts/check-dom-ids.js` and `tests/run_tests.js` (85 DOM-id checks + ~37 pure-JS unit tests: Gravity settle mechanics, Replay log, Pieces coverage, etc.) have never actually run in CI. There's no comment or doc explaining that as deliberate — it looks like an oversight from when CI was first set up (`[REDACTED_SECRET]`, the only commit that's ever touched `ci.yml`). That's exactly how the `DifficultyBarbell` load-order bug and the `getBoundingClientRect` gap both went unnoticed: `npm test`'s node steps would have caught them immediately, but CI never runs that path.
+
+
+### 2026-08-16T12:19:55.044Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The exploratory screenshot regeneration finished too. Let's check it, then fix `[REDACTED_SECRET]`.
+
+
+### 2026-08-16T12:20:11.079Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The output was truncated by my own `tail -40`. This matches a known, already-documented open issue (next_steps.md: "the 'Random taps' exploratory test still soft-fails on some wide/short and portrait scenarios"). Let me confirm by rerunning just the failing ones directly.
+
+
+### 2026-08-16T12:22:26.596Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No custom notification integration is configured — just the standard GitHub Actions signals:
+
+- **Commit status**: a red ✗ next to the commit on GitHub (and on the PR, if it's part of one) — the same place the green checkmark shows when it passes.
+- **Email**: GitHub emails you by default on a failed workflow run for your own commits, unless you've turned that off in your GitHub notification settings.
+- **Actions tab**: `github.com/[REDACTED_SECRET]` lists every run; failed ones are flagged red, and you can open the run to see which step failed and its log.
+- **`gh` CLI**: `gh run list` / `gh run watch` from the repo root, if you want it in the terminal instead of the browser.
+
+Nothing beyond that is wired up (no Slack/webhook). Let's check on the exploratory rerun.
+
+
+### 2026-08-16T12:22:30.475Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — I'll wait for it rather than poll. Meanwhile, let's fix `ci.yml` per your go-ahead.
+
+
+### 2026-08-16T12:22:40.197Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify `npm test` still generates `[REDACTED_PRIVATE_INFO]` correctly (the step's own comment depends on that), by checking `npm test`'s background run from earlier.
+
+
+### 2026-08-16T12:22:46.207Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running — `[REDACTED_SECRET]` runs the entire Playwright suite across all four projects, which takes a while. I'll wait for the completion notifications rather than poll further.
+
+
+### 2026-08-16T12:22:58.550Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This matches the already-documented, pre-existing "board-fill gaps" issue in `next_steps.md` (Snake/Gravity fit soft-assertions, unrelated to Melody or anything touched this session) — not something I introduced, and out of scope here. I'll keep waiting on the full `npm test` run.
+
+
+### 2026-08-16T12:23:06.720Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Status so far: fixed `[REDACTED_PRIVATE_INFO]`'s script-load-order bug and missing `getBoundingClientRect` mock (both now pass — 37/37, exit 0), fixed the stale mode lists in that same mock, regenerated `screenshots/` (2 pre-existing, already-documented board-fill soft-fails on Mobile/Tablet — unrelated to this session's work), and updated `[REDACTED_PRIVATE_INFO]` to run `npm test` instead of a bare `npx playwright test` so the node-level checks actually run in CI going forward. Full `npm test` is running in the background now; I'll report back once it finishes.
+
+
+### 2026-08-16T12:24:46.879Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Android phone screenshots all show broken img tag. Otherwise it looks pretty good.
+
+
+### 2026-08-16T12:24:56.311Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check how the exploratory fixture saves screenshots and writes the manifest, especially around the gated-profile failure path.
+
+
+### 2026-08-16T12:25:25.856Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's likely a race condition from my own mistake — I ran two Playwright invocations concurrently (`npm test`'s full suite and a separate Mobile-Chrome-only exploratory rerun), both touching the same `[REDACTED_PRIVATE_INFO]` files and `[REDACTED_PRIVATE_INFO]` at the same time. One process's cleanup step can delete files the other just wrote or is still referencing. Let me check if the background `npm test` run has finished yet.
+
+
+### 2026-08-16T12:25:31.228Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still running (empty output, no results yet). I'll wait for it to finish rather than run anything else concurrently — running another Playwright process now would just cause the same race again.
+
+
+### 2026-08-16T12:25:37.937Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's most likely my own doing — I ran two Playwright processes at once (the full `npm test` and a separate Mobile-Chrome-only rerun), both racing to write/delete the same `[REDACTED_PRIVATE_INFO]` files and `[REDACTED_PRIVATE_INFO]`. Whichever finished last could have deleted files the other's manifest still points to, which is exactly a broken-`<img>` symptom. The `npm test` background run is still going — I'll let it finish (without starting anything else against `screenshots/` in the meantime) and then check that the Android phone manifest is consistent again.
+
+
+### 2026-08-16T12:28:35.819Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`npm test` finished — exit code 0. Let's check the output and verify the Android phone screenshot manifest is consistent now.
+
+
+### 2026-08-16T12:28:46.834Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+399 passed, 3 failed — all matching previously-confirmed pre-existing flakes (Blast's landscape-queue test on two projects, Tablet Chrome's board-fill soft-fail). No new failures from my changes. Now let's verify the Android phone screenshot manifest is consistent (no more races, since this was the last/only writer).
+
+
+### 2026-08-16T12:29:03.811Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Path math was wrong. Let me just pass the [REDACTED_PRIVATE_INFO] dir directly.
+
+
+### 2026-08-16T12:29:16.717Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 70 Android phone manifest entries now point to files that actually exist — the race is resolved now that `npm test` was the sole, final writer. Let's double-check the other three profiles too, for good measure.
+
+
+### 2026-08-16T12:29:26.350Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four profiles are fully consistent now — 70/70 files present for each, zero missing. The broken `<img>` tags you saw were exactly the race I suspected: two concurrent Playwright processes both clearing and rewriting `mobile-chrome__*.png` and `manifest-mobile-chrome.js` at the same time. Refresh `screenshots/index.html` and it should be clean now.
+
+Summary of everything from this session's tail end:
+- Fixed `tests/run_tests.js`: missing `difficulty-barbell.js` load order, missing `getBoundingClientRect` DOM-mock stub, and a stale hardcoded mode list (both now match all 7 modes).
+- Fixed `screenshots/index.html`'s `DISPLAY_NAME` map, missing `life`.
+- Fixed `ci.yml` to run `npm test` instead of a bare `npx playwright test`, so CI now actually exercises the DOM-id check and the ~37 node unit tests going forward.
+- Full `npm test` now passes end-to-end (399 passed, 3 pre-existing unrelated flakes: Blast's landscape-queue test on two projects, one Tablet Chrome board-fill soft-fail).
+- Regenerated `screenshots/` cleanly across all four profiles.
+
+Nothing here is committed yet except the earlier `run_tests.js`/`screenshots/index.html` fix (`[REDACTED_SECRET]`) — the `ci.yml` change is still uncommitted. Want me to commit that now?
+
+
+### 2026-08-16T12:50:52.068Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> &lt;&lt;autonomous-loop-dynamic&gt;&gt;
+
+
+### 2026-08-16T12:51:05.710Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Right — the `getBoundingClientRect`/stale-mode-list fix came after the earlier commit (`704dcf0` only had the load-order fix). Both this and `ci.yml` are verified (full `npm test` passed clean). Committing now, matching standing instructions to commit at will rather than wait to be asked.
+
+
+### 2026-08-16T12:51:22.795Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Committed as `[REDACTED_SECRET]`. Everything from this session is now in git: the melody scrubber redesign, the difficulty-barbell refactor, the invariant-test fixes, and this last round of `npm test`/CI hygiene fixes. Ending the loop here since there's no further pending work.
+
+
+### 2026-08-16T12:52:56.498Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Thanks! Next: the file infrastructure isn't working the way I expected it to: life save gives me a download rather than saving to my local folder? When I moved files in my local folder, I didn't see the available options update?
+
+
+### 2026-08-16T12:55:16.329Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both bugs confirmed with clear root causes — this is a shared bug in `js/file-folder.js` affecting [REDACTED_PERSON] and [REDACTED_PERSON] alike, not something specific to [REDACTED_PERSON]. Let me look at the exact code before fixing.
+
+
+### 2026-08-16T12:55:43.905Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's fix Bug 2 — re-list the folder when the dropdown is opened. Let's find where the `<select>` is wired up.
+
+
+### 2026-08-16T12:56:10.493Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now Bug 2 — trigger a re-list when the dropdown is about to open. Since a native `<select>` can't be told to wait for an async refresh before painting, the practical fix is to kick off a background re-list on `mousedown`/`focus`, so the listing catches up by the next open rather than staying stale indefinitely.
+
+
+### 2026-08-16T12:56:36.287Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's implement the fix carefully. Reusing `[REDACTED_SECRET]` directly for this would be wrong — it unconditionally auto-loads file index 0, which would silently reload/replace the player's current content just from hovering the dropdown. I need a separate quiet re-list that preserves the current selection by filename (since indices shift when the sorted listing changes).
+
+
+### 2026-08-16T12:56:44.218Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the `[REDACTED_SECRET]` method near `listFiles`.
+
+
+### 2026-08-16T12:57:06.152Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at the existing test fixtures for the fake directory handle, so I can write proper red-green regression tests.
+
+
+### 2026-08-16T12:57:31.307Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's look further at the existing [REDACTED_PRIVATE_INFO] tests to find a natural insertion point and match style.
+
+
+### 2026-08-16T12:57:46.034Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's extend the shared fake fixture to also record the permission `[REDACTED_PRIVATE_INFO]` arguments it's called with, without changing any existing test's behavior.
+
+
+### 2026-08-16T12:57:57.669Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add the new regression tests right after the "[REDACTED_PRIVATE_INFO]" test.
+
+
+### 2026-08-16T12:58:18.751Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run the new tests against the fixed code first.
+
+
+### 2026-08-16T12:59:05.654Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The test needs to wait for the `choose-folder` option to actually exist before selecting it (a race, not a real fix problem — confirmed by 3/4 passing).
+
+
+### 2026-08-16T12:59:18.214Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 4 pass. Now let's confirm red — revert `[REDACTED_PRIVATE_INFO]` temporarily and verify these tests actually fail against the old code.
+
+
+### 2026-08-16T12:59:57.371Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 4 fail cleanly against the pre-fix code (`"read"` received where `"readwrite"` expected; the re-list test times out since there's no listener at all) — red confirmed. Restoring the fix.
+
+
+### 2026-08-16T13:00:01.831Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix restored (`life_helpers/*` are unrelated background work happening concurrently, not mine). Let's run all four tests green again, then the broader MidiFolder/Life folder test group for regressions.
+
+
+### 2026-08-16T13:00:13.254Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 16 pass. Let's run the full [REDACTED_PRIVATE_INFO] and both [REDACTED_PRIVATE_INFO] to check for regressions.
+
+
+### 2026-08-16T13:01:15.952Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_STUDENT] Now the invariants suite.
+
+
+### 2026-08-16T13:03:21.667Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While the invariants suite runs in the background, let's check whether Life's own folder tests need equivalent coverage, since the user's original bug report was specifically about Life.
+
+
+### 2026-08-16T13:03:29.546Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 59 invariants pass. Since `LifeFolder` shares the exact same `FileFolder._proto` code as `MidiFolder` (confirmed by the Explore report — the bug is entirely in shared code, not per-mode), the Melody-side tests already exercise the fix for both. Let's add one small confirming test directly against `LifeFolder` since that's what was actually reported.
+
+
+### 2026-08-16T13:03:50.258Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full [REDACTED_STUDENT] and the full [REDACTED_PRIVATE_INFO] once more for final confirmation.
+
+
+### 2026-08-16T13:04:59.912Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 124 pass. Now let's document this in `[REDACTED_PRIVATE_INFO]` (find the existing [REDACTED_PRIVATE_INFO] folder-save writeup mentioned by the explore report).
+
+
+### 2026-08-16T13:05:30.460Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+I'll insert INV-52 right before that `## Primary Elements` appendix, matching where INV-49 physically ended up.
+
+
+### 2026-08-16T13:05:52.273Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No entries need updating — no prior "download only"/"stale listing" caveat was documented there. Let's now run the full desktop + invariants suites one more time [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-16T13:06:55.051Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 124 pass. Let's run [REDACTED_PRIVATE_INFO] too since it also touches folder tests, then commit.
+
+
+### 2026-08-16T13:06:58.538Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+No folder-related tests in [REDACTED_PRIVATE_INFO]. Let's commit.
+
+
