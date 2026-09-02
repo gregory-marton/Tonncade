@@ -7758,3 +7758,286 @@ Now let's write a test confirming the direct picker routes non-MIDI files correc
 Let me add tests exercising the real `<input type=file>` picker end-to-end for both [REDACTED_PERSON] and [REDACTED_PERSON].
 
 
+### 2026-08-17T05:59:56.409Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Let's confirm red by reverting the routing fix in [REDACTED_SECRET] temporarily.
+
+
+### 2026-08-17T06:00:17.159Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:00:55.213Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fix #1 done. Now let's tackle finding #2: staff/labels/timeline scroll synchronization.
+
+
+### 2026-08-17T06:01:38.808Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the Compose side:
+
+
+### 2026-08-17T06:01:53.904Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:02:16.140Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check the live rendering directly — that's a more urgent signal than the scroll-sync CSS I was just working on.
+
+
+### 2026-08-17T06:02:45.519Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both render fine on desktop. Let me check mobile/narrow viewports, since that's the more likely place for a "[REDACTED_PRIVATE_INFO]" gap.
+
+
+### 2026-08-17T06:03:13.114Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — the staff renders but VexFlow's default black notation is nearly invisible against this app's dark theme. Let's check for a color override.
+
+
+### 2026-08-17T06:03:48.768Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed the API exists. Let's verify it works via a quick smoke test before wiring it into `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-17T06:04:39.698Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's write a red/green test confirming the rendered elements use the light color, not black.
+
+
+### 2026-08-17T06:04:53.812Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add a proper dedicated test right after the "empty note array" test.
+
+
+### 2026-08-17T06:05:13.837Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's clean up the [REDACTED_PRIVATE_INFO] and run this new test.
+
+
+### 2026-08-17T06:05:19.807Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now confirm red by removing the fix.
+
+
+### 2026-08-17T06:05:23.873Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me use Edit instead.
+
+
+### 2026-08-17T06:05:32.373Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:05:41.830Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Duplicate, as suspected. Let me clean it up.
+
+
+### 2026-08-17T06:06:07.203Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+You're right to push on this — full suites did run and pass, but they check structure (element counts, x-positions), not actual visual rendering, which is exactly how the black-on-black bug slipped through. Let me reproduce your [REDACTED_PRIVATE_INFO] directly rather than assume.
+
+
+### 2026-08-17T06:07:23.800Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That confirms it: at narrow/mobile widths the staff is deliberately `display:none` (an earlier, intentional decision — "rich content sized for a real panel, not a small corner HUD"). Combined with [REDACTED_PRIVATE_INFO] defaulting to Random (a sparse live window) and Compose starting empty, a plain screenshot genuinely has nothing to show. Before I build anything, let me pin down what you want:
+
+
+### 2026-08-17T06:09:55.360Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+There's already a `screenshots/` gallery infrastructure — let me look at it before building anything new.
+
+
+### 2026-08-17T06:12:24.788Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both [REDACTED_PRIVATE_INFO]. Let's check the actual screenshots visually.
+
+
+### 2026-08-17T06:12:38.720Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`MidiFolder` is actually shared by both Melody *and* Compose (per its own doc comment), and now handles `.mid`/`.musicxml`/`.mxl`, not just MIDI — so "[REDACTED_PRIVATE_INFO]" would be more wrong in a different way (implies Melody-only). Something like `SongFolder` or `ScoreFolder` would be more accurate on both counts. It's a real rename across `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `[REDACTED_PRIVATE_INFO]`, `index.html`, and tests, so let me hold off on it until I clear the Codex-flagged items still open (barline/scrub-I-beam spanning the stack, Compose MusicXML save) — I'll circle back unless you'd rather I do it now.
+
+
+### 2026-08-17T06:12:58.069Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Playful, but no — it's one `FileFolder` instance among several (Life has its own `LifeFolder`), so "Tonncade"-anything would overclaim scope. `SongFolder`/`ScoreFolder` still reads best to me. Continuing on the real bug I just found: the staff isn't refreshing after recording taps.
+
+
+### 2026-08-17T06:13:49.821Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+To clarify: `FileFolder` (in `js/file-folder.js`) is the shared *mechanism* — same factory, same remembered-folder-handle storage. But it's instantiated twice into two separate objects: `MidiFolder` (in `js/midi-folder.js`, used by [REDACTED_PERSON], handles `.mid`/`.musicxml`/`.xml`/`.mxl`) and `LifeFolder` (in `js/life.js`, handles `.yaml`/`.yml`). So the naming question was specifically about `MidiFolder`'s own name, not the shared `FileFolder` base — `LifeFolder` already names itself correctly for what it holds. Let me get back to the recording-refresh bug I just found.
+
+
+### 2026-08-17T06:14:08.934Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good pattern using real `polygon.cell` locators. Let me add a test verifying the staff updates live during recording.
+
+
+### 2026-08-17T06:14:29.018Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirm red by removing the fix.
+
+
+### 2026-08-17T06:14:40.799Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:14:56.750Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The staff shows now with 5 recorded notes, in light color, matching the labels below it. Let's clean up the scratch test files and run the full regression suites.
+
+
+### 2026-08-17T06:16:49.976Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Real regression from my scroll refactor — let me fix that first, then address the Melody seeding variety idea.
+
+
+### 2026-08-17T06:17:43.255Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Got it — I'll build that into the seeding logic once this [REDACTED_PRIVATE_INFO] is resolved. Continuing the fix now.
+
+
+### 2026-08-17T06:18:32.304Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:20:11.186Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 205 pass. Let's also run the node unit tests and check `[REDACTED_SECRET]` before committing.
+
+
+### 2026-08-17T06:21:10.879Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly staged only the picker-fix hunk. Now let's stage the rest of commit 1's files and commit.
+
+
+### 2026-08-17T06:21:36.234Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Correctly staged the scroll-sync and picker test hunks only. Let's commit [REDACTED_SECRET].
+
+
+### 2026-08-17T06:21:47.005Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now commit [REDACTED_SECRET].
+
+
+### 2026-08-17T06:22:03.872Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me enhance the [REDACTED_SECRET] per your requests (vary Random vs. a real song, and show some progress) before committing that piece.
+
+
+### 2026-08-17T06:22:30.777Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:22:59.412Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found a real bug in my seeding logic — `MidiFolder.onlineIndex` isn't ready yet when I check it (async fetch race), so it silently stays on [REDACTED_SECRET] every time. Let me fix with a proper wait.
+
+
+### 2026-08-17T06:23:09.020Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:23:24.244Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now genuine variety: real bundled songs with `userIndex` advanced (progress), and one legitimate Random scenario. Let's check the screenshots visually.
+
+
+### 2026-08-17T06:23:28.223Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is exactly the "game in progress" look the user wanted — real song ("[REDACTED_PRIVATE_INFO]"), [REDACTED_PRIVATE_INFO], "[REDACTED_PRIVATE_INFO]" status, staff and timeline both showing content. Let's clean up scratch files and finalize.
+
+
+### 2026-08-17T06:27:05.173Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Full matrix passes cleanly with the seeding logic integrated. Let's spot-check a couple of generated screenshots directly from `[REDACTED_PRIVATE_INFO]`.
+
+
+### 2026-08-17T06:27:34.955Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Real song loaded ("[REDACTED_PRIVATE_INFO]"), real progress (3/3 streak, "Correct! Go ahead..."), staff and Tonnetz highlight in sync, all in light color against dark background. This is exactly what was missing. Let's commit this.
+
+
+### 2026-08-17T06:27:53.424Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All four of the original Codex findings are now fixed and committed, plus the deeper "staff never refreshes during recording" bug and the screenshot-fixture gap. Let me tackle the two remaining items: [REDACTED_PRIVATE_INFO], and the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T06:28:08.954Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's look at Compose's `save()` function in full.
+
+
+### 2026-08-17T06:28:49.368Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's rewrite [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:29:11.556Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's update this test to expect [REDACTED_STUDENT] output instead of MIDI.
+
+
+### 2026-08-17T06:29:25.496Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the second test — check its current content since it was specifically about the quantize-tempo MIDI behavior, which no longer applies.
+
+
+### 2026-08-17T06:29:51.656Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, matches exactly. Now let's run these two tests.
+
+
+### 2026-08-17T06:29:59.149Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both pass. Let's confirm red on the first by reverting `[REDACTED_SECRET]` temporarily.
+
+
+### 2026-08-17T06:30:23.632Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both fail as expected. Restoring the fix.
+
+
+### 2026-08-17T06:32:13.902Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 205 pass. Let's run the node suite and check `[REDACTED_SECRET]`, then commit.
+
+
+### 2026-08-17T06:32:32.021Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:34:45.485Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's add `[REDACTED_PRIVATE_INFO]` and wire it, plus move the scrub-marker to the wrapper.
+
+
+### 2026-08-17T06:34:54.031Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me update this stale comment and add `renderBarlineOverlay`.
+
+
+### 2026-08-17T06:35:29.244Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now [REDACTED_SECRET]:
+
+
+### 2026-08-17T06:35:45.303Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's update `[REDACTED_PRIVATE_INFO]` to parent the marker under the wrapper instead of `#melody-note-list`.
+
+
+### 2026-08-17T06:36:16.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me finish this one function first so I don't leave it in a broken state, then set up the scheduled pause.
