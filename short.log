@@ -8041,3 +8041,672 @@ Now let's update `[REDACTED_PRIVATE_INFO]` to parent the marker under the wrappe
 ### 2026-08-17T06:36:16.742Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
 
 Let me finish this one function first so I don't leave it in a broken state, then set up the scheduled pause.
+
+
+### 2026-08-17T06:36:36.143Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, clean — no stray `listEl` reference left in `setupScrubMarker`. Now let's do the same for Compose's timeline (check if it has an analogous scrub marker — it doesn't per earlier reads, only Melody has this). Let's run tests now.
+
+
+### 2026-08-17T06:36:57.238Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PERSON] Let's run the full desktop suite before writing new tests, to confirm no other regressions from this restructuring.
+
+
+### 2026-08-17T06:38:54.150Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me add [REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:39:28.482Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Lines [REDACTED_PRIVATE_INFO] and [REDACTED_PRIVATE_INFO] are my new tests. Let me add the mode click before each.
+
+
+### 2026-08-17T06:39:44.457Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run these four new tests.
+
+
+### 2026-08-17T06:39:51.420Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO] Let's confirm red on the scrub-marker span test by temporarily reverting its parent.
+
+
+### 2026-08-17T06:40:08.972Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:40:13.334Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's run the full suite once more, check `[REDACTED_SECRET]`, then commit before pausing.
+
+
+### 2026-08-17T06:41:54.140Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 208 pass. Let's check `[REDACTED_SECRET]` and node tests, then commit.
+
+
+### 2026-08-17T06:42:08.796Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still nothing new. Let's commit the barline/scrub-marker work now.
+
+
+### 2026-08-17T06:42:39.848Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T06:42:58.198Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All six Codex-flagged issues (and the extra bugs found while fixing them) are committed. I've scheduled a wakeup in an hour to check `[REDACTED_SECRET]` for your fix and pick things back up — nothing further to do until then.
+
+
+### 2026-08-17T07:43:00.869Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Resume the Tonncade notation-review work. Check [REDACTED_PRIVATE_INFO] for genuine Codex review entries (grep -in "codex" [REDACTED_PRIVATE_INFO], excluding my own prior checkpoint greps/log lines). If Codex has posted real findings, read and address them the same way as the last round (verify each against the actual code before fixing, write red/green tests, run full node+Playwright suites, commit per coherent unit). If nothing new yet, report that plainly and check again next wakeup. All six review-fix commits from the last round are already landed (scroll-sync, picker routing, dark-theme color, Compose Save→MusicXML, recording live-refresh, barline/scrub-I-beam stack-span) — Tasks #11 and #12 are complete, no other tasks pending.
+
+
+### 2026-08-17T07:43:33.401Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still nothing new — the log hasn't grown by a single line since my last check an hour ago ([REDACTED_PRIVATE_INFO], my own closing message, is still the last line), and every hit for "codex" remains one of my own prior log entries. Repo state is unchanged and clean, exactly as I left it. No new findings to act on.
+
+
+### 2026-08-17T07:43:42.995Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still quiet — nothing new in `[REDACTED_SECRET]` since the last check. I've scheduled another check in an hour.
+
+
+### 2026-08-17T08:44:00.796Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Resume the Tonncade notation-review work. Check [REDACTED_PRIVATE_INFO] for genuine Codex review entries (grep -in "codex" [REDACTED_PRIVATE_INFO], excluding my own prior checkpoint greps/log lines — cross-check against the log's line count/tail to confirm it actually grew since last check). If Codex has posted real findings, read and address them the same way as the last round (verify each against the actual code before fixing, write red/green tests, run full node+Playwright suites, commit per coherent unit). If nothing new yet, report that plainly and check again next wakeup. All six review-fix commits are landed (scroll-sync, picker routing, dark-theme color, Compose Save→MusicXML, recording live-refresh, barline/scrub-I-beam stack-span) — Tasks #11 and #12 are complete, no other tasks pending.
+
+
+### 2026-08-17T08:44:23.172Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All growth since the last check is just my own prior checkpoint entries getting logged back — no genuine [REDACTED_SECRET] has appeared. Let's confirm repo state is still clean and unchanged.
+
+
+### 2026-08-17T08:44:31.831Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still nothing new from Codex — the log has grown only with my own automated checkpoint entries since the last two checks, no genuine review content anywhere. Repo state is unchanged, clean, and matches exactly where I left it ([REDACTED_SECRET]).
+
+
+### 2026-08-17T08:44:40.584Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Still quiet — third consecutive check with nothing new. Scheduled another check in an hour.
+
+
+### 2026-08-17T09:45:00.109Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> [1 prior /loop wakeup found nothing actionable; loop is healthy.]
+
+
+### 2026-08-17T09:45:00.325Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Resume the Tonncade notation-review work. Check [REDACTED_PRIVATE_INFO] for genuine Codex review entries (grep -in "codex" [REDACTED_PRIVATE_INFO], excluding my own prior checkpoint greps/log lines — cross-check against the log's line count/tail to confirm it actually grew with something OTHER than my own automated entries since last check). If Codex has posted real findings, read and address them the same way as the last round (verify each against the actual code before fixing, write red/green tests, run full node+Playwright suites, commit per coherent unit). If nothing new yet, report that plainly and check again next wakeup. All six review-fix commits are landed (scroll-sync, picker routing, dark-theme color, Compose Save→MusicXML, recording live-refresh, barline/scrub-I-beam stack-span) — Tasks #11 and #12 are complete, no other tasks pending. This is the fourth consecutive quiet check.
+
+
+### 2026-08-17T09:45:18.375Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — line count grew only by my own prior checkpoint's tool-call/output entries (my last message and the ScheduleWakeup call/result), nothing else appended since. Let's confirm repo state too.
+
+
+### 2026-08-17T09:45:25.024Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fourth consecutive check, still nothing genuine from Codex — repo state unchanged and clean, HEAD still at `3103c52`. Scheduling another check in an hour.
+
+
+### 2026-08-17T09:45:34.552Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fourth consecutive quiet check — still nothing genuine from Codex, repo unchanged. Scheduled another check in an hour.
+
+
+### 2026-08-17T10:46:00.440Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> [2 prior /loop wakeups found nothing actionable; loop is healthy.]
+
+
+### 2026-08-17T10:46:00.536Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Resume the Tonncade notation-review work. Check [REDACTED_PRIVATE_INFO] for genuine Codex review entries (grep -in "codex" [REDACTED_PRIVATE_INFO], excluding my own prior checkpoint greps/log lines — cross-check against the log's line count/tail to confirm it actually grew with something OTHER than my own automated entries since last check). If Codex has posted real findings, read and address them the same way as the last round (verify each against the actual code before fixing, write red/green tests, run full node+Playwright suites, commit per coherent unit). If nothing new yet, report that plainly and check again next wakeup. All six review-fix commits are landed (scroll-sync, picker routing, dark-theme color, Compose Save→MusicXML, recording live-refresh, barline/scrub-I-beam stack-span) — Tasks #11 and #12 are complete, no other tasks pending. This is the fifth consecutive quiet check — if it stays quiet, consider whether continuing to poll hourly indefinitely is still the right call versus surfacing this pattern to the user more prominently.
+
+
+### 2026-08-17T10:46:18.233Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed still nothing genuine — only my own prior automated entries. This is the [REDACTED_PRIVATE_INFO], so per the loop's own suggestion, I'll surface this more prominently rather than silently rescheduling again.
+
+
+### 2026-08-17T10:46:28.191Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Five straight hourly checks now, and `[REDACTED_SECRET]` still has no genuine Codex review content — every match is my own prior automated log lines. Repo is unchanged since the last commit (`[REDACTED_SECRET]`). At this point it's more likely the Codex integration just isn't writing to this log at all than that a check is arriving any moment, so continuing to poll hourly on autopilot doesn't seem like the right default anymore.
+
+I'll stop the automatic hourly polling here rather than keep looping quietly — let me know if you want me to resume checking (e.g. once you've confirmed Codex is actually wired up to write there), or if there's something else to work on in the meantime.
+
+
+### 2026-08-17T10:46:35.124Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Loop stopped. Five consecutive hourly checks found nothing genuine from Codex in `[REDACTED_SECRET]`, so I've paused the automatic polling rather than continue indefinitely — ping me to resume checking, or just say the word if there's other work to pick up.
+
+
+### 2026-08-17T10:54:56.212Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> [REDACTED_SECRET] Cool! That's not a bad start. I'm noticing that we have the aligned set (both staffs and the corresponding note name/octave) above the non-aligned list, and that wasn't my intent: just the aligned set is less confusing, but the color hints are right now on the lower list, not the aligned staff. They should be on the aligned staff and note/octave please. That needs a name. There is also some odd doubling going on at the beginning of the second measure. The little staff line through the C is barely visible to my old eyes, and would do well to be fully white like the note. When I start the game, I play C and it doesn't go ahead: it just plays C, never playing the D that comes after it anymore, which is a pretty serious regression. The blue scrubber is not an I through the grand staff and note name, but through the entire vertical space including instructions and dropdown and everything, and it doesn't give off the appearance of being draggable. Oh, and still as soon as I played through the first measure correctly the first time it auto-advanced, without much visible effect, so that was surprising -- auto advance should be a visible movement not an all-of-a-sudden change -- but I don't recall if that ever worked right.
+
+
+### 2026-08-17T10:54:56.212Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> [Image: source: [REDACTED_PRIVATE_INFO]]
+
+
+### 2026-08-17T10:55:39.123Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a serious regression report — let me prioritize the critical gameplay bug first (playing [RE[REDACTED_PERSON]ACTE[REDACTED_PERSON]_PERSON] never advances to [REDACTED_PERSON]), then the scrub marker spanning way too much, then the visual/design items. Let me reproduce live rather than guess.
+
+
+### 2026-08-17T10:56:12.154Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+`[REDACTED_PERSON]` did advance (0→1) after playing C correctly — that part isn't broken. Let me check what should happen next since `[REDACTED_PERSON] >= targetLength` now.
+
+
+### 2026-08-17T10:57:48.001Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me reproduce with real keyboard input (as an actual player would use), not direct function calls, and watch for errors.
+
+
+### 2026-08-17T10:59:09.808Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check exactly what determines the staff's visible note window — this may be a display-freezing issue rather than a game-logic bug.
+
+
+### 2026-08-17T11:00:03.046Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me set the [REDACTED_SECRET] investigation aside for now (my repros show it working, so this may be a pre-existing edge case, not tonight's regression) and start with the concrete visual bugs I clearly caused. First, the scrub marker spanning way too much.
+
+
+### 2026-08-17T11:00:26.723Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found it — the wrapper's `position: relative` isn't actually applying. Let me check the HTML.
+
+
+### 2026-08-17T11:00:36.352Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Found the root cause — I wrote a `.notation-scroll` CSS class (with `position: relative`) but never actually applied that class to the wrapper divs, only inline `overflow-x: auto`. Let me fix both.
+
+
+### 2026-08-17T11:00:56.502Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T11:01:04.348Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed — the marker now correctly spans exactly the wrapper's 255px, not the full 720px viewport. Let's look at the screenshot to confirm visually.
+
+
+### 2026-08-17T11:01:15.659Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good, the marker fix works. Now let's investigate the "doubling" at the start of measure 2, using the real song this time.
+
+
+### 2026-08-17T11:02:03.449Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me look at exactly what `[REDACTED_SECRET]` produces to understand the overflow.
+
+
+### 2026-08-17T11:02:36.188Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That overflow is specific to the raw `.mid` file's rest-fragmented durations. Let me check whether the same overlap happens with the bundled `.musicxml` version, which real users actually load via the dropdown now.
+
+
+### 2026-08-17T11:03:09.132Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+The issue reproduces even with clean quarter notes — measure 1 (which carries the clef/key/time-signature glyphs) is overflowing because it's formatted with the same fixed width budget as later bare measures. Let me check if VexFlow exposes the actual usable note-drawing width per stave.
+
+
+### 2026-08-17T11:03:14.816Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Both exist. Let's use the real per-stave usable width instead of the hardcoded `[REDACTED_SECRET]` constant.
+
+
+### 2026-08-17T11:03:36.694Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's verify this fixes the overlap.
+
+
+### 2026-08-17T11:03:45.139Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed — id=3 at x=178 (within measure 1) and id=4 at x=207 (well into measure 2), no more overlap. Let's write a proper test.
+
+
+### 2026-08-17T11:04:12.825Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirm red by reverting to the old fixed-width formula.
+
+
+### 2026-08-17T11:04:26.516Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T11:04:37.526Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+My earlier scrub-marker test was too weak to catch this exact bug (it only checked a lower bound). Let me strengthen it.
+
+
+### 2026-08-17T11:05:06.263Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's confirm this strengthened test now passes with the [REDACTED_STUDENT], and would have failed without it.
+
+
+### 2026-08-17T11:05:13.713Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now confirm red by reverting the class attribute.
+
+
+### 2026-08-17T11:05:31.118Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red — [REDACTED_SECRET]
+
+
+### 2026-08-17T11:05:38.438Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's investigate the [REDACTED_PRIVATE_INFO].
+
+
+### 2026-08-17T11:06:43.664Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Two more instances of the same hardcoded-color bug: ledger lines (`#444`) and note stems (`black`), neither inheriting my `NOTE_COLOR` fix. Let me check VexFlow's per-note style API.
+
+
+### 2026-08-17T11:07:08.262Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's apply the fix directly in `[REDACTED_PRIVATE_INFO]` — set explicit style on each `StaveNote`.
+
+
+### 2026-08-17T11:07:22.895Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's re-run the [REDACTED_SECRET] to confirm.
+
+
+### 2026-08-17T11:07:41.686Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Zero hardcoded dark colors remain. Let's write a red/green test for this.
+
+
+### 2026-08-17T11:08:01.181Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's add a targeted test for the ledger-line/stem specifically (using a note that requires a ledger line, like middle C).
+
+
+### 2026-08-17T11:08:17.982Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirm red by removing the setStyle calls.
+
+
+### 2026-08-17T11:08:34.708Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed red ([REDACTED_PRIVATE_INFO]). Restoring the fix.
+
+
+### 2026-08-17T11:08:46.155Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T11:10:32.736Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+All 210 pass. Let's check `[REDACTED_SECRET]` and `[REDACTED_SECRET]`, then commit these three fixes.
+
+
+### 2026-08-17T11:10:41.235Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's commit these as [REDACTED_PRIVATE_INFO] (all three are real bugs found via this live-feedback pass).
+
+
+### 2026-08-17T11:11:01.105Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's take a fresh screenshot to visually confirm all three fixes together before reporting back.
+
+
+### 2026-08-17T11:11:57.804Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Fixed and committed three real bugs, confirmed visually. Now let me report back and check in on the remaining, larger items.
+
+
+### 2026-08-17T11:12:13.028Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Three concrete bugs fixed and committed:
+
+1. **Scrub marker spanning everything** — the wrapper never actually got the `.notation-scroll` CSS class applied (I'd written the class but only used inline `overflow-x:auto`), so `position:relative` never took effect and the marker's absolute positioning escaped to the whole page. Fixed — it now stops exactly at the bottom of the stack.
+2. **Doubling at measure 2** — measure 1 was being formatted against the same fixed width budget as later measures, but its clef/key/time-signature glyphs eat into that same space, leaving less real room for notes — so its last note overflowed past the barline into measure 2's territory. Now reads each stave's own actual usable width instead of guessing a constant.
+3. **Ledger line / stem barely visible** — confirmed: VexFlow hardcodes ledger lines to `#444` and stems to `black` regardless of the render context's color, so my earlier dark-theme fix (which only covers context-inheriting elements) missed both. Now set explicitly per-note.
+
+On the "play C, it doesn't go ahead" report: I reproduced actual gameplay both via direct calls and real keyboard input, and `[REDACTED_PRIVATE_INFO]` advances correctly (C→D→E...) in both cases — the underlying logic isn't stuck. My guess is the visual bugs above (a full-page marker, overlapping noteheads) made it *look* broken even though it wasn't, and separately, the "3 clean reps before the drilled segment grows by a whole measure" mechanic is real but has zero visible indicator while it's counting — which likely explains the "sudden jump" too. Worth you retesting now that the visuals are fixed; if it's still stuck, that's a different, more specific bug I haven't found yet.
+
+Now the bigger design item — consolidating the two lists:
+
+
+### 2026-08-17T11:25:07.810Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T11:25:19.854Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> There are a few things to name: does just the combination of a note name and its octave already have a name?
+
+
+### 2026-08-17T11:25:31.533Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Yes — in music theory, "note name + octave" (like "[REDACTED_PRIVATE_INFO]" or "[REDACTED_PRIVATE_INFO]") is just called a **pitch** (as distinct from "pitch class," which is the letter alone, octave-agnostic — "C" as opposed to "[REDACTED_PRIVATE_INFO]"). The convention of writing it as letter+octave-number is **Scientific Pitch Notation** (SPN), which is exactly what this UI already does.
+
+So "pitch" is the term already sitting there unused — e.g. "pitch row" or "pitch label" for the aligned strip, rather than inventing something new.
+
+
+### 2026-08-17T11:27:35.952Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Good. Let that row by itself be the pitch row. Then what remains to name is the combination of the grand staff and the aligned pitch row below it. Let's call that the timeline?
+
+
+### 2026-08-17T11:27:50.242Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+One flag before locking this in: `#compose-timeline` already exists in Compose mode (the click/drag time-range-selection row) and is referred to as "the timeline" throughout its own comments and tests — a separate thing from what you're naming here. If Melody's staff+pitch-row also becomes "the timeline," the word means two different things depending on mode, which could trip up future reading of the code (or a future you).
+
+Want to keep "timeline" for this anyway (Compose's version is different enough in role that it's fine), or should I look for a name that doesn't collide?
+
+
+### 2026-08-17T11:28:09.088Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> In what ways are the two different?
+
+
+### 2026-08-17T11:28:29.151Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+They differ in almost every respect except "shows notes in time order":
+
+- **Purpose**: Compose's is a *selection tool for editing* — drag across it to select a time range, which flattens onto the Tonnetz for transform (central Compose workflow). Melody's staff+pitch-row is a *live performance/progress display* — it shows where you currently are in the piece as you play.
+- **Layout**: Compose's is a plain flex row, tokens sized to their own content, no relationship to a staff. Melody's pitch row is x-aligned to the staff above it (each label sits at the exact x VexFlow reported for that note) — a direct visual extension of the staff, not an independent list.
+- **State it carries**: Compose's tokens are static — just note identity. Melody's carries live practice state: past-note dimming, the next-3-notes color hints, and a scrub marker for seeking.
+- **No staff involved at all in Compose** — `[REDACTED_SECRET]` sits below `[REDACTED_PRIVATE_INFO]` in the DOM but isn't x-aligned to it or derived from it the way Melody's pitch row is.
+
+So they really are different things that happen to share a superficial "row of time-ordered notes" shape. Given that, I lean toward keeping "timeline" free for Compose's meaning and picking something else for Melody's staff+pitch-row combo — but it's a judgment call, not a strong objection.
+
+
+### 2026-08-17T11:33:47.893Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Oh. Compose's should absolutely be aligned with the staff above it, just as Melody's is. So I'm thinking of what they have in common as the timeline. I also think that a starting and ending scrubber must be part of Compose's timeline as well, because we want to visualize finite parts of songs on the Tonnetz, so it's important to be clear about where those boundaries are. I agree that the enhancements to the timeline to make playthrough practice fun are deserving of their own name, so when we're talking about what Melody and Compose have in common (grand staff, pitch row, start and end scrubbers), I'd like to refer to it as the timeline, but when we're talking about the timeline plus the coloring and other decorations for the specific mode, then in Melody it makes sense to me to call that the practice strip or something similarly specific.
+
+
+### 2026-08-17T11:34:21.497Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That reframing makes sense — let me make sure I have the shared "Timeline" scope right before planning any implementation, since this is a bigger change than it might look (Compose's current row isn't staff-aligned at all today, and has no scrubber, just click-drag token selection).
+
+
+### 2026-08-17T11:36:57.225Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This is a substantial architecture — a shared two-marker Timeline component used by both modes, plus Melody's decorated "practice strip" layer on top, plus replacing Compose's whole selection UI. Let me put together a concrete plan before touching code.
+
+
+### 2026-08-17T11:37:03.402Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Confirmed — that matches the shared-Timeline architecture I was sketching. Let me go into plan mode to work out the concrete design before touching code, since this touches both modes' state and interaction models.
+
+
+### 2026-08-17T11:38:41.848Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me check the full scope of what references the elements I'd be replacing, before finalizing the plan.
+
+
+### 2026-08-17T11:40:48.347Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's an unrelated stale plan from a different task — I'll overwrite it entirely.
+
+
+### 2026-08-17T11:57:12.794Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me draft rewrites of both, reflecting the new architecture, for us to work through together.
+
+**[REDACTED_PRIVATE_INFO]** only needs a small, surgical edit — its core reasoning (octave must be shown to disambiguate) is unchanged, just which element shows it:
+
+> ### [REDACTED_PRIVATE_INFO]: A melody note's octave is part of its identity, and the UI must say so
+>
+> Melody mode's matching (`MelodyMode.handleUserInputNote`) compares exact MIDI pitch, not just note NAME... [unchanged intro]
+>
+> Fixed at the legibility layer rather than by relaxing the match: **the pitch row** (part of the shared Timeline — see INV-52) shows an **octave-qualified pitch** (e.g. "E4", not just "E") for every note — that qualification is what resolves the "wrong E." The practice strip (Melody's decorated Timeline) additionally colors the next three notes to play in a distinct hue matching the Tonnetz's glow on the corresponding cells — that coloring is practice-strip-specific, not part of the base Timeline Compose also uses.
+
+**INV-26** is the bigger one — its *behavioral* half (startIndex tracking, seekTo, mistake-resets-to-startIndex) is melody.js game logic, completely untouched by this refactor, so that stays as-is. Its *UI mechanics* half (v2/v3 history: single marker, `#melody-note-list`, offsetLeft positioning, same-node-reuse-across-drag) is what actually changes. My instinct is to keep the v2/v3 history intact (the lessons in it — especially the touch-target-detachment one — still apply and still matter) and append a **v4** section describing the move to the shared `Timeline` component: same lessons carried forward, generalized to two markers (start *and* end, end now real and draggable too, not just implicit), shared with Compose.
+
+Does that split match what you had in mind, or do you want INV-26 restructured differently — e.g., splitting the behavioral half and the UI-mechanics half into two separate invariants now that the UI mechanics are shared infrastructure rather than Melody-specific?
+
+
+### 2026-08-17T12:03:00.478Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> No need to refer to MIDI, just "pitch". I don't think the history is useful for INV-26 and would rather trim it to the current state. Give a proposal here before editing?
+
+
+### 2026-08-17T12:03:29.304Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Here's my proposal for both, trimmed and pitch-only:
+
+---
+
+**[REDACTED_SECRET]** (small edit — swap MIDI language for "pitch," swap the element reference):
+
+> ### [REDACTED_SECRET]: A melody note's octave is part of its identity, and the UI must say so
+>
+> Melody mode's matching (`[REDACTED_PRIVATE_INFO]`) compares exact pitch, not just letter name — two different-octave "E"s are genuinely different notes to it, and that's the correct rule: a melody's octave is part of the tune, not an incidental detail a player should be free to substitute. Real report: a player found it possible to play "the wrong E" against a real keyboard — a big board (or a keyboard with several octaves of physical keys) puts more than one cell with the same bare letter name within easy reach, and the letter alone doesn't say which one is meant.
+>
+> Fixed at the legibility layer rather than by relaxing the match: the pitch row (part of the shared Timeline — INV-52) shows each note's octave-qualified pitch (e.g. "E4", not just "E") — that's what resolves the "wrong E." The practice strip (Melody's decorated Timeline) additionally colors the next three notes to play in a distinct hue matching the Tonnetz's glow on the corresponding cells; that coloring is practice-strip-specific, not part of the base Timeline Compose also uses.
+>
+> **Test:** ... *(keep existing pointers)*
+
+---
+
+**INV-26**, trimmed to current-state only, splitting out the shared mechanics into a new INV-52:
+
+> ### INV-26: Melody's drilled segment can be replayed from any note already reached, not just note 0
+>
+> `[REDACTED_PRIVATE_INFO]` tracks where the drilled segment begins, clamped to `[0, [REDACTED_PRIVATE_INFO] - 1]` — never past the notes already reached. `[REDACTED_PRIVATE_INFO]` clears any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A wrong note resets `userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an earlier stretch also becomes the new starting point for mistake-recovery within that practice pass. Scrubbing forward (within the already-reached range) skips replaying mastered notes; scrubbing back replays an earlier stretch. `seekTo` is a no-op during a full-melody preview (`isPlayingPreview`), a different, position-independent playback path.
+>
+> The end of the drilled segment (`[REDACTED_PRIVATE_INFO]`) works the same way in reverse — dragging the Timeline's end marker sets it directly, same as `seekTo` does for the start; the existing spaced-repetition auto-advance (INV-51) also moves it, and either one keeps `startIndex <= [REDACTED_PRIVATE_INFO] - 1` true.
+>
+> **Test:** ... *(existing pointers, minus the v2/v3-specific ones that no longer apply)*
+
+> ### INV-52: The Timeline component's two markers always reuse the same DOM nodes across a drag
+>
+> `js/timeline.js`'s `Timeline` component (shared by Melody's practice strip and Compose's selection UI) draws two draggable boundary markers over the aligned pitch row. Each marker is created once and only ever repositioned via `style.left` afterward — never recreated, never removed and re-added mid-drag. Found necessary the hard way (a full re-render mid-gesture detaches whatever a real `touchstart` captured as its event target, silently breaking the rest of a real touch drag) and still binding: any future change to marker rendering must preserve this, not just get it right by accident.
+>
+> Positioning uses each note's own `offsetLeft` (stable across scroll position), not `getBoundingClientRect()`. Dragging near either edge of the scroll container auto-scrolls it.
+>
+> **Test:** ...
+
+---
+
+Want any changes before I write these to the actual doc?
+
+
+### 2026-08-17T12:03:58.799Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Also letter name is properly called "chroma"? Or am I mixing that up?
+
+
+### 2026-08-17T12:04:18.599Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+They're closely related but not quite interchangeable. **[REDACTED_STUDENT]** is the standard music-theory term for "octave-invariant note identity" — C, C#, D, etc., 12 of them, and it already includes the accidental (C and C# are different pitch classes). **[REDACTED_STUDENT]** is essentially a synonym for pitch class, more common in the music-psychology/MIR literature (from Shepard's "pitch = height + chroma" model) than in ordinary music theory — same concept, different field's vocabulary.
+
+Neither term means quite what I wrote ("letter name alone") — that phrasing was imprecise on my part, since "E" without an accidental isn't really a named concept on its own (E and E♭ are different pitch classes/chroma but the same letter). Let me fix my draft: "pitch class" is the right term for what INV-25 is actually contrasting against full pitch (which adds octave). I'll use that instead of "letter name" throughout.
+
+
+### 2026-08-17T12:06:46.333Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> So 26 is a bigger change. Once the user can move the end scrubber, practice and start from any position, not just any position already reached. The game doesn't need to emphasize this, and should stick with the "already reached" idea, but the concept of reached has no reality outside of the position of the auto-advancing end marker.
+
+
+### 2026-08-17T12:07:14.054Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's an important correction — "reached" isn't a separately-tracked, protected concept at all; it's *defined as* wherever `targetLength` currently sits, however it got there. Let me revise:
+
+> ### [REDACTED_PRIVATE_INFO]: Melody's drilled segment can be replayed from any position within it, not just note 0
+>
+> `MelodyMode.state.startIndex` tracks where the drilled segment begins, clamped to `[0, targetLength - 1]`. `MelodyMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A wrong note resets `userIndex` back to `startIndex` (not always 0), so scrubbing to relisten to an earlier stretch also becomes the new starting point for mistake-recovery within that practice pass. `seekTo` is a no-op during a full-melody preview (`isPlayingPreview`), a different, position-independent playback path.
+>
+> `targetLength` — the drilled segment's *end* — has no independent notion of "already reached": it's simply wherever `targetLength` currently points, whether it got there via the existing spaced-repetition auto-advance (INV-51) or because the player dragged the Timeline's end marker there directly. Dragging the end marker sets `targetLength` outright, same as `seekTo` does for `startIndex` — there's no gate requiring the segment be "earned" first, matching this project's general stance against gating content behind proof-of-mastery (e.g. copy/paste into Blast is unrestricted too). Either path keeps `startIndex <= targetLength - 1` true.
+>
+> **Test:** ... *(existing pointers, minus the v2/v3-specific ones that no longer apply)*
+
+Does that read right, or does "no independent notion of already reached" need to land somewhere more prominent (e.g. its own short paragraph or callout) rather than folded into the targetLength paragraph?
+
+
+### 2026-08-17T12:10:00.403Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> No, more generally: [REDACTED_SECRET] Melody's drilled segment is user-selectable and tries to be helpful and fun: it starts at the left scrubber and ends at the right scrubber. They start at [0,1], the end scrubber auto-advances with correct play once (or the user can move it) and the beginning scrubber auto advances by measure with k correct plays where k is currently 3 (or the user can move it).
+
+
+### 2026-08-17T12:10:56.800Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That reframes the mechanic more cleanly than what's currently coded — let me confirm I've got it right, since this is a real behavior change, not just documentation:
+
+- Segment = `[startIndex, targetLength)`. Both boundaries are now directly user-draggable via the two Timeline markers.
+- Starts at `[0, 1)` — just note 0.
+- **End** (`targetLength`) auto-advances by one note per single correct play at the frontier — immediate, no streak required. (Today's code doesn't do this — it freezes `targetLength` until a 3-rep streak, then jumps it a whole measure alongside `startIndex`. This would decouple that.)
+- **Start** (`startIndex`) auto-advances by a whole measure once the player has cleanly played the *current* segment `k` (=3) times in a row — the existing spaced-repetition streak logic, but now *only* moving `startIndex`, since `targetLength` is already tracking ahead on its own.
+- Either boundary is also directly draggable by the player at any time, no gating.
+
+So this splits what's currently one intertwined "go-ahead" mechanic into two independent, more legible ones: end = continuous positive feedback for reaching new material, start = periodic "you've mastered this, skip past it" once proven. Is that the right read? If so, I'll fold the `handleUserInputNote`/`playTargetSequence` logic change into the plan alongside the Timeline UI work, and draft [REDACTED_SECRET] (and a new invariant for this specific auto-advance split) against that.
+
+
+### 2026-08-17T12:13:11.141Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> Your description of current end behavior matches my bug report. That's the real regression. What I described is correct. Your description of the start advance is not quite right: auto-advances by a whole measure once the player has cleanly played *that measure* k (=3) times in a row.
+
+
+### 2026-08-17T12:13:44.341Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Good — that confirms the frozen-`[REDACTED_PRIVATE_INFO]` behavior really is the "C doesn't go ahead" regression, not a false alarm from my earlier repro. And the start-streak correction (scoped to *that specific measure*, not the whole growing segment) makes sense — otherwise the mastery bar would keep getting harder as the segment grows, which defeats the point.
+
+Updated understanding, now split into two invariants:
+
+> ### [REDACTED_STUDENT]: Melody's drilled segment can be replayed from any position within it, not just note 0
+>
+> `[REDACTED_PRIVATE_INFO]` tracks where the drilled segment begins, clamped to `[0, [REDACTED_PRIVATE_INFO] - 1]`. `[REDACTED_STUDENT]` clears any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`, which schedules relative to `[REDACTED_STUDENT]` instead of always `melody[0].time`. A wrong note resets `[REDACTED_STUDENT]` back to `startIndex` (not always 0). `seekTo` is a no-op during a full-melody preview (`[REDACTED_STUDENT]`), a different, position-independent playback path.
+>
+> Both `startIndex` and `[REDACTED_PRIVATE_INFO]` are directly player-draggable via the Timeline's two markers, with no gate requiring either be "earned" first — matching this project's general stance against gating content behind proof-of-mastery. Their own auto-advance mechanics are INV-53.
+>
+> **Test:** ...
+
+> ### INV-53: The drilled segment's two ends auto-advance independently — the end continuously, the start only once a measure is mastered
+>
+> Real regression, reported live: `[REDACTED_PRIVATE_INFO]` (the segment's end) used to stay frozen after every single correct note, only jumping — a whole measure at a time — once `startIndex`'s own 3-rep streak completed. That coupling is the bug: playing a note correctly should visibly, immediately extend how far you can go, not wait on an unrelated mastery gate.
+>
+> Now decoupled: **end** (`[REDACTED_PRIVATE_INFO]`) grows by one note immediately on every correct play at the frontier — continuous, no streak required. **Start** (`startIndex`) only jumps forward, by a whole measure, once the player has cleanly played *that specific measure* (the one `startIndex` currently sits in — not the whole, possibly-longer-by-now segment up to `[REDACTED_PRIVATE_INFO]`) `k` (= 3) times in a row; a mistake resets that streak to 0. Scoping the streak to one measure rather than the whole segment keeps the mastery bar constant as the segment grows, rather than getting harder every time the end advances.
+>
+> **Test:** ...
+
+I trimmed the test pointers to placeholders since the actual test names will change with implementation — want me to leave them blank for now, or draft the intended test names too before we move to code?
+
+
+### 2026-08-17T12:14:24.787Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> I gave you a specific wording for 26. Please use it?
+
+
+### 2026-08-17T12:14:42.238Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+You're right, sorry — let me use it directly:
+
+> ### INV-26: Melody's drilled segment is user-selectable and tries to be helpful and fun
+>
+> The drilled segment starts at the left (start) scrubber and ends at the right (end) scrubber. They start at `[0, 1)` (`[REDACTED_PRIVATE_INFO]`, `state.targetLength = 1`). The end scrubber auto-advances with correct play, once per correct play (or the user can move it directly). The beginning scrubber auto-advances by a measure once the player has cleanly played that measure `k` correct plays in a row, where `k` is currently 3 (or the user can move it directly).
+>
+> `MelodyMode.seekTo(index)` clears any pending mistake/going-ahead timers, sets `startIndex`, and calls `playTargetSequence()`, which schedules relative to `melody[startIndex].time` instead of always `melody[0].time`. A wrong note resets `userIndex` back to `startIndex`, not always 0. `seekTo` is a no-op during a full-melody preview (`isPlayingPreview`), a different, position-independent playback path. Dragging either scrubber directly is ungated — no proof-of-mastery required, matching this project's general stance (e.g. copy/paste into Blast is unrestricted too).
+>
+> **Test:** ...
+
+Does that match, or is there more to trim/adjust?
+
+
+### 2026-08-17T12:16:04.006Z | claude (sonnet) | user | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+> The last nit to pick here is the naming of startIndex and targetLength. Can we simply use the timeline's start and end markers?
+
+
+### 2026-08-17T12:16:27.159Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+That's a good rename to make — `[REDACTED_SECRET]` in particular reads as an implementation detail (a count), not a marker position. One real design question before I commit to it though: `[REDACTED_SECRET]` today is an *exclusive* bound (`melody.slice(startIndex, [REDACTED_SECRET])`, `userIndex >= [REDACTED_SECRET]` checks) — the segment is `[startIndex, [REDACTED_SECRET])`. The end *marker* visually sits on a specific note (same as the start marker), which is inherently an *inclusive* position.
+
+
+### 2026-08-17T12:17:28.428Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_PRIVATE_INFO]
+
+
+### 2026-08-17T12:20:35.108Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's view `handleUserInputNote` in full with current line numbers.
+
+
+### 2026-08-17T12:21:56.716Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's make all these edits. First the state defaults block.
+
+
+### 2026-08-17T12:22:17.623Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]` and `[REDACTED_SECRET]`:
+
+
+### 2026-08-17T12:22:37.092Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now `[REDACTED_SECRET]` and `[REDACTED_SECRET]`:
+
+
+### 2026-08-17T12:22:45.161Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now the main `handleUserInputNote` rewrite:
+
+
+### 2026-08-17T12:23:13.510Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check for remaining `targetLength` references I might have missed.
+
+
+### 2026-08-17T12:23:39.884Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's see what's currently broken from this [REDACTED_SECRET] before touching [REDACTED_SECRET].
+
+
+### 2026-08-17T12:25:46.926Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+While that runs, let's find every test referencing `[REDACTED_STUDENT]` directly.
+
+
+### 2026-08-17T12:26:14.985Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let me finish [REDACTED_STUDENT] by validating the state-logic tests (not the DOM-marker ones, which get rewritten wholesale in Task #15). First, the "scrub control clamps" test.
+
+
+### 2026-08-17T12:26:31.424Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Now let's look at the "3 clean playthroughs" test — this one tests the OLD coupled behavior, which is exactly what I'm replacing. Let me view it fully.
+
+
+### 2026-08-17T12:27:37.517Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's run these two rewritten tests now.
+
+
+### 2026-08-17T12:27:51.856Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+Let's check that adjacent test/comment about "grows too easily," since my change might interact with it.
+
+
+### 2026-08-17T12:28:08.956Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+This test directly asserts the OLD (buggy) frozen behavior — let me replace it with the opposite assertion, which is the actual regression-fix test.
+
+
+### 2026-08-17T12:28:36.904Z | claude (claude-sonnet-5) | claude | conversation 627637ca-d250-4ad7-8a24-ddd841e171dd
+
+[REDACTED_SECRET]
